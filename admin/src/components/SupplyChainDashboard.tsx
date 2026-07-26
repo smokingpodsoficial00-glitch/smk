@@ -400,7 +400,8 @@ export function SupplyChainDashboard() {
                   onChange={(e) => setBrand(e.target.value)}
                   placeholder="Ex: Ignite, Zomo, Nikbar"
                   required
-                  className="bg-elevated/70 border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary"
+                  style={{ backgroundColor: '#18181b' }}
+                  className="bg-[#18181b] border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary [color-scheme:dark]"
                 />
               </div>
 
@@ -412,7 +413,8 @@ export function SupplyChainDashboard() {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ex: V50, BC5000"
                   required
-                  className="bg-elevated/70 border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary"
+                  style={{ backgroundColor: '#18181b' }}
+                  className="bg-[#18181b] border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary [color-scheme:dark]"
                 />
               </div>
 
@@ -424,7 +426,8 @@ export function SupplyChainDashboard() {
                   onChange={(e) => setFlavor(e.target.value)}
                   placeholder="Ex: Watermelon Ice"
                   required
-                  className="bg-elevated/70 border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary"
+                  style={{ backgroundColor: '#18181b' }}
+                  className="bg-[#18181b] border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary [color-scheme:dark]"
                 />
               </div>
 
@@ -435,7 +438,8 @@ export function SupplyChainDashboard() {
                   value={puffs} 
                   onChange={(e) => setPuffs(e.target.value)}
                   placeholder="5000"
-                  className="bg-elevated/70 border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary"
+                  style={{ backgroundColor: '#18181b' }}
+                  className="bg-[#18181b] border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary [color-scheme:dark]"
                 />
               </div>
 
@@ -448,7 +452,8 @@ export function SupplyChainDashboard() {
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder="90.00"
                   required
-                  className="bg-elevated/70 border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-400 focus:bg-elevated/90 font-mono"
+                  style={{ backgroundColor: '#18181b' }}
+                  className="bg-[#18181b] border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-400 font-mono [color-scheme:dark]"
                 />
               </div>
 
@@ -461,7 +466,8 @@ export function SupplyChainDashboard() {
                   onChange={(e) => setCostPrice(e.target.value)}
                   placeholder="35.00"
                   required
-                  className="bg-elevated/70 border border-border rounded-xl px-3 py-2 text-sm text-emerald-400 placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-400 focus:bg-elevated/90 font-mono"
+                  style={{ backgroundColor: '#18181b', color: '#34d399' }}
+                  className="bg-[#18181b] border border-border rounded-xl px-3 py-2 text-sm text-emerald-400 placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-400 font-mono [color-scheme:dark]"
                 />
               </div>
 
@@ -472,7 +478,8 @@ export function SupplyChainDashboard() {
                   value={stock} 
                   onChange={(e) => setStock(e.target.value)}
                   placeholder="0"
-                  className="bg-elevated/70 border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary"
+                  style={{ backgroundColor: '#18181b' }}
+                  className="bg-[#18181b] border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary [color-scheme:dark]"
                 />
               </div>
 
