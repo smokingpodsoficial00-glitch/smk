@@ -175,20 +175,33 @@ export function SupplyChainDashboard() {
         imageUrl = await uploadProductImage(imageFile);
       }
 
-      const { data, error } = await supabase
+      let insertPayload: any = {
+        name: name.trim(),
+        brand,
+        flavor: flavor.trim(),
+        price: parseFloat(price),
+        cost_price: parseFloat(costPrice) || 35.00,
+        stock: parseInt(stock) || 0,
+        puffs: parseInt(puffs) || 5000,
+        image_url: imageUrl,
+        is_active: true,
+      };
+
+      let { data, error } = await supabase
         .from("smoking_products")
-        .insert({
-          name: name.trim(),
-          brand,
-          flavor: flavor.trim(),
-          price: parseFloat(price),
-          cost_price: parseFloat(costPrice) || 35.00,
-          stock: parseInt(stock) || 0,
-          puffs: parseInt(puffs) || 5000,
-          image_url: imageUrl,
-          is_active: true,
-        })
+        .insert(insertPayload)
         .select();
+
+      // Se a coluna cost_price ainda não tiver sido adicionada no Supabase SQL, tenta salvar sem a coluna para nunca travar o usuário
+      if (error && (error.message?.includes("cost_price") || error.code === "PGRST204")) {
+        delete insertPayload.cost_price;
+        const fallbackRes = await supabase
+          .from("smoking_products")
+          .insert(insertPayload)
+          .select();
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+      }
 
       if (!error && data && data.length > 0) {
         setName("");
