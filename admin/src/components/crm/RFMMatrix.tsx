@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Star, AlertTriangle, TrendingUp, UserCheck, Crown, ShieldAlert, Phone, Loader2, MessageSquare, ExternalLink } from "lucide-react";
+import { Star, TrendingUp, UserCheck, Crown, ShieldAlert, Phone, Loader2, MessageSquare } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { fetchLiveClients, RealClient } from "@/lib/crm";
 import { supabase } from "@/lib/supabase";
@@ -10,9 +10,15 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
   const [filterSegment, setFilterSegment] = useState<string>('all');
 
   const loadClients = async () => {
-    const live = await fetchLiveClients();
-    setClients(live);
-    setLoading(false);
+    try {
+      const live = await fetchLiveClients();
+      setClients(Array.isArray(live) ? live : []);
+    } catch (err) {
+      console.error("Erro no loadClients:", err);
+      setClients([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -37,13 +43,13 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
     );
   }
 
-  const champions = clients.filter(c => c.segment === 'champion');
-  const loyals = clients.filter(c => c.segment === 'loyal');
-  const atRisk = clients.filter(c => c.segment === 'at_risk');
+  const champions = clients.filter(c => c && c.segment === 'champion');
+  const loyals = clients.filter(c => c && c.segment === 'loyal');
+  const atRisk = clients.filter(c => c && c.segment === 'at_risk');
 
   const filteredClients = filterSegment === 'all' 
     ? clients 
-    : clients.filter(c => c.segment === filterSegment);
+    : clients.filter(c => c && c.segment === filterSegment);
 
   return (
     <div className="flex flex-col gap-6">
@@ -131,26 +137,27 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredClients.map(client => {
-                  const phoneClean = client.phone.replace(/\D/g, '');
-                  const waUrl = `https://wa.me/${phoneClean}?text=${encodeURIComponent(`Olá ${client.name}, tudo bem? Aqui é da Smoking Pods!`)}`;
+                  if (!client) return null;
+                  const phoneClean = (client.phone || '').replace(/\D/g, '');
+                  const waUrl = `https://wa.me/${phoneClean}?text=${encodeURIComponent(`Olá ${client.name || 'Cliente'}, tudo bem? Aqui é da Smoking Pods!`)}`;
 
                   return (
                     <tr 
-                      key={client.id} 
+                      key={client.id || phoneClean} 
                       className="hover:bg-white/5 transition-colors cursor-pointer group"
                     >
                       <td className="px-6 py-4" onClick={() => onSelectClient(client)}>
                         <div className="flex items-center gap-3">
                           <div className="size-9 rounded-full bg-elevated flex items-center justify-center font-bold text-silver border border-white/10 group-hover:border-primary/50 transition-colors">
-                            {client.name.charAt(0).toUpperCase()}
+                            {(client.name || 'C').charAt(0).toUpperCase()}
                           </div>
                           <div>
                             <div className="font-semibold text-white group-hover:text-primary transition-colors">
-                              {client.name}
+                              {client.name || 'Cliente'}
                             </div>
                             <div className="text-xs text-muted-foreground font-mono flex items-center gap-1 mt-0.5">
                               <Phone className="size-3 text-muted-foreground/60" />
-                              {client.phone}
+                              {client.phone || 'Sem telefone'}
                             </div>
                           </div>
                         </div>
@@ -174,23 +181,23 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
                         )}
                         {client.segment === 'at_risk' && (
                           <span className="bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 w-fit">
-                            <AlertTriangle className="size-3.5" /> Em Risco
+                            <ShieldAlert className="size-3.5" /> Em Risco
                           </span>
                         )}
                       </td>
 
                       <td className="px-6 py-4 font-mono font-bold text-emerald-400" onClick={() => onSelectClient(client)}>
-                        {formatBRL(client.spent)}
+                        {formatBRL(client.spent || 0)}
                       </td>
 
                       <td className="px-6 py-4 font-mono text-silver" onClick={() => onSelectClient(client)}>
-                        {client.ordersCount} {client.ordersCount === 1 ? 'pedido' : 'pedidos'}
+                        {client.ordersCount || 1} {client.ordersCount === 1 ? 'pedido' : 'pedidos'}
                       </td>
 
                       <td className="px-6 py-4 text-xs text-muted-foreground" onClick={() => onSelectClient(client)}>
-                        <div>{client.lastOrderDate}</div>
+                        <div>{client.lastOrderDate || 'Hoje'}</div>
                         <div className="text-[11px] text-muted-foreground/60 mt-0.5">
-                          {client.daysSinceLastOrder === 0 ? 'Hoje' : `há ${client.daysSinceLastOrder} dias`}
+                          {client.daysSinceLastOrder === 0 ? 'Hoje' : `há ${client.daysSinceLastOrder || 0} dias`}
                         </div>
                       </td>
 

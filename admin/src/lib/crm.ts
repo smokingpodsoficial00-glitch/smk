@@ -20,10 +20,14 @@ export interface RealClient {
 export async function fetchLiveClients(): Promise<RealClient[]> {
   try {
     // 1. Buscar todos os pedidos do Supabase
-    const { data: orders } = await supabase
+    const { data: orders, error: ordersErr } = await supabase
       .from('smoking_orders')
       .select('*')
       .order('created_at', { ascending: false });
+
+    if (ordersErr) {
+      console.error("Erro ao buscar smoking_orders:", ordersErr);
+    }
 
     // 2. Buscar cadastro de clientes (se houver)
     const { data: customers } = await supabase
@@ -31,13 +35,16 @@ export async function fetchLiveClients(): Promise<RealClient[]> {
       .select('*');
 
     const customerMap = new Map<string, any>();
-    if (customers) {
+    if (customers && Array.isArray(customers)) {
       for (const c of customers) {
-        if (c.phone) customerMap.set(c.phone.replace(/\D/g, ''), c);
+        if (c && c.phone) {
+          const clean = String(c.phone).replace(/\D/g, '');
+          if (clean) customerMap.set(clean, c);
+        }
       }
     }
 
-    if (!orders || orders.length === 0) {
+    if (!orders || !Array.isArray(orders) || orders.length === 0) {
       return [];
     }
 
@@ -45,8 +52,9 @@ export async function fetchLiveClients(): Promise<RealClient[]> {
     const clientGroups = new Map<string, any[]>();
 
     for (const order of orders) {
-      const phoneRaw = order.client_phone || order.customer_phone || 'Sem Telefone';
-      const phoneClean = phoneRaw.replace(/\D/g, '') || phoneRaw;
+      if (!order) continue;
+      const phoneRaw = String(order.client_phone || order.customer_phone || order.phone || '5511999999999');
+      const phoneClean = phoneRaw.replace(/\D/g, '') || '5511999999999';
 
       if (!clientGroups.has(phoneClean)) {
         clientGroups.set(phoneClean, []);
@@ -58,36 +66,41 @@ export async function fetchLiveClients(): Promise<RealClient[]> {
     const now = new Date().getTime();
 
     for (const [phone, clientOrders] of clientGroups.entries()) {
-      // Ordenar por data (mais recente primeiro)
-      clientOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      if (!clientOrders || clientOrders.length === 0) continue;
 
-      const latestOrder = clientOrders[0];
+      // Ordenar por data (mais recente primeiro)
+      clientOrders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+
+      const latestOrder = clientOrders[0] || {};
       const registeredCustomer = customerMap.get(phone);
 
       const name = registeredCustomer?.name || latestOrder.client_name || latestOrder.customer_name || `Cliente ${phone.slice(-4)}`;
       const address = registeredCustomer?.address || latestOrder.shipping_address || latestOrder.delivery_address || 'Endereço não informado';
-      const rawPhone = latestOrder.client_phone || latestOrder.customer_phone || phone;
+      const rawPhone = latestOrder.client_phone || latestOrder.customer_phone || phone || '5511999999999';
 
       // Calcular Gasto Total (LTV)
       const validOrders = clientOrders.filter(o => 
-        o.payment_status === 'PAGO' || 
-        ['PREPARANDO', 'EM_ROTA', 'ENTREGUE', 'CONCLUIDO'].includes(o.delivery_status)
+        o && (
+          o.payment_status === 'PAGO' || 
+          ['PREPARANDO', 'EM_ROTA', 'ENTREGUE', 'CONCLUIDO'].includes(o.delivery_status)
+        )
       );
 
       const spent = validOrders.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
       const ordersCount = validOrders.length > 0 ? validOrders.length : clientOrders.length;
 
-      const lastOrderTimestamp = new Date(latestOrder.created_at).getTime();
+      const lastOrderDateStr = latestOrder.created_at ? new Date(latestOrder.created_at).toLocaleDateString('pt-BR') : 'Hoje';
+      const lastOrderTimestamp = latestOrder.created_at ? new Date(latestOrder.created_at).getTime() : now;
       const daysSinceLastOrder = Math.max(0, Math.floor((now - lastOrderTimestamp) / (1000 * 60 * 60 * 24)));
 
       // Extrair último pod comprado
-      const firstItem = Array.isArray(latestOrder.items) && latestOrder.items.length > 0 ? latestOrder.items[0] : null;
+      const itemsList = Array.isArray(latestOrder.items) ? latestOrder.items : [];
+      const firstItem = itemsList.length > 0 ? itemsList[0] : null;
       const lastProduct = firstItem ? `${firstItem.name || 'Pod'} ${firstItem.flavor || ''}` : 'Vape Descartável';
       const lastFlavor = firstItem?.flavor || 'Frutado';
       const lastPuffs = firstItem?.puffs || 5000;
 
       // Estimar ciclo de secagem do vape (Puffs / consumo médio)
-      // 5.000 puffs = ~20 dias | 10.000 puffs = ~35 dias
       const expectedCycleDays = lastPuffs >= 10000 ? 35 : lastPuffs >= 8000 ? 25 : 20;
 
       // Calcular Segmento RFM
@@ -104,15 +117,15 @@ export async function fetchLiveClients(): Promise<RealClient[]> {
 
       result.push({
         id: phone,
-        phone: rawPhone,
-        name,
-        address,
-        spent,
-        ordersCount,
-        lastOrderDate: new Date(latestOrder.created_at).toLocaleDateString('pt-BR'),
-        daysSinceLastOrder,
-        lastProduct,
-        lastFlavor,
+        phone: String(rawPhone),
+        name: String(name),
+        address: String(address),
+        spent: isNaN(spent) ? 0 : spent,
+        ordersCount: isNaN(ordersCount) ? 1 : ordersCount,
+        lastOrderDate: lastOrderDateStr,
+        daysSinceLastOrder: isNaN(daysSinceLastOrder) ? 0 : daysSinceLastOrder,
+        lastProduct: String(lastProduct),
+        lastFlavor: String(lastFlavor),
         lastPuffs,
         expectedCycleDays,
         segment,
