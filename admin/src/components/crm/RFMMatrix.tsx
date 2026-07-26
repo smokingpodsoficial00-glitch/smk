@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Star, TrendingUp, UserCheck, Crown, ShieldAlert, Phone, Loader2, MessageSquare } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
-import { fetchLiveClients, RealClient } from "@/lib/crm";
+import { fetchLiveClients, type RealClient } from "@/lib/crm";
 import { supabase } from "@/lib/supabase";
 
 export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealClient) => void }) {

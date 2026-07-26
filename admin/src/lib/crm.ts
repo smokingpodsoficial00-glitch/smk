@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 
-export interface RealClient {
+export type RealClient = {
   id: string;
   phone: string;
   name: string;
@@ -15,7 +15,10 @@ export interface RealClient {
   expectedCycleDays: number;
   segment: 'champion' | 'loyal' | 'new' | 'at_risk';
   orders: any[];
-}
+};
+
+// Exportacao de tempo de execucao para evitar qualquer erro no Vite
+export const RealClient = {};
 
 export async function fetchLiveClients(): Promise<RealClient[]> {
   try {

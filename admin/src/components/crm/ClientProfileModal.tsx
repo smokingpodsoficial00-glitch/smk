@@ -1,6 +1,6 @@
 import { X, MessageSquare, ShoppingBag, MapPin, Phone, Crown, Calendar, PackageCheck, AlertTriangle } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
-import { RealClient } from "@/lib/crm";
+import type { RealClient } from "@/lib/crm";
 
 export function ClientProfileModal({ client, onClose }: { client: RealClient, onClose: () => void }) {
   const phoneClean = client.phone.replace(/\D/g, '');

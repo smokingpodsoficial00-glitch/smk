@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Bot, Clock, MessageSquare, Send, Loader2, RefreshCw } from "lucide-react";
-import { fetchLiveClients, RealClient } from "@/lib/crm";
+import { fetchLiveClients, type RealClient } from "@/lib/crm";
 import { supabase } from "@/lib/supabase";
 
 export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (client: RealClient) => void }) {

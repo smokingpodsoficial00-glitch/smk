@@ -1,6 +1,6 @@
 import React, { Component, ReactNode, useState } from "react";
 import { Users, Bot, Target, Zap, Activity, AlertTriangle, RefreshCw } from "lucide-react";
-import { RealClient } from "@/lib/crm";
+import type { RealClient } from "@/lib/crm";
 
 // Componentes do CRM
 import { RFMMatrix } from "./crm/RFMMatrix";
