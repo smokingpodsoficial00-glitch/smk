@@ -83,6 +83,11 @@ export function KanbanBoard() {
   useEffect(() => {
     fetchOrders();
 
+    // Polling de 3 em 3 segundos para manter sincronizado entre usuários
+    const intervalId = setInterval(() => {
+      fetchOrders();
+    }, 3000);
+
     // Inscrição Realtime no canal do Supabase
     const subscription = supabase
       .channel('smoking_orders_changes')
@@ -92,6 +97,7 @@ export function KanbanBoard() {
       .subscribe();
 
     return () => {
+      clearInterval(intervalId);
       supabase.removeChannel(subscription);
     };
   }, []);

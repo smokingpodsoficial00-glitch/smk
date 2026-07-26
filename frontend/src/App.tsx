@@ -34,6 +34,11 @@ function Menu() {
   useEffect(() => {
     loadProducts();
 
+    // Polling de 3 em 3 segundos para manter sincronizado (sem F5)
+    const intervalId = setInterval(() => {
+      loadProducts();
+    }, 3000);
+
     // Inscrição em tempo real para atualizações de estoque no Supabase
     const subscription = supabase
       .channel("public:smoking_products")
@@ -43,6 +48,7 @@ function Menu() {
       .subscribe();
 
     return () => {
+      clearInterval(intervalId);
       supabase.removeChannel(subscription);
     };
   }, []);

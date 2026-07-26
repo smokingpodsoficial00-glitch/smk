@@ -149,6 +149,15 @@ export function SupplyChainDashboard() {
 
   useEffect(() => {
     fetchData();
+    
+    // Polling de 3 em 3 segundos para manter sincronizado
+    const intervalId = setInterval(() => {
+      fetchData();
+    }, 3000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
   }, []);
 
   const handleAddProduct = async (e: React.FormEvent) => {
