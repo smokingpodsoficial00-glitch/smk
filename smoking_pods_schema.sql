@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS public.smoking_products (
     puffs INTEGER DEFAULT 5000,  -- Quantidade de puxadas
     flavor TEXT NOT NULL,        -- Ex: Watermelon Ice, Blue Razz Ice
     price DECIMAL(10,2) NOT NULL, -- Preço de venda em BRL (Ex: 90.00)
+    cost_price DECIMAL(10,2) DEFAULT 35.00, -- Custo estimado de compra/reposição em BRL (Ex: 35.00)
     stock INTEGER DEFAULT 0,     -- Quantidade em estoque
     image_url TEXT,              -- URL da imagem do produto
     is_active BOOLEAN DEFAULT true, -- Ativo no cardápio
