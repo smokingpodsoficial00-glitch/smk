@@ -350,19 +350,19 @@ export function KanbanBoard() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Pesquisar pedido por ID, cliente, sabor, modelo ou endereço..."
-                className="w-full bg-elevated/70 border border-border rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 transition-all"
+                className="w-full bg-[#0f0f0f] border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-emerald-500/50 transition-all shadow-inner"
               />
             </div>
 
             {/* Filtros Dropdown */}
             <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
               {/* Filtro Período */}
-              <div className="flex items-center gap-1.5 bg-elevated border border-border rounded-xl px-2.5 py-1.5 text-xs text-silver">
+              <div className="flex items-center gap-1.5 bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-silver">
                 <Clock className="size-3.5 text-muted-foreground" />
                 <select
                   value={timeFilter}
                   onChange={(e) => setTimeFilter(e.target.value)}
-                  className="bg-transparent text-xs text-silver focus:outline-none cursor-pointer"
+                  className="bg-[#0f0f0f] text-xs text-silver focus:outline-none cursor-pointer"
                 >
                   <option value="24H" className="bg-[#121212]">Últimas 24h</option>
                   <option value="HOJE" className="bg-[#121212]">Hoje</option>
@@ -373,12 +373,12 @@ export function KanbanBoard() {
               </div>
 
               {/* Filtro Pagamento */}
-              <div className="flex items-center gap-1.5 bg-elevated border border-border rounded-xl px-2.5 py-1.5 text-xs text-silver">
+              <div className="flex items-center gap-1.5 bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-silver">
                 <Filter className="size-3.5 text-muted-foreground" />
                 <select
                   value={paymentFilter}
                   onChange={(e) => setPaymentFilter(e.target.value)}
-                  className="bg-transparent text-xs text-silver focus:outline-none cursor-pointer"
+                  className="bg-[#0f0f0f] text-xs text-silver focus:outline-none cursor-pointer"
                 >
                   <option value="TODOS" className="bg-[#121212]">Todos Pagamentos</option>
                   <option value="PIX" className="bg-[#121212]">PIX</option>
