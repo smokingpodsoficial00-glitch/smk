@@ -1,0 +1,62 @@
+2026/07/06-19:54:32.496 43c4 Reusing MANIFEST D:\projetosss\smoking-pods\backend\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/07/06-19:54:32.498 43c4 Recovering log #3564
+2026/07/06-19:54:32.553 43c4 Reusing old log D:\projetosss\smoking-pods\backend\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/003564.log 
+2026/07/06-19:54:36.413 43c4 Level-0 table #3599: started
+2026/07/06-19:54:36.602 43c4 Level-0 table #3599: 1262926 bytes OK
+2026/07/06-19:54:36.651 43c4 Delete type=0 #3564
+2026/07/06-19:54:36.791 43c4 Compacting 1@0 + 0@1 files
+2026/07/06-19:54:36.955 43c4 Generated table #3600@0: 15743 keys, 281006 bytes
+2026/07/06-19:54:37.078 43c4 Generated table #3601@0: 2715 keys, 217205 bytes
+2026/07/06-19:54:37.199 43c4 Generated table #3602@0: 231 keys, 11068 bytes
+2026/07/06-19:54:37.200 43c4 Compacted 1@0 + 0@1 files => 509279 bytes
+2026/07/06-19:54:37.251 43c4 compacted to: files[ 0 3 31 0 0 0 0 ]
+2026/07/06-19:54:37.251 43c4 Delete type=2 #3599
+2026/07/06-19:54:37.277 43c4 Compacting 1@1 + 10@2 files
+2026/07/06-19:54:37.709 43c4 Generated table #3603@1: 2645 keys, 2143447 bytes
+2026/07/06-19:54:38.092 43c4 Generated table #3604@1: 16244 keys, 2177614 bytes
+2026/07/06-19:54:38.723 43c4 Generated table #3605@1: 29989 keys, 2271578 bytes
+2026/07/06-19:54:39.098 43c4 Generated table #3606@1: 27698 keys, 2240382 bytes
+2026/07/06-19:54:39.614 43c4 Generated table #3607@1: 45568 keys, 2236898 bytes
+2026/07/06-19:54:40.074 43c4 Generated table #3608@1: 30001 keys, 2225337 bytes
+2026/07/06-19:54:40.298 43c4 Generated table #3609@1: 6614 keys, 2124896 bytes
+2026/07/06-19:54:40.488 43c4 Generated table #3610@1: 984 keys, 2117401 bytes
+2026/07/06-19:54:40.722 43c4 Generated table #3611@1: 10314 keys, 2133901 bytes
+2026/07/06-19:54:40.898 43c4 Generated table #3612@1: 5559 keys, 2107397 bytes
+2026/07/06-19:54:40.898 43c4 Compacted 1@1 + 10@2 files => 21778851 bytes
+2026/07/06-19:54:40.962 43c4 compacted to: files[ 0 2 31 0 0 0 0 ]
+2026/07/06-19:54:40.964 43c4 Delete type=2 #3517
+2026/07/06-19:54:40.964 43c4 Delete type=2 #3569
+2026/07/06-19:54:40.964 43c4 Delete type=2 #3570
+2026/07/06-19:54:40.965 43c4 Delete type=2 #3571
+2026/07/06-19:54:40.965 43c4 Delete type=2 #3572
+2026/07/06-19:54:40.966 43c4 Delete type=2 #3573
+2026/07/06-19:54:40.966 43c4 Delete type=2 #3574
+2026/07/06-19:54:40.966 43c4 Delete type=2 #3575
+2026/07/06-19:54:40.966 43c4 Delete type=2 #3576
+2026/07/06-19:54:40.966 43c4 Delete type=2 #3577
+2026/07/06-19:54:40.966 43c4 Delete type=2 #3601
+2026/07/06-19:54:42.688 43ec Compacting 1@1 + 10@2 files
+2026/07/06-19:54:42.906 43ec Generated table #3613@1: 85541 keys, 2236765 bytes
+2026/07/06-19:54:43.129 43ec Generated table #3614@1: 97796 keys, 2250950 bytes
+2026/07/06-19:54:43.381 43ec Generated table #3615@1: 88547 keys, 2379420 bytes
+2026/07/06-19:54:43.548 43ec Generated table #3616@1: 39893 keys, 2197926 bytes
+2026/07/06-19:54:43.729 43ec Generated table #3617@1: 53860 keys, 2223286 bytes
+2026/07/06-19:54:43.884 43ec Generated table #3618@1: 14931 keys, 2162820 bytes
+2026/07/06-19:54:43.995 43ec Generated table #3619@1: 1198 keys, 2135779 bytes
+2026/07/06-19:54:44.141 43ec Generated table #3620@1: 1059 keys, 2130955 bytes
+2026/07/06-19:54:44.320 43ec Generated table #3621@1: 407 keys, 2122352 bytes
+2026/07/06-19:54:44.499 43ec Generated table #3622@1: 1237 keys, 2128101 bytes
+2026/07/06-19:54:44.559 43ec Generated table #3623@1: 61 keys, 59549 bytes
+2026/07/06-19:54:44.559 43ec Compacted 1@1 + 10@2 files => 22027903 bytes
+2026/07/06-19:54:44.604 43ec compacted to: files[ 0 1 32 0 0 0 0 ]
+2026/07/06-19:54:44.605 43ec Delete type=2 #3580
+2026/07/06-19:54:44.605 43ec Delete type=2 #3581
+2026/07/06-19:54:44.605 43ec Delete type=2 #3582
+2026/07/06-19:54:44.605 43ec Delete type=2 #3583
+2026/07/06-19:54:44.605 43ec Delete type=2 #3584
+2026/07/06-19:54:44.605 43ec Delete type=2 #3585
+2026/07/06-19:54:44.605 43ec Delete type=2 #3586
+2026/07/06-19:54:44.605 43ec Delete type=2 #3587
+2026/07/06-19:54:44.605 43ec Delete type=2 #3588
+2026/07/06-19:54:44.605 43ec Delete type=2 #3589
+2026/07/06-19:54:44.605 43ec Delete type=2 #3600

@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    background-color: theme('colors.background');
+    color: theme('colors.foreground');
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background-image: theme('backgroundImage.gradient-radial');
+    background-attachment: fixed;
+  }
+  ::selection { background: oklch(1 0 0 / 20%); color: oklch(1 0 0); }
+}
+
+@layer utilities {
+  .glass {
+    background: color-mix(in oklab, theme('colors.background') 60%, transparent);
+    backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid theme('colors.border');
+  }
+  .glass-strong {
+    background: color-mix(in oklab, oklch(0.12 0 0) 80%, transparent);
+    backdrop-filter: blur(32px) saturate(200%);
+    border: 1px solid theme('colors.border');
+  }
+  .text-silver {
+    background: theme('backgroundImage.gradient-silver');
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
