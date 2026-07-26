@@ -1,49 +1,39 @@
-import { X, MessageSquare, ShoppingBag, MapPin, Phone, Crown, AlertTriangle } from "lucide-react";
+import { X, MessageSquare, ShoppingBag, MapPin, Phone, Crown, Calendar, PackageCheck, AlertTriangle } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
+import { RealClient } from "@/lib/crm";
 
-// Mock detalhado de um cliente
-const mockClientDetails = {
-  id: "c1",
-  name: "Lucas Mendes",
-  phone: "+55 (11) 95555-5555",
-  segment: "champion",
-  ltv: 1250,
-  favoriteFlavorFamily: "Frutados (Ice)",
-  address: "Av Prestes Maia, 333 - Nova Petrópolis, SBC",
-  timeline: [
-    { type: "bot", text: "Lembrete de reposição disparado (Waka 10000)", date: "Hoje, 10:30" },
-    { type: "order", text: "Pedido #PED-089 Entregue (Elf Bar BC5000)", date: "Há 22 dias" },
-    { type: "bot", text: "Mensagem de boas vindas recebida", date: "Há 4 meses" }
-  ]
-};
-
-export function ClientProfileModal({ clientId, onClose }: { clientId: string, onClose: () => void }) {
-  // Num cenário real, usaríamos o clientId para buscar os dados no Supabase.
-  const c = mockClientDetails;
+export function ClientProfileModal({ client, onClose }: { client: RealClient, onClose: () => void }) {
+  const phoneClean = client.phone.replace(/\D/g, '');
+  const waUrl = `https://wa.me/${phoneClean}?text=${encodeURIComponent(`Olá ${client.name}! Tudo bem?`)}`;
 
   return (
-    <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-end p-0">
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-end p-0">
       <div className="bg-[#0a0a0a] border-l border-border h-full w-full max-w-lg shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+        
+        {/* Header do Perfil 360 */}
         <header className="px-6 py-5 border-b border-border flex items-center justify-between bg-card">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xl font-bold">
-              {c.name.charAt(0)}
+            <div className="size-12 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xl font-bold border border-primary/30">
+              {client.name.charAt(0).toUpperCase()}
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-white">{c.name}</h2>
+              <h2 className="text-xl font-semibold text-white">{client.name}</h2>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Phone className="size-3" /> {c.phone}
+                <span className="text-xs text-muted-foreground flex items-center gap-1 font-mono">
+                  <Phone className="size-3 text-muted-foreground/60" /> {client.phone}
                 </span>
-                {c.segment === 'champion' && (
+                {client.segment === 'champion' && (
                   <span className="bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-2 py-0.5 rounded text-[10px] uppercase font-bold flex items-center gap-1">
-                    <Crown className="size-3" /> VIP
+                    <Crown className="size-3" /> VIP Champion
                   </span>
                 )}
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-muted-foreground hover:text-white transition-colors">
+          <button 
+            onClick={onClose} 
+            className="p-2 hover:bg-white/5 rounded-full text-muted-foreground hover:text-white transition-colors cursor-pointer"
+          >
             <X className="size-5" />
           </button>
         </header>
@@ -53,54 +43,79 @@ export function ClientProfileModal({ clientId, onClose }: { clientId: string, on
           {/* Quick Stats */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-card border border-border p-4 rounded-xl">
-              <h4 className="text-xs text-muted-foreground mb-1">Lifetime Value (LTV)</h4>
-              <p className="text-xl font-bold text-white">{formatBRL(c.ltv)}</p>
+              <h4 className="text-xs text-muted-foreground mb-1">Lifetime Value (LTV Real)</h4>
+              <p className="text-xl font-bold text-emerald-400 font-mono">{formatBRL(client.spent)}</p>
             </div>
             <div className="bg-card border border-border p-4 rounded-xl">
-              <h4 className="text-xs text-muted-foreground mb-1">Perfil de Sabor</h4>
-              <p className="text-sm font-semibold text-primary">{c.favoriteFlavorFamily}</p>
+              <h4 className="text-xs text-muted-foreground mb-1">Total de Pedidos Realizados</h4>
+              <p className="text-xl font-bold text-white font-mono">{client.ordersCount} pedidos</p>
             </div>
           </div>
 
-          <div className="flex items-start gap-2 text-sm text-muted-foreground bg-elevated/50 p-3 rounded-lg border border-white/5">
-            <MapPin className="size-4 shrink-0 mt-0.5 text-silver" />
-            <span>{c.address}</span>
+          {/* Endereço de Entrega */}
+          <div className="bg-card border border-border p-4 rounded-xl">
+            <h4 className="text-xs font-semibold text-silver mb-2 flex items-center gap-2">
+              <MapPin className="size-4 text-emerald-400" />
+              Endereço Principal de Entrega
+            </h4>
+            <p className="text-sm text-muted-foreground font-mono">
+              {client.address}
+            </p>
           </div>
 
-          <div className="h-px bg-border w-full" />
-
-          {/* Timeline */}
+          {/* Histórico Real de Pedidos */}
           <div>
             <h3 className="text-sm font-semibold text-silver mb-4 flex items-center gap-2">
-              <MessageSquare className="size-4" />
-              Histórico & Interações (Timeline 360)
+              <ShoppingBag className="size-4 text-primary" />
+              Histórico do Cliente ({client.orders.length} pedidos registrados)
             </h3>
-            
-            <div className="relative pl-4 border-l border-border ml-2 flex flex-col gap-6">
-              {c.timeline.map((event, idx) => (
-                <div key={idx} className="relative">
-                  <div className={`absolute -left-[21px] w-2.5 h-2.5 rounded-full border-2 border-background ${event.type === 'bot' ? 'bg-primary' : 'bg-emerald-400'}`} />
-                  <div className="text-xs text-muted-foreground mb-1">{event.date}</div>
-                  <div className={`text-sm ${event.type === 'bot' ? 'text-silver' : 'font-medium text-emerald-400'}`}>
-                    {event.text}
+
+            <div className="flex flex-col gap-3">
+              {client.orders.map((order, idx) => {
+                const orderDate = new Date(order.created_at).toLocaleDateString('pt-BR');
+                const items: any[] = Array.isArray(order.items) ? order.items : [];
+
+                return (
+                  <div key={order.id || idx} className="bg-elevated border border-white/5 rounded-xl p-4 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono text-muted-foreground flex items-center gap-1">
+                        <Calendar className="size-3" />
+                        {orderDate}
+                      </span>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        {order.delivery_status || 'ENTREGUE'}
+                      </span>
+                    </div>
+
+                    <div className="text-sm font-medium text-white">
+                      {items.map(i => `${i.quantity || 1}x ${i.name || 'Pod'} ${i.flavor || ''}`).join(', ') || 'Pod Descartável'}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-white/5">
+                      <span>Valor Total</span>
+                      <span className="font-mono font-bold text-silver">{formatBRL(parseFloat(order.total_amount || 0))}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
         </div>
 
-        {/* Action Footer */}
-        <div className="p-6 border-t border-border bg-card">
-          <button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(var(--primary),0.2)]">
-            <AlertTriangle className="size-4" />
-            Assumir Conversa no WhatsApp
-          </button>
-          <p className="text-xs text-center text-muted-foreground mt-3">
-            O Bot será paralisado e o chat abrirá na tela para você falar diretamente.
-          </p>
-        </div>
+        {/* Footer com Ação no WhatsApp */}
+        <footer className="p-4 border-t border-border bg-card">
+          <a
+            href={waUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md"
+          >
+            <MessageSquare className="size-4" />
+            Abrir Conversa no WhatsApp
+          </a>
+        </footer>
+
       </div>
     </div>
   );
