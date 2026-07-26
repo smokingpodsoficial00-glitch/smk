@@ -270,7 +270,7 @@ export function KanbanBoard() {
             }`}
           >
             <CheckCircle2 className="size-3.5" />
-            Concluídos 24h ({completed24hOrders.length})
+            Concluídos ({allCompletedOrders.length})
           </button>
         </div>
       </header>
