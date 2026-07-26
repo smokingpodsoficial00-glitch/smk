@@ -13,6 +13,7 @@ export function SupplyChainDashboard() {
   const [brand, setBrand] = useState("Ignite");
   const [flavor, setFlavor] = useState("");
   const [price, setPrice] = useState("90.00");
+  const [costPrice, setCostPrice] = useState("35.00");
   const [stock, setStock] = useState("10");
   const [puffs, setPuffs] = useState("5000");
 
@@ -24,19 +25,19 @@ export function SupplyChainDashboard() {
 
   // Input edits temporários por ID do produto
   const [editingStock, setEditingStock] = useState<Record<string, string>>({});
-  const [editingFields, setEditingFields] = useState<Record<string, { brand?: string; name?: string; flavor?: string; price?: string }>>({});
+  const [editingFields, setEditingFields] = useState<Record<string, { brand?: string; name?: string; flavor?: string; price?: string; cost_price?: string }>>({});
 
-  const handleSaveRowField = async (id: string, field: 'brand' | 'name' | 'flavor' | 'price') => {
+  const handleSaveRowField = async (id: string, field: 'brand' | 'name' | 'flavor' | 'price' | 'cost_price') => {
     const skuFields = editingFields[id];
     if (!skuFields || skuFields[field] === undefined) return;
     const value = skuFields[field];
 
     try {
       let updatePayload: any = {};
-      if (field === 'price') {
+      if (field === 'price' || field === 'cost_price') {
         const parsedPrice = parseFloat(value!);
         if (isNaN(parsedPrice) || parsedPrice < 0) return;
-        updatePayload.price = parsedPrice;
+        updatePayload[field] = parsedPrice;
       } else {
         if (!value!.trim()) return;
         updatePayload[field] = value!.trim();
@@ -181,6 +182,7 @@ export function SupplyChainDashboard() {
           brand,
           flavor: flavor.trim(),
           price: parseFloat(price),
+          cost_price: parseFloat(costPrice) || 35.00,
           stock: parseInt(stock) || 0,
           puffs: parseInt(puffs) || 5000,
           image_url: imageUrl,
@@ -192,6 +194,7 @@ export function SupplyChainDashboard() {
         setName("");
         setFlavor("");
         setPrice("90.00");
+        setCostPrice("35.00");
         setStock("10");
         setPuffs("5000");
         setImageFile(null);
@@ -437,7 +440,7 @@ export function SupplyChainDashboard() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] uppercase text-muted-foreground tracking-wider font-semibold">Preço (BRL)</label>
+                <label className="text-[10px] uppercase text-muted-foreground tracking-wider font-semibold">Preço Venda (BRL)</label>
                 <input 
                   type="number" 
                   step="0.01" 
@@ -446,6 +449,19 @@ export function SupplyChainDashboard() {
                   placeholder="90.00"
                   required
                   className="bg-elevated/70 border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] uppercase text-muted-foreground tracking-wider font-semibold">Custo Reposição (BRL)</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  value={costPrice} 
+                  onChange={(e) => setCostPrice(e.target.value)}
+                  placeholder="35.00"
+                  required
+                  className="bg-elevated/70 border border-border rounded-xl px-3 py-2 text-sm text-emerald-400 placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-400 font-mono"
                 />
               </div>
 
@@ -539,7 +555,8 @@ export function SupplyChainDashboard() {
               <tr>
                 <th className="px-4 py-4 font-medium text-center" style={{ width: '70px' }}>Foto</th>
                 <th className="px-6 py-4 font-medium">Marca / Modelo / Sabor</th>
-                <th className="px-6 py-4 font-medium">Preço (BRL)</th>
+                <th className="px-6 py-4 font-medium">Preço Venda</th>
+                <th className="px-6 py-4 font-medium text-emerald-400">Custo Reposição</th>
                 <th className="px-6 py-4 font-medium text-center" style={{ width: '160px' }}>Estoque Físico</th>
                 <th className="px-6 py-4 font-medium text-center">Status</th>
                 <th className="px-6 py-4 font-medium text-right">Ações</th>
@@ -635,7 +652,22 @@ export function SupplyChainDashboard() {
                           onBlur={() => handleSaveRowField(sku.id, 'price')}
                           onKeyDown={(e) => e.key === "Enter" && handleSaveRowField(sku.id, 'price')}
                           className="w-20 bg-transparent text-sm font-mono text-silver border-b border-transparent hover:border-white/20 focus:border-emerald-400 focus:bg-elevated/80 rounded px-1 py-0.5 focus:outline-none transition-colors"
-                          title="Clique para editar o preço"
+                          title="Clique para editar o preço de venda"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-6 py-3 font-mono text-emerald-400 font-medium">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-emerald-500/60">R$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editingFields[sku.id]?.cost_price ?? (sku.cost_price ? sku.cost_price.toString() : "35.00")}
+                          onChange={(e) => setEditingFields(prev => ({ ...prev, [sku.id]: { ...prev[sku.id], cost_price: e.target.value } }))}
+                          onBlur={() => handleSaveRowField(sku.id, 'cost_price')}
+                          onKeyDown={(e) => e.key === "Enter" && handleSaveRowField(sku.id, 'cost_price')}
+                          className="w-20 bg-transparent text-sm font-mono text-emerald-400 border-b border-transparent hover:border-emerald-400/40 focus:border-emerald-400 focus:bg-elevated/80 rounded px-1 py-0.5 focus:outline-none transition-colors"
+                          title="Clique para editar o custo de reposição (atacado)"
                         />
                       </div>
                     </td>
