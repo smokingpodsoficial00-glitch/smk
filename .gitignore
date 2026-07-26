@@ -25,8 +25,8 @@ Thumbs.db
 .idea/
 
 # WhatsApp session cache
-backend/.wwebjs_auth/
-backend/.wwebjs_cache/
+backend/.wwebjs_auth*/
+backend/.wwebjs_cache*/
 
 # Temp & Cache
 .cache/
