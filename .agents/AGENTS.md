@@ -12,3 +12,7 @@ Sempre que um novo chat de trabalho for iniciado neste workspace:
 
 3. **Curadoria do Vault**:
    - Siga rigorosamente as regras definidas em [AGENTS.md](file:///D:/Obsidian%20Vaults/Cerebro%20Smoking%20Pods/99_Sistema/AGENTS.md).
+
+4. **Regra de Trabalho em Equipe (Git Sync Automático)**:
+   - Toda vez que for iniciada uma nova tarefa ou recurso neste workspace, execute primeiro um `git pull` para baixar as novidades do parceiro.
+   - Toda vez que uma tarefa for concluída com sucesso, execute automaticamente um `git push` para sincronizar e enviar as alterações para a equipe.
