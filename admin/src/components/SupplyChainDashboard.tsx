@@ -448,7 +448,7 @@ export function SupplyChainDashboard() {
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder="90.00"
                   required
-                  className="bg-elevated/70 border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary"
+                  className="bg-elevated/70 border border-border rounded-xl px-3 py-2 text-sm text-silver placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-400 focus:bg-elevated/90 font-mono"
                 />
               </div>
 
@@ -461,7 +461,7 @@ export function SupplyChainDashboard() {
                   onChange={(e) => setCostPrice(e.target.value)}
                   placeholder="35.00"
                   required
-                  className="bg-elevated/70 border border-border rounded-xl px-3 py-2 text-sm text-emerald-400 placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-400 font-mono"
+                  className="bg-elevated/70 border border-border rounded-xl px-3 py-2 text-sm text-emerald-400 placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-400 focus:bg-elevated/90 font-mono"
                 />
               </div>
 
