@@ -11,7 +11,7 @@ export default function App() {
   return (
     <div className="flex h-screen bg-[#050505] text-white overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-white/10 bg-[#0a0a0a] flex flex-col shrink-0">
+      <aside className="w-52 lg:w-64 border-r border-white/10 bg-[#0a0a0a] flex flex-col shrink-0">
         <div className="h-16 flex items-center px-6 border-b border-white/10">
           <h1 className="text-xl font-bold tracking-tight text-silver">Smoking Admin</h1>
         </div>

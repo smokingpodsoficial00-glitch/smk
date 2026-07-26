@@ -222,20 +222,20 @@ export function KanbanBoard() {
 
       {/* Conteúdo da Aba: KANBAN EM ANDAMENTO */}
       {activeTab === 'kanban' && (
-        <div className="flex-1 overflow-x-auto p-6">
-          <div className="flex gap-6 h-full items-start min-w-max">
+        <div className="flex-1 overflow-hidden p-4 md:p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 xl:gap-5 h-full w-full">
             {columns.map(col => {
               const colOrders = orders.filter(o => o.status === col.status);
               return (
-                <div key={col.title} className="w-80 flex flex-col h-full max-h-full">
-                  <div className="flex items-center justify-between mb-4 px-1 shrink-0">
-                    <h3 className="font-medium text-silver">{col.title}</h3>
-                    <span className="grid place-items-center bg-elevated text-xs font-semibold size-6 rounded-full">
+                <div key={col.title} className="flex flex-col h-full max-h-full min-w-0">
+                  <div className="flex items-center justify-between mb-3 px-1 shrink-0">
+                    <h3 className="font-medium text-silver text-sm lg:text-base truncate">{col.title}</h3>
+                    <span className="grid place-items-center bg-elevated text-xs font-semibold size-6 rounded-full shrink-0">
                       {colOrders.length}
                     </span>
                   </div>
                   
-                  <div className="flex flex-col gap-4 overflow-y-auto pb-4 pr-2 custom-scrollbar">
+                  <div className="flex-1 flex flex-col gap-3 overflow-y-auto pb-4 pr-1 custom-scrollbar min-h-0">
                     {colOrders.map(order => (
                       <OrderCard 
                         key={order.realId} 
@@ -245,7 +245,7 @@ export function KanbanBoard() {
                       />
                     ))}
                     {colOrders.length === 0 && (
-                      <div className="border border-dashed border-border rounded-2xl p-6 text-center text-sm text-muted-foreground">
+                      <div className="border border-dashed border-border rounded-2xl p-4 text-center text-xs text-muted-foreground">
                         Nenhum pedido aqui
                       </div>
                     )}
