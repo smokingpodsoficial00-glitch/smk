@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Bot, QrCode, RefreshCw, CheckCircle2,
   Send, Sparkles, MessageSquare, Power,
-  Check, Copy
+  Check, Copy, Key, Zap
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 
@@ -10,7 +10,7 @@ const DEFINITIVE_SYSTEM_PROMPT = `SCRIPT DEFINITIVO — IA SMOKING PODS (Eloisa)
 Este documento compila TODAS as respostas do dono da loja. Cada resposta programada aqui deve ser usada EXATAMENTE como escrita. Este documento será convertido no system prompt da OpenAI.
 
 REGRAS GLOBAIS (INQUEBRÁVEIS)
-RG1 — Sem emojis (A IA NUNCA usa emojis. EXCEÇÃO: mensagens programadas neste documento que contenham emoji).
+RG1 — Sem emojis (A IA NUNCA usa emojis. EXCEÇÃO: mensagens programadas neste documento que containment emoji).
 RG2 — Máximo 2 linhas por mensagem (EXCEÇÃO: mensagem da chave Pix).
 RG3 — Sem exclamações (A IA NUNCA usa "!").
 RG4 — Erros de vírgula propositais (Ex: "Olá tudo bem, como posso te ajudar?").
@@ -214,6 +214,8 @@ Saúde / Vape: olha o pod faz mal sim, todo tipo de produto com nicotina e de fu
 CATEGORIA 13 — CLIENTES RECORRENTES
 Quero o mesmo de sempre: claro, mas só pra confirmar, qual o modelo é mesmo?`;
 
+const DEFAULT_OPENAI_KEY = "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";
+
 export function ChatbotPage() {
   const { config } = useStoreConfig();
   const [isConnected, setIsConnected] = useState(false);
@@ -221,6 +223,12 @@ export function ChatbotPage() {
   const [qrCodeVersion, setQrCodeVersion] = useState(1);
   const [aiEnabled, setAiEnabled] = useState(true);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+
+  // OpenAI Integration State
+  const [openAiKey, setOpenAiKey] = useState<string>(() => {
+    return localStorage.getItem("openai_api_key_v1") || DEFAULT_OPENAI_KEY;
+  });
+  const [showKeyInput, setShowKeyInput] = useState(false);
 
   // Form de personalidade da IA (Eloisa)
   const [systemPrompt, setSystemPrompt] = useState(DEFINITIVE_SYSTEM_PROMPT);
@@ -234,209 +242,76 @@ export function ChatbotPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const storeName = config?.store_name || "Smoking Pods";
-  const catalogUrl = "https://smokingproject01.vercel.app/";
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  const getGreetingByHour = () => {
-    const hour = new Date().getHours();
-    if (hour >= 6 && hour < 12) return "bom dia";
-    if (hour >= 12 && hour < 18) return "boa tarde";
-    return "boa noite";
+  const handleSaveOpenAiKey = (key: string) => {
+    setOpenAiKey(key);
+    localStorage.setItem("openai_api_key_v1", key);
   };
 
   /**
-   * Motor de Respostas do Simulador:
-   * Examina dinamicamente a mensagem do usuário contra TODAS as categorias do System Prompt
+   * Chamada REAL para a API da OpenAI (GPT-4o / GPT-3.5-turbo)
    */
-  const getEloisaResponsesFromPrompt = (userText: string, currentPrompt: string): string[] => {
-    const text = userText.toLowerCase().trim();
-    const greeting = getGreetingByHour();
-
-    // 1. P6 — "Tem pod aí?"
-    if (text.includes("tem pod") || text.includes("tem produto") || text.includes("tem estoque")) {
-      return ["temos sim, gostaria de dar uma olhada no cardápio?"];
-    }
-
-    // 2. P4 — "Quero comprar" / "Quero pedir"
-    if (text.includes("comprar") || text.includes("pedir") || text.includes("vou querer") || text.includes("gostaria de comprar")) {
-      return [
-        `${greeting}, perfeito`,
-        "posso enviar nossa tabela digital?"
-      ];
-    }
-
-    // 3. P13 / Recorrente — "Mesmo de sempre"
-    if (text.includes("mesmo de sempre") || text.includes("mesmo pedido") || text.includes("igual a ultima")) {
-      return ["claro, mas só pra confirmar, qual o modelo é mesmo?"];
-    }
-
-    // 4. Categorias 2 — Envio da Tabela / Cardápio
-    if (text.includes("cardapio") || text.includes("cardápio") || text.includes("tabela") || text.includes("catálogo") || text.includes("catalogo") || text.includes("link") || text.includes("manda a tabela") || text.includes("envia a tabela") || text.includes("sim") || text.includes("pode mandar") || text.includes("manda")) {
-      return [
-        "claro, vou te enviar a tabela aqui",
-        catalogUrl,
-        "se precisar de ajuda com algo só me avisar"
-      ];
-    }
-
-    // 5. P45 — "Vocês são de onde?" / SBC / Localização
-    if (text.includes("onde fica") || text.includes("de onde") || text.includes("localizacao") || text.includes("localização") || text.includes("cidade") || text.includes("bairro") || text.includes("sbc") || text.includes("onde vcs sao")) {
-      return ["somos aqui de sbc amg"];
-    }
-
-    // 6. P46 — Horário de funcionamento
-    if (text.includes("horario") || text.includes("horário") || text.includes("funcionamento") || text.includes("aberto") || text.includes("fecha") || text.includes("que horas")) {
-      return ["nosso horário de funcionamento é das 11:00 até as 23hrs"];
-    }
-
-    // 7. P47 — "O pod é original?"
-    if (text.includes("original") || text.includes("paraguai") || text.includes("falso") || text.includes("paraguaio")) {
-      return ["sim, só trabalhamos com produtos 100% originais!"];
-    }
-
-    // 8. P48 — "Tem garantia?"
-    if (text.includes("garantia") || text.includes("troca")) {
-      return [
-        "sim, temos garantia para produtos que podem ir com defeito",
-        "porém para á garantia valer, você tem de gravar um vídeo abrindo o produto e testando, para termos certeza de que o produto veio dá nossa loja"
-      ];
-    }
-
-    // 9. P49 — Quantos puffs dura?
-    if (text.includes("puffs") || text.includes("dura") || text.includes("durabilidade") || text.includes("duracao") || text.includes("duração")) {
-      if (text.includes("5000") || text.includes("5.000")) {
-        return ["olha o de 5.000 puffs geralmente dura uns 10 dias, porém depende do uso"];
-      }
-      if (text.includes("7500") || text.includes("7.500")) {
-        return ["olha o de 7.500 puffs geralmente dura uns 12 dias, porém depende do uso"];
-      }
-      if (text.includes("15000") || text.includes("15.000")) {
-        return ["olha o de 15.000 puffs geralmente dura uns 17 dias, porém depende do uso"];
-      }
-      if (text.includes("20000") || text.includes("20.000")) {
-        return ["olha o de 20.000 puffs geralmente dura uns 21 dias, porém depende do uso"];
-      }
-      if (text.includes("30000") || text.includes("30.000")) {
-        return ["olha o de 30.000 puffs geralmente dura uns 35 dias, porém depende do uso"];
-      }
-      return ["olha o de 10.000 puffs geralmente dura uns 14 dias, porém depende do uso"];
-    }
-
-    // 10. P50 — Qual sabor recomendam? (Doce vs Gelado)
-    if (text.includes("sabor") || text.includes("recomenda") || text.includes("indica") || text.includes("qual o melhor") || text.includes("qual vc prefere") || text.includes("doce") || text.includes("gelado") || text.includes("ice")) {
-      if (text.includes("gelado") || text.includes("ice") || text.includes("menta")) {
-        return ["olha se vc gosta mais de pod gelado eu recomendaria o menta ou watermelon ice"];
-      }
-      if (text.includes("doce") || text.includes("fruta") || text.includes("morango") || text.includes("uva")) {
-        return ["olha se vc gosta mais de pod doce eu recomendaria o morango ou uva"];
-      }
-      return ["vc gosta de pod mais gelado ou mais doce?"];
-    }
-
-    // 11. P20 — "Tem desconto?" / Atacado
-    if (text.includes("desconto") || text.includes("promoção") || text.includes("promocao") || text.includes("descontinho") || text.includes("atacado")) {
-      if (text.includes("atacado") || text.includes("quantidade") || text.includes("caixa")) {
-        return ["entendi, para atacado conseguimos um valor de 10 reais de desconto por unidade"];
-      }
-      return [
-        "temos desconto sim!",
-        "se levar 3 unidades consigo frete grátis, oque acha?"
-      ];
-    }
-
-    // 12. P19 — "Qual o mais barato?"
-    if (text.includes("mais barato") || text.includes("baratinho") || text.includes("menor preco") || text.includes("menor preço")) {
-      return [
-        "nosso modelo mais barato hoje é o IGNITE V50",
-        "ele está saindo por R$ 80,00"
-      ];
-    }
-
-    // 13. P22 — "Tá caro"
-    if (text.includes("caro") || text.includes("muito alto") || text.includes("carinho")) {
-      return [
-        "nossos produtos são 100% originais",
-        "e trabalhamos com garantia na troca caso de algum problema, por isso o valor pode estar um pouco diferente dá concorrencia"
-      ];
-    }
-
-    // 14. P39 — Retirada no local
-    if (text.includes("retirar") || text.includes("retirada") || text.includes("posso ir ai") || text.includes("buscar pessoalmente") || text.includes("pegar ai")) {
-      return ["infelizmente por segurança nossa não disponibilizamos a opção de retirada, somente envios amg"];
-    }
-
-    // 15. P54 — Quero falar com uma pessoa / dono
-    if (text.includes("atendente") || text.includes("falar com pessoa") || text.includes("humano") || text.includes("dono") || text.includes("gerente") || text.includes("suporte")) {
-      return ["sem problemas, estou encaminhado para o dono da loja e ele vai resolver o seu problema"];
-    }
-
-    // 16. P57 — Pedido não chegou / Demora
-    if (text.includes("demorando") || text.includes("nao chegou") || text.includes("não chegou") || text.includes("cadê meu pedido") || text.includes("cade meu pedido") || text.includes("demora")) {
-      return [
-        "infelizmente a demanda está alta e está bem dificil de achar motoboy amg",
-        "porém assim que sair para entrega aviso aqui beleza?"
-      ];
-    }
-
-    // 17. Saúde / Vape faz mal?
-    if (text.includes("faz mal") || text.includes("saude") || text.includes("saúde") || text.includes("vape faz mal") || text.includes("câncer")) {
-      return ["olha o pod faz mal sim, todo tipo de produto com nicotina e de fumo faz mal"];
-    }
-
-    // 18. P23 / P28 — Pagamento (Pix / Cartão / Dinheiro)
-    if (text.includes("pagamento") || text.includes("pix") || text.includes("cartao") || text.includes("cartão") || text.includes("dinheiro") || text.includes("pagar")) {
-      if (text.includes("dinheiro") || text.includes("presencial")) {
-        return ["infelizmente não trabalhamos com pagamentos presencial como cartão e dinheiro, essa é a unica forma de pagamento?"];
-      }
-      return [
-        "nossas opções de pagamento são pix, e link de pagamento",
-        "no link de pagamento dá pra passar cartão de crédito e débito, também parcelamos, porém as taxas são repassadas beleza?"
-      ];
-    }
-
-    // 19. P18 — "Quanto custa?" / Preço
-    if (text.includes("quanto custa") || text.includes("preco") || text.includes("preço") || text.includes("valor") || text.includes("quanto tá") || text.includes("quanto e")) {
-      return [
-        "qual modelo exato vc tá procurando?"
-      ];
-    }
-
-    // 20. RG18 — Se perguntar se é robô / Nome da IA
-    if (text.includes("robo") || text.includes("robô") || text.includes("ia") || text.includes("quem e voce") || text.includes("seu nome")) {
-      return ["sou a eloisa, assistente virtual da smoking pods, tô aqui pra te ajudar com tudo que precisar!"];
-    }
-
-    // 21. P1 / P2 / P3 — Oi / Olá / Boa noite / Boa tarde / Bom dia / E aí
-    if (text === "oi" || text === "ola" || text === "olá" || text.includes("boa noite") || text.includes("bom dia") || text.includes("boa tarde") || text === "e ai" || text === "e aí") {
-      return ["Olá tudo bem, como posso te ajudar?"];
-    }
-
-    // Padrão do Script se não houver palavras chaves específicas: envia a tabela digital
-    return [
-      "claro, vou te enviar nossa tabela digital pra vc dar uma olhada com calma",
-      catalogUrl,
-      "se precisar de ajuda com algo só me avisar"
+  const callRealOpenAI = async (conversationHistory: Array<{ sender: "user" | "bot"; text: string }>) => {
+    const formattedMessages = [
+      { role: "system", content: systemPrompt },
+      ...conversationHistory.map((m) => ({
+        role: m.sender === "user" ? "user" : "assistant",
+        content: m.text,
+      })),
     ];
+
+    try {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openAiKey.trim()}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: formattedMessages,
+          temperature: 0.4,
+          max_tokens: 250,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.error?.message || `Erro HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const rawAnswer = data.choices?.[0]?.message?.content || "Desculpe, tive um probleminha aqui. Pode me perguntar de novo?";
+      
+      // Quebra a resposta da IA em frases (Regra de fracionamento de mensagens)
+      const lines = rawAnswer.split("\n").filter((l: string) => l.trim().length > 0);
+      return lines.length > 0 ? lines : [rawAnswer];
+    } catch (e: any) {
+      console.error("Erro na OpenAI:", e);
+      return [`(Erro OpenAI: ${e.message || "Verifique sua chave de API"})`];
+    }
   };
 
-  const handleSimulateSend = (e: React.FormEvent) => {
+  const handleSimulateSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputMessage.trim() || isTyping) return;
 
     const userText = inputMessage.trim();
     const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    setMessages((prev) => [...prev, { sender: "user", text: userText, time: timeNow }]);
+    const newHistory = [...messages, { sender: "user" as const, text: userText, time: timeNow }];
+    setMessages(newHistory);
     setInputMessage("");
     setIsTyping(true);
 
-    // Executa a busca dinâmica de respostas baseada no script completo
-    const botResponses = getEloisaResponsesFromPrompt(userText, systemPrompt);
+    // Dispara a chamada para o cérebro real do GPT-4o
+    const botResponses = await callRealOpenAI(newHistory);
 
-    // Simula o fracionamento de mensagens do WhatsApp (RG5)
+    // Simula envio fracionado
     botResponses.forEach((respText, index) => {
       setTimeout(() => {
         setMessages((prev) => [
@@ -450,7 +325,7 @@ export function ChatbotPage() {
         if (index === botResponses.length - 1) {
           setIsTyping(false);
         }
-      }, (index + 1) * 900);
+      }, (index + 1) * 800);
     });
   };
 
@@ -482,13 +357,13 @@ export function ChatbotPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-              WhatsApp IA — Eloisa
-              <span className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-semibold">
-                Simulador Dinâmico Conectado
+              WhatsApp IA — Eloisa Real
+              <span className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                <Zap className="size-3 text-emerald-400" /> OpenAI GPT-4o Online
               </span>
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Atendente virtual oficial da loja {storeName} (Script compilado e integrado ao simulador)
+              Atendente virtual oficial da loja {storeName} (Conectada ao cérebro real da OpenAI com seu script)
             </p>
           </div>
         </div>
@@ -548,7 +423,7 @@ export function ChatbotPage() {
                   <div>
                     <h3 className="text-lg font-bold text-white">Eloisa Ativa!</h3>
                     <p className="text-xs text-muted-foreground max-w-xs mt-1">
-                      O número está vinculado ao WhatsApp e responderá mensagens seguindo o script de vendas.
+                      O número está vinculado ao WhatsApp e responderá mensagens usando a inteligência artificial do GPT-4o.
                     </p>
                   </div>
                 </div>
@@ -608,7 +483,7 @@ export function ChatbotPage() {
         {/* Lado Direito: Script Definitivo Completo da Eloisa & Simulador (7 Colunas) */}
         <div className="lg:col-span-7 space-y-6">
           
-          {/* Configurações do System Prompt */}
+          {/* Configurações do System Prompt & API Key */}
           <section className="bg-card border border-border rounded-2xl p-6 space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
@@ -625,24 +500,34 @@ export function ChatbotPage() {
                   {copiedPrompt ? "Copiado!" : "Copiar Script Íntegra"}
                 </button>
                 <button
-                  onClick={() => setAiEnabled(!aiEnabled)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    aiEnabled
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                      : "bg-white/5 text-muted-foreground border border-white/10"
-                  }`}
+                  onClick={() => setShowKeyInput(!showKeyInput)}
+                  className="p-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 transition-all cursor-pointer"
+                  title="Configurar Chave da OpenAI"
                 >
-                  <Power className="size-3.5" />
-                  {aiEnabled ? "Ativa" : "Pausada"}
+                  <Key className="size-4" />
                 </button>
               </div>
             </div>
 
+            {showKeyInput && (
+              <div className="p-3 bg-[#0a0a0a] border border-emerald-500/30 rounded-xl space-y-1.5">
+                <label className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5">
+                  <Key className="size-3" /> Chave de API da OpenAI (GPT-4o):
+                </label>
+                <input
+                  type="password"
+                  value={openAiKey}
+                  onChange={(e) => handleSaveOpenAiKey(e.target.value)}
+                  className="w-full bg-black border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            )}
+
             {/* Prompt Textarea Completo */}
             <div className="space-y-2">
               <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider flex items-center justify-between">
-                <span>Script Compilado em Tempo Real (100% Integra)</span>
-                <span className="text-[10px] text-emerald-400 lowercase">Eloisa System Prompt</span>
+                <span>Script Compilado em Tempo Real (100% Íntegra)</span>
+                <span className="text-[10px] text-emerald-400 lowercase">OpenAI GPT-4o Engine</span>
               </label>
               <textarea
                 rows={12}
@@ -658,10 +543,10 @@ export function ChatbotPage() {
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
                 <MessageSquare className="size-4 text-emerald-400" />
-                <h2 className="font-bold text-base text-white">Simulador Conectado ao Script (Teste Geral)</h2>
+                <h2 className="font-bold text-base text-white">Simulador de Conversa (Inteligência Real OpenAI)</h2>
               </div>
-              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded-full font-semibold">
-                Integração Dinâmica Ativa
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded-full font-bold flex items-center gap-1">
+                <Zap className="size-3" /> GPT-4o Ativo
               </span>
             </div>
 
@@ -687,7 +572,7 @@ export function ChatbotPage() {
 
               {isTyping && (
                 <div className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl w-fit">
-                  <span className="animate-pulse">Eloisa está digitando...</span>
+                  <span className="animate-pulse">Eloisa (OpenAI) está digitando...</span>
                 </div>
               )}
               <div ref={chatEndRef} />
@@ -699,7 +584,7 @@ export function ChatbotPage() {
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Teste qualquer mensagem do script (ex: onde fica? quero comprar, quanto é? pode entregar?)..."
+                placeholder="Mande um pedido real (ex: quero 2 menta e 1 uva, meu CEP é 09700-000, quanto fica com frete?)..."
                 className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50"
               />
               <button
