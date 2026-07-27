@@ -484,8 +484,6 @@ export function SupplyChainDashboard() {
     })
     .sort((a, b) => b.totalStock - a.totalStock);
 
-  const maxGroupStock = Math.max(50, ...skuGroups.map(g => g.totalStock));
-
   // ─── Loading State ──────────────────────────────────────
   if (loading) {
     return (
@@ -541,7 +539,7 @@ export function SupplyChainDashboard() {
                 <Box className="size-4 text-emerald-400" />
               </div>
             </div>
-            <div className="text-3xl font-bold text-white font-mono">{totalProducts}</div>
+            <div className="text-3xl font-bold text-white">{totalProducts}</div>
             <span className="text-[10px] text-muted-foreground">modelos ativos no sistema</span>
           </div>
 
@@ -553,7 +551,7 @@ export function SupplyChainDashboard() {
                 <DollarSign className="size-4 text-emerald-400" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-emerald-400 font-mono">{formatBRL(totalStockValue)}</div>
+            <div className="text-2xl font-bold text-emerald-400">{formatBRL(totalStockValue)}</div>
             <span className="text-[10px] text-emerald-400/60">valor total a preço de venda</span>
           </div>
 
@@ -565,7 +563,7 @@ export function SupplyChainDashboard() {
                 <Tag className="size-4 text-muted-foreground" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-silver font-mono">{formatBRL(totalStockCost)}</div>
+            <div className="text-2xl font-bold text-silver">{formatBRL(totalStockCost)}</div>
             <span className="text-[10px] text-muted-foreground">custo de reposição total</span>
           </div>
 
@@ -577,9 +575,9 @@ export function SupplyChainDashboard() {
                 <TrendingUp className="size-4 text-emerald-400" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-emerald-400 font-mono">{formatBRL(estimatedProfit)}</div>
+            <div className="text-2xl font-bold text-emerald-400">{formatBRL(estimatedProfit)}</div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold font-mono">{profitMarginPct}%</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold">{profitMarginPct}%</span>
               <span className="text-[10px] text-muted-foreground">margem bruta</span>
             </div>
           </div>
@@ -589,19 +587,19 @@ export function SupplyChainDashboard() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between">
             <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Unidades</span>
-            <span className="text-base font-bold text-silver font-mono">{totalStockUnits} un</span>
+            <span className="text-base font-bold text-silver">{totalStockUnits} un</span>
           </div>
           <div className="bg-card border border-amber-500/20 rounded-xl px-4 py-3 flex items-center justify-between">
             <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Estoque Baixo</span>
-            <span className="text-base font-bold text-amber-400 font-mono">{lowStockCount}</span>
+            <span className="text-base font-bold text-amber-400">{lowStockCount}</span>
           </div>
           <div className="bg-card border border-red-500/20 rounded-xl px-4 py-3 flex items-center justify-between">
             <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Sem Estoque</span>
-            <span className="text-base font-bold text-red-400 font-mono">{outOfStockCount}</span>
+            <span className="text-base font-bold text-red-400">{outOfStockCount}</span>
           </div>
           <div className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between">
             <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Última Entrada</span>
-            <span className="text-xs font-bold text-muted-foreground font-mono">{lastEntryTime}</span>
+            <span className="text-xs font-bold text-muted-foreground">{lastEntryTime}</span>
           </div>
         </div>
 
@@ -633,7 +631,7 @@ export function SupplyChainDashboard() {
                         <span className={`text-xs font-semibold truncate ${medal ? medal.text : "text-muted-foreground"}`}>
                           {item.flavor || item.product_name}
                         </span>
-                        <span className="text-xs font-mono text-muted-foreground ml-2 shrink-0">
+                        <span className="text-xs text-muted-foreground ml-2 shrink-0 font-medium">
                           {item.total_sold} un
                         </span>
                       </div>
@@ -663,7 +661,7 @@ export function SupplyChainDashboard() {
                 <div className="size-full rounded-full" style={{ background: conicGradient }} />
                 <div className="absolute inset-[18%] rounded-full bg-card" />
                 <div className="absolute inset-0 flex items-center justify-center flex-col">
-                  <span className="text-sm font-bold text-white font-mono">{totalStockUnits}</span>
+                  <span className="text-sm font-bold text-white">{totalStockUnits}</span>
                   <span className="text-[9px] text-muted-foreground">unidades</span>
                 </div>
               </div>
@@ -675,7 +673,7 @@ export function SupplyChainDashboard() {
                     <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
                     <div className="flex-1 flex items-center justify-between min-w-0">
                       <span className="text-xs font-medium text-silver truncate">{seg.brandName}</span>
-                      <span className="text-[11px] font-mono text-muted-foreground ml-2 shrink-0">
+                      <span className="text-[11px] text-muted-foreground ml-2 shrink-0 font-medium">
                         {seg.count} un ({seg.pct}%)
                       </span>
                     </div>
@@ -753,7 +751,7 @@ export function SupplyChainDashboard() {
           </div>
         </div>
 
-        {/* ── LISTA DE PRODUTOS (FULL WIDTH, CARDS ENRIQUECIDOS) ─ */}
+        {/* ── LISTA DE PRODUTOS (FULL WIDTH, CARDS MINIMALISTAS E ELEGANTES) ─ */}
         <div className="space-y-4">
           {skuGroups.length === 0 ? (
             <div className="bg-card border border-border rounded-2xl p-16 text-center text-sm text-muted-foreground">
@@ -772,9 +770,8 @@ export function SupplyChainDashboard() {
               const realFlavors = group.realFlavors;
               const isGroupVisible = group.flavors.some((f: any) => f.is_active);
               const isGroupMenuActive = activeGroupMenuKey === group.groupKey;
-              const stockPct = Math.min(100, Math.round((group.totalStock / maxGroupStock) * 100));
 
-              // Stock bar & badge label inteligente por Sabor
+              // Stock badge label inteligente por Sabor
               let stockBarColor = "bg-emerald-400";
               let stockBadgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
               let stockLabel = `Em estoque (${group.totalStock} un)`;
@@ -796,18 +793,18 @@ export function SupplyChainDashboard() {
                   key={group.groupKey} 
                   className={`bg-card border border-border rounded-2xl shadow-lg transition-all relative ${isGroupMenuActive ? 'z-40' : 'z-10'}`}
                 >
-                  {/* ── CARD HEADER ENRIQUECIDO ────────── */}
+                  {/* ── CARD HEADER MINIMALISTA E UNIFORME ────────── */}
                   <div 
                     onClick={() => toggleGroup(group.groupKey)}
-                    className="p-5 cursor-pointer hover:bg-white/[0.015] transition-colors select-none"
+                    className="p-5 cursor-pointer hover:bg-white/[0.015] transition-colors select-none space-y-4"
                   >
-                    {/* Linha 1: Info principal */}
-                    <div className="flex items-start justify-between gap-4 mb-4">
+                    {/* Linha Superior: Foto, Nome, Puffs e Ações */}
+                    <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-4">
                         {/* Foto do Modelo */}
                         <div 
                           onClick={(e) => e.stopPropagation()}
-                          className="relative size-16 rounded-xl border border-white/10 bg-black/40 overflow-hidden shrink-0 group/img cursor-pointer"
+                          className="relative size-14 rounded-xl border border-white/10 bg-black/40 overflow-hidden shrink-0 group/img cursor-pointer"
                           title="Clique para alterar a foto deste modelo"
                         >
                           {group.image_url ? (
@@ -837,20 +834,20 @@ export function SupplyChainDashboard() {
 
                         <div>
                           <div className="flex items-center gap-2.5">
-                            <h3 className="font-bold text-base text-white">{displayName}</h3>
-                            <span className="text-[10px] bg-elevated border border-border text-muted-foreground px-2 py-0.5 rounded-md font-mono">
+                            <h3 className="font-bold text-base text-white tracking-tight">{displayName}</h3>
+                            <span className="text-[10px] bg-white/5 border border-white/10 text-muted-foreground px-2 py-0.5 rounded-md font-medium">
                               {group.puffs} puffs
                             </span>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="text-xs text-muted-foreground mt-0.5">
                             {realFlavors.length} {realFlavors.length === 1 ? 'sabor cadastrado' : 'sabores cadastrados'}
                           </p>
                         </div>
                       </div>
 
-                      {/* Ações do Grupo */}
+                      {/* Ações do Grupo (Status, Olho, 3 Pontos, Chevron) */}
                       <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border ${stockBadgeClass}`}>
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${stockBadgeClass}`}>
                           <div className={`size-1.5 rounded-full ${stockBarColor}`} />
                           {stockLabel}
                         </span>
@@ -911,33 +908,29 @@ export function SupplyChainDashboard() {
                       </div>
                     </div>
 
-                    {/* Linha 2: Barra de Estoque Visual */}
-                    <div className="flex items-center gap-4 mb-3">
-                      <div className="flex-1 h-2 bg-elevated rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${stockBarColor}`}
-                          style={{ width: `${stockPct}%` }}
-                        />
+                    {/* Linha Única de Métricas Unificadas e Elegantes (Sem Barra de Progresso Polluted) */}
+                    <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-xs font-medium pt-1 border-t border-white/5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground">Estoque Total</span>
+                        <span className="font-bold text-white bg-white/5 border border-white/10 px-2 py-0.5 rounded-md">
+                          {group.totalStock} un
+                        </span>
                       </div>
-                      <span className="text-xs font-bold text-white font-mono shrink-0">{group.totalStock} un</span>
-                    </div>
-
-                    {/* Linha 3: Métricas Financeiras */}
-                    <div className="flex items-center gap-6 text-xs">
+                      <div className="h-3 w-px bg-white/10" />
                       <div className="flex items-center gap-1.5">
                         <span className="text-muted-foreground">Venda</span>
-                        <span className="font-semibold text-white font-mono">{formatBRL(group.price)}</span>
+                        <span className="font-bold text-white">{formatBRL(group.price)}</span>
                       </div>
-                      <div className="h-3 w-px bg-border" />
+                      <div className="h-3 w-px bg-white/10" />
                       <div className="flex items-center gap-1.5">
                         <span className="text-muted-foreground">Custo</span>
-                        <span className="font-semibold text-muted-foreground font-mono">{formatBRL(group.cost_price)}</span>
+                        <span className="font-medium text-muted-foreground">{formatBRL(group.cost_price)}</span>
                       </div>
-                      <div className="h-3 w-px bg-border" />
+                      <div className="h-3 w-px bg-white/10" />
                       <div className="flex items-center gap-1.5">
                         <span className="text-muted-foreground">Lucro</span>
-                        <span className="font-semibold text-emerald-400 font-mono">{formatBRL(profit)}</span>
-                        <span className="text-[10px] text-emerald-400/60 font-mono">({marginPct}%)</span>
+                        <span className="font-bold text-emerald-400">{formatBRL(profit)}</span>
+                        <span className="text-[10px] text-emerald-400/80 font-semibold">({marginPct}%)</span>
                       </div>
                     </div>
                   </div>
@@ -984,9 +977,9 @@ export function SupplyChainDashboard() {
                           {realFlavors.map((flavorSku: any) => {
                             const flavorStock = flavorSku.stock || 0;
                             let flavorBadge;
-                            if (flavorStock >= 5) flavorBadge = <span className="text-emerald-400 text-[10px]">🟢 Em estoque</span>;
-                            else if (flavorStock > 0) flavorBadge = <span className="text-amber-400 text-[10px]">🟡 Estoque Baixo</span>;
-                            else flavorBadge = <span className="text-red-400 text-[10px]">🔴 Esgotado</span>;
+                            if (flavorStock >= 5) flavorBadge = <span className="text-emerald-400 text-[10px] font-medium">🟢 Em estoque</span>;
+                            else if (flavorStock > 0) flavorBadge = <span className="text-amber-400 text-[10px] font-medium">🟡 Estoque Baixo</span>;
+                            else flavorBadge = <span className="text-red-400 text-[10px] font-medium">🔴 Esgotado</span>;
 
                             const isFilteredMatch = 
                               (filterTab === 'SEM_ESTOQUE' && flavorStock === 0) ||
@@ -1017,7 +1010,7 @@ export function SupplyChainDashboard() {
                                     </button>
                                     <span 
                                       onClick={() => { setEditingStockSku(flavorSku); setNewStockValue(flavorStock.toString()); }}
-                                      className="w-10 text-center text-xs font-bold text-silver font-mono cursor-pointer hover:text-emerald-400"
+                                      className="w-10 text-center text-xs font-bold text-silver cursor-pointer hover:text-emerald-400"
                                       title="Clique para editar"
                                     >
                                       {flavorStock} un
@@ -1103,7 +1096,7 @@ export function SupplyChainDashboard() {
                 <input 
                   type="number" value={puffs} onChange={(e) => setPuffs(e.target.value)}
                   placeholder="Ex.: 5000"
-                  className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono"
+                  className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium"
                 />
               </div>
 
@@ -1113,7 +1106,7 @@ export function SupplyChainDashboard() {
                   <input 
                     type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)}
                     placeholder="90.00" required
-                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono"
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -1121,7 +1114,7 @@ export function SupplyChainDashboard() {
                   <input 
                     type="number" step="0.01" value={costPrice} onChange={(e) => setCostPrice(e.target.value)}
                     placeholder="35.00"
-                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono"
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium"
                   />
                 </div>
               </div>
@@ -1207,7 +1200,7 @@ export function SupplyChainDashboard() {
                 <label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Estoque Inicial (unidades)</label>
                 <input type="number" value={newFlavorStock} onChange={(e) => setNewFlavorStock(e.target.value)}
                   placeholder="Ex.: 10"
-                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-emerald-500/50 transition-all font-mono"
+                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-emerald-500/50 transition-all font-medium"
                 />
               </div>
               <div className="flex gap-2 pt-2">
@@ -1237,7 +1230,7 @@ export function SupplyChainDashboard() {
               <input type="number" autoFocus value={newStockValue}
                 onChange={(e) => setNewStockValue(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSaveModalStock()}
-                className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-sm text-white font-mono text-center focus:outline-none focus:border-emerald-500/50"
+                className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-sm text-white text-center focus:outline-none focus:border-emerald-500/50 font-medium"
               />
             </div>
             <div className="flex gap-2">
@@ -1261,12 +1254,12 @@ export function SupplyChainDashboard() {
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] uppercase font-semibold text-muted-foreground">Preço de Venda (R$)</label>
                 <input type="number" step="0.01" value={batchPrice} onChange={(e) => setBatchPrice(e.target.value)}
-                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/50" />
+                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50 font-medium" />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] uppercase font-semibold text-muted-foreground">Custo de Reposição (R$)</label>
                 <input type="number" step="0.01" value={batchCostPrice} onChange={(e) => setBatchCostPrice(e.target.value)}
-                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/50" />
+                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50 font-medium" />
               </div>
             </div>
             <div className="flex gap-2 pt-2">
@@ -1304,15 +1297,15 @@ export function SupplyChainDashboard() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-card border border-border rounded-xl p-3">
                   <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Venda</span>
-                  <span className="text-sm font-bold font-mono text-white mt-1 block">{formatBRL(selectedDrawerSKU.price)}</span>
+                  <span className="text-sm font-bold text-white mt-1 block">{formatBRL(selectedDrawerSKU.price)}</span>
                 </div>
                 <div className="bg-card border border-border rounded-xl p-3">
                   <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Custo</span>
-                  <span className="text-sm font-bold font-mono text-muted-foreground mt-1 block">{formatBRL(selectedDrawerSKU.cost_price || 35)}</span>
+                  <span className="text-sm font-bold text-muted-foreground mt-1 block">{formatBRL(selectedDrawerSKU.cost_price || 35)}</span>
                 </div>
                 <div className="bg-card border border-emerald-500/20 rounded-xl p-3">
                   <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Lucro</span>
-                  <span className="text-sm font-bold font-mono text-emerald-400 mt-1 block">
+                  <span className="text-sm font-bold text-emerald-400 mt-1 block">
                     {formatBRL(selectedDrawerSKU.price - (selectedDrawerSKU.cost_price || 35))}
                   </span>
                 </div>
@@ -1321,7 +1314,7 @@ export function SupplyChainDashboard() {
               <div className="bg-card border border-border rounded-xl p-4 space-y-2">
                 <div className="flex justify-between items-center text-xs">
                   <span className="text-muted-foreground font-medium">Estoque Físico</span>
-                  <span className="font-mono font-bold text-white text-sm">{selectedDrawerSKU.stock} un</span>
+                  <span className="font-bold text-white text-sm">{selectedDrawerSKU.stock} un</span>
                 </div>
                 <div className="h-2 w-full bg-elevated rounded-full overflow-hidden">
                   <div 
@@ -1337,15 +1330,15 @@ export function SupplyChainDashboard() {
                 <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider block">Inteligência de Vendas</span>
                 <div className="flex justify-between border-b border-border/60 pb-2">
                   <span className="text-silver">Vendidos Hoje</span>
-                  <span className="font-mono text-white font-semibold">2 un</span>
+                  <span className="text-white font-semibold">2 un</span>
                 </div>
                 <div className="flex justify-between border-b border-border/60 pb-2">
                   <span className="text-silver">Vendidos nesta Semana</span>
-                  <span className="font-mono text-emerald-400 font-semibold">14 un</span>
+                  <span className="text-emerald-400 font-semibold">14 un</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-silver">Última Venda</span>
-                  <span className="font-mono text-muted-foreground">Hoje às 15:40</span>
+                  <span className="text-muted-foreground font-medium">Hoje às 15:40</span>
                 </div>
               </div>
             </div>
