@@ -120,7 +120,8 @@ export function SupplyChainDashboard() {
       const { data: prodData } = await supabase
         .from("smoking_products")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true });
 
       const { data: topData } = await supabase
         .from("vw_top_selling_flavors")
@@ -218,11 +219,10 @@ export function SupplyChainDashboard() {
         .select();
 
       if (error || !data || data.length === 0) {
-        fetchData();
+        console.error("Erro ao atualizar estoque no Supabase:", error);
       }
     } catch (err) {
-      console.error(err);
-      fetchData();
+      console.error("Exceção ao atualizar estoque:", err);
     }
   };
 
@@ -311,14 +311,25 @@ export function SupplyChainDashboard() {
 
     return true;
   }).sort((a, b) => {
-    if (sortBy === 'MAIOR_ESTOQUE') return (b.stock || 0) - (a.stock || 0);
-    if (sortBy === 'MENOR_ESTOQUE') return (a.stock || 0) - (b.stock || 0);
-    if (sortBy === 'MAIS_VENDIDOS') {
+    if (sortBy === 'MAIOR_ESTOQUE') {
+      const diff = (b.stock || 0) - (a.stock || 0);
+      if (diff !== 0) return diff;
+    } else if (sortBy === 'MENOR_ESTOQUE') {
+      const diff = (a.stock || 0) - (b.stock || 0);
+      if (diff !== 0) return diff;
+    } else if (sortBy === 'MAIS_VENDIDOS') {
       const topA = topSelling.find(t => t.product_id === a.id)?.total_sold || 0;
       const topB = topSelling.find(t => t.product_id === b.id)?.total_sold || 0;
-      return topB - topA;
+      const diff = topB - topA;
+      if (diff !== 0) return diff;
+    } else if (sortBy === 'RECENTES') {
+      const timeA = new Date(a.created_at || 0).getTime();
+      const timeB = new Date(b.created_at || 0).getTime();
+      const diff = timeB - timeA;
+      if (diff !== 0) return diff;
     }
-    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    // Tie-breaker 100% determinístico por ID: impede que linhas pulem ou troquem de posição ao alterar o estoque
+    return (a.id || '').localeCompare(b.id || '');
   });
 
   if (loading) {
