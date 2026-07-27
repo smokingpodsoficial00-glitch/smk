@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { 
   PackageSearch, Plus, Minus, Eye, EyeOff, Loader2, ImagePlus, Upload, 
   Trash2, Search, Filter, ArrowUpDown, MoreVertical, Copy, Edit3, DollarSign, 
-  CheckCircle2, X, TrendingUp, PieChart, ChevronRight, ChevronDown, ChevronUp, Tag
+  CheckCircle2, X, TrendingUp, PieChart, ChevronRight, ChevronDown, ChevronUp, Tag, Box
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatBRL } from "@/lib/cart";
@@ -37,12 +37,29 @@ export function SupplyChainDashboard() {
   // Estado para grupos expandidos no Accordion
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Record<string, boolean>>({});
 
-  // Estado para Pop-up de Edição de Estoque
+  // Estado para o menu de 3 pontos do grupo/modelo
+  const [activeGroupMenuKey, setActiveGroupMenuKey] = useState<string | null>(null);
+
+  // Estado para Modal de Edição de Preço/Custo em Lote por Grupo
+  const [editingGroup, setEditingGroup] = useState<any | null>(null);
+  const [batchPrice, setBatchPrice] = useState<string>("");
+  const [batchCostPrice, setBatchCostPrice] = useState<string>("");
+
+  // Estado para Pop-up de Edição de Estoque por Sabor
   const [editingStockSku, setEditingStockSku] = useState<any | null>(null);
   const [newStockValue, setNewStockValue] = useState<string>("");
 
   // Estado para Gaveta Lateral (Drawer) de Detalhes do SKU
   const [selectedDrawerSKU, setSelectedDrawerSKU] = useState<any | null>(null);
+
+  const getGroupDisplayName = (brand: string, name: string) => {
+    const b = (brand || '').trim();
+    const n = (name || '').trim();
+    if (!b) return n;
+    if (!n) return b;
+    if (n.toLowerCase().startsWith(b.toLowerCase())) return n;
+    return `${b} ${n}`;
+  };
 
   const compressImage = (file: File, maxWidth = 500, quality = 0.75): Promise<string> => {
     return new Promise((resolve) => {
@@ -250,6 +267,76 @@ export function SupplyChainDashboard() {
       await handleUpdateStock(editingStockSku.id, parsed);
     }
     setEditingStockSku(null);
+  };
+
+  // AÇÕES EM LOTE PARA GRUPOS / MODELOS
+  const handleToggleGroupActive = async (group: any) => {
+    const ids = group.flavors.map((f: any) => f.id);
+    const anyActive = group.flavors.some((f: any) => f.is_active);
+    const newActiveState = !anyActive;
+
+    try {
+      setProducts(prev => prev.map(p => ids.includes(p.id) ? { ...p, is_active: newActiveState } : p));
+      await supabase.from("smoking_products").update({ is_active: newActiveState }).in("id", ids);
+    } catch (err) {
+      console.error(err);
+      fetchData();
+    }
+  };
+
+  const handleZeroGroupStock = async (group: any) => {
+    const groupName = getGroupDisplayName(group.brand, group.name);
+    if (!confirm(`Deseja marcar todos os ${group.flavors.length} sabores de "${groupName}" como Fora de Estoque (0 un)?`)) return;
+
+    const ids = group.flavors.map((f: any) => f.id);
+    try {
+      setProducts(prev => prev.map(p => ids.includes(p.id) ? { ...p, stock: 0 } : p));
+      await supabase.from("smoking_products").update({ stock: 0 }).in("id", ids);
+    } catch (err) {
+      console.error(err);
+      fetchData();
+    }
+  };
+
+  const handleDeleteGroup = async (group: any) => {
+    const groupName = getGroupDisplayName(group.brand, group.name);
+    if (!confirm(`ATENÇÃO: Deseja excluir permanentemente o modelo "${groupName}" e todos os seus ${group.flavors.length} sabores cadastrados?`)) return;
+
+    const ids = group.flavors.map((f: any) => f.id);
+    try {
+      setProducts(prev => prev.filter(p => !ids.includes(p.id)));
+      if (selectedDrawerSKU && ids.includes(selectedDrawerSKU.id)) setSelectedDrawerSKU(null);
+      await supabase.from("smoking_products").delete().in("id", ids);
+    } catch (err) {
+      console.error(err);
+      fetchData();
+    }
+  };
+
+  const handleSaveBatchGroupEdit = async () => {
+    if (!editingGroup) return;
+    const ids = editingGroup.flavors.map((f: any) => f.id);
+    const pVal = parseFloat(batchPrice);
+    const cVal = parseFloat(batchCostPrice);
+
+    let updatePayload: any = {};
+    if (!isNaN(pVal) && pVal >= 0) updatePayload.price = pVal;
+    if (!isNaN(cVal) && cVal >= 0) updatePayload.cost_price = cVal;
+
+    if (Object.keys(updatePayload).length === 0) {
+      setEditingGroup(null);
+      return;
+    }
+
+    try {
+      setProducts(prev => prev.map(p => ids.includes(p.id) ? { ...p, ...updatePayload } : p));
+      await supabase.from("smoking_products").update(updatePayload).in("id", ids);
+    } catch (err) {
+      console.error(err);
+      fetchData();
+    } finally {
+      setEditingGroup(null);
+    }
   };
 
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
@@ -584,7 +671,7 @@ export function SupplyChainDashboard() {
 
                 const profit = group.price - group.cost_price;
                 const marginPct = group.price > 0 ? Math.round((profit / group.price) * 100) : 0;
-                const stockPct = Math.min(100, Math.round((group.totalStock / 50) * 100));
+                const displayName = getGroupDisplayName(group.brand, group.name);
 
                 let groupStatusBadge;
                 if (group.totalStock >= 10) {
@@ -620,7 +707,7 @@ export function SupplyChainDashboard() {
                       <div className="flex items-center gap-3">
                         <div className="size-12 rounded-xl border border-white/10 bg-black/40 overflow-hidden flex items-center justify-center shrink-0">
                           {group.image_url ? (
-                            <img src={group.image_url} alt={group.name} className="size-full object-cover" />
+                            <img src={group.image_url} alt={displayName} className="size-full object-cover" />
                           ) : (
                             <ImagePlus className="size-5 text-muted-foreground/40" />
                           )}
@@ -628,7 +715,7 @@ export function SupplyChainDashboard() {
 
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="font-bold text-base text-silver">{group.brand} {group.name}</h3>
+                            <h3 className="font-bold text-base text-silver">{displayName}</h3>
                             <span className="text-[10px] bg-elevated border border-border text-muted-foreground px-2 py-0.5 rounded-md font-mono">
                               {group.puffs} puffs
                             </span>
@@ -639,8 +726,8 @@ export function SupplyChainDashboard() {
                         </div>
                       </div>
 
-                      {/* Métricas e Botão Expansor */}
-                      <div className="flex items-center gap-6 justify-between md:justify-end">
+                      {/* Métricas e Botões de Ação do Grupo */}
+                      <div className="flex items-center gap-4 justify-between md:justify-end">
                         <div className="flex items-center gap-4 text-xs font-mono">
                           <div>
                             <span className="text-[10px] uppercase text-muted-foreground block">Venda</span>
@@ -653,9 +740,89 @@ export function SupplyChainDashboard() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 relative">
                           {groupStatusBadge}
 
+                          {/* Menu de 3 Pontos (⋮) do Grupo */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveGroupMenuKey(activeGroupMenuKey === group.groupKey ? null : group.groupKey);
+                              }}
+                              className="p-1.5 rounded-lg bg-elevated hover:bg-white/10 text-muted-foreground hover:text-white transition-colors cursor-pointer"
+                              title="Ações do Modelo"
+                            >
+                              <MoreVertical className="size-4" />
+                            </button>
+
+                            {activeGroupMenuKey === group.groupKey && (
+                              <div 
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute right-0 top-9 z-50 bg-[#121212] border border-border rounded-xl shadow-2xl py-1.5 w-56 text-xs font-medium text-left animate-in fade-in zoom-in-95 duration-150"
+                              >
+                                <button
+                                  onClick={() => {
+                                    setEditingGroup(group);
+                                    setBatchPrice(group.price.toString());
+                                    setBatchCostPrice(group.cost_price.toString());
+                                    setActiveGroupMenuKey(null);
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-white/10 flex items-center gap-2 text-silver cursor-pointer"
+                                >
+                                  <Edit3 className="size-3.5 text-blue-400" />
+                                  Editar Preço / Custo em Lote
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    handleToggleGroupActive(group);
+                                    setActiveGroupMenuKey(null);
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-white/10 flex items-center gap-2 text-silver cursor-pointer"
+                                >
+                                  {group.flavors.some((f: any) => f.is_active) ? (
+                                    <>
+                                      <EyeOff className="size-3.5 text-amber-400" />
+                                      Ocultar Modelo do Cardápio
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Eye className="size-3.5 text-emerald-400" />
+                                      Exibir Modelo no Cardápio
+                                    </>
+                                  )}
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    handleZeroGroupStock(group);
+                                    setActiveGroupMenuKey(null);
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-white/10 flex items-center gap-2 text-amber-400 cursor-pointer"
+                                >
+                                  <Box className="size-3.5" />
+                                  Marcar Fora de Estoque (0 un)
+                                </button>
+
+                                <div className="h-px bg-border my-1" />
+
+                                <button
+                                  onClick={() => {
+                                    handleDeleteGroup(group);
+                                    setActiveGroupMenuKey(null);
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-red-500/10 flex items-center gap-2 text-red-400 cursor-pointer"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                  Excluir Modelo Completo
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Botão de Expandir Chevron */}
                           <div className="p-1.5 rounded-lg bg-elevated hover:bg-white/10 text-muted-foreground hover:text-white transition-colors">
                             {isExpanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
                           </div>
@@ -668,7 +835,7 @@ export function SupplyChainDashboard() {
                       <div className="bg-[#0c0c0c] border-t border-border/80 p-4 space-y-3 animate-in fade-in duration-200">
                         <div className="flex items-center justify-between pb-2 border-b border-white/5">
                           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Sabores em Estoque para {group.brand} {group.name}
+                            Sabores em Estoque para {displayName}
                           </span>
 
                           <button
@@ -928,7 +1095,7 @@ export function SupplyChainDashboard() {
         </div>
       </div>
 
-      {/* POP-UP MODAL: EDICAO RAPIDA DE ESTOQUE */}
+      {/* POP-UP MODAL: EDICAO RAPIDA DE ESTOQUE POR SABOR */}
       {editingStockSku && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#121212] border border-border rounded-2xl w-full max-w-xs shadow-2xl p-5 relative animate-in fade-in zoom-in-95 duration-150 space-y-4">
@@ -966,6 +1133,66 @@ export function SupplyChainDashboard() {
                 className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs py-2 rounded-xl"
               >
                 Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POP-UP MODAL: EDICAO EM LOTE DO MODELO (PREÇO / CUSTO) */}
+      {editingGroup && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#121212] border border-border rounded-2xl w-full max-w-sm shadow-2xl p-5 relative animate-in fade-in zoom-in-95 duration-150 space-y-4">
+            <button 
+              onClick={() => setEditingGroup(null)}
+              className="absolute top-3 right-3 text-muted-foreground hover:text-white"
+            >
+              <X className="size-4" />
+            </button>
+            
+            <h3 className="font-semibold text-sm text-silver">Editar Valores do Modelo</h3>
+            <p className="text-xs text-muted-foreground">
+              {getGroupDisplayName(editingGroup.brand, editingGroup.name)} ({editingGroup.flavors.length} sabores afetados)
+            </p>
+
+            <div className="space-y-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] uppercase font-semibold text-muted-foreground">Preço de Venda (R$)</label>
+                <input 
+                  type="number"
+                  step="0.01"
+                  value={batchPrice}
+                  onChange={(e) => setBatchPrice(e.target.value)}
+                  placeholder="Ex.: 90.00"
+                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/50"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] uppercase font-semibold text-muted-foreground">Custo de Reposição (R$)</label>
+                <input 
+                  type="number"
+                  step="0.01"
+                  value={batchCostPrice}
+                  onChange={(e) => setBatchCostPrice(e.target.value)}
+                  placeholder="Ex.: 35.00"
+                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/50"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button 
+                onClick={() => setEditingGroup(null)}
+                className="flex-1 bg-elevated hover:bg-white/10 text-muted-foreground text-xs py-2.5 rounded-xl border border-border"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleSaveBatchGroupEdit}
+                className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs py-2.5 rounded-xl"
+              >
+                Salvar em Lote
               </button>
             </div>
           </div>
