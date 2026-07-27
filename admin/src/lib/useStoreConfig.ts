@@ -33,47 +33,25 @@ const DEFAULT_CONFIG: StoreConfig = {
   description: "",
 };
 
-const LOCAL_STORAGE_KEY = "store_config_fallback_v1";
+const LOCAL_STORAGE_KEY = "store_config_fallback_v2";
 
-// BroadcastChannel para sincronização instantânea em abas do mesmo navegador
+// Limpa qualquer cookie corrompido antigo que travou o navegador
+if (typeof document !== "undefined") {
+  try {
+    document.cookie = "store_config=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT;";
+  } catch {}
+}
+
 let broadcastChannel: BroadcastChannel | null = null;
 try {
   if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-    broadcastChannel = new BroadcastChannel("store_config_channel");
+    broadcastChannel = new BroadcastChannel("store_config_channel_v2");
   }
 } catch (e) {
-  console.warn("BroadcastChannel não suportado:", e);
-}
-
-// Cookie compartilhado entre portas no localhost (5173 e 5174)
-function getCookieConfig(): StoreConfig | null {
-  try {
-    if (typeof document === "undefined") return null;
-    const match = document.cookie.match(/(?:^|; )store_config=([^;]*)/);
-    if (match && match[1]) {
-      return JSON.parse(decodeURIComponent(match[1]));
-    }
-  } catch (e) {
-    console.warn("Erro ao ler cookie:", e);
-  }
-  return null;
-}
-
-function setCookieConfig(cfg: StoreConfig) {
-  try {
-    if (typeof document === "undefined") return;
-    const val = encodeURIComponent(JSON.stringify(cfg));
-    if (val.length < 4000) {
-      document.cookie = `store_config=${val}; path=/; max-age=31536000; SameSite=Lax`;
-    }
-  } catch (e) {
-    console.warn("Erro ao salvar cookie:", e);
-  }
+  console.warn("BroadcastChannel não disponível:", e);
 }
 
 function getLocalFallback(): StoreConfig {
-  const cookieVal = getCookieConfig();
-  if (cookieVal) return cookieVal;
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (saved) return JSON.parse(saved);
@@ -84,7 +62,6 @@ function getLocalFallback(): StoreConfig {
 }
 
 function saveLocalFallback(cfg: StoreConfig) {
-  setCookieConfig(cfg);
   try {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cfg));
   } catch (e) {
@@ -106,7 +83,7 @@ function notifyListeners() {
 }
 
 async function fetchConfig(): Promise<StoreConfig> {
-  // 1. Tentar ler da tabela dedicada `store_config`
+  // 1. Tentar ler da tabela dedicada `store_config` no Supabase
   try {
     const { data, error } = await supabase
       .from("store_config")
@@ -120,7 +97,7 @@ async function fetchConfig(): Promise<StoreConfig> {
       return cachedConfig;
     }
   } catch (e) {
-    console.warn("Tabela store_config não disponível, tentando fallback em smoking_products:", e);
+    console.warn("Tabela store_config não acessível:", e);
   }
 
   // 2. Fallback: Ler do registro especial `__STORE_CONFIG__` na tabela `smoking_products`
@@ -148,10 +125,10 @@ async function fetchConfig(): Promise<StoreConfig> {
       return cachedConfig;
     }
   } catch (e) {
-    console.warn("Fallback smoking_products indisponível:", e);
+    console.warn("Fallback smoking_products não acessível:", e);
   }
 
-  // 3. Fallback final: cookie e localStorage local
+  // 3. Fallback final: localStorage local
   cachedConfig = getLocalFallback();
   notifyListeners();
   return cachedConfig;
@@ -169,7 +146,6 @@ export function useStoreConfig() {
     };
     listeners.add(onUpdate);
 
-    // Ouve mensagens de atualização do BroadcastChannel
     if (broadcastChannel) {
       const handleBroadcast = (e: MessageEvent) => {
         if (e.data && typeof e.data === "object") {
@@ -181,9 +157,9 @@ export function useStoreConfig() {
       broadcastChannel.addEventListener("message", handleBroadcast);
     }
 
-    // Supabase Realtime subscription
+    // Escuta Realtime do Supabase
     const channel = supabase
-      .channel("admin-store-config-realtime")
+      .channel("admin-store-config-v2")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "store_config" },
@@ -228,13 +204,13 @@ export function useStoreConfig() {
         updated_at: new Date().toISOString(),
       };
 
-      // 1. Atualizar cache local, Cookie & BroadcastChannel imediatamente
+      // 1. Atualiza estado local e BroadcastChannel
       saveLocalFallback(newConfig);
       cachedConfig = newConfig;
       setConfig(newConfig);
       notifyListeners();
 
-      // 2. Sincronizar na tabela dedicada `store_config` se existir
+      // 2. Salva na tabela dedicada `store_config` no Supabase
       try {
         const { data: existingRows } = await supabase
           .from("store_config")
@@ -252,10 +228,10 @@ export function useStoreConfig() {
             .insert([updates]);
         }
       } catch (e) {
-        console.info("Info: Tabela store_config indisponível:", e);
+        console.info("Tabela store_config não encontrada:", e);
       }
 
-      // 3. SEMPRE salvar na tabela `smoking_products` sob `brand: '__STORE_CONFIG__'`
+      // 3. Salva na tabela `smoking_products` sob `brand: '__STORE_CONFIG__'`
       try {
         const { data: configProducts } = await supabase
           .from("smoking_products")
@@ -289,7 +265,7 @@ export function useStoreConfig() {
             });
         }
       } catch (e) {
-        console.warn("Erro ao salvar fallback de configuração em smoking_products:", e);
+        console.warn("Erro no fallback smoking_products:", e);
       }
 
       setSaveStatus("success");
@@ -302,10 +278,10 @@ export function useStoreConfig() {
 
   const uploadLogo = useCallback(
     async (file: File): Promise<string | null> => {
-      // 1. Tentar upload no Supabase Storage (bucket store-assets ou product-images)
+      // 1. Tentar upload no Supabase Storage
       try {
         const ext = file.name.split(".").pop() || "png";
-        const fileName = `logo_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.${ext}`;
+        const fileName = `logo_${Date.now()}.${ext}`;
 
         let bucketName = "store-assets";
         let uploadRes = await supabase.storage.from(bucketName).upload(`logo/${fileName}`, file, { upsert: true });
@@ -320,10 +296,10 @@ export function useStoreConfig() {
           if (data?.publicUrl) return data.publicUrl;
         }
       } catch (e) {
-        console.warn("Storage Supabase indisponível, convertendo logo para Base64:", e);
+        console.warn("Supabase Storage indisponível, convertendo para Base64 leve:", e);
       }
 
-      // 2. Fallback: Converte imagem para Base64 comprimido
+      // 2. Fallback: Converte imagem para Base64 ultraleve (máx 250px) para não estourar memória
       return new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -332,7 +308,7 @@ export function useStoreConfig() {
             const canvas = document.createElement("canvas");
             let width = img.width;
             let height = img.height;
-            const max = 350;
+            const max = 250;
             if (width > max || height > max) {
               if (width > height) {
                 height = Math.round((height * max) / width);
@@ -346,7 +322,7 @@ export function useStoreConfig() {
             canvas.height = height;
             const ctx = canvas.getContext("2d");
             ctx?.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL("image/jpeg", 0.75));
+            resolve(canvas.toDataURL("image/png", 0.8));
           };
           img.src = reader.result as string;
         };

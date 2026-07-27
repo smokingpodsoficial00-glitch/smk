@@ -31,35 +31,25 @@ const DEFAULT_CONFIG: StoreConfig = {
   description: "",
 };
 
-const LOCAL_STORAGE_KEY = "store_config_fallback_v1";
+const LOCAL_STORAGE_KEY = "store_config_fallback_v2";
 
-// BroadcastChannel para sincronização instantânea com Admin
+// Limpa qualquer cookie antigo
+if (typeof document !== "undefined") {
+  try {
+    document.cookie = "store_config=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT;";
+  } catch {}
+}
+
 let broadcastChannel: BroadcastChannel | null = null;
 try {
   if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-    broadcastChannel = new BroadcastChannel("store_config_channel");
+    broadcastChannel = new BroadcastChannel("store_config_channel_v2");
   }
 } catch (e) {
-  console.warn("BroadcastChannel não suportado:", e);
-}
-
-// Cookie compartilhado entre portas no localhost (5173 e 5174)
-function getCookieConfig(): StoreConfig | null {
-  try {
-    if (typeof document === "undefined") return null;
-    const match = document.cookie.match(/(?:^|; )store_config=([^;]*)/);
-    if (match && match[1]) {
-      return JSON.parse(decodeURIComponent(match[1]));
-    }
-  } catch (e) {
-    console.warn("Erro ao ler cookie:", e);
-  }
-  return null;
+  console.warn("BroadcastChannel não disponível:", e);
 }
 
 function getLocalFallback(): StoreConfig {
-  const cookieVal = getCookieConfig();
-  if (cookieVal) return cookieVal;
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (saved) return JSON.parse(saved);
@@ -78,14 +68,7 @@ function notifyListeners() {
 }
 
 async function fetchConfig(): Promise<StoreConfig> {
-  // 1. Tentar ler cookie compartilhado em tempo real
-  const cookieVal = getCookieConfig();
-  if (cookieVal) {
-    cachedConfig = cookieVal;
-    notifyListeners();
-  }
-
-  // 2. Tentar ler da tabela dedicada `store_config`
+  // 1. Tentar ler da tabela dedicada `store_config`
   try {
     const { data, error } = await supabase
       .from("store_config")
@@ -102,7 +85,7 @@ async function fetchConfig(): Promise<StoreConfig> {
     console.warn("Tabela store_config não acessível no frontend:", e);
   }
 
-  // 3. Fallback: Ler do registro especial `__STORE_CONFIG__` na tabela `smoking_products`
+  // 2. Fallback: Ler do registro especial `__STORE_CONFIG__` na tabela `smoking_products`
   try {
     const { data, error } = await supabase
       .from("smoking_products")
@@ -127,10 +110,10 @@ async function fetchConfig(): Promise<StoreConfig> {
       return cachedConfig;
     }
   } catch (e) {
-    console.warn("Fallback smoking_products indisponível no frontend:", e);
+    console.warn("Fallback smoking_products não acessível no frontend:", e);
   }
 
-  // 4. Fallback final: cookie / localStorage local
+  // 3. Fallback final: localStorage local
   cachedConfig = getLocalFallback();
   notifyListeners();
   return cachedConfig;
@@ -146,7 +129,6 @@ export function useStoreConfig() {
     };
     listeners.add(onUpdate);
 
-    // Ouve atualizações via BroadcastChannel (Admin -> Frontend)
     if (broadcastChannel) {
       const handleBroadcast = (e: MessageEvent) => {
         if (e.data && typeof e.data === "object") {
@@ -158,9 +140,9 @@ export function useStoreConfig() {
       broadcastChannel.addEventListener("message", handleBroadcast);
     }
 
-    // Supabase Realtime postgres_changes subscription!
+    // Escuta Realtime do Supabase
     const channel = supabase
-      .channel("frontend-store-config-realtime")
+      .channel("frontend-store-config-v2")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "store_config" },
@@ -188,14 +170,10 @@ export function useStoreConfig() {
       });
     }
 
-    // Polling a cada 1s para ler o cookie compartilhado no localhost instantaneamente!
+    // Polling a cada 2s
     const intervalId = setInterval(() => {
-      const cookieConfig = getCookieConfig();
-      if (cookieConfig && JSON.stringify(cookieConfig) !== JSON.stringify(cachedConfig)) {
-        cachedConfig = cookieConfig;
-        setConfig(cookieConfig);
-      }
-    }, 1000);
+      fetchConfig().then(result => setConfig(result));
+    }, 2000);
 
     return () => {
       listeners.delete(onUpdate);
