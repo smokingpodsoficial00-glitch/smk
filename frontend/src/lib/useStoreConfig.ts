@@ -31,19 +31,12 @@ const DEFAULT_CONFIG: StoreConfig = {
   description: "",
 };
 
-const LOCAL_STORAGE_KEY = "store_config_fallback_v2";
-
-// Limpa qualquer cookie antigo
-if (typeof document !== "undefined") {
-  try {
-    document.cookie = "store_config=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT;";
-  } catch {}
-}
+const LOCAL_STORAGE_KEY = "store_config_fallback_v3";
 
 let broadcastChannel: BroadcastChannel | null = null;
 try {
   if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-    broadcastChannel = new BroadcastChannel("store_config_channel_v2");
+    broadcastChannel = new BroadcastChannel("store_config_channel_v3");
   }
 } catch (e) {
   console.warn("BroadcastChannel não disponível:", e);
@@ -140,20 +133,26 @@ export function useStoreConfig() {
       broadcastChannel.addEventListener("message", handleBroadcast);
     }
 
-    // Escuta Realtime do Supabase
-    const channel = supabase
-      .channel("frontend-store-config-v2")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "store_config" },
-        () => { fetchConfig().then(result => setConfig(result)); }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "smoking_products" },
-        () => { fetchConfig().then(result => setConfig(result)); }
-      )
-      .subscribe();
+    // Supabase Realtime subscription segura (sem quebrar o React)
+    let channel: any = null;
+    try {
+      channel = supabase
+        .channel(`front-config-${Math.random().toString(36).substring(2, 7)}`)
+        .on(
+          "postgres_changes" as any,
+          { event: "*", schema: "public", table: "store_config" },
+          () => { fetchConfig().then(result => setConfig(result)); }
+        )
+        .on(
+          "postgres_changes" as any,
+          { event: "*", schema: "public", table: "smoking_products" },
+          () => { fetchConfig().then(result => setConfig(result)); }
+        );
+
+      channel.subscribe();
+    } catch (e) {
+      console.warn("Erro ao registrar Supabase Realtime no frontend:", e);
+    }
 
     if (cachedConfig) {
       setConfig(cachedConfig);
@@ -178,7 +177,9 @@ export function useStoreConfig() {
     return () => {
       listeners.delete(onUpdate);
       clearInterval(intervalId);
-      supabase.removeChannel(channel);
+      if (channel) {
+        try { supabase.removeChannel(channel); } catch {}
+      }
     };
   }, []);
 

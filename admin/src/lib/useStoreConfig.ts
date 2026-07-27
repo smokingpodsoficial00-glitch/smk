@@ -33,19 +33,12 @@ const DEFAULT_CONFIG: StoreConfig = {
   description: "",
 };
 
-const LOCAL_STORAGE_KEY = "store_config_fallback_v2";
-
-// Limpa qualquer cookie corrompido antigo que travou o navegador
-if (typeof document !== "undefined") {
-  try {
-    document.cookie = "store_config=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT;";
-  } catch {}
-}
+const LOCAL_STORAGE_KEY = "store_config_fallback_v3";
 
 let broadcastChannel: BroadcastChannel | null = null;
 try {
   if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-    broadcastChannel = new BroadcastChannel("store_config_channel_v2");
+    broadcastChannel = new BroadcastChannel("store_config_channel_v3");
   }
 } catch (e) {
   console.warn("BroadcastChannel não disponível:", e);
@@ -157,20 +150,26 @@ export function useStoreConfig() {
       broadcastChannel.addEventListener("message", handleBroadcast);
     }
 
-    // Escuta Realtime do Supabase
-    const channel = supabase
-      .channel("admin-store-config-v2")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "store_config" },
-        () => { fetchConfig().then(cfg => setConfig(cfg)); }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "smoking_products" },
-        () => { fetchConfig().then(cfg => setConfig(cfg)); }
-      )
-      .subscribe();
+    // Supabase Realtime subscription segura (sem quebrar o React)
+    let channel: any = null;
+    try {
+      channel = supabase
+        .channel(`admin-config-${Math.random().toString(36).substring(2, 7)}`)
+        .on(
+          "postgres_changes" as any,
+          { event: "*", schema: "public", table: "store_config" },
+          () => { fetchConfig().then(cfg => setConfig(cfg)); }
+        )
+        .on(
+          "postgres_changes" as any,
+          { event: "*", schema: "public", table: "smoking_products" },
+          () => { fetchConfig().then(cfg => setConfig(cfg)); }
+        );
+
+      channel.subscribe();
+    } catch (e) {
+      console.warn("Erro ao registrar Supabase Realtime (ignorado com segurança):", e);
+    }
 
     if (cachedConfig) {
       setConfig(cachedConfig);
@@ -189,7 +188,9 @@ export function useStoreConfig() {
 
     return () => {
       listeners.delete(onUpdate);
-      supabase.removeChannel(channel);
+      if (channel) {
+        try { supabase.removeChannel(channel); } catch {}
+      }
     };
   }, []);
 
@@ -278,7 +279,6 @@ export function useStoreConfig() {
 
   const uploadLogo = useCallback(
     async (file: File): Promise<string | null> => {
-      // 1. Tentar upload no Supabase Storage
       try {
         const ext = file.name.split(".").pop() || "png";
         const fileName = `logo_${Date.now()}.${ext}`;
@@ -299,7 +299,6 @@ export function useStoreConfig() {
         console.warn("Supabase Storage indisponível, convertendo para Base64 leve:", e);
       }
 
-      // 2. Fallback: Converte imagem para Base64 ultraleve (máx 250px) para não estourar memória
       return new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => {
