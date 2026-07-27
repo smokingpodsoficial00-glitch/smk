@@ -33,12 +33,12 @@ const DEFAULT_CONFIG: StoreConfig = {
   description: "",
 };
 
-const LOCAL_STORAGE_KEY = "store_config_fallback_v3";
+const LOCAL_STORAGE_KEY = "store_config_fallback_v4";
 
 let broadcastChannel: BroadcastChannel | null = null;
 try {
   if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-    broadcastChannel = new BroadcastChannel("store_config_channel_v3");
+    broadcastChannel = new BroadcastChannel("store_config_channel_v4");
   }
 } catch (e) {
   console.warn("BroadcastChannel não disponível:", e);
@@ -76,7 +76,10 @@ function notifyListeners() {
 }
 
 async function fetchConfig(): Promise<StoreConfig> {
-  // 1. Tentar ler da tabela dedicada `store_config` no Supabase
+  let mainConfig: StoreConfig | null = null;
+  let fallbackConfig: StoreConfig | null = null;
+
+  // 1. Tentar ler da tabela dedicada `store_config`
   try {
     const { data, error } = await supabase
       .from("store_config")
@@ -84,16 +87,13 @@ async function fetchConfig(): Promise<StoreConfig> {
       .limit(1);
 
     if (!error && data && data.length > 0) {
-      cachedConfig = data[0] as StoreConfig;
-      saveLocalFallback(cachedConfig);
-      notifyListeners();
-      return cachedConfig;
+      mainConfig = data[0] as StoreConfig;
     }
   } catch (e) {
     console.warn("Tabela store_config não acessível:", e);
   }
 
-  // 2. Fallback: Ler do registro especial `__STORE_CONFIG__` na tabela `smoking_products`
+  // 2. Tentar ler da tabela `smoking_products` (__STORE_CONFIG__)
   try {
     const { data, error } = await supabase
       .from("smoking_products")
@@ -103,26 +103,36 @@ async function fetchConfig(): Promise<StoreConfig> {
 
     if (!error && data && data.length > 0) {
       const row = data[0];
-      let parsedConfig: StoreConfig = { ...DEFAULT_CONFIG };
       if (row.flavor) {
         try {
-          parsedConfig = { ...DEFAULT_CONFIG, ...JSON.parse(row.flavor) };
-        } catch {
-          parsedConfig.store_name = row.name || DEFAULT_CONFIG.store_name;
-          parsedConfig.logo_url = row.image_url || null;
-        }
+          fallbackConfig = JSON.parse(row.flavor);
+        } catch {}
       }
-      cachedConfig = parsedConfig;
-      saveLocalFallback(cachedConfig);
-      notifyListeners();
-      return cachedConfig;
+      if (!fallbackConfig) {
+        fallbackConfig = {
+          ...DEFAULT_CONFIG,
+          store_name: row.name || DEFAULT_CONFIG.store_name,
+          logo_url: row.image_url || null,
+        };
+      } else if (row.image_url && !fallbackConfig.logo_url) {
+        fallbackConfig.logo_url = row.image_url;
+      }
     }
   } catch (e) {
     console.warn("Fallback smoking_products não acessível:", e);
   }
 
-  // 3. Fallback final: localStorage local
-  cachedConfig = getLocalFallback();
+  // Combina as fontes
+  let local = getLocalFallback();
+  let finalConfig: StoreConfig = mainConfig || fallbackConfig || local;
+
+  const bestLogo = mainConfig?.logo_url || fallbackConfig?.logo_url || local.logo_url;
+  if (bestLogo) {
+    finalConfig.logo_url = bestLogo;
+  }
+
+  cachedConfig = finalConfig;
+  saveLocalFallback(cachedConfig);
   notifyListeners();
   return cachedConfig;
 }
@@ -150,11 +160,10 @@ export function useStoreConfig() {
       broadcastChannel.addEventListener("message", handleBroadcast);
     }
 
-    // Supabase Realtime subscription segura (sem quebrar o React)
     let channel: any = null;
     try {
       channel = supabase
-        .channel(`admin-config-${Math.random().toString(36).substring(2, 7)}`)
+        .channel(`admin-cfg-${Math.random().toString(36).substring(2, 7)}`)
         .on(
           "postgres_changes" as any,
           { event: "*", schema: "public", table: "store_config" },
@@ -168,7 +177,7 @@ export function useStoreConfig() {
 
       channel.subscribe();
     } catch (e) {
-      console.warn("Erro ao registrar Supabase Realtime (ignorado com segurança):", e);
+      console.warn("Realtime error:", e);
     }
 
     if (cachedConfig) {
@@ -205,7 +214,7 @@ export function useStoreConfig() {
         updated_at: new Date().toISOString(),
       };
 
-      // 1. Atualiza estado local e BroadcastChannel
+      // 1. Atualiza cache local e BroadcastChannel
       saveLocalFallback(newConfig);
       cachedConfig = newConfig;
       setConfig(newConfig);
