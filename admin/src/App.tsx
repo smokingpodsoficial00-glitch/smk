@@ -26,47 +26,47 @@ export default function App() {
         <div className={`h-16 flex items-center border-b border-white/10 w-full px-4 ${
           sidebarCollapsed ? 'justify-center' : 'justify-between'
         }`}>
-          {!sidebarCollapsed && (
-            <div className="flex items-center gap-2.5 min-w-0">
+          {!sidebarCollapsed ? (
+            <>
+              <div className="flex items-center gap-2.5 min-w-0">
+                {config?.logo_url ? (
+                  <img 
+                    src={config.logo_url} 
+                    alt={displayName} 
+                    className="w-7 h-7 rounded-lg object-contain shrink-0" 
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                    <Store className="size-4 text-emerald-400" />
+                  </div>
+                )}
+                <h1 className="text-lg font-bold tracking-tight text-white truncate">
+                  {displayName}
+                </h1>
+              </div>
+              <button
+                onClick={() => setSidebarCollapsed(true)}
+                className="p-2 rounded-xl text-muted-foreground hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                title="Recolher menu lateral"
+              >
+                <MoreHorizontal className="size-5" />
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setSidebarCollapsed(false)}
+              className="p-2 rounded-xl text-muted-foreground hover:text-white hover:bg-white/10 transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-white/10"
+              title="Expandir menu lateral"
+            >
               {config?.logo_url ? (
                 <img 
                   src={config.logo_url} 
                   alt={displayName} 
-                  className="w-7 h-7 rounded-lg object-contain shrink-0" 
+                  className="w-7 h-7 rounded-lg object-contain" 
                 />
               ) : (
-                <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-                  <Store className="size-4 text-primary" />
-                </div>
+                <Store className="size-5 text-emerald-400" />
               )}
-              <h1 className="text-lg font-bold tracking-tight text-silver truncate">
-                {displayName}
-              </h1>
-            </div>
-          )}
-          {sidebarCollapsed && config?.logo_url && (
-            <img 
-              src={config.logo_url} 
-              alt={displayName} 
-              className="w-7 h-7 rounded-lg object-contain" 
-            />
-          )}
-          {sidebarCollapsed && !config?.logo_url && (
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="p-2 rounded-xl text-muted-foreground hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-              title="Expandir menu lateral"
-            >
-              <MoreHorizontal className="size-5" />
-            </button>
-          )}
-          {!sidebarCollapsed && (
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="p-2 rounded-xl text-muted-foreground hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
-              title="Recolher menu lateral"
-            >
-              <MoreHorizontal className="size-5" />
             </button>
           )}
         </div>
