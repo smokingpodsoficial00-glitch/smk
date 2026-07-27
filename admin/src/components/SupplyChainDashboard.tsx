@@ -13,20 +13,27 @@ export function SupplyChainDashboard() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Form states (Campos limpos)
+  // Form states (Cadastro de Modelo Limpo - sem Sabor e sem Estoque Inicial)
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
-  const [flavor, setFlavor] = useState("");
   const [price, setPrice] = useState("");
   const [costPrice, setCostPrice] = useState("");
-  const [stock, setStock] = useState("");
   const [puffs, setPuffs] = useState("");
 
-  // Upload state
+  // Upload state (Formulário de Modelo)
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Modal para Adicionar Sabor a um Modelo Existente
+  const [addingFlavorGroup, setAddingFlavorGroup] = useState<any | null>(null);
+  const [newFlavorName, setNewFlavorName] = useState("");
+  const [newFlavorStock, setNewFlavorStock] = useState("");
+  const [newFlavorImageFile, setNewFlavorImageFile] = useState<File | null>(null);
+  const [newFlavorImagePreview, setNewFlavorImagePreview] = useState<string>("");
+  const [submittingFlavor, setSubmittingFlavor] = useState(false);
+  const flavorFileInputRef = useRef<HTMLInputElement>(null);
 
   // Filtros e ordenação ERP
   const [searchQuery, setSearchQuery] = useState("");
@@ -165,10 +172,11 @@ export function SupplyChainDashboard() {
     return () => clearInterval(intervalId);
   }, []);
 
+  // CADASTRO DE MODELO DE POD (FORMULÁRIO LATERAL LIMPO)
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !flavor.trim() || !price.trim()) {
-      alert("Por favor, preencha o Modelo, o Sabor e o Preço para cadastrar.");
+    if (!name.trim() || !price.trim()) {
+      alert("Por favor, preencha o Modelo e o Preço para cadastrar.");
       return;
     }
     setSubmitting(true);
@@ -182,10 +190,10 @@ export function SupplyChainDashboard() {
       let insertPayload: any = {
         name: name.trim(),
         brand: brand.trim() || "Genérico",
-        flavor: flavor.trim(),
+        flavor: "Padrão",
         price: parseFloat(price),
         cost_price: parseFloat(costPrice) || 35.00,
-        stock: parseInt(stock) || 0,
+        stock: 0,
         puffs: parseInt(puffs) || 5000,
         image_url: imageUrl,
         is_active: true,
@@ -209,15 +217,13 @@ export function SupplyChainDashboard() {
       if (!error && data && data.length > 0) {
         setName("");
         setBrand("");
-        setFlavor("");
         setPrice("");
         setCostPrice("");
-        setStock("");
         setPuffs("");
         setImageFile(null);
         setImagePreview("");
         if (fileInputRef.current) fileInputRef.current.value = "";
-        alert(`SKU "${flavor.trim()}" cadastrado com sucesso!`);
+        alert(`Modelo "${getGroupDisplayName(brand, name)}" cadastrado com sucesso!`);
         await fetchData();
       } else {
         alert("Erro ao inserir no Supabase: " + (error?.message || "Erro desconhecido."));
@@ -230,12 +236,67 @@ export function SupplyChainDashboard() {
     }
   };
 
-  const handleQuickAddFlavor = (groupBrand: string, groupName: string, groupPuffs: number) => {
-    setBrand(groupBrand);
-    setName(groupName);
-    setPuffs(groupPuffs ? groupPuffs.toString() : "5000");
-    setFlavor("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  // CADASTRO DEDICADO DE SABOR VIA MODAL
+  const handleAddFlavorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addingFlavorGroup || !newFlavorName.trim()) {
+      alert("Por favor, informe o nome do sabor.");
+      return;
+    }
+    setSubmittingFlavor(true);
+
+    try {
+      let imageUrl = addingFlavorGroup.image_url || "";
+      if (newFlavorImageFile) {
+        imageUrl = await uploadProductImage(newFlavorImageFile);
+      }
+
+      let insertPayload: any = {
+        name: addingFlavorGroup.name,
+        brand: addingFlavorGroup.brand,
+        flavor: newFlavorName.trim(),
+        price: addingFlavorGroup.price,
+        cost_price: addingFlavorGroup.cost_price || 35.00,
+        stock: parseInt(newFlavorStock) || 0,
+        puffs: addingFlavorGroup.puffs || 5000,
+        image_url: imageUrl,
+        is_active: true,
+      };
+
+      let { data, error } = await supabase
+        .from("smoking_products")
+        .insert(insertPayload)
+        .select();
+
+      if (error && (error.message?.includes("cost_price") || error.code === "PGRST204")) {
+        delete insertPayload.cost_price;
+        const fallbackRes = await supabase
+          .from("smoking_products")
+          .insert(insertPayload)
+          .select();
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+      }
+
+      if (!error && data) {
+        const addedName = newFlavorName.trim();
+        const modelName = getGroupDisplayName(addingFlavorGroup.brand, addingFlavorGroup.name);
+        setAddingFlavorGroup(null);
+        setNewFlavorName("");
+        setNewFlavorStock("");
+        setNewFlavorImageFile(null);
+        setNewFlavorImagePreview("");
+        alert(`Sabor "${addedName}" adicionado ao modelo ${modelName}!`);
+        await fetchData();
+      } else {
+        alert("Erro ao adicionar sabor: " + (error?.message || "Erro desconhecido."));
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("Erro ao adicionar sabor: " + err.message);
+    } finally {
+      setSubmittingFlavor(false);
+    }
   };
 
   const handleUpdateStock = async (id: string, newStock: number) => {
@@ -849,7 +910,11 @@ export function SupplyChainDashboard() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleQuickAddFlavor(group.brand, group.name, group.puffs);
+                              setAddingFlavorGroup(group);
+                              setNewFlavorName("");
+                              setNewFlavorStock("");
+                              setNewFlavorImageFile(null);
+                              setNewFlavorImagePreview("");
                             }}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/20 transition-all cursor-pointer"
                           >
@@ -944,12 +1009,12 @@ export function SupplyChainDashboard() {
           </div>
         </div>
 
-        {/* COLUNA DIREITA (25%): CARD COMPACTO DE CADASTRO DE SKU */}
+        {/* COLUNA DIREITA (25%): CARD COMPACTO DE CADASTRO DE MODELO DE POD */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-card border border-border rounded-2xl p-5 shadow-xl space-y-5 sticky top-6">
             <div className="flex items-center gap-2 text-silver border-b border-border pb-3">
               <Plus className="size-4 text-emerald-400" />
-              <h3 className="text-sm font-semibold">Cadastro de SKU</h3>
+              <h3 className="text-sm font-semibold">Cadastro de Modelo</h3>
             </div>
 
             <form onSubmit={handleAddProduct} className="space-y-4">
@@ -960,7 +1025,7 @@ export function SupplyChainDashboard() {
                   type="text" 
                   value={brand} 
                   onChange={(e) => setBrand(e.target.value)}
-                  placeholder="Digite a marca"
+                  placeholder="Digite a marca (ex: Ignite)"
                   className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-emerald-500/50 transition-all"
                 />
               </div>
@@ -973,19 +1038,6 @@ export function SupplyChainDashboard() {
                   value={name} 
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ex.: V50, BC5000"
-                  required
-                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-emerald-500/50 transition-all"
-                />
-              </div>
-
-              {/* Sabor */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Sabor *</label>
-                <input 
-                  type="text" 
-                  value={flavor} 
-                  onChange={(e) => setFlavor(e.target.value)}
-                  placeholder="Digite o sabor"
                   required
                   className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-emerald-500/50 transition-all"
                 />
@@ -1031,19 +1083,7 @@ export function SupplyChainDashboard() {
                 </div>
               </div>
 
-              {/* Estoque Inicial */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Estoque Inicial</label>
-                <input 
-                  type="number" 
-                  value={stock} 
-                  onChange={(e) => setStock(e.target.value)}
-                  placeholder="Ex.: 10"
-                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-emerald-500/50 transition-all"
-                />
-              </div>
-
-              {/* Upload de Imagem */}
+              {/* Upload de Imagem do Pod */}
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Foto do Pod</label>
                 <div 
@@ -1095,12 +1135,127 @@ export function SupplyChainDashboard() {
                 disabled={submitting}
                 className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer mt-2"
               >
-                {submitting ? <Loader2 className="size-3.5 animate-spin" /> : "Cadastrar SKU"}
+                {submitting ? <Loader2 className="size-3.5 animate-spin" /> : "Cadastrar Modelo"}
               </button>
             </form>
           </div>
         </div>
       </div>
+
+      {/* MODAL DEDICADO: ADICIONAR SABOR AO MODELO SELECIONADO */}
+      {addingFlavorGroup && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#121212] border border-border rounded-2xl w-full max-w-sm shadow-2xl p-5 relative animate-in fade-in zoom-in-95 duration-150 space-y-4">
+            <button 
+              onClick={() => setAddingFlavorGroup(null)}
+              className="absolute top-3 right-3 text-muted-foreground hover:text-white"
+            >
+              <X className="size-4" />
+            </button>
+            
+            <div>
+              <h3 className="font-bold text-sm text-silver flex items-center gap-2">
+                <Plus className="size-4 text-emerald-400" />
+                Adicionar Sabor ao Modelo
+              </h3>
+              <p className="text-xs text-emerald-400 font-semibold mt-0.5">
+                {getGroupDisplayName(addingFlavorGroup.brand, addingFlavorGroup.name)}
+              </p>
+            </div>
+
+            <form onSubmit={handleAddFlavorSubmit} className="space-y-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Nome do Sabor *</label>
+                <input 
+                  type="text"
+                  autoFocus
+                  required
+                  value={newFlavorName}
+                  onChange={(e) => setNewFlavorName(e.target.value)}
+                  placeholder="Ex.: Watermelon Ice, Mint, Grape"
+                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-emerald-500/50 transition-all"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Estoque Inicial (unidades)</label>
+                <input 
+                  type="number"
+                  value={newFlavorStock}
+                  onChange={(e) => setNewFlavorStock(e.target.value)}
+                  placeholder="Ex.: 10"
+                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-emerald-500/50 transition-all font-mono"
+                />
+              </div>
+
+              {/* Upload Opcional de Foto Específica do Sabor */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Foto do Sabor (Opcional)</label>
+                <div className="border border-dashed border-white/10 rounded-xl p-2 text-center bg-[#0f0f0f]">
+                  {newFlavorImagePreview ? (
+                    <div className="relative size-14 mx-auto rounded-lg overflow-hidden border border-white/10">
+                      <img src={newFlavorImagePreview} alt="Preview" className="size-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewFlavorImageFile(null);
+                          setNewFlavorImagePreview("");
+                        }}
+                        className="absolute top-0.5 right-0.5 bg-black/80 text-red-400 p-0.5 rounded-full"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        ref={flavorFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setNewFlavorImageFile(file);
+                            const reader = new FileReader();
+                            reader.onloadend = () => setNewFlavorImagePreview(reader.result as string);
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="hidden"
+                        id="modal-flavor-upload"
+                      />
+                      <label
+                        htmlFor="modal-flavor-upload"
+                        className="text-[11px] font-medium text-emerald-400 hover:underline cursor-pointer block"
+                      >
+                        Selecionar Imagem do Sabor
+                      </label>
+                      <span className="text-[9px] text-muted-foreground block">Usa a foto do modelo se deixado em branco</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setAddingFlavorGroup(null)}
+                  className="flex-1 bg-elevated hover:bg-white/10 text-muted-foreground text-xs py-2.5 rounded-xl border border-border"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={submittingFlavor}
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs py-2.5 rounded-xl disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {submittingFlavor ? <Loader2 className="size-3.5 animate-spin" /> : "Adicionar Sabor"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* POP-UP MODAL: EDICAO RAPIDA DE ESTOQUE POR SABOR */}
       {editingStockSku && (
