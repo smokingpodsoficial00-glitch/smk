@@ -67,11 +67,10 @@ async function fetchConfig(): Promise<StoreConfig> {
     const { data, error } = await supabase
       .from("store_config")
       .select("*")
-      .limit(1)
-      .single();
+      .limit(1);
 
-    if (!error && data) {
-      cachedConfig = data as StoreConfig;
+    if (!error && data && data.length > 0) {
+      cachedConfig = data[0] as StoreConfig;
       try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cachedConfig)); } catch {}
       notifyListeners();
       return cachedConfig;
@@ -136,6 +135,21 @@ export function useStoreConfig() {
       broadcastChannel.addEventListener("message", handleBroadcast);
     }
 
+    // Supabase Realtime postgres_changes subscription!
+    const channel = supabase
+      .channel("frontend-store-config-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "store_config" },
+        () => { fetchConfig().then(result => setConfig(result)); }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "smoking_products" },
+        () => { fetchConfig().then(result => setConfig(result)); }
+      )
+      .subscribe();
+
     if (cachedConfig) {
       setConfig(cachedConfig);
       setLoading(false);
@@ -151,14 +165,15 @@ export function useStoreConfig() {
       });
     }
 
-    // Polling a cada 3s para garantir sync mesmo em navegadores sem BroadcastChannel
+    // Polling de 2s para garantia absoluta
     const intervalId = setInterval(() => {
       fetchConfig().then(result => setConfig(result));
-    }, 3000);
+    }, 2000);
 
     return () => {
       listeners.delete(onUpdate);
       clearInterval(intervalId);
+      supabase.removeChannel(channel);
     };
   }, []);
 

@@ -34,9 +34,8 @@ const DEFAULT_CONFIG: StoreConfig = {
 };
 
 const LOCAL_STORAGE_KEY = "store_config_fallback_v1";
-const CONFIG_SKU_ID = "00000000-0000-0000-0000-000000000000";
 
-// BroadcastChannel para sincronização instantânea em abas e portas do mesmo navegador
+// BroadcastChannel para sincronização instantânea em abas do mesmo navegador
 let broadcastChannel: BroadcastChannel | null = null;
 try {
   if (typeof window !== "undefined" && "BroadcastChannel" in window) {
@@ -83,11 +82,10 @@ async function fetchConfig(): Promise<StoreConfig> {
     const { data, error } = await supabase
       .from("store_config")
       .select("*")
-      .limit(1)
-      .single();
+      .limit(1);
 
-    if (!error && data) {
-      cachedConfig = data as StoreConfig;
+    if (!error && data && data.length > 0) {
+      cachedConfig = data[0] as StoreConfig;
       saveLocalFallback(cachedConfig);
       notifyListeners();
       return cachedConfig;
@@ -152,11 +150,22 @@ export function useStoreConfig() {
         }
       };
       broadcastChannel.addEventListener("message", handleBroadcast);
-      return () => {
-        listeners.delete(onUpdate);
-        broadcastChannel?.removeEventListener("message", handleBroadcast);
-      };
     }
+
+    // Supabase Realtime subscription
+    const channel = supabase
+      .channel("admin-store-config-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "store_config" },
+        () => { fetchConfig().then(cfg => setConfig(cfg)); }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "smoking_products" },
+        () => { fetchConfig().then(cfg => setConfig(cfg)); }
+      )
+      .subscribe();
 
     if (cachedConfig) {
       setConfig(cachedConfig);
@@ -175,6 +184,7 @@ export function useStoreConfig() {
 
     return () => {
       listeners.delete(onUpdate);
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -195,38 +205,60 @@ export function useStoreConfig() {
       setConfig(newConfig);
       notifyListeners();
 
-      // 2. Tentar salvar na tabela dedicada `store_config`
+      // 2. Sincronizar na tabela dedicada `store_config` se existir
       try {
-        if (config.id && config.id !== "local-config-id") {
+        const { data: existingRows } = await supabase
+          .from("store_config")
+          .select("id")
+          .limit(1);
+
+        if (existingRows && existingRows.length > 0) {
           await supabase
             .from("store_config")
             .update(updates)
-            .eq("id", config.id);
+            .eq("id", existingRows[0].id);
         } else {
           await supabase
             .from("store_config")
-            .upsert([updates]);
+            .insert([updates]);
         }
       } catch (e) {
-        console.info("Info: Tabela store_config não encontrada ou sem permissão:", e);
+        console.info("Info: Tabela store_config indisponível:", e);
       }
 
-      // 3. SEMPRE salvar na tabela `smoking_products` como `__STORE_CONFIG__` para sincronização garantida!
+      // 3. SEMPRE salvar na tabela `smoking_products` sob `brand: '__STORE_CONFIG__'` (100% garantido!)
       try {
-        await supabase
+        const { data: configProducts } = await supabase
           .from("smoking_products")
-          .upsert({
-            id: CONFIG_SKU_ID,
-            brand: "__STORE_CONFIG__",
-            name: newConfig.store_name,
-            flavor: JSON.stringify(newConfig),
-            image_url: newConfig.logo_url || "",
-            price: 0,
-            cost_price: 0,
-            stock: 0,
-            puffs: 0,
-            is_active: false,
-          });
+          .select("id")
+          .eq("brand", "__STORE_CONFIG__")
+          .limit(1);
+
+        if (configProducts && configProducts.length > 0) {
+          await supabase
+            .from("smoking_products")
+            .update({
+              name: newConfig.store_name,
+              flavor: JSON.stringify(newConfig),
+              image_url: newConfig.logo_url || "",
+              is_active: false,
+            })
+            .eq("id", configProducts[0].id);
+        } else {
+          await supabase
+            .from("smoking_products")
+            .insert({
+              brand: "__STORE_CONFIG__",
+              name: newConfig.store_name,
+              flavor: JSON.stringify(newConfig),
+              image_url: newConfig.logo_url || "",
+              price: 0,
+              cost_price: 0,
+              stock: 0,
+              puffs: 0,
+              is_active: false,
+            });
+        }
       } catch (e) {
         console.warn("Erro ao salvar fallback de configuração em smoking_products:", e);
       }
@@ -246,7 +278,6 @@ export function useStoreConfig() {
         const ext = file.name.split(".").pop() || "png";
         const fileName = `logo_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.${ext}`;
 
-        // Tenta bucket store-assets primeiro, depois product-images
         let bucketName = "store-assets";
         let uploadRes = await supabase.storage.from(bucketName).upload(`logo/${fileName}`, file, { upsert: true });
 
