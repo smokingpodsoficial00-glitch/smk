@@ -187,14 +187,20 @@ export function SupplyChainDashboard() {
         imageUrl = await uploadProductImage(imageFile);
       }
 
+      const newBrandName = brand.trim() || "Genérico";
+      const newModelName = name.trim();
+      const newPriceVal = parseFloat(price);
+      const newCostVal = parseFloat(costPrice) || 35.00;
+      const newPuffsVal = parseInt(puffs) || 5000;
+
       let insertPayload: any = {
-        name: name.trim(),
-        brand: brand.trim() || "Genérico",
+        name: newModelName,
+        brand: newBrandName,
         flavor: "Padrão",
-        price: parseFloat(price),
-        cost_price: parseFloat(costPrice) || 35.00,
+        price: newPriceVal,
+        cost_price: newCostVal,
         stock: 0,
-        puffs: parseInt(puffs) || 5000,
+        puffs: newPuffsVal,
         image_url: imageUrl,
         is_active: true,
       };
@@ -223,8 +229,20 @@ export function SupplyChainDashboard() {
         setImageFile(null);
         setImagePreview("");
         if (fileInputRef.current) fileInputRef.current.value = "";
-        alert(`Modelo "${getGroupDisplayName(brand, name)}" cadastrado com sucesso!`);
+        
         await fetchData();
+
+        // Abre automaticamente o modal para cadastrar o primeiro sabor real!
+        setAddingFlavorGroup({
+          brand: newBrandName,
+          name: newModelName,
+          price: newPriceVal,
+          cost_price: newCostVal,
+          puffs: newPuffsVal,
+          image_url: imageUrl,
+        });
+        setNewFlavorName("");
+        setNewFlavorStock("");
       } else {
         alert("Erro ao inserir no Supabase: " + (error?.message || "Erro desconhecido."));
       }
@@ -744,6 +762,12 @@ export function SupplyChainDashboard() {
                 const marginPct = group.price > 0 ? Math.round((profit / group.price) * 100) : 0;
                 const displayName = getGroupDisplayName(group.brand, group.name);
 
+                // Filtra os sabores reais (ignorando placeholders "Padrão")
+                const realFlavors = group.flavors.filter((f: any) => {
+                  const fName = (f.flavor || '').trim().toLowerCase();
+                  return fName !== 'padrão' && fName !== 'padrao' && fName !== '';
+                });
+
                 let groupStatusBadge;
                 if (group.totalStock >= 10) {
                   groupStatusBadge = (
@@ -830,7 +854,7 @@ export function SupplyChainDashboard() {
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {group.flavors.length} {group.flavors.length === 1 ? 'sabor cadastrado' : 'sabores cadastrados'}
+                            {realFlavors.length} {realFlavors.length === 1 ? 'sabor cadastrado' : 'sabores cadastrados'}
                           </p>
                         </div>
                       </div>
@@ -962,76 +986,97 @@ export function SupplyChainDashboard() {
                           </button>
                         </div>
 
-                        {/* Lista Limpa de Sabores (Sem Miniaturas Redundantes) */}
-                        <div className="divide-y divide-white/5">
-                          {group.flavors.map((flavorSku) => {
-                            const flavorStock = flavorSku.stock || 0;
-                            let flavorBadge;
-                            if (flavorStock >= 5) {
-                              flavorBadge = <span className="text-emerald-400 text-[10px]">🟢 Em estoque</span>;
-                            } else if (flavorStock > 0) {
-                              flavorBadge = <span className="text-amber-400 text-[10px]">🟡 Estoque Baixo</span>;
-                            } else {
-                              flavorBadge = <span className="text-red-400 text-[10px]">🔴 Esgotado</span>;
-                            }
+                        {/* Lista de Sabores Reais */}
+                        {realFlavors.length === 0 ? (
+                          <div className="py-6 text-center space-y-2">
+                            <p className="text-xs text-muted-foreground">
+                              Nenhum sabor cadastrado ainda para este modelo.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAddingFlavorGroup(group);
+                                setNewFlavorName("");
+                                setNewFlavorStock("");
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/20 transition-all cursor-pointer"
+                            >
+                              <Plus className="size-3.5" />
+                              Cadastrar Primeiro Sabor
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-white/5">
+                            {realFlavors.map((flavorSku: any) => {
+                              const flavorStock = flavorSku.stock || 0;
+                              let flavorBadge;
+                              if (flavorStock >= 5) {
+                                flavorBadge = <span className="text-emerald-400 text-[10px]">🟢 Em estoque</span>;
+                              } else if (flavorStock > 0) {
+                                flavorBadge = <span className="text-amber-400 text-[10px]">🟡 Estoque Baixo</span>;
+                              } else {
+                                flavorBadge = <span className="text-red-400 text-[10px]">🔴 Esgotado</span>;
+                              }
 
-                            return (
-                              <div 
-                                key={flavorSku.id}
-                                onClick={() => setSelectedDrawerSKU(flavorSku)}
-                                className="py-2.5 px-3 flex items-center justify-between gap-4 hover:bg-white/[0.02] rounded-xl transition-colors cursor-pointer"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div>
-                                    <span className="font-semibold text-white text-xs block">{flavorSku.flavor}</span>
-                                    {flavorBadge}
-                                  </div>
-                                </div>
-
-                                {/* Controles de Estoque do Sabor */}
-                                <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
-                                  <div className="inline-flex items-center gap-1 bg-[#0f0f0f] border border-white/10 rounded-xl p-1">
-                                    <button 
-                                      type="button"
-                                      onClick={() => handleUpdateStock(flavorSku.id, flavorStock - 1)}
-                                      disabled={flavorStock === 0}
-                                      className="grid place-items-center size-6 rounded-lg hover:bg-white/10 active:scale-95 disabled:opacity-20 cursor-pointer text-muted-foreground hover:text-white"
-                                    >
-                                      <Minus className="size-3" />
-                                    </button>
-
-                                    <span 
-                                      onClick={() => {
-                                        setEditingStockSku(flavorSku);
-                                        setNewStockValue(flavorStock.toString());
-                                      }}
-                                      className="w-10 text-center text-xs font-bold text-silver font-mono cursor-pointer hover:text-emerald-400"
-                                      title="Clique para editar a quantidade"
-                                    >
-                                      {flavorStock} un
-                                    </span>
-
-                                    <button 
-                                      type="button"
-                                      onClick={() => handleUpdateStock(flavorSku.id, flavorStock + 1)}
-                                      className="grid place-items-center size-6 rounded-lg hover:bg-white/10 active:scale-95 cursor-pointer text-muted-foreground hover:text-white"
-                                    >
-                                      <Plus className="size-3" />
-                                    </button>
+                              return (
+                                <div 
+                                  key={flavorSku.id}
+                                  onClick={() => setSelectedDrawerSKU(flavorSku)}
+                                  className="py-2.5 px-3 flex items-center justify-between gap-4 hover:bg-white/[0.02] rounded-xl transition-colors cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div>
+                                      <span className="font-semibold text-white text-xs block">{flavorSku.flavor}</span>
+                                      {flavorBadge}
+                                    </div>
                                   </div>
 
-                                  <button
-                                    onClick={() => setSelectedDrawerSKU(flavorSku)}
-                                    className="p-1.5 rounded-lg bg-elevated hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
-                                    title="Ver detalhes do sabor"
-                                  >
-                                    <ChevronRight className="size-4" />
-                                  </button>
+                                  {/* Controles de Estoque do Sabor */}
+                                  <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                                    <div className="inline-flex items-center gap-1 bg-[#0f0f0f] border border-white/10 rounded-xl p-1">
+                                      <button 
+                                        type="button"
+                                        onClick={() => handleUpdateStock(flavorSku.id, flavorStock - 1)}
+                                        disabled={flavorStock === 0}
+                                        className="grid place-items-center size-6 rounded-lg hover:bg-white/10 active:scale-95 disabled:opacity-20 cursor-pointer text-muted-foreground hover:text-white"
+                                      >
+                                        <Minus className="size-3" />
+                                      </button>
+
+                                      <span 
+                                        onClick={() => {
+                                          setEditingStockSku(flavorSku);
+                                          setNewStockValue(flavorStock.toString());
+                                        }}
+                                        className="w-10 text-center text-xs font-bold text-silver font-mono cursor-pointer hover:text-emerald-400"
+                                        title="Clique para editar a quantidade"
+                                      >
+                                        {flavorStock} un
+                                      </span>
+
+                                      <button 
+                                        type="button"
+                                        onClick={() => handleUpdateStock(flavorSku.id, flavorStock + 1)}
+                                        className="grid place-items-center size-6 rounded-lg hover:bg-white/10 active:scale-95 cursor-pointer text-muted-foreground hover:text-white"
+                                      >
+                                        <Plus className="size-3" />
+                                      </button>
+                                    </div>
+
+                                    <button
+                                      onClick={() => setSelectedDrawerSKU(flavorSku)}
+                                      className="p-1.5 rounded-lg bg-elevated hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
+                                      title="Ver detalhes do sabor"
+                                    >
+                                      <ChevronRight className="size-4" />
+                                    </button>
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
