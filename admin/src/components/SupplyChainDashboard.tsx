@@ -22,8 +22,8 @@ export function SupplyChainDashboard() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // ─── Drawer de Novo Produto ─────────────────────────────
-  const [showNewProductDrawer, setShowNewProductDrawer] = useState(false);
+  // ─── Modal Flutuante Centralizado de Novo Produto ──────
+  const [showNewProductModal, setShowNewProductModal] = useState(false);
 
   // Form states (Cadastro de Modelo)
   const [name, setName] = useState("");
@@ -205,7 +205,7 @@ export function SupplyChainDashboard() {
         setName(""); setBrand(""); setPrice(""); setCostPrice(""); setPuffs("");
         setImageFile(null); setImagePreview("");
         if (fileInputRef.current) fileInputRef.current.value = "";
-        setShowNewProductDrawer(false);
+        setShowNewProductModal(false);
         await fetchData();
 
         setAddingFlavorGroup({
@@ -483,10 +483,10 @@ export function SupplyChainDashboard() {
   return (
     <div className="flex-1 overflow-y-auto bg-background custom-scrollbar relative">
 
-      {/* ━━━ STICKY HEADER + BARRA DE AÇÕES ━━━━━━━━━━━━━━ */}
+      {/* ━━━ STICKY HEADER COM APENAS O BOTÃO NOVO PRODUTO ━━━━━━━━━━━━━━ */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border">
         <div className="px-4 md:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                 <PackageSearch className="size-5 text-emerald-400" />
@@ -497,37 +497,14 @@ export function SupplyChainDashboard() {
               </p>
             </div>
 
-            {/* Barra de Ações Principais */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowNewProductDrawer(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.15)] cursor-pointer active:scale-[0.97]"
-              >
-                <Plus className="size-3.5" />
-                Novo Produto
-              </button>
-              <button
-                onClick={() => alert("Funcionalidade de Entrada em breve!")}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-elevated hover:bg-white/10 text-silver text-xs font-semibold border border-border transition-all cursor-pointer"
-              >
-                <Download className="size-3.5 text-emerald-400" />
-                Entrada
-              </button>
-              <button
-                onClick={() => alert("Funcionalidade de Saída em breve!")}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-elevated hover:bg-white/10 text-silver text-xs font-semibold border border-border transition-all cursor-pointer"
-              >
-                <Upload className="size-3.5 text-red-400" />
-                Saída
-              </button>
-              <button
-                onClick={() => alert("Relatórios em breve!")}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-elevated hover:bg-white/10 text-silver text-xs font-semibold border border-border transition-all cursor-pointer"
-              >
-                <BarChart3 className="size-3.5 text-blue-400" />
-                Relatórios
-              </button>
-            </div>
+            {/* Apenas o Botão + Novo Produto no Topo Superior Direito */}
+            <button
+              onClick={() => setShowNewProductModal(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] cursor-pointer active:scale-[0.97]"
+            >
+              <Plus className="size-4" />
+              Novo Produto
+            </button>
           </div>
         </div>
       </div>
@@ -674,7 +651,7 @@ export function SupplyChainDashboard() {
 
               {/* Legenda */}
               <div className="flex-1 space-y-2.5">
-                {donutSegments.map((seg, idx) => (
+                {donutSegments.map((seg) => (
                   <div key={seg.brandName} className="flex items-center gap-2.5">
                     <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
                     <div className="flex-1 flex items-center justify-between min-w-0">
@@ -1049,52 +1026,57 @@ export function SupplyChainDashboard() {
         </div>
       </div>
 
-      {/* ━━━ DRAWER: NOVO PRODUTO ━━━━━━━━━━━━━━━━━━━━━━━ */}
-      {showNewProductDrawer && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end">
+      {/* ━━━ MODAL FLUTUANTE CENTRALIZADO ("BOLHA"): NOVO PRODUTO ━━━━━━━━ */}
+      {showNewProductModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+          {/* Backdrop Click para fechar */}
           <div 
             className="absolute inset-0" 
-            onClick={() => setShowNewProductDrawer(false)} 
+            onClick={() => setShowNewProductModal(false)} 
           />
-          <div className="relative bg-[#121212] border-l border-border w-full max-w-[480px] h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
-            {/* Header do Drawer */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-border shrink-0">
+          
+          {/* Card Flutuante Centralizado (Bolha) */}
+          <div className="relative bg-[#121212] border border-border rounded-3xl w-full max-w-lg shadow-2xl p-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200 space-y-5">
+            {/* Header do Modal */}
+            <div className="flex items-center justify-between border-b border-border pb-4">
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <Plus className="size-5 text-emerald-400" />
-                  Novo Produto
+                  Cadastrar Novo Modelo
                 </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Cadastrar um novo modelo de pod</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Preencha as informações do produto</p>
               </div>
               <button 
-                onClick={() => setShowNewProductDrawer(false)}
-                className="p-2 rounded-lg text-muted-foreground hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                onClick={() => setShowNewProductModal(false)}
+                className="p-2 rounded-xl text-muted-foreground hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X className="size-5" />
               </button>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleAddProduct} className="flex-1 overflow-y-auto px-6 py-6 space-y-5 custom-scrollbar">
-              {/* Marca */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Marca</label>
-                <input 
-                  type="text" value={brand} onChange={(e) => setBrand(e.target.value)}
-                  placeholder="Ex.: Ignite, Elf Bar, Lost Mary"
-                  className="bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
-                />
-              </div>
+            {/* Formulario */}
+            <form onSubmit={handleAddProduct} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                {/* Marca */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Marca</label>
+                  <input 
+                    type="text" value={brand} onChange={(e) => setBrand(e.target.value)}
+                    placeholder="Ex.: Ignite, Elf Bar"
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                  />
+                </div>
 
-              {/* Modelo */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Modelo *</label>
-                <input 
-                  type="text" value={name} onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex.: V50, BC5000, OS5000"
-                  required
-                  className="bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
-                />
+                {/* Modelo */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Modelo *</label>
+                  <input 
+                    type="text" value={name} onChange={(e) => setName(e.target.value)}
+                    placeholder="Ex.: V50, BC5000"
+                    required
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                  />
+                </div>
               </div>
 
               {/* Puffs */}
@@ -1103,7 +1085,7 @@ export function SupplyChainDashboard() {
                 <input 
                   type="number" value={puffs} onChange={(e) => setPuffs(e.target.value)}
                   placeholder="Ex.: 5000"
-                  className="bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                  className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono"
                 />
               </div>
 
@@ -1114,7 +1096,7 @@ export function SupplyChainDashboard() {
                   <input 
                     type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)}
                     placeholder="90.00" required
-                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono"
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -1122,7 +1104,7 @@ export function SupplyChainDashboard() {
                   <input 
                     type="number" step="0.01" value={costPrice} onChange={(e) => setCostPrice(e.target.value)}
                     placeholder="35.00"
-                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono"
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono"
                   />
                 </div>
               </div>
@@ -1134,12 +1116,12 @@ export function SupplyChainDashboard() {
                   onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                   onDragLeave={() => setIsDragging(false)}
                   onDrop={handleDrop}
-                  className={`border border-dashed rounded-xl p-4 text-center transition-all ${
+                  className={`border border-dashed rounded-xl p-3 text-center transition-all ${
                     isDragging ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/10 bg-[#0a0a0a]'
                   }`}
                 >
                   {imagePreview ? (
-                    <div className="relative size-20 mx-auto rounded-xl overflow-hidden border border-white/10">
+                    <div className="relative size-16 mx-auto rounded-xl overflow-hidden border border-white/10">
                       <img src={imagePreview} alt="Preview" className="size-full object-cover" />
                       <button
                         type="button"
@@ -1150,36 +1132,36 @@ export function SupplyChainDashboard() {
                       </button>
                     </div>
                   ) : (
-                    <div className="py-2">
-                      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" id="drawer-pod-upload" />
-                      <Camera className="size-8 text-muted-foreground/30 mx-auto mb-2" />
-                      <label htmlFor="drawer-pod-upload" className="text-sm font-medium text-emerald-400 hover:underline cursor-pointer">
+                    <div className="py-1">
+                      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" id="modal-pod-upload" />
+                      <Camera className="size-6 text-muted-foreground/30 mx-auto mb-1" />
+                      <label htmlFor="modal-pod-upload" className="text-xs font-medium text-emerald-400 hover:underline cursor-pointer">
                         Selecionar Imagem
                       </label>
-                      <span className="text-[11px] text-muted-foreground block mt-1">ou arraste o arquivo aqui</span>
+                      <span className="text-[10px] text-muted-foreground block mt-0.5">ou arraste o arquivo aqui</span>
                     </div>
                   )}
                 </div>
               </div>
-            </form>
 
-            {/* Footer do Drawer */}
-            <div className="px-6 py-4 border-t border-border flex gap-3 shrink-0">
-              <button 
-                type="button"
-                onClick={() => setShowNewProductDrawer(false)}
-                className="flex-1 bg-elevated hover:bg-white/10 text-muted-foreground text-sm py-3 rounded-xl border border-border transition-all cursor-pointer font-medium"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={(e) => { e.preventDefault(); handleAddProduct(e as any); }}
-                disabled={submitting}
-                className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm py-3 rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.15)] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {submitting ? <Loader2 className="size-4 animate-spin" /> : "Cadastrar Modelo"}
-              </button>
-            </div>
+              {/* Botões de Ação do Modal */}
+              <div className="flex gap-2.5 pt-3 border-t border-border">
+                <button 
+                  type="button"
+                  onClick={() => setShowNewProductModal(false)}
+                  className="flex-1 bg-elevated hover:bg-white/10 text-muted-foreground text-xs font-semibold py-2.5 rounded-xl border border-border transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs py-2.5 rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  {submitting ? <Loader2 className="size-3.5 animate-spin" /> : "Cadastrar Modelo"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
