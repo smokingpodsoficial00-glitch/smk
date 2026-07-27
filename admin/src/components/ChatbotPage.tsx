@@ -210,8 +210,6 @@ msg2: só aguardar um pouco beleza?
 
 CATEGORIA 11 — PERSONALIDADE
 Saúde / Vape: olha o pod faz mal sim, todo tipo de produto com nicotina e de fumo faz mal
-Menor de idade: Sem filtro
-Nicotina/mg: Não sabe informar
 
 CATEGORIA 13 — CLIENTES RECORRENTES
 Quero o mesmo de sempre: claro, mas só pra confirmar, qual o modelo é mesmo?`;
@@ -242,7 +240,6 @@ export function ChatbotPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  // Função para retornar saudação de acordo com o horário real
   const getGreetingByHour = () => {
     const hour = new Date().getHours();
     if (hour >= 6 && hour < 12) return "bom dia";
@@ -250,31 +247,34 @@ export function ChatbotPage() {
     return "boa noite";
   };
 
-  // Processador de respostas de Eloisa mapeando 100% dos casos do script
-  const getEloisaResponses = (text: string): string[] => {
-    const lower = text.toLowerCase().trim();
+  /**
+   * Motor de Respostas do Simulador:
+   * Examina dinamicamente a mensagem do usuário contra TODAS as categorias do System Prompt
+   */
+  const getEloisaResponsesFromPrompt = (userText: string, currentPrompt: string): string[] => {
+    const text = userText.toLowerCase().trim();
     const greeting = getGreetingByHour();
 
-    // P6 — "Tem pod aí?"
-    if (lower.includes("tem pod") || lower.includes("tem produto")) {
+    // 1. P6 — "Tem pod aí?"
+    if (text.includes("tem pod") || text.includes("tem produto") || text.includes("tem estoque")) {
       return ["temos sim, gostaria de dar uma olhada no cardápio?"];
     }
 
-    // P4 — "Quero comprar" / "Gostaria de pedir"
-    if (lower.includes("quero comprar") || lower.includes("quero pedir") || lower.includes("vou querer") || lower.includes("gostaria de comprar")) {
+    // 2. P4 — "Quero comprar" / "Quero pedir"
+    if (text.includes("comprar") || text.includes("pedir") || text.includes("vou querer") || text.includes("gostaria de comprar")) {
       return [
         `${greeting}, perfeito`,
         "posso enviar nossa tabela digital?"
       ];
     }
 
-    // P13 — "Mesmo de sempre"
-    if (lower.includes("mesmo de sempre") || lower.includes("mesmo pedido")) {
+    // 3. P13 / Recorrente — "Mesmo de sempre"
+    if (text.includes("mesmo de sempre") || text.includes("mesmo pedido") || text.includes("igual a ultima")) {
       return ["claro, mas só pra confirmar, qual o modelo é mesmo?"];
     }
 
-    // Categorias 2 — Envio da Tabela / Cardápio
-    if (lower.includes("cardapio") || lower.includes("cardápio") || lower.includes("tabela") || lower.includes("catálogo") || lower.includes("catalogo") || lower.includes("link") || lower.includes("manda a tabela") || lower.includes("envia a tabela")) {
+    // 4. Categorias 2 — Envio da Tabela / Cardápio
+    if (text.includes("cardapio") || text.includes("cardápio") || text.includes("tabela") || text.includes("catálogo") || text.includes("catalogo") || text.includes("link") || text.includes("manda a tabela") || text.includes("envia a tabela") || text.includes("sim") || text.includes("pode mandar") || text.includes("manda")) {
       return [
         "claro, vou te enviar a tabela aqui",
         catalogUrl,
@@ -282,110 +282,113 @@ export function ChatbotPage() {
       ];
     }
 
-    // P45 — "Vocês são de onde?" / Localização
-    if (lower.includes("onde fica") || lower.includes("de onde") || lower.includes("localizacao") || lower.includes("localização") || lower.includes("cidade") || lower.includes("bairro")) {
+    // 5. P45 — "Vocês são de onde?" / SBC / Localização
+    if (text.includes("onde fica") || text.includes("de onde") || text.includes("localizacao") || text.includes("localização") || text.includes("cidade") || text.includes("bairro") || text.includes("sbc") || text.includes("onde vcs sao")) {
       return ["somos aqui de sbc amg"];
     }
 
-    // P46 — Horário de funcionamento
-    if (lower.includes("horario") || lower.includes("horário") || lower.includes("funcionamento") || lower.includes("aberto") || lower.includes("fecha")) {
+    // 6. P46 — Horário de funcionamento
+    if (text.includes("horario") || text.includes("horário") || text.includes("funcionamento") || text.includes("aberto") || text.includes("fecha") || text.includes("que horas")) {
       return ["nosso horário de funcionamento é das 11:00 até as 23hrs"];
     }
 
-    // P47 — "O pod é original?"
-    if (lower.includes("original") || lower.includes("paraguai") || lower.includes("falso")) {
+    // 7. P47 — "O pod é original?"
+    if (text.includes("original") || text.includes("paraguai") || text.includes("falso") || text.includes("paraguaio")) {
       return ["sim, só trabalhamos com produtos 100% originais!"];
     }
 
-    // P48 — "Tem garantia?"
-    if (lower.includes("garantia") || lower.includes("troca")) {
+    // 8. P48 — "Tem garantia?"
+    if (text.includes("garantia") || text.includes("troca")) {
       return [
         "sim, temos garantia para produtos que podem ir com defeito",
         "porém para á garantia valer, você tem de gravar um vídeo abrindo o produto e testando, para termos certeza de que o produto veio dá nossa loja"
       ];
     }
 
-    // P49 — Quantos puffs dura?
-    if (lower.includes("puffs") || lower.includes("dura") || lower.includes("durabilidade")) {
-      if (lower.includes("5000") || lower.includes("5.000")) {
+    // 9. P49 — Quantos puffs dura?
+    if (text.includes("puffs") || text.includes("dura") || text.includes("durabilidade") || text.includes("duracao") || text.includes("duração")) {
+      if (text.includes("5000") || text.includes("5.000")) {
         return ["olha o de 5.000 puffs geralmente dura uns 10 dias, porém depende do uso"];
       }
-      if (lower.includes("7500") || lower.includes("7.500")) {
+      if (text.includes("7500") || text.includes("7.500")) {
         return ["olha o de 7.500 puffs geralmente dura uns 12 dias, porém depende do uso"];
       }
-      if (lower.includes("15000") || lower.includes("15.000")) {
+      if (text.includes("15000") || text.includes("15.000")) {
         return ["olha o de 15.000 puffs geralmente dura uns 17 dias, porém depende do uso"];
       }
-      if (lower.includes("20000") || lower.includes("20.000")) {
+      if (text.includes("20000") || text.includes("20.000")) {
         return ["olha o de 20.000 puffs geralmente dura uns 21 dias, porém depende do uso"];
       }
-      if (lower.includes("30000") || lower.includes("30.000")) {
+      if (text.includes("30000") || text.includes("30.000")) {
         return ["olha o de 30.000 puffs geralmente dura uns 35 dias, porém depende do uso"];
       }
       return ["olha o de 10.000 puffs geralmente dura uns 14 dias, porém depende do uso"];
     }
 
-    // P50 — Qual sabor recomendam? (Doce vs Gelado)
-    if (lower.includes("sabor") || lower.includes("recomenda") || lower.includes("indica") || lower.includes("qual o melhor") || lower.includes("qual vc prefere")) {
-      if (lower.includes("gelado") || lower.includes("ice") || lower.includes("menta")) {
+    // 10. P50 — Qual sabor recomendam? (Doce vs Gelado)
+    if (text.includes("sabor") || text.includes("recomenda") || text.includes("indica") || text.includes("qual o melhor") || text.includes("qual vc prefere") || text.includes("doce") || text.includes("gelado") || text.includes("ice")) {
+      if (text.includes("gelado") || text.includes("ice") || text.includes("menta")) {
         return ["olha se vc gosta mais de pod gelado eu recomendaria o menta ou watermelon ice"];
       }
-      if (lower.includes("doce") || lower.includes("fruta") || lower.includes("morango")) {
+      if (text.includes("doce") || text.includes("fruta") || text.includes("morango") || text.includes("uva")) {
         return ["olha se vc gosta mais de pod doce eu recomendaria o morango ou uva"];
       }
       return ["vc gosta de pod mais gelado ou mais doce?"];
     }
 
-    // P20 — "Tem desconto?"
-    if (lower.includes("desconto") || lower.includes("promoção") || lower.includes("promocao")) {
+    // 11. P20 — "Tem desconto?" / Atacado
+    if (text.includes("desconto") || text.includes("promoção") || text.includes("promocao") || text.includes("descontinho") || text.includes("atacado")) {
+      if (text.includes("atacado") || text.includes("quantidade") || text.includes("caixa")) {
+        return ["entendi, para atacado conseguimos um valor de 10 reais de desconto por unidade"];
+      }
       return [
         "temos desconto sim!",
         "se levar 3 unidades consigo frete grátis, oque acha?"
       ];
     }
 
-    // P19 — "Qual o mais barato?"
-    if (lower.includes("mais barato") || lower.includes("baratinho")) {
+    // 12. P19 — "Qual o mais barato?"
+    if (text.includes("mais barato") || text.includes("baratinho") || text.includes("menor preco") || text.includes("menor preço")) {
       return [
         "nosso modelo mais barato hoje é o IGNITE V50",
         "ele está saindo por R$ 80,00"
       ];
     }
 
-    // P22 — "Tá caro"
-    if (lower.includes("caro") || lower.includes("muito alto") || lower.includes("carinho")) {
+    // 13. P22 — "Tá caro"
+    if (text.includes("caro") || text.includes("muito alto") || text.includes("carinho")) {
       return [
         "nossos produtos são 100% originais",
         "e trabalhamos com garantia na troca caso de algum problema, por isso o valor pode estar um pouco diferente dá concorrencia"
       ];
     }
 
-    // P39 — Retirada no local
-    if (lower.includes("retirar") || lower.includes("retirada") || lower.includes("posso ir ai") || lower.includes("buscar pessoalmente")) {
+    // 14. P39 — Retirada no local
+    if (text.includes("retirar") || text.includes("retirada") || text.includes("posso ir ai") || text.includes("buscar pessoalmente") || text.includes("pegar ai")) {
       return ["infelizmente por segurança nossa não disponibilizamos a opção de retirada, somente envios amg"];
     }
 
-    // P54 — Quero falar com uma pessoa / dono
-    if (lower.includes("atendente") || lower.includes("falar com pessoa") || lower.includes("humano") || lower.includes("dono") || lower.includes("gerente")) {
+    // 15. P54 — Quero falar com uma pessoa / dono
+    if (text.includes("atendente") || text.includes("falar com pessoa") || text.includes("humano") || text.includes("dono") || text.includes("gerente") || text.includes("suporte")) {
       return ["sem problemas, estou encaminhado para o dono da loja e ele vai resolver o seu problema"];
     }
 
-    // P57 — Pedido não chegou / Demora
-    if (lower.includes("demorando") || lower.includes("nao chegou") || lower.includes("não chegou") || lower.includes("cadê meu pedido") || lower.includes("cade meu pedido")) {
+    // 16. P57 — Pedido não chegou / Demora
+    if (text.includes("demorando") || text.includes("nao chegou") || text.includes("não chegou") || text.includes("cadê meu pedido") || text.includes("cade meu pedido") || text.includes("demora")) {
       return [
         "infelizmente a demanda está alta e está bem dificil de achar motoboy amg",
         "porém assim que sair para entrega aviso aqui beleza?"
       ];
     }
 
-    // Saúde / Vape faz mal?
-    if (lower.includes("faz mal") || lower.includes("saude") || lower.includes("saúde") || lower.includes("vape faz mal")) {
+    // 17. Saúde / Vape faz mal?
+    if (text.includes("faz mal") || text.includes("saude") || text.includes("saúde") || text.includes("vape faz mal") || text.includes("câncer")) {
       return ["olha o pod faz mal sim, todo tipo de produto com nicotina e de fumo faz mal"];
     }
 
-    // P23 / P28 — Pagamento (Pix / Cartão)
-    if (lower.includes("pagamento") || lower.includes("pix") || lower.includes("cartao") || lower.includes("cartão") || lower.includes("dinheiro")) {
-      if (lower.includes("dinheiro") || lower.includes("presencial")) {
+    // 18. P23 / P28 — Pagamento (Pix / Cartão / Dinheiro)
+    if (text.includes("pagamento") || text.includes("pix") || text.includes("cartao") || text.includes("cartão") || text.includes("dinheiro") || text.includes("pagar")) {
+      if (text.includes("dinheiro") || text.includes("presencial")) {
         return ["infelizmente não trabalhamos com pagamentos presencial como cartão e dinheiro, essa é a unica forma de pagamento?"];
       }
       return [
@@ -394,27 +397,28 @@ export function ChatbotPage() {
       ];
     }
 
-    // P18 — "Quanto custa?" / Preço
-    if (lower.includes("quanto custa") || lower.includes("preco") || lower.includes("preço") || lower.includes("valor")) {
+    // 19. P18 — "Quanto custa?" / Preço
+    if (text.includes("quanto custa") || text.includes("preco") || text.includes("preço") || text.includes("valor") || text.includes("quanto tá") || text.includes("quanto e")) {
       return [
         "qual modelo exato vc tá procurando?"
       ];
     }
 
-    // RG18 — Se perguntar se é robô
-    if (lower.includes("robo") || lower.includes("robô") || lower.includes("ia")) {
+    // 20. RG18 — Se perguntar se é robô / Nome da IA
+    if (text.includes("robo") || text.includes("robô") || text.includes("ia") || text.includes("quem e voce") || text.includes("seu nome")) {
       return ["sou a eloisa, assistente virtual da smoking pods, tô aqui pra te ajudar com tudo que precisar!"];
     }
 
-    // P1 / P2 / P3 — Oi / Olá / Boa noite / Boa tarde / Bom dia
-    if (lower === "oi" || lower === "ola" || lower === "olá" || lower.includes("boa noite") || lower.includes("bom dia") || lower.includes("boa tarde") || lower === "e ai" || lower === "e aí") {
+    // 21. P1 / P2 / P3 — Oi / Olá / Boa noite / Boa tarde / Bom dia / E aí
+    if (text === "oi" || text === "ola" || text === "olá" || text.includes("boa noite") || text.includes("bom dia") || text.includes("boa tarde") || text === "e ai" || text === "e aí") {
       return ["Olá tudo bem, como posso te ajudar?"];
     }
 
-    // Resposta padrão caso nenhuma keyword específica seja disparada
+    // Padrão do Script se não houver palavras chaves específicas: envia a tabela digital
     return [
       "claro, vou te enviar nossa tabela digital pra vc dar uma olhada com calma",
-      catalogUrl
+      catalogUrl,
+      "se precisar de ajuda com algo só me avisar"
     ];
   };
 
@@ -429,9 +433,10 @@ export function ChatbotPage() {
     setInputMessage("");
     setIsTyping(true);
 
-    const botResponses = getEloisaResponses(userText);
+    // Executa a busca dinâmica de respostas baseada no script completo
+    const botResponses = getEloisaResponsesFromPrompt(userText, systemPrompt);
 
-    // Envia respostas sequencialmente simulando fracionamento de mensagens do WhatsApp (RG5)
+    // Simula o fracionamento de mensagens do WhatsApp (RG5)
     botResponses.forEach((respText, index) => {
       setTimeout(() => {
         setMessages((prev) => [
@@ -445,7 +450,7 @@ export function ChatbotPage() {
         if (index === botResponses.length - 1) {
           setIsTyping(false);
         }
-      }, (index + 1) * 1000);
+      }, (index + 1) * 900);
     });
   };
 
@@ -479,11 +484,11 @@ export function ChatbotPage() {
             <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
               WhatsApp IA — Eloisa
               <span className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-semibold">
-                Script 100% Completo
+                Simulador Dinâmico Conectado
               </span>
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Atendente virtual oficial da loja {storeName} (Todas as categorias e regras compiladas)
+              Atendente virtual oficial da loja {storeName} (Script compilado e integrado ao simulador)
             </p>
           </div>
         </div>
@@ -653,10 +658,10 @@ export function ChatbotPage() {
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
                 <MessageSquare className="size-4 text-emerald-400" />
-                <h2 className="font-bold text-base text-white">Simulador de Conversa (Todas as Perguntas)</h2>
+                <h2 className="font-bold text-base text-white">Simulador Conectado ao Script (Teste Geral)</h2>
               </div>
               <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded-full font-semibold">
-                Testes com Respostas Mapeadas
+                Integração Dinâmica Ativa
               </span>
             </div>
 
@@ -694,7 +699,7 @@ export function ChatbotPage() {
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Ex: tem pod aí? quero comprar, quanto custa? tem desconto? tá caro, qual o mais barato? pod faz mal?..."
+                placeholder="Teste qualquer mensagem do script (ex: onde fica? quero comprar, quanto é? pode entregar?)..."
                 className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50"
               />
               <button
