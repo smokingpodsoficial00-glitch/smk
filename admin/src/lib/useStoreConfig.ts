@@ -79,7 +79,7 @@ async function fetchConfig(): Promise<StoreConfig> {
   let mainConfig: StoreConfig | null = null;
   let fallbackConfig: StoreConfig | null = null;
 
-  // 1. Tentar ler da tabela dedicada `store_config`
+  // 1. Tentar ler da tabela dedicada `store_config` no Supabase (se existir)
   try {
     const { data, error } = await supabase
       .from("store_config")
@@ -241,7 +241,7 @@ export function useStoreConfig() {
         console.info("Tabela store_config não encontrada:", e);
       }
 
-      // 3. Salva na tabela `smoking_products` sob `brand: '__STORE_CONFIG__'`
+      // 3. Salva na tabela `smoking_products` sob `brand: '__STORE_CONFIG__'` (sem cost_price)
       try {
         const { data: configProducts } = await supabase
           .from("smoking_products")
@@ -268,7 +268,6 @@ export function useStoreConfig() {
               flavor: JSON.stringify(newConfig),
               image_url: newConfig.logo_url || "",
               price: 0,
-              cost_price: 0,
               stock: 0,
               puffs: 0,
               is_active: false,
