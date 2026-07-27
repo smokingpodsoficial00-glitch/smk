@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, useEffect, type ReactNode } from "react";
 import type { Product } from "@/lib/products";
+import { supabase } from "@/lib/supabase";
 
 export interface CartItem { product: Product; quantity: number; }
 
@@ -56,14 +57,53 @@ export function useCart() {
   return ctx;
 }
 
+// Fallback caso o store_config não esteja disponível
 export const WHATSAPP_NUMBER = "5511977300561"; // troque pelo seu número
 
 export function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export function buildWhatsAppUrl(items: CartItem[], total: number) {
+// Busca o WhatsApp e nome da loja do store_config (cache em memória)
+let _cachedWhatsApp: string | null = null;
+let _cachedStoreName: string | null = null;
+let _configFetchPromise: Promise<void> | null = null;
+
+async function ensureStoreConfig() {
+  if (_cachedWhatsApp !== null) return;
+  if (_configFetchPromise) {
+    await _configFetchPromise;
+    return;
+  }
+  _configFetchPromise = (async () => {
+    try {
+      const { data } = await supabase.from("store_config").select("whatsapp_number, store_name").limit(1).single();
+      if (data) {
+        _cachedWhatsApp = data.whatsapp_number || WHATSAPP_NUMBER;
+        _cachedStoreName = data.store_name || "Minha Loja";
+      }
+    } catch {
+      _cachedWhatsApp = WHATSAPP_NUMBER;
+      _cachedStoreName = "Minha Loja";
+    }
+  })();
+  await _configFetchPromise;
+}
+
+export async function getWhatsAppNumber(): Promise<string> {
+  await ensureStoreConfig();
+  return _cachedWhatsApp || WHATSAPP_NUMBER;
+}
+
+export async function getStoreName(): Promise<string> {
+  await ensureStoreConfig();
+  return _cachedStoreName || "Minha Loja";
+}
+
+export function buildWhatsAppUrl(items: CartItem[], total: number, whatsappNumber?: string, storeName?: string) {
+  const phone = whatsappNumber || _cachedWhatsApp || WHATSAPP_NUMBER;
+  const name = storeName || _cachedStoreName || "Minha Loja";
   const parts = items.map(i => `${i.quantity}x ${i.product.name} (${i.product.flavor})`).join(", ");
-  const msg = `[PEDIDO-SMOKING] ${parts} | Total: ${formatBRL(total)}`;
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+  const msg = `[PEDIDO-${name.toUpperCase().replace(/\s+/g, "")}] ${parts} | Total: ${formatBRL(total)}`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
 }

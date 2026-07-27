@@ -47,7 +47,7 @@ export function SupplyChainDashboard() {
   const [newFlavorStock, setNewFlavorStock] = useState("");
   const [submittingFlavor, setSubmittingFlavor] = useState(false);
 
-  // Filtros ERP Limpos (Marca + Status de Estoque do Modelo)
+  // Filtros ERP Limpos (Marca + Status de Estoque por Sabor)
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [filterTab, setFilterTab] = useState<"TODOS" | "EM_ESTOQUE" | "BAIXO_ESTOQUE" | "SEM_ESTOQUE">("TODOS");
@@ -417,10 +417,15 @@ export function SupplyChainDashboard() {
     ? `conic-gradient(${donutSegments.map(s => `${s.color} ${s.start}% ${s.end}%`).join(', ')})`
     : 'conic-gradient(#333 0% 100%)';
 
-  // ─── Grouping & Filtering (AGRUPAMENTO PRIMEIRO, DEPOIS FILTRO POR MODELO) ──────
+  // ─── Grouping & Filtering Inteligente por Sabor ───────────────────────
   interface SKUGroup {
     groupKey: string; brand: string; name: string; puffs: number;
-    price: number; cost_price: number; image_url: string; totalStock: number; flavors: any[];
+    price: number; cost_price: number; image_url: string; totalStock: number; 
+    flavors: any[];
+    realFlavors: any[];
+    outOfStockFlavors: any[];
+    lowStockFlavors: any[];
+    inStockFlavors: any[];
   }
 
   // Step 1: Pre-filter products by search query and selected brand only
@@ -447,26 +452,34 @@ export function SupplyChainDashboard() {
       groupedMap[groupKey] = {
         groupKey, brand: brandName, name: modelName, puffs: product.puffs || 5000,
         price: parseFloat(product.price) || 0, cost_price: parseFloat(product.cost_price) || 35,
-        image_url: product.image_url || "", totalStock: 0, flavors: []
+        image_url: product.image_url || "", totalStock: 0, 
+        flavors: [], realFlavors: [], outOfStockFlavors: [], lowStockFlavors: [], inStockFlavors: []
       };
-    }
-
-    // Accumulate total stock only for real flavors (ignore dummy 'Padrão' placeholders)
-    const fName = (product.flavor || '').trim().toLowerCase();
-    if (fName !== 'padrão' && fName !== 'padrao' && fName !== '') {
-      groupedMap[groupKey].totalStock += (product.stock || 0);
     }
 
     groupedMap[groupKey].flavors.push(product);
     if (!groupedMap[groupKey].image_url && product.image_url) groupedMap[groupKey].image_url = product.image_url;
   });
 
-  // Step 3: Apply filterTab directly on the grouped Model's totalStock!
+  // Step 3: Compute real flavor lists & stock counts per model group
+  Object.values(groupedMap).forEach(group => {
+    group.realFlavors = group.flavors.filter((f: any) => {
+      const fName = (f.flavor || '').trim().toLowerCase();
+      return fName !== 'padrão' && fName !== 'padrao' && fName !== '';
+    });
+
+    group.totalStock = group.realFlavors.reduce((sum, f) => sum + (f.stock || 0), 0);
+    group.outOfStockFlavors = group.realFlavors.filter(f => (f.stock || 0) === 0);
+    group.lowStockFlavors = group.realFlavors.filter(f => (f.stock || 0) > 0 && (f.stock || 0) < 5);
+    group.inStockFlavors = group.realFlavors.filter(f => (f.stock || 0) >= 5);
+  });
+
+  // Step 4: Apply filterTab based on ANY flavor in the model group matching the selected status!
   const skuGroups = Object.values(groupedMap)
     .filter(group => {
-      if (filterTab === 'EM_ESTOQUE') return group.totalStock >= 5;
-      if (filterTab === 'BAIXO_ESTOQUE') return group.totalStock > 0 && group.totalStock < 5;
-      if (filterTab === 'SEM_ESTOQUE') return group.totalStock === 0;
+      if (filterTab === 'SEM_ESTOQUE') return group.outOfStockFlavors.length > 0;
+      if (filterTab === 'BAIXO_ESTOQUE') return group.lowStockFlavors.length > 0;
+      if (filterTab === 'EM_ESTOQUE') return group.inStockFlavors.length > 0;
       return true; // TODOS
     })
     .sort((a, b) => b.totalStock - a.totalStock);
@@ -749,30 +762,33 @@ export function SupplyChainDashboard() {
           ) : (
             skuGroups.map((group) => {
               const isSearching = searchQuery.trim().length > 0;
-              const isExpanded = expandedGroupKeys[group.groupKey] ?? isSearching;
+              const isFilterActive = filterTab !== 'TODOS';
+              // Auto-expand accordion when search or specific status filter is active
+              const isExpanded = expandedGroupKeys[group.groupKey] ?? (isSearching || isFilterActive);
+
               const profit = group.price - group.cost_price;
               const marginPct = group.price > 0 ? Math.round((profit / group.price) * 100) : 0;
               const displayName = getGroupDisplayName(group.brand, group.name);
-              const realFlavors = group.flavors.filter((f: any) => {
-                const fName = (f.flavor || '').trim().toLowerCase();
-                return fName !== 'padrão' && fName !== 'padrao' && fName !== '';
-              });
+              const realFlavors = group.realFlavors;
               const isGroupVisible = group.flavors.some((f: any) => f.is_active);
               const isGroupMenuActive = activeGroupMenuKey === group.groupKey;
               const stockPct = Math.min(100, Math.round((group.totalStock / maxGroupStock) * 100));
 
-              // Stock bar color & badge label
+              // Stock bar & badge label inteligente por Sabor
               let stockBarColor = "bg-emerald-400";
               let stockBadgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
               let stockLabel = `Em estoque (${group.totalStock} un)`;
-              if (group.totalStock === 0) {
+
+              if (group.outOfStockFlavors.length > 0) {
                 stockBarColor = "bg-red-400";
                 stockBadgeClass = "bg-red-500/10 text-red-400 border-red-500/20";
-                stockLabel = "Esgotado (0 un)";
-              } else if (group.totalStock < 5) {
+                const numOut = group.outOfStockFlavors.length;
+                stockLabel = `${numOut} ${numOut === 1 ? 'sabor esgotado' : 'sabores esgotados'}`;
+              } else if (group.lowStockFlavors.length > 0) {
                 stockBarColor = "bg-amber-400";
                 stockBadgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
-                stockLabel = `Estoque baixo (${group.totalStock} un)`;
+                const numLow = group.lowStockFlavors.length;
+                stockLabel = `${numLow} ${numLow === 1 ? 'sabor em baixo estoque' : 'sabores em baixo estoque'}`;
               }
 
               return (
@@ -972,11 +988,18 @@ export function SupplyChainDashboard() {
                             else if (flavorStock > 0) flavorBadge = <span className="text-amber-400 text-[10px]">🟡 Estoque Baixo</span>;
                             else flavorBadge = <span className="text-red-400 text-[10px]">🔴 Esgotado</span>;
 
+                            const isFilteredMatch = 
+                              (filterTab === 'SEM_ESTOQUE' && flavorStock === 0) ||
+                              (filterTab === 'BAIXO_ESTOQUE' && flavorStock > 0 && flavorStock < 5) ||
+                              (filterTab === 'EM_ESTOQUE' && flavorStock >= 5);
+
                             return (
                               <div 
                                 key={flavorSku.id}
                                 onClick={() => setSelectedDrawerSKU(flavorSku)}
-                                className="py-2.5 px-3 flex items-center justify-between gap-4 hover:bg-white/[0.02] rounded-xl transition-colors cursor-pointer"
+                                className={`py-2.5 px-3 flex items-center justify-between gap-4 rounded-xl transition-colors cursor-pointer ${
+                                  isFilteredMatch && filterTab !== 'TODOS' ? 'bg-white/[0.04] border border-white/10' : 'hover:bg-white/[0.02]'
+                                }`}
                               >
                                 <div>
                                   <span className="font-semibold text-white text-xs block">{flavorSku.flavor}</span>

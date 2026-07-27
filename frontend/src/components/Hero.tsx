@@ -1,6 +1,7 @@
 import { Search, ShoppingBag } from "lucide-react";
 import { BRANDS } from "@/lib/products";
 import { useCart } from "@/lib/cart";
+import { useStoreConfig } from "@/lib/useStoreConfig";
 
 interface HeroProps {
   query: string;
@@ -13,7 +14,12 @@ interface HeroProps {
 
 export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartClick, brands }: HeroProps) {
   const { totalItems } = useCart();
+  const { config } = useStoreConfig();
   const brandList = brands && brands.length > 0 ? brands : (BRANDS as unknown as string[]);
+
+  const storeName = config?.store_name || "Minha Loja";
+  const storeDescription = config?.description || "Pedido finalizado em segundos pelo WhatsApp.";
+  const logoUrl = config?.logo_url;
 
   return (
     <section className="px-5 pt-10 pb-6 sm:pt-16 sm:pb-10 max-w-6xl mx-auto relative">
@@ -35,8 +41,17 @@ export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartC
       </button>
 
       <div className="flex flex-col items-center text-center gap-3 sm:gap-5">
-        <span className="text-[9px] sm:text-[11px] uppercase tracking-[0.35em] text-muted-foreground">Barato · Prático · Rápido</span>
-        <h1 className="text-silver text-4xl sm:text-7xl font-semibold tracking-tight leading-none pb-2 -mb-2">Smoking Pods</h1>
+        {logoUrl && (
+          <img 
+            src={logoUrl} 
+            alt={storeName} 
+            className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-2xl mb-1"
+          />
+        )}
+        <span className="text-[9px] sm:text-[11px] uppercase tracking-[0.35em] text-muted-foreground">
+          {storeDescription.length > 50 ? storeDescription.substring(0, 50) + "..." : storeDescription}
+        </span>
+        <h1 className="text-silver text-4xl sm:text-7xl font-semibold tracking-tight leading-none pb-2 -mb-2">{storeName}</h1>
         <p className="text-muted-foreground max-w-md text-xs sm:text-base">
           Pedido finalizado em segundos pelo WhatsApp.
         </p>

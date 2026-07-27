@@ -1,13 +1,18 @@
 import { useState } from "react";
-import { LayoutDashboard, PackageSearch, Users, Settings, CircleDollarSign, MoreHorizontal } from "lucide-react";
+import { LayoutDashboard, PackageSearch, Users, Settings, CircleDollarSign, MoreHorizontal, Store } from "lucide-react";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { FinanceDashboard } from "@/components/FinanceDashboard";
 import { SupplyChainDashboard } from "@/components/SupplyChainDashboard";
 import { CRMDashboard } from "@/components/CRMDashboard";
+import { SettingsPage } from "@/components/SettingsPage";
+import { useStoreConfig } from "@/lib/useStoreConfig";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("pedidos");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { config, loading: configLoading } = useStoreConfig();
+
+  const displayName = config?.store_name || "Minha Loja";
 
   return (
     <div className="flex h-screen bg-[#050505] text-white overflow-hidden">
@@ -22,17 +27,48 @@ export default function App() {
           sidebarCollapsed ? 'justify-center' : 'justify-between'
         }`}>
           {!sidebarCollapsed && (
-            <h1 className="text-lg font-bold tracking-tight text-silver truncate">
-              Smoking Admin
-            </h1>
+            <div className="flex items-center gap-2.5 min-w-0">
+              {config?.logo_url ? (
+                <img 
+                  src={config.logo_url} 
+                  alt={displayName} 
+                  className="w-7 h-7 rounded-lg object-contain shrink-0" 
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+                  <Store className="size-4 text-primary" />
+                </div>
+              )}
+              <h1 className="text-lg font-bold tracking-tight text-silver truncate">
+                {displayName}
+              </h1>
+            </div>
           )}
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="p-2 rounded-xl text-muted-foreground hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
-          >
-            <MoreHorizontal className="size-5" />
-          </button>
+          {sidebarCollapsed && config?.logo_url && (
+            <img 
+              src={config.logo_url} 
+              alt={displayName} 
+              className="w-7 h-7 rounded-lg object-contain" 
+            />
+          )}
+          {sidebarCollapsed && !config?.logo_url && (
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-2 rounded-xl text-muted-foreground hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              title="Expandir menu lateral"
+            >
+              <MoreHorizontal className="size-5" />
+            </button>
+          )}
+          {!sidebarCollapsed && (
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-2 rounded-xl text-muted-foreground hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+              title="Recolher menu lateral"
+            >
+              <MoreHorizontal className="size-5" />
+            </button>
+          )}
         </div>
         
         {/* Navegação Principal */}
@@ -101,9 +137,14 @@ export default function App() {
         {/* Rodapé / Configurações */}
         <div className={`p-3 border-t border-white/10 w-full ${sidebarCollapsed ? 'flex justify-center' : ''}`}>
           <button 
+            onClick={() => setActiveTab("configuracoes")}
             title={sidebarCollapsed ? "Configurações" : undefined}
-            className={`flex items-center gap-3 py-3 rounded-xl text-muted-foreground hover:bg-white/5 hover:text-white w-full transition-all ${
+            className={`flex items-center gap-3 py-3 rounded-xl w-full transition-all ${
               sidebarCollapsed ? 'justify-center px-3' : 'px-4'
+            } ${
+              activeTab === 'configuracoes'
+                ? 'bg-primary text-primary-foreground shadow'
+                : 'text-muted-foreground hover:bg-white/5 hover:text-white'
             }`}
           >
             <Settings className="size-5 shrink-0" />
@@ -118,6 +159,7 @@ export default function App() {
         {activeTab === 'financeiro' && <FinanceDashboard />}
         {activeTab === 'estoque' && <SupplyChainDashboard />}
         {activeTab === 'clientes' && <CRMDashboard />}
+        {activeTab === 'configuracoes' && <SettingsPage />}
       </main>
     </div>
   );
