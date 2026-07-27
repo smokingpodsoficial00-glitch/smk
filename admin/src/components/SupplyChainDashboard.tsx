@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { 
   PackageSearch, Plus, Minus, Eye, EyeOff, Loader2, ImagePlus, Upload, 
   Trash2, Search, Filter, ArrowUpDown, MoreVertical, Copy, Edit3, DollarSign, 
-  CheckCircle2, X, TrendingUp, PieChart, ChevronRight, ChevronDown, ChevronUp, Tag, Box
+  CheckCircle2, X, TrendingUp, PieChart, ChevronRight, ChevronDown, ChevronUp, Tag, Box, Camera
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatBRL } from "@/lib/cart";
@@ -26,14 +26,14 @@ export function SupplyChainDashboard() {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Estado para upload de imagem no Hover do Modelo
+  const [uploadingGroupKey, setUploadingGroupKey] = useState<string | null>(null);
+
   // Modal para Adicionar Sabor a um Modelo Existente
   const [addingFlavorGroup, setAddingFlavorGroup] = useState<any | null>(null);
   const [newFlavorName, setNewFlavorName] = useState("");
   const [newFlavorStock, setNewFlavorStock] = useState("");
-  const [newFlavorImageFile, setNewFlavorImageFile] = useState<File | null>(null);
-  const [newFlavorImagePreview, setNewFlavorImagePreview] = useState<string>("");
   const [submittingFlavor, setSubmittingFlavor] = useState(false);
-  const flavorFileInputRef = useRef<HTMLInputElement>(null);
 
   // Filtros e ordenação ERP
   const [searchQuery, setSearchQuery] = useState("");
@@ -236,7 +236,24 @@ export function SupplyChainDashboard() {
     }
   };
 
-  // CADASTRO DEDICADO DE SABOR VIA MODAL
+  // ATUALIZAR IMAGEM DO MODELO DIRETO VIA HOVER
+  const handleUpdateGroupImage = async (group: any, file: File) => {
+    setUploadingGroupKey(group.groupKey);
+    try {
+      const newImageUrl = await uploadProductImage(file);
+      const ids = group.flavors.map((f: any) => f.id);
+
+      setProducts(prev => prev.map(p => ids.includes(p.id) ? { ...p, image_url: newImageUrl } : p));
+      await supabase.from("smoking_products").update({ image_url: newImageUrl }).in("id", ids);
+    } catch (err) {
+      console.error("Erro ao atualizar imagem do modelo:", err);
+      fetchData();
+    } finally {
+      setUploadingGroupKey(null);
+    }
+  };
+
+  // CADASTRO DEDICADO DE SABOR VIA MODAL (SEM CAMPO DE FOTO)
   const handleAddFlavorSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addingFlavorGroup || !newFlavorName.trim()) {
@@ -246,11 +263,6 @@ export function SupplyChainDashboard() {
     setSubmittingFlavor(true);
 
     try {
-      let imageUrl = addingFlavorGroup.image_url || "";
-      if (newFlavorImageFile) {
-        imageUrl = await uploadProductImage(newFlavorImageFile);
-      }
-
       let insertPayload: any = {
         name: addingFlavorGroup.name,
         brand: addingFlavorGroup.brand,
@@ -259,7 +271,7 @@ export function SupplyChainDashboard() {
         cost_price: addingFlavorGroup.cost_price || 35.00,
         stock: parseInt(newFlavorStock) || 0,
         puffs: addingFlavorGroup.puffs || 5000,
-        image_url: imageUrl,
+        image_url: addingFlavorGroup.image_url || "",
         is_active: true,
       };
 
@@ -284,8 +296,6 @@ export function SupplyChainDashboard() {
         setAddingFlavorGroup(null);
         setNewFlavorName("");
         setNewFlavorStock("");
-        setNewFlavorImageFile(null);
-        setNewFlavorImagePreview("");
         alert(`Sabor "${addedName}" adicionado ao modelo ${modelName}!`);
         await fetchData();
       } else {
@@ -773,12 +783,43 @@ export function SupplyChainDashboard() {
                       className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-white/[0.02] transition-colors select-none"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="size-12 rounded-xl border border-white/10 bg-black/40 overflow-hidden flex items-center justify-center shrink-0">
+                        {/* FOTO DO MODELO COM SUPORTE A HOVER E EDIÇÃO DIRETA */}
+                        <div 
+                          onClick={(e) => e.stopPropagation()}
+                          className="relative size-12 rounded-xl border border-white/10 bg-black/40 overflow-hidden shrink-0 group/img cursor-pointer"
+                          title="Clique para alterar a foto deste modelo"
+                        >
                           {group.image_url ? (
                             <img src={group.image_url} alt={displayName} className="size-full object-cover" />
                           ) : (
-                            <ImagePlus className="size-5 text-muted-foreground/40" />
+                            <ImagePlus className="size-5 text-muted-foreground/40 absolute inset-0 m-auto" />
                           )}
+
+                          {/* Overlay no Hover para Trocar Foto */}
+                          <label 
+                            htmlFor={`group-img-upload-${group.groupKey}`} 
+                            className="absolute inset-0 bg-black/75 opacity-0 group-hover/img:opacity-100 transition-opacity flex flex-col items-center justify-center text-white cursor-pointer"
+                          >
+                            {uploadingGroupKey === group.groupKey ? (
+                              <Loader2 className="size-4 animate-spin text-emerald-400" />
+                            ) : (
+                              <>
+                                <Camera className="size-4 text-emerald-400" />
+                                <span className="text-[8px] font-bold mt-0.5 uppercase tracking-wider">Trocar</span>
+                              </>
+                            )}
+                          </label>
+
+                          <input
+                            id={`group-img-upload-${group.groupKey}`}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleUpdateGroupImage(group, file);
+                            }}
+                          />
                         </div>
 
                         <div>
@@ -913,8 +954,6 @@ export function SupplyChainDashboard() {
                               setAddingFlavorGroup(group);
                               setNewFlavorName("");
                               setNewFlavorStock("");
-                              setNewFlavorImageFile(null);
-                              setNewFlavorImagePreview("");
                             }}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/20 transition-all cursor-pointer"
                           >
@@ -923,7 +962,7 @@ export function SupplyChainDashboard() {
                           </button>
                         </div>
 
-                        {/* Lista de Sabores */}
+                        {/* Lista Limpa de Sabores (Sem Miniaturas Redundantes) */}
                         <div className="divide-y divide-white/5">
                           {group.flavors.map((flavorSku) => {
                             const flavorStock = flavorSku.stock || 0;
@@ -940,16 +979,9 @@ export function SupplyChainDashboard() {
                               <div 
                                 key={flavorSku.id}
                                 onClick={() => setSelectedDrawerSKU(flavorSku)}
-                                className="py-3 px-2 flex items-center justify-between gap-4 hover:bg-white/[0.02] rounded-xl transition-colors cursor-pointer"
+                                className="py-2.5 px-3 flex items-center justify-between gap-4 hover:bg-white/[0.02] rounded-xl transition-colors cursor-pointer"
                               >
                                 <div className="flex items-center gap-3">
-                                  <div className="size-8 rounded-lg overflow-hidden border border-white/10 bg-black/40 flex items-center justify-center shrink-0">
-                                    {flavorSku.image_url ? (
-                                      <img src={flavorSku.image_url} alt={flavorSku.flavor} className="size-full object-cover" />
-                                    ) : (
-                                      <Tag className="size-3.5 text-muted-foreground/40" />
-                                    )}
-                                  </div>
                                   <div>
                                     <span className="font-semibold text-white text-xs block">{flavorSku.flavor}</span>
                                     {flavorBadge}
@@ -1142,7 +1174,7 @@ export function SupplyChainDashboard() {
         </div>
       </div>
 
-      {/* MODAL DEDICADO: ADICIONAR SABOR AO MODELO SELECIONADO */}
+      {/* MODAL DEDICADO: ADICIONAR SABOR AO MODELO SELECIONADO (LIMPO E SEM UPLOAD REDUNDANTE) */}
       {addingFlavorGroup && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#121212] border border-border rounded-2xl w-full max-w-sm shadow-2xl p-5 relative animate-in fade-in zoom-in-95 duration-150 space-y-4">
@@ -1186,54 +1218,6 @@ export function SupplyChainDashboard() {
                   placeholder="Ex.: 10"
                   className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-emerald-500/50 transition-all font-mono"
                 />
-              </div>
-
-              {/* Upload Opcional de Foto Específica do Sabor */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Foto do Sabor (Opcional)</label>
-                <div className="border border-dashed border-white/10 rounded-xl p-2 text-center bg-[#0f0f0f]">
-                  {newFlavorImagePreview ? (
-                    <div className="relative size-14 mx-auto rounded-lg overflow-hidden border border-white/10">
-                      <img src={newFlavorImagePreview} alt="Preview" className="size-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewFlavorImageFile(null);
-                          setNewFlavorImagePreview("");
-                        }}
-                        className="absolute top-0.5 right-0.5 bg-black/80 text-red-400 p-0.5 rounded-full"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <input
-                        ref={flavorFileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setNewFlavorImageFile(file);
-                            const reader = new FileReader();
-                            reader.onloadend = () => setNewFlavorImagePreview(reader.result as string);
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                        className="hidden"
-                        id="modal-flavor-upload"
-                      />
-                      <label
-                        htmlFor="modal-flavor-upload"
-                        className="text-[11px] font-medium text-emerald-400 hover:underline cursor-pointer block"
-                      >
-                        Selecionar Imagem do Sabor
-                      </label>
-                      <span className="text-[9px] text-muted-foreground block">Usa a foto do modelo se deixado em branco</span>
-                    </div>
-                  )}
-                </div>
               </div>
 
               <div className="flex gap-2 pt-2">
