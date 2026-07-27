@@ -373,20 +373,6 @@ export function SupplyChainDashboard() {
     }
   };
 
-  const handleZeroGroupStock = async (group: any) => {
-    const groupName = getGroupDisplayName(group.brand, group.name);
-    if (!confirm(`Deseja marcar todos os ${group.flavors.length} sabores de "${groupName}" como Fora de Estoque (0 un)?`)) return;
-
-    const ids = group.flavors.map((f: any) => f.id);
-    try {
-      setProducts(prev => prev.map(p => ids.includes(p.id) ? { ...p, stock: 0 } : p));
-      await supabase.from("smoking_products").update({ stock: 0 }).in("id", ids);
-    } catch (err) {
-      console.error(err);
-      fetchData();
-    }
-  };
-
   const handleDeleteGroup = async (group: any) => {
     const groupName = getGroupDisplayName(group.brand, group.name);
     if (!confirm(`ATENÇÃO: Deseja excluir permanentemente o modelo "${groupName}" e todos os seus ${group.flavors.length} sabores cadastrados?`)) return;
@@ -768,6 +754,8 @@ export function SupplyChainDashboard() {
                   return fName !== 'padrão' && fName !== 'padrao' && fName !== '';
                 });
 
+                const isGroupVisible = group.flavors.some((f: any) => f.is_active);
+
                 let groupStatusBadge;
                 if (group.totalStock >= 10) {
                   groupStatusBadge = (
@@ -874,6 +862,33 @@ export function SupplyChainDashboard() {
                         </div>
 
                         <div className="flex items-center gap-2 relative">
+                          {/* BADGE PROFISSIONAL DE VISIBILIDADE NO CARDÁPIO (OLHO VERDE / AMARELO 1-CLIQUE) */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleGroupActive(group);
+                            }}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border transition-all cursor-pointer select-none shadow-sm ${
+                              isGroupVisible 
+                                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25" 
+                                : "bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25"
+                            }`}
+                            title={isGroupVisible ? "Modelo Visível no Cardápio Público (Clique para Ocultar)" : "Modelo Oculto do Cardápio Público (Clique para Exibir)"}
+                          >
+                            {isGroupVisible ? (
+                              <>
+                                <Eye className="size-3.5 text-emerald-400" />
+                                <span>No Cardápio</span>
+                              </>
+                            ) : (
+                              <>
+                                <EyeOff className="size-3.5 text-amber-400" />
+                                <span>Oculto</span>
+                              </>
+                            )}
+                          </button>
+
                           {groupStatusBadge}
 
                           {/* Menu de 3 Pontos (⋮) do Grupo */}
@@ -893,63 +908,55 @@ export function SupplyChainDashboard() {
                             {activeGroupMenuKey === group.groupKey && (
                               <div 
                                 onClick={(e) => e.stopPropagation()}
-                                className="absolute right-0 top-9 z-50 bg-[#121212] border border-border rounded-xl shadow-2xl py-1.5 w-56 text-xs font-medium text-left animate-in fade-in zoom-in-95 duration-150"
+                                className="absolute right-0 top-9 z-50 bg-[#18181b] border border-white/15 rounded-xl shadow-2xl py-1.5 w-56 text-xs font-medium text-left animate-in fade-in zoom-in-95 duration-150 overflow-hidden"
                               >
                                 <button
+                                  type="button"
                                   onClick={() => {
                                     setEditingGroup(group);
                                     setBatchPrice(group.price.toString());
                                     setBatchCostPrice(group.cost_price.toString());
                                     setActiveGroupMenuKey(null);
                                   }}
-                                  className="w-full text-left px-3 py-2 hover:bg-white/10 flex items-center gap-2 text-silver cursor-pointer"
+                                  className="w-full text-left px-3.5 py-2.5 hover:bg-white/15 hover:text-white flex items-center gap-2.5 text-silver transition-colors cursor-pointer"
                                 >
                                   <Edit3 className="size-3.5 text-blue-400" />
-                                  Editar Preço / Custo em Lote
+                                  <span>Editar Preço / Custo em Lote</span>
                                 </button>
 
                                 <button
+                                  type="button"
                                   onClick={() => {
                                     handleToggleGroupActive(group);
                                     setActiveGroupMenuKey(null);
                                   }}
-                                  className="w-full text-left px-3 py-2 hover:bg-white/10 flex items-center gap-2 text-silver cursor-pointer"
+                                  className="w-full text-left px-3.5 py-2.5 hover:bg-white/15 hover:text-white flex items-center gap-2.5 text-silver transition-colors cursor-pointer"
                                 >
-                                  {group.flavors.some((f: any) => f.is_active) ? (
+                                  {isGroupVisible ? (
                                     <>
                                       <EyeOff className="size-3.5 text-amber-400" />
-                                      Ocultar Modelo do Cardápio
+                                      <span>Ocultar Modelo do Cardápio</span>
                                     </>
                                   ) : (
                                     <>
                                       <Eye className="size-3.5 text-emerald-400" />
-                                      Exibir Modelo no Cardápio
+                                      <span>Exibir Modelo no Cardápio</span>
                                     </>
                                   )}
                                 </button>
 
-                                <button
-                                  onClick={() => {
-                                    handleZeroGroupStock(group);
-                                    setActiveGroupMenuKey(null);
-                                  }}
-                                  className="w-full text-left px-3 py-2 hover:bg-white/10 flex items-center gap-2 text-amber-400 cursor-pointer"
-                                >
-                                  <Box className="size-3.5" />
-                                  Marcar Fora de Estoque (0 un)
-                                </button>
-
-                                <div className="h-px bg-border my-1" />
+                                <div className="h-px bg-white/10 my-1" />
 
                                 <button
+                                  type="button"
                                   onClick={() => {
                                     handleDeleteGroup(group);
                                     setActiveGroupMenuKey(null);
                                   }}
-                                  className="w-full text-left px-3 py-2 hover:bg-red-500/10 flex items-center gap-2 text-red-400 cursor-pointer"
+                                  className="w-full text-left px-3.5 py-2.5 hover:bg-red-500/20 text-red-400 hover:text-red-300 flex items-center gap-2.5 transition-colors cursor-pointer"
                                 >
                                   <Trash2 className="size-3.5" />
-                                  Excluir Modelo Completo
+                                  <span>Excluir Modelo Completo</span>
                                 </button>
                               </div>
                             )}
