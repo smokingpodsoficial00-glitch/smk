@@ -14,11 +14,12 @@ export interface StoreConfig {
   address: string;
   instagram_url: string;
   description: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-const DEFAULT_CONFIG: Omit<StoreConfig, "id" | "created_at" | "updated_at"> = {
+const DEFAULT_CONFIG: StoreConfig = {
+  id: "local-config-id",
   store_name: "Minha Loja",
   store_slug: "minha-loja",
   logo_url: null,
@@ -29,43 +30,73 @@ const DEFAULT_CONFIG: Omit<StoreConfig, "id" | "created_at" | "updated_at"> = {
   pix_name: "",
   address: "",
   instagram_url: "",
-  description: "",
+  description: "Painel ERP & Catálogo Digital",
 };
 
-// Cache global para evitar múltiplas requisições
+const LOCAL_STORAGE_KEY = "store_config_fallback_v1";
+
+// Tenta carregar do localStorage no startup
+function getLocalFallback(): StoreConfig {
+  try {
+    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch (e) {
+    console.warn("Erro ao ler localStorage:", e);
+  }
+  return DEFAULT_CONFIG;
+}
+
+function saveLocalFallback(cfg: StoreConfig) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cfg));
+  } catch (e) {
+    console.warn("Erro ao salvar localStorage:", e);
+  }
+}
+
+// Cache global em memória
 let cachedConfig: StoreConfig | null = null;
-let fetchPromise: Promise<StoreConfig | null> | null = null;
+let fetchPromise: Promise<StoreConfig> | null = null;
 const listeners = new Set<() => void>();
 
 function notifyListeners() {
   listeners.forEach((fn) => fn());
 }
 
-async function fetchConfig(): Promise<StoreConfig | null> {
-  const { data, error } = await supabase
-    .from("store_config")
-    .select("*")
-    .limit(1)
-    .single();
+async function fetchConfig(): Promise<StoreConfig> {
+  try {
+    const { data, error } = await supabase
+      .from("store_config")
+      .select("*")
+      .limit(1)
+      .single();
 
-  if (error) {
-    console.warn("Erro ao buscar store_config:", error.message);
-    return null;
+    if (!error && data) {
+      cachedConfig = data as StoreConfig;
+      saveLocalFallback(cachedConfig);
+      notifyListeners();
+      return cachedConfig;
+    }
+  } catch (e) {
+    console.warn("Supabase store_config não acessível, usando fallback local:", e);
   }
-  cachedConfig = data as StoreConfig;
+
+  // Fallback se o Supabase falhar/tabela não existir
+  cachedConfig = getLocalFallback();
   notifyListeners();
   return cachedConfig;
 }
 
 export function useStoreConfig() {
-  const [config, setConfig] = useState<StoreConfig | null>(cachedConfig);
+  const [config, setConfig] = useState<StoreConfig>(cachedConfig || getLocalFallback());
   const [loading, setLoading] = useState(!cachedConfig);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
 
   useEffect(() => {
-    // Registrar listener para atualizações do cache global
-    const onUpdate = () => setConfig(cachedConfig);
+    const onUpdate = () => {
+      if (cachedConfig) setConfig(cachedConfig);
+    };
     listeners.add(onUpdate);
 
     if (cachedConfig) {
@@ -89,32 +120,57 @@ export function useStoreConfig() {
   }, []);
 
   const updateConfig = useCallback(
-    async (updates: Partial<Omit<StoreConfig, "id" | "created_at" | "updated_at">>) => {
-      if (!config) return;
+    async (updates: Partial<Omit<StoreConfig, "created_at" | "updated_at">>) => {
       setSaving(true);
       setSaveStatus("idle");
 
-      const { data, error } = await supabase
-        .from("store_config")
-        .update(updates)
-        .eq("id", config.id)
-        .select()
-        .single();
+      const newConfig: StoreConfig = {
+        ...config,
+        ...updates,
+        updated_at: new Date().toISOString(),
+      };
 
-      if (error) {
-        console.error("Erro ao salvar configurações:", error.message);
-        setSaveStatus("error");
-        setSaving(false);
-        return false;
+      // 1. Atualizar localStorage & estado local imediatamente
+      saveLocalFallback(newConfig);
+      cachedConfig = newConfig;
+      setConfig(newConfig);
+      notifyListeners();
+
+      // 2. Tentar sincronizar com Supabase se a tabela existir
+      try {
+        let resData = null;
+        if (config.id && config.id !== "local-config-id") {
+          const { data, error } = await supabase
+            .from("store_config")
+            .update(updates)
+            .eq("id", config.id)
+            .select()
+            .single();
+
+          if (!error && data) resData = data;
+        } else {
+          // Tenta upsert se for local
+          const { data, error } = await supabase
+            .from("store_config")
+            .upsert([updates])
+            .select()
+            .single();
+
+          if (!error && data) resData = data;
+        }
+
+        if (resData) {
+          cachedConfig = resData as StoreConfig;
+          saveLocalFallback(cachedConfig);
+          setConfig(cachedConfig);
+          notifyListeners();
+        }
+      } catch (e) {
+        console.info("Salvo apenas localmente (Supabase indisponível):", e);
       }
 
-      cachedConfig = data as StoreConfig;
-      setConfig(cachedConfig);
-      notifyListeners();
       setSaveStatus("success");
       setSaving(false);
-
-      // Reset status após 3 segundos
       setTimeout(() => setSaveStatus("idle"), 3000);
       return true;
     },
@@ -123,20 +179,31 @@ export function useStoreConfig() {
 
   const uploadLogo = useCallback(
     async (file: File): Promise<string | null> => {
-      const ext = file.name.split(".").pop() || "png";
-      const filePath = `logo/logo_${Date.now()}.${ext}`;
+      // 1. Tentar upload no Supabase Storage
+      try {
+        const ext = file.name.split(".").pop() || "png";
+        const filePath = `logo/logo_${Date.now()}.${ext}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("store-assets")
-        .upload(filePath, file, { upsert: true });
+        const { error: uploadError } = await supabase.storage
+          .from("store-assets")
+          .upload(filePath, file, { upsert: true });
 
-      if (uploadError) {
-        console.error("Erro no upload do logo:", uploadError.message);
-        return null;
+        if (!uploadError) {
+          const { data } = supabase.storage.from("store-assets").getPublicUrl(filePath);
+          if (data?.publicUrl) return data.publicUrl;
+        }
+      } catch (e) {
+        console.warn("Upload Supabase indisponível, convertendo para Base64 local:", e);
       }
 
-      const { data } = supabase.storage.from("store-assets").getPublicUrl(filePath);
-      return data.publicUrl;
+      // 2. Fallback: Converte imagem para Base64 se o bucket do Supabase ainda não existir
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          resolve(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      });
     },
     []
   );
@@ -149,7 +216,7 @@ export function useStoreConfig() {
   }, []);
 
   return {
-    config: config || (DEFAULT_CONFIG as unknown as StoreConfig),
+    config,
     loading,
     saving,
     saveStatus,
