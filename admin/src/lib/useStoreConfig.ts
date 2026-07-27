@@ -45,7 +45,35 @@ try {
   console.warn("BroadcastChannel não suportado:", e);
 }
 
+// Cookie compartilhado entre portas no localhost (5173 e 5174)
+function getCookieConfig(): StoreConfig | null {
+  try {
+    if (typeof document === "undefined") return null;
+    const match = document.cookie.match(/(?:^|; )store_config=([^;]*)/);
+    if (match && match[1]) {
+      return JSON.parse(decodeURIComponent(match[1]));
+    }
+  } catch (e) {
+    console.warn("Erro ao ler cookie:", e);
+  }
+  return null;
+}
+
+function setCookieConfig(cfg: StoreConfig) {
+  try {
+    if (typeof document === "undefined") return;
+    const val = encodeURIComponent(JSON.stringify(cfg));
+    if (val.length < 4000) {
+      document.cookie = `store_config=${val}; path=/; max-age=31536000; SameSite=Lax`;
+    }
+  } catch (e) {
+    console.warn("Erro ao salvar cookie:", e);
+  }
+}
+
 function getLocalFallback(): StoreConfig {
+  const cookieVal = getCookieConfig();
+  if (cookieVal) return cookieVal;
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (saved) return JSON.parse(saved);
@@ -56,6 +84,7 @@ function getLocalFallback(): StoreConfig {
 }
 
 function saveLocalFallback(cfg: StoreConfig) {
+  setCookieConfig(cfg);
   try {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cfg));
   } catch (e) {
@@ -122,7 +151,7 @@ async function fetchConfig(): Promise<StoreConfig> {
     console.warn("Fallback smoking_products indisponível:", e);
   }
 
-  // 3. Fallback final: localStorage local
+  // 3. Fallback final: cookie e localStorage local
   cachedConfig = getLocalFallback();
   notifyListeners();
   return cachedConfig;
@@ -199,7 +228,7 @@ export function useStoreConfig() {
         updated_at: new Date().toISOString(),
       };
 
-      // 1. Atualizar cache local & BroadcastChannel imediatamente
+      // 1. Atualizar cache local, Cookie & BroadcastChannel imediatamente
       saveLocalFallback(newConfig);
       cachedConfig = newConfig;
       setConfig(newConfig);
@@ -226,7 +255,7 @@ export function useStoreConfig() {
         console.info("Info: Tabela store_config indisponível:", e);
       }
 
-      // 3. SEMPRE salvar na tabela `smoking_products` sob `brand: '__STORE_CONFIG__'` (100% garantido!)
+      // 3. SEMPRE salvar na tabela `smoking_products` sob `brand: '__STORE_CONFIG__'`
       try {
         const { data: configProducts } = await supabase
           .from("smoking_products")
@@ -303,7 +332,7 @@ export function useStoreConfig() {
             const canvas = document.createElement("canvas");
             let width = img.width;
             let height = img.height;
-            const max = 400;
+            const max = 350;
             if (width > max || height > max) {
               if (width > height) {
                 height = Math.round((height * max) / width);
@@ -317,7 +346,7 @@ export function useStoreConfig() {
             canvas.height = height;
             const ctx = canvas.getContext("2d");
             ctx?.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL("image/jpeg", 0.8));
+            resolve(canvas.toDataURL("image/jpeg", 0.75));
           };
           img.src = reader.result as string;
         };

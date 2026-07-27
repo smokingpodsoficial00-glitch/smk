@@ -43,7 +43,23 @@ try {
   console.warn("BroadcastChannel não suportado:", e);
 }
 
+// Cookie compartilhado entre portas no localhost (5173 e 5174)
+function getCookieConfig(): StoreConfig | null {
+  try {
+    if (typeof document === "undefined") return null;
+    const match = document.cookie.match(/(?:^|; )store_config=([^;]*)/);
+    if (match && match[1]) {
+      return JSON.parse(decodeURIComponent(match[1]));
+    }
+  } catch (e) {
+    console.warn("Erro ao ler cookie:", e);
+  }
+  return null;
+}
+
 function getLocalFallback(): StoreConfig {
+  const cookieVal = getCookieConfig();
+  if (cookieVal) return cookieVal;
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (saved) return JSON.parse(saved);
@@ -62,7 +78,14 @@ function notifyListeners() {
 }
 
 async function fetchConfig(): Promise<StoreConfig> {
-  // 1. Tentar ler da tabela dedicada `store_config`
+  // 1. Tentar ler cookie compartilhado em tempo real
+  const cookieVal = getCookieConfig();
+  if (cookieVal) {
+    cachedConfig = cookieVal;
+    notifyListeners();
+  }
+
+  // 2. Tentar ler da tabela dedicada `store_config`
   try {
     const { data, error } = await supabase
       .from("store_config")
@@ -79,7 +102,7 @@ async function fetchConfig(): Promise<StoreConfig> {
     console.warn("Tabela store_config não acessível no frontend:", e);
   }
 
-  // 2. Fallback: Ler do registro especial `__STORE_CONFIG__` na tabela `smoking_products`
+  // 3. Fallback: Ler do registro especial `__STORE_CONFIG__` na tabela `smoking_products`
   try {
     const { data, error } = await supabase
       .from("smoking_products")
@@ -107,7 +130,7 @@ async function fetchConfig(): Promise<StoreConfig> {
     console.warn("Fallback smoking_products indisponível no frontend:", e);
   }
 
-  // 3. Fallback final: localStorage local
+  // 4. Fallback final: cookie / localStorage local
   cachedConfig = getLocalFallback();
   notifyListeners();
   return cachedConfig;
@@ -165,10 +188,14 @@ export function useStoreConfig() {
       });
     }
 
-    // Polling de 2s para garantia absoluta
+    // Polling a cada 1s para ler o cookie compartilhado no localhost instantaneamente!
     const intervalId = setInterval(() => {
-      fetchConfig().then(result => setConfig(result));
-    }, 2000);
+      const cookieConfig = getCookieConfig();
+      if (cookieConfig && JSON.stringify(cookieConfig) !== JSON.stringify(cachedConfig)) {
+        cachedConfig = cookieConfig;
+        setConfig(cookieConfig);
+      }
+    }, 1000);
 
     return () => {
       listeners.delete(onUpdate);

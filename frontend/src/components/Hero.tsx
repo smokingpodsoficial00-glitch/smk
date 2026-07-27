@@ -17,7 +17,7 @@ export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartC
   const { config } = useStoreConfig();
   const brandList = brands && brands.length > 0 ? brands : (BRANDS as unknown as string[]);
 
-  const storeName = config?.store_name || "Minha Loja";
+  const storeName = config?.store_name || "Smoking Pods";
   const logoUrl = config?.logo_url;
 
   return (
@@ -39,21 +39,19 @@ export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartC
         </div>
       </button>
 
-      {/* Destaque Central: Logo do Negócio + Nome da Loja */}
+      {/* Destaque Central: Badge de Logo do Negócio + Nome da Loja */}
       <div className="flex flex-col items-center text-center gap-3 sm:gap-4">
-        {logoUrl ? (
-          <div className="relative size-20 sm:size-24 rounded-2xl p-2.5 bg-black/60 border border-white/15 shadow-[0_0_30px_rgba(16,185,129,0.15)] flex items-center justify-center overflow-hidden transition-all hover:scale-105">
+        <div className="relative size-20 sm:size-24 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-2.5 flex items-center justify-center overflow-hidden shadow-[0_0_25px_rgba(16,185,129,0.15)] transition-all hover:scale-105">
+          {logoUrl ? (
             <img 
               src={logoUrl} 
               alt={storeName} 
-              className="size-full object-contain"
+              className="size-full object-contain rounded-xl"
             />
-          </div>
-        ) : (
-          <div className="size-16 sm:size-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.1)]">
-            <Store className="size-8 sm:size-10 text-emerald-400" />
-          </div>
-        )}
+          ) : (
+            <Store className="size-9 sm:size-11 text-emerald-400" />
+          )}
+        </div>
 
         <h1 className="text-white text-3xl sm:text-6xl font-bold tracking-tight leading-none">
           {storeName}
