@@ -697,8 +697,15 @@ export function SupplyChainDashboard() {
                   );
                 }
 
+                const isGroupMenuActive = activeGroupMenuKey === group.groupKey;
+
                 return (
-                  <div key={group.groupKey} className="bg-card border border-border rounded-2xl overflow-hidden shadow-xl transition-all">
+                  <div 
+                    key={group.groupKey} 
+                    className={`bg-card border border-border rounded-2xl shadow-xl transition-all relative ${
+                      isGroupMenuActive ? 'z-40' : 'z-10'
+                    }`}
+                  >
                     {/* LINHA HEADER DO MODELO (CATEGORIA) */}
                     <div 
                       onClick={() => toggleGroup(group.groupKey)}
@@ -832,7 +839,7 @@ export function SupplyChainDashboard() {
 
                     {/* SUB-TABELA DE SABORES DO MODELO (ACCORDION EXPANDIDO) */}
                     {isExpanded && (
-                      <div className="bg-[#0c0c0c] border-t border-border/80 p-4 space-y-3 animate-in fade-in duration-200">
+                      <div className="bg-[#0c0c0c] border-t border-border/80 p-4 space-y-3 animate-in fade-in duration-200 rounded-b-2xl">
                         <div className="flex items-center justify-between pb-2 border-b border-white/5">
                           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                             Sabores em Estoque para {displayName}
