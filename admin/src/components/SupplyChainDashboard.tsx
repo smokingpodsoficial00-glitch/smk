@@ -918,27 +918,6 @@ export function SupplyChainDashboard() {
                                   <span>Editar Preço / Custo em Lote</span>
                                 </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    handleToggleGroupActive(group);
-                                    setActiveGroupMenuKey(null);
-                                  }}
-                                  className="w-full text-left px-3.5 py-2.5 hover:bg-white/15 hover:text-white flex items-center gap-2.5 text-silver transition-colors cursor-pointer"
-                                >
-                                  {isGroupVisible ? (
-                                    <>
-                                      <EyeOff className="size-3.5 text-amber-400" />
-                                      <span>Ocultar Modelo do Cardápio</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Eye className="size-3.5 text-emerald-400" />
-                                      <span>Exibir Modelo no Cardápio</span>
-                                    </>
-                                  )}
-                                </button>
-
                                 <div className="h-px bg-white/10 my-1" />
 
                                 <button
