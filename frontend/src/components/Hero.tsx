@@ -1,4 +1,4 @@
-import { Search, ShoppingBag } from "lucide-react";
+import { Search, ShoppingBag, Store } from "lucide-react";
 import { BRANDS } from "@/lib/products";
 import { useCart } from "@/lib/cart";
 import { useStoreConfig } from "@/lib/useStoreConfig";
@@ -18,57 +18,66 @@ export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartC
   const brandList = brands && brands.length > 0 ? brands : (BRANDS as unknown as string[]);
 
   const storeName = config?.store_name || "Minha Loja";
-  const storeDescription = config?.description || "Pedido finalizado em segundos pelo WhatsApp.";
   const logoUrl = config?.logo_url;
 
   return (
-    <section className="px-5 pt-10 pb-6 sm:pt-16 sm:pb-10 max-w-6xl mx-auto relative">
+    <section className="px-5 pt-8 pb-6 sm:pt-14 sm:pb-10 max-w-6xl mx-auto relative">
       
       {/* Carrinho de topo esquerdo (Minimalista) */}
       <button 
         onClick={onCartClick}
-        className="absolute top-6 left-5 sm:top-10 flex items-center justify-center p-2 rounded-full transition-transform hover:scale-110"
+        className="absolute top-6 left-5 sm:top-8 flex items-center justify-center p-2 rounded-full transition-transform hover:scale-110 cursor-pointer"
         aria-label="Ver carrinho"
       >
         <div className="relative">
-          <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+          <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
           {totalItems > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 grid place-items-center w-4 h-4 rounded-full bg-primary text-[9px] font-bold text-primary-foreground border border-black">
+            <span className="absolute -top-1.5 -right-1.5 grid place-items-center w-4 h-4 rounded-full bg-emerald-500 text-[9px] font-bold text-black border border-black">
               {totalItems}
             </span>
           )}
         </div>
       </button>
 
-      <div className="flex flex-col items-center text-center gap-3 sm:gap-5">
-        {logoUrl && (
-          <img 
-            src={logoUrl} 
-            alt={storeName} 
-            className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-2xl mb-1"
-          />
+      {/* Destaque Central: Logo do Negócio + Nome da Loja */}
+      <div className="flex flex-col items-center text-center gap-3 sm:gap-4">
+        {logoUrl ? (
+          <div className="relative size-20 sm:size-24 rounded-2xl p-2.5 bg-black/60 border border-white/15 shadow-[0_0_30px_rgba(16,185,129,0.15)] flex items-center justify-center overflow-hidden transition-all hover:scale-105">
+            <img 
+              src={logoUrl} 
+              alt={storeName} 
+              className="size-full object-contain"
+            />
+          </div>
+        ) : (
+          <div className="size-16 sm:size-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.1)]">
+            <Store className="size-8 sm:size-10 text-emerald-400" />
+          </div>
         )}
-        <span className="text-[9px] sm:text-[11px] uppercase tracking-[0.35em] text-muted-foreground">
-          {storeDescription.length > 50 ? storeDescription.substring(0, 50) + "..." : storeDescription}
-        </span>
-        <h1 className="text-silver text-4xl sm:text-7xl font-semibold tracking-tight leading-none pb-2 -mb-2">{storeName}</h1>
-        <p className="text-muted-foreground max-w-md text-xs sm:text-base">
+
+        <h1 className="text-white text-3xl sm:text-6xl font-bold tracking-tight leading-none">
+          {storeName}
+        </h1>
+
+        <p className="text-muted-foreground max-w-md text-xs sm:text-sm font-medium">
           Pedido finalizado em segundos pelo WhatsApp.
         </p>
       </div>
 
-      <div className="mt-8 sm:mt-12 max-w-xl mx-auto">
-        <div className="glass-strong rounded-full flex items-center gap-3 px-5 py-3.5">
+      {/* Barra de Pesquisa Destacada */}
+      <div className="mt-8 sm:mt-10 max-w-xl mx-auto">
+        <div className="glass-strong rounded-full flex items-center gap-3 px-5 py-3.5 border border-white/10 focus-within:border-emerald-500/50 transition-all">
           <Search className="size-4 text-muted-foreground shrink-0" />
           <input
             value={query}
             onChange={e => onQueryChange(e.target.value)}
-            placeholder="Buscar marca, modelo ou sabor"
+            placeholder="Buscar marca, modelo ou sabor..."
             className="bg-transparent outline-none text-sm sm:text-base flex-1 min-w-0 placeholder:text-muted-foreground"
           />
         </div>
       </div>
 
+      {/* Filtros por Marca */}
       <div className="mt-6 flex items-center justify-center gap-2 flex-wrap">
         <Pill label="Todos" active={activeBrand === null} onClick={() => onBrandChange(null)} />
         {brandList.map(b => (
@@ -83,8 +92,8 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 border ${
-        active ? "bg-primary text-primary-foreground border-transparent"
+      className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 border cursor-pointer ${
+        active ? "bg-emerald-500 text-black font-bold border-transparent shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                : "glass text-foreground hover:bg-elevated"
       }`}
     >{label}</button>
