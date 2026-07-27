@@ -862,34 +862,28 @@ export function SupplyChainDashboard() {
                         </div>
 
                         <div className="flex items-center gap-2 relative">
-                          {/* BADGE PROFISSIONAL DE VISIBILIDADE NO CARDÁPIO (OLHO VERDE / AMARELO 1-CLIQUE) */}
+                          {groupStatusBadge}
+
+                          {/* OLHINHO MINIMALISTA DE VISIBILIDADE (POSICIONADO AO LADO DOS 3 PONTOS) */}
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleToggleGroupActive(group);
                             }}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border transition-all cursor-pointer select-none shadow-sm ${
+                            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
                               isGroupVisible 
-                                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25" 
-                                : "bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25"
+                                ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20" 
+                                : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/20"
                             }`}
                             title={isGroupVisible ? "Modelo Visível no Cardápio Público (Clique para Ocultar)" : "Modelo Oculto do Cardápio Público (Clique para Exibir)"}
                           >
                             {isGroupVisible ? (
-                              <>
-                                <Eye className="size-3.5 text-emerald-400" />
-                                <span>No Cardápio</span>
-                              </>
+                              <Eye className="size-4 text-emerald-400" />
                             ) : (
-                              <>
-                                <EyeOff className="size-3.5 text-amber-400" />
-                                <span>Oculto</span>
-                              </>
+                              <EyeOff className="size-4 text-amber-400" />
                             )}
                           </button>
-
-                          {groupStatusBadge}
 
                           {/* Menu de 3 Pontos (⋮) do Grupo */}
                           <div className="relative">
