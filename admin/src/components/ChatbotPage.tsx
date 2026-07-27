@@ -1,10 +1,48 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
-  Bot, QrCode, Smartphone, Wifi, WifiOff, RefreshCw, CheckCircle2,
-  AlertTriangle, Send, Sparkles, MessageSquare, Power,
-  ShieldCheck, ArrowRight, Zap, Copy, Check
+  Bot, QrCode, RefreshCw, CheckCircle2,
+  Send, Sparkles, MessageSquare, Power,
+  Clock, Shield, HeartHandshake, FileText, Check, Copy
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
+
+const DEFINITIVE_SYSTEM_PROMPT = `SCRIPT DEFINITIVO — IA SMOKING PODS (Eloisa)
+
+REGRAS GLOBAIS (INQUEBRÁVEIS)
+RG1 — Sem emojis (Apenas mensagens programadas contendo emojis)
+RG2 — Máximo 2 linhas por mensagem
+RG3 — Sem exclamações ("!")
+RG4 — Erros de vírgula propositais para parecer humana (ex: "Olá tudo bem, como posso te ajudar?")
+RG5 — Fracionamento de mensagens (envia msg1, msg2 em sequência com delay)
+RG6 — Respostas programadas são lei (usar exatamente como escritas)
+RG7 — Respostas não-programadas (sem emoji, sem "!", max 2 linhas, minúsculo)
+RG8 — Tudo em minúsculo (exceto primeira letra do primeiro contato)
+RG9 — Tratamento: "você" / "vc" (nunca "tu")
+RG10 — Gírias autorizadas: blz, show, vc, amg
+RG11 — Abreviações: vc, pra, td, msg
+RG12 — Sem negrito, itálico ou listas
+RG13 — Sem promoções espontâneas
+RG14 — Somente produtos próprios do estoque
+RG15 — Assuntos proibidos: política, religião, concorrentes
+RG16 — Retomar fluxo de vendas se fizer pergunta avulsa
+RG17 — Nome: Eloisa, assistente virtual da Smoking Pods (não se apresenta espontaneamente)
+RG18 — Se perguntarem se é robô: fala a verdade que é a Eloisa assistente virtual
+
+SAUDAÇÕES POR HORÁRIO:
+06:00–11:59 → bom dia
+12:00–17:59 → boa tarde
+18:00–05:59 → boa noite
+
+LINK DO CARDÁPIO:
+https://smokingproject01.vercel.app/
+
+TABELA DE DURAÇÃO PUFFS:
+5.000 puffs → 10 dias
+7.500 puffs → 12 dias
+10.000 puffs → 14 dias
+15.000 puffs → 17 dias
+20.000 puffs → 21 dias
+30.000 puffs → 35 dias`;
 
 export function ChatbotPage() {
   const { config } = useStoreConfig();
@@ -12,53 +50,173 @@ export function ChatbotPage() {
   const [isQrLoading, setIsQrLoading] = useState(false);
   const [qrCodeVersion, setQrCodeVersion] = useState(1);
   const [aiEnabled, setAiEnabled] = useState(true);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
 
-  // Form de personalidade da IA
-  const [systemPrompt, setSystemPrompt] = useState(
-    "Você é a Maya, assistente virtual de vendas especializada em pods descartáveis. Seja educada, ágil, tire dúvidas sobre sabores/puffs e envie o link do nosso catálogo para fechamento do pedido via PIX ou cartão."
-  );
-  const [greetingMessage, setGreetingMessage] = useState(
-    "Olá! 💨 Bem-vindo à nossa loja! Como posso te ajudar a escolher o seu pod ideal hoje?"
-  );
+  // Form de personalidade da IA (Eloisa)
+  const [systemPrompt, setSystemPrompt] = useState(DEFINITIVE_SYSTEM_PROMPT);
+  const [isTyping, setIsTyping] = useState(false);
 
   // Chat Simulator State
   const [messages, setMessages] = useState<Array<{ sender: "user" | "bot"; text: string; time: string }>>([
-    { sender: "bot", text: greetingMessage, time: "14:30" },
+    { sender: "bot", text: "Olá tudo bem, como posso te ajudar?", time: "14:30" },
   ]);
   const [inputMessage, setInputMessage] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const storeName = config?.store_name || "Smoking Pods";
+  const catalogUrl = "https://smokingproject01.vercel.app/";
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
+
+  // Função para retornar saudação de acordo com o horário real
+  const getGreetingByHour = () => {
+    const hour = new Date().getHours();
+    if (hour >= 6 && hour < 12) return "bom dia";
+    if (hour >= 12 && hour < 18) return "boa tarde";
+    return "boa noite";
+  };
+
+  // Processador de respostas de Eloisa
+  const getEloisaResponses = (text: string): string[] => {
+    const lower = text.toLowerCase();
+    const greeting = getGreetingByHour();
+
+    // P1 / P2 / P3 - Saudação genérica
+    if (lower === "oi" || lower === "ola" || lower === "olá" || lower.includes("boa noite") || lower.includes("bom dia") || lower.includes("boa tarde")) {
+      return ["Olá tudo bem, como posso te ajudar?"];
+    }
+
+    // P4 / Tabela / Cardápio
+    if (lower.includes("cardapio") || lower.includes("cardápio") || lower.includes("tabela") || lower.includes("catálogo") || lower.includes("catalogo") || lower.includes("link") || lower.includes("tem pod") || lower.includes("comprar")) {
+      return [
+        "claro, vou te enviar a tabela aqui",
+        catalogUrl,
+        "se precisar de ajuda com algo só me avisar"
+      ];
+    }
+
+    // P45 - Origem
+    if (lower.includes("de onde") || lower.includes("onde fica") || lower.includes("localizacao") || lower.includes("localização")) {
+      return ["somos aqui de sbc amg"];
+    }
+
+    // P46 - Horário
+    if (lower.includes("horario") || lower.includes("horário") || lower.includes("funciona")) {
+      return ["nosso horário de funcionamento é das 11:00 até as 23hrs"];
+    }
+
+    // P47 - Originalidade
+    if (lower.includes("original")) {
+      return ["sim, só trabalhamos com produtos 100% originais!"];
+    }
+
+    // P48 - Garantia
+    if (lower.includes("garantia")) {
+      return [
+        "sim, temos garantia para produtos que podem ir com defeito",
+        "porém para á garantia valer, você tem de gravar um vídeo abrindo o produto e testando, para termos certeza de que o produto veio dá nossa loja"
+      ];
+    }
+
+    // P49 - Puffs / Duração
+    if (lower.includes("puffs") || lower.includes("dura") || lower.includes("quanto tempo")) {
+      if (lower.includes("5000") || lower.includes("5.000")) {
+        return ["olha o de 5.000 puffs geralmente dura uns 10 dias, porém depende do uso"];
+      }
+      if (lower.includes("7500") || lower.includes("7.500")) {
+        return ["olha o de 7.500 puffs geralmente dura uns 12 dias, porém depende do uso"];
+      }
+      if (lower.includes("15000") || lower.includes("15.000")) {
+        return ["olha o de 15.000 puffs geralmente dura uns 17 dias, porém depende do uso"];
+      }
+      if (lower.includes("20000") || lower.includes("20.000")) {
+        return ["olha o de 20.000 puffs geralmente dura uns 21 dias, porém depende do uso"];
+      }
+      if (lower.includes("30000") || lower.includes("30.000")) {
+        return ["olha o de 30.000 puffs geralmente dura uns 35 dias, porém depende do uso"];
+      }
+      return ["olha o de 10.000 puffs geralmente dura uns 14 dias, porém depende do uso"];
+    }
+
+    // P50 - Recomendação de Sabor (Doce vs Gelado)
+    if (lower.includes("sabor") || lower.includes("recomenda") || lower.includes("indica") || lower.includes("qual o melhor")) {
+      if (lower.includes("gelado") || lower.includes("ice") || lower.includes("menta")) {
+        return ["olha se vc gosta mais de pod gelado eu recomendaria o menta ou watermelon ice"];
+      }
+      if (lower.includes("doce") || lower.includes("fruta")) {
+        return ["olha se vc gosta mais de pod doce eu recomendaria o morango ou uva"];
+      }
+      return ["vc gosta de pod mais gelado ou mais doce?"];
+    }
+
+    // P20 - Desconto / Promoção
+    if (lower.includes("desconto") || lower.includes("promoção") || lower.includes("promocao") || lower.includes("mais barato")) {
+      return [
+        "temos desconto sim!",
+        "se levar 3 unidades consigo frete grátis, oque acha?"
+      ];
+    }
+
+    // P23 / P28 - Pagamento
+    if (lower.includes("pagamento") || lower.includes("pix") || lower.includes("cartao") || lower.includes("cartão")) {
+      return [
+        "nossas opções de pagamento são pix, e link de pagamento",
+        "no link de pagamento dá pra passar cartão de crédito e débito, também parcelamos, porém as taxas são repassadas beleza?"
+      ];
+    }
+
+    // P17 / P18 - Preços
+    if (lower.includes("quanto custa") || lower.includes("preco") || lower.includes("preço") || lower.includes("valor")) {
+      return [
+        `${greeting}, tudo bem?`,
+        "qual modelo exato vc tá procurando?",
+        `caso queira ver todos os valores, temos nossa tabela: ${catalogUrl}`
+      ];
+    }
+
+    // RG18 - Se perguntar se é robô
+    if (lower.includes("robo") || lower.includes("robô") || lower.includes("ia") || lower.includes("humano")) {
+      return ["sou a eloisa, assistente virtual da smoking pods, tô aqui pra te ajudar com tudo que precisar!"];
+    }
+
+    // Resposta Padrão de Fluxo
+    return [
+      "perfeito, vou te enviar nossa tabela digital pra vc dar uma olhada com calma",
+      catalogUrl
+    ];
+  };
 
   const handleSimulateSend = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || isTyping) return;
 
     const userText = inputMessage.trim();
     const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     setMessages((prev) => [...prev, { sender: "user", text: userText, time: timeNow }]);
     setInputMessage("");
+    setIsTyping(true);
 
-    // Simulação da resposta da IA
-    setTimeout(() => {
-      let botResponse = "Perfeito! Temos várias opções disponíveis a pronta entrega. Dê uma olhada no nosso catálogo digital!";
-      const lower = userText.toLowerCase();
+    const botResponses = getEloisaResponses(userText);
 
-      if (lower.includes("sabor") || lower.includes("quais")) {
-        botResponse = "Temos sabores como Watermelon Ice, Blueberry Ice, Grape Ice e Mango! Qual é o seu preferido?";
-      } else if (lower.includes("preço") || lower.includes("quanto") || lower.includes("valor")) {
-        botResponse = "Os nossos pods descartáveis começam a partir de R$ 80,00 com entrega super rápida!";
-      } else if (lower.includes("pagamento") || lower.includes("pix")) {
-        botResponse = "Aceitamos pagamento via Pix com aprovação instantânea ou cartão de crédito no momento da entrega!";
-      } else if (lower.includes("link") || lower.includes("catálogo") || lower.includes("catalogo")) {
-        botResponse = `Acesse nosso catálogo completo aqui: ${window.location.origin.replace(":5174", ":5173")}`;
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        { sender: "bot", text: botResponse, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-      ]);
-    }, 1000);
+    // Envia respostas sequencialmente simulando fracionamento de mensagens do WhatsApp (RG5)
+    botResponses.forEach((respText, index) => {
+      setTimeout(() => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: "bot",
+            text: respText,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          },
+        ]);
+        if (index === botResponses.length - 1) {
+          setIsTyping(false);
+        }
+      }, (index + 1) * 1200);
+    });
   };
 
   const handleGenerateNewQr = () => {
@@ -73,6 +231,12 @@ export function ChatbotPage() {
     setIsConnected(!isConnected);
   };
 
+  const handleCopyPrompt = () => {
+    navigator.clipboard.writeText(systemPrompt);
+    setCopiedPrompt(true);
+    setTimeout(() => setCopiedPrompt(false), 2000);
+  };
+
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar bg-background p-6 space-y-8">
       {/* Header com Status */}
@@ -83,13 +247,13 @@ export function ChatbotPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-              WhatsApp IA & Chatbot
+              WhatsApp IA — Eloisa
               <span className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-semibold">
-                Online
+                Script Definitivo v3.0
               </span>
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Conecte seu WhatsApp via QR Code e automatize os atendimentos da loja {storeName}
+              Atendente virtual oficial da loja {storeName} (Sem emojis, respostas programadas, fracionadas)
             </p>
           </div>
         </div>
@@ -99,10 +263,10 @@ export function ChatbotPage() {
           <div className={`size-3 rounded-full animate-pulse ${isConnected ? "bg-emerald-400 shadow-[0_0_10px_#10b981]" : "bg-amber-400"}`} />
           <div className="text-xs">
             <p className="font-semibold text-white">
-              {isConnected ? "WhatsApp Conectado" : "Aguardando Leitura do QR Code"}
+              {isConnected ? "Eloisa Conectada" : "Aguardando Leitura do QR Code"}
             </p>
             <p className="text-muted-foreground text-[10px]">
-              {isConnected ? "Sessão Ativa" : "Escaneie o código para conectar"}
+              {isConnected ? "Sessão Ativa no WhatsApp" : "Escaneie o código para conectar"}
             </p>
           </div>
           <button
@@ -113,7 +277,7 @@ export function ChatbotPage() {
                 : "bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30"
             }`}
           >
-            {isConnected ? "Desconectar" : "Conectar WhatsApp"}
+            {isConnected ? "Desconectar" : "Conectar Eloisa"}
           </button>
         </div>
       </div>
@@ -147,9 +311,9 @@ export function ChatbotPage() {
                     <CheckCircle2 className="size-8" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">WhatsApp Ativo!</h3>
+                    <h3 className="text-lg font-bold text-white">Eloisa Ativa!</h3>
                     <p className="text-xs text-muted-foreground max-w-xs mt-1">
-                      O seu número está conectado e pronto para responder mensagens automaticamente com a IA.
+                      O número está vinculado ao WhatsApp e responderá mensagens seguindo o script de vendas.
                     </p>
                   </div>
                 </div>
@@ -179,96 +343,90 @@ export function ChatbotPage() {
                   </div>
 
                   <p className="text-[11px] text-muted-foreground text-center mt-4">
-                    QR Code v{qrCodeVersion} • Atualiza a cada 45s para segurança
+                    QR Code v{qrCodeVersion} • Validade renovada a cada 45s
                   </p>
                 </>
               )}
             </div>
 
-            {/* Passo a Passo de Instruções */}
+            {/* Passo a Passo */}
             <div className="space-y-3 pt-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Como conectar:</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Como vincular:</h3>
               <div className="space-y-2 text-xs">
                 <div className="flex items-start gap-3 p-2.5 rounded-xl bg-white/5 border border-white/5">
                   <span className="flex items-center justify-center size-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">1</span>
-                  <span className="text-white/80">Abra o <strong>WhatsApp</strong> no seu celular</span>
+                  <span className="text-white/80">Abra o <strong>WhatsApp</strong> no celular</span>
                 </div>
                 <div className="flex items-start gap-3 p-2.5 rounded-xl bg-white/5 border border-white/5">
                   <span className="flex items-center justify-center size-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">2</span>
-                  <span className="text-white/80">Toque em <strong>Menu (•••)</strong> ou <strong>Configurações</strong> e selecione <strong>Dispositivos Conectados</strong></span>
+                  <span className="text-white/80">Acesse <strong>Dispositivos Conectados</strong></span>
                 </div>
                 <div className="flex items-start gap-3 p-2.5 rounded-xl bg-white/5 border border-white/5">
                   <span className="flex items-center justify-center size-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">3</span>
-                  <span className="text-white/80">Toque em <strong>Conectar um dispositivo</strong> e aponte a câmera para o QR Code acima</span>
+                  <span className="text-white/80">Escaneie o QR Code para conectar a Eloisa ao WhatsApp da loja</span>
                 </div>
               </div>
             </div>
           </section>
         </div>
 
-        {/* Lado Direito: Personalidade da IA & Simulador ao Vivo (7 Colunas) */}
+        {/* Lado Direito: Script Definitivo da Eloisa & Simulador (7 Colunas) */}
         <div className="lg:col-span-7 space-y-6">
           
-          {/* Configurações da IA */}
+          {/* Configurações do System Prompt */}
           <section className="bg-card border border-border rounded-2xl p-6 space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
                 <Sparkles className="size-4 text-emerald-400" />
-                <h2 className="font-bold text-base text-white">Agente de IA & Atendimento</h2>
+                <h2 className="font-bold text-base text-white">System Prompt — Eloisa (Script Oficial)</h2>
               </div>
               
-              {/* Toggle IA ON/OFF */}
-              <button
-                onClick={() => setAiEnabled(!aiEnabled)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  aiEnabled
-                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                    : "bg-white/5 text-muted-foreground border border-white/10"
-                }`}
-              >
-                <Power className="size-3.5" />
-                {aiEnabled ? "IA Ativada" : "IA Pausada"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopyPrompt}
+                  className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-white/80 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  {copiedPrompt ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                  {copiedPrompt ? "Copiado!" : "Copiar Script"}
+                </button>
+                <button
+                  onClick={() => setAiEnabled(!aiEnabled)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    aiEnabled
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      : "bg-white/5 text-muted-foreground border border-white/10"
+                  }`}
+                >
+                  <Power className="size-3.5" />
+                  {aiEnabled ? "Ativa" : "Pausada"}
+                </button>
+              </div>
             </div>
 
-            {/* Prompt de Comportamento */}
+            {/* Prompt Textarea */}
             <div className="space-y-2">
               <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider flex items-center justify-between">
-                <span>Personalidade & Instruções da IA</span>
-                <span className="text-[10px] text-emerald-400 lowercase">Prompt do Sistema</span>
+                <span>Regras e Respostas Programadas (OpenAI Prompt)</span>
+                <span className="text-[10px] text-emerald-400 lowercase">Eloisa Vendas</span>
               </label>
               <textarea
-                rows={3}
+                rows={6}
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
-                placeholder="Defina o tom de voz da IA, regras de desconto, frete e saudações..."
-                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 resize-none font-sans"
-              />
-            </div>
-
-            {/* Mensagem de Saudação */}
-            <div className="space-y-2">
-              <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">
-                Mensagem Inicial (Saudação)
-              </label>
-              <input
-                type="text"
-                value={greetingMessage}
-                onChange={(e) => setGreetingMessage(e.target.value)}
-                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 resize-none font-mono custom-scrollbar"
               />
             </div>
           </section>
 
-          {/* Simulador de Atendimento ao Vivo */}
+          {/* Simulador de Atendimento da Eloisa */}
           <section className="bg-card border border-border rounded-2xl p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
                 <MessageSquare className="size-4 text-emerald-400" />
-                <h2 className="font-bold text-base text-white">Testar Respostas da IA (Simulador)</h2>
+                <h2 className="font-bold text-base text-white">Simulador de Conversa (Testar Eloisa)</h2>
               </div>
-              <span className="text-[10px] bg-white/5 border border-white/10 px-2 py-1 rounded-full text-muted-foreground">
-                Ambiente de Testes
+              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded-full font-semibold">
+                Testes em Tempo Real
               </span>
             </div>
 
@@ -280,10 +438,10 @@ export function ChatbotPage() {
                   className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-xs ${
+                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs ${
                       msg.sender === "user"
                         ? "bg-emerald-500 text-black font-semibold rounded-br-none"
-                        : "bg-white/10 text-white border border-white/10 rounded-bl-none"
+                        : "bg-white/10 text-white border border-white/10 rounded-bl-none font-normal"
                     }`}
                   >
                     {msg.text}
@@ -291,6 +449,13 @@ export function ChatbotPage() {
                   <span className="text-[9px] text-muted-foreground px-1 mt-1">{msg.time}</span>
                 </div>
               ))}
+
+              {isTyping && (
+                <div className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl w-fit">
+                  <span className="animate-pulse">Eloisa está digitando...</span>
+                </div>
+              )}
+              <div ref={chatEndRef} />
             </div>
 
             {/* Form de Envio no Simulador */}
@@ -299,12 +464,13 @@ export function ChatbotPage() {
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Digite como se fosse um cliente (ex: quais sabores tem?)..."
+                placeholder="Envie uma mensagem de teste (ex: tem pod? quantos puffs dura?)..."
                 className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50"
               />
               <button
                 type="submit"
-                className="px-4 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-all flex items-center justify-center cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                disabled={isTyping}
+                className="px-4 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-all flex items-center justify-center cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.2)] disabled:opacity-50"
               >
                 <Send className="size-4" />
               </button>
