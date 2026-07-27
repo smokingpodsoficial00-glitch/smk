@@ -47,12 +47,10 @@ export function SupplyChainDashboard() {
   const [newFlavorStock, setNewFlavorStock] = useState("");
   const [submittingFlavor, setSubmittingFlavor] = useState(false);
 
-  // Filtros e ordenação ERP
+  // Filtros ERP Limpos (Marca + Status de Estoque do Modelo)
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
-  const [filterTab, setFilterTab] = useState<
-    "TODOS" | "EM_ESTOQUE" | "BAIXO_ESTOQUE" | "SEM_ESTOQUE" | "MAIS_VENDIDOS" | "MAIOR_LUCRO" | "REPOSICAO_NECESSARIA"
-  >("TODOS");
+  const [filterTab, setFilterTab] = useState<"TODOS" | "EM_ESTOQUE" | "BAIXO_ESTOQUE" | "SEM_ESTOQUE">("TODOS");
 
   // Estado para grupos expandidos no Accordion
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Record<string, boolean>>({});
@@ -419,14 +417,15 @@ export function SupplyChainDashboard() {
     ? `conic-gradient(${donutSegments.map(s => `${s.color} ${s.start}% ${s.end}%`).join(', ')})`
     : 'conic-gradient(#333 0% 100%)';
 
-  // ─── Filtering ──────────────────────────────────────────
-  const filteredProducts = products.filter(p => {
-    const currentStock = p.stock || 0;
+  // ─── Grouping & Filtering (AGRUPAMENTO PRIMEIRO, DEPOIS FILTRO POR MODELO) ──────
+  interface SKUGroup {
+    groupKey: string; brand: string; name: string; puffs: number;
+    price: number; cost_price: number; image_url: string; totalStock: number; flavors: any[];
+  }
+
+  // Step 1: Pre-filter products by search query and selected brand only
+  const baseFilteredProducts = products.filter(p => {
     if (selectedBrand && p.brand !== selectedBrand) return false;
-    if (filterTab === 'EM_ESTOQUE' && currentStock < 5) return false;
-    if (filterTab === 'BAIXO_ESTOQUE' && (currentStock === 0 || currentStock >= 5)) return false;
-    if (filterTab === 'SEM_ESTOQUE' && currentStock > 0) return false;
-    if (filterTab === 'REPOSICAO_NECESSARIA' && currentStock >= 5) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       return (p.brand || '').toLowerCase().includes(q) ||
@@ -437,17 +436,13 @@ export function SupplyChainDashboard() {
     return true;
   });
 
-  // ─── Grouping ───────────────────────────────────────────
-  interface SKUGroup {
-    groupKey: string; brand: string; name: string; puffs: number;
-    price: number; cost_price: number; image_url: string; totalStock: number; flavors: any[];
-  }
-
+  // Step 2: Group all matching products into SKU Groups (Models)
   const groupedMap: Record<string, SKUGroup> = {};
-  filteredProducts.forEach(product => {
+  baseFilteredProducts.forEach(product => {
     const brandName = (product.brand || "Genérico").trim();
     const modelName = (product.name || "Pod").trim();
     const groupKey = `${brandName.toLowerCase()}__${modelName.toLowerCase()}`;
+
     if (!groupedMap[groupKey]) {
       groupedMap[groupKey] = {
         groupKey, brand: brandName, name: modelName, puffs: product.puffs || 5000,
@@ -455,15 +450,26 @@ export function SupplyChainDashboard() {
         image_url: product.image_url || "", totalStock: 0, flavors: []
       };
     }
-    groupedMap[groupKey].totalStock += (product.stock || 0);
+
+    // Accumulate total stock only for real flavors (ignore dummy 'Padrão' placeholders)
+    const fName = (product.flavor || '').trim().toLowerCase();
+    if (fName !== 'padrão' && fName !== 'padrao' && fName !== '') {
+      groupedMap[groupKey].totalStock += (product.stock || 0);
+    }
+
     groupedMap[groupKey].flavors.push(product);
     if (!groupedMap[groupKey].image_url && product.image_url) groupedMap[groupKey].image_url = product.image_url;
   });
 
-  const skuGroups = Object.values(groupedMap).sort((a, b) => {
-    if (filterTab === 'MAIOR_LUCRO') return (b.price - b.cost_price) - (a.price - a.cost_price);
-    return b.totalStock - a.totalStock;
-  });
+  // Step 3: Apply filterTab directly on the grouped Model's totalStock!
+  const skuGroups = Object.values(groupedMap)
+    .filter(group => {
+      if (filterTab === 'EM_ESTOQUE') return group.totalStock >= 5;
+      if (filterTab === 'BAIXO_ESTOQUE') return group.totalStock > 0 && group.totalStock < 5;
+      if (filterTab === 'SEM_ESTOQUE') return group.totalStock === 0;
+      return true; // TODOS
+    })
+    .sort((a, b) => b.totalStock - a.totalStock);
 
   const maxGroupStock = Math.max(50, ...skuGroups.map(g => g.totalStock));
 
@@ -670,7 +676,7 @@ export function SupplyChainDashboard() {
           </div>
         </div>
 
-        {/* ── PESQUISA + FILTROS ───────────────────────── */}
+        {/* ── PESQUISA + FILTROS DE ESTOQUE SIMPLIFICADOS ───────────────────────── */}
         <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
           {/* Campo de Busca Destacado */}
           <div className="relative w-full">
@@ -711,23 +717,20 @@ export function SupplyChainDashboard() {
             ))}
           </div>
 
-          {/* Filtros de Status */}
+          {/* Filtros de Status de Estoque Estritamente Solicitados (4 Opções Limpas) */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 custom-scrollbar text-xs">
             {[
               { id: "TODOS", label: "Todos" },
               { id: "EM_ESTOQUE", label: "🟢 Em estoque" },
               { id: "BAIXO_ESTOQUE", label: "🟡 Baixo estoque" },
               { id: "SEM_ESTOQUE", label: "🔴 Sem estoque" },
-              { id: "MAIS_VENDIDOS", label: "🔥 Mais vendidos" },
-              { id: "MAIOR_LUCRO", label: "💰 Maior lucro" },
-              { id: "REPOSICAO_NECESSARIA", label: "⚠️ Reposição" },
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setFilterTab(tab.id as any)}
-                className={`px-3 py-1.5 rounded-lg font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all whitespace-nowrap cursor-pointer ${
                   filterTab === tab.id
-                    ? "bg-emerald-500 text-black shadow"
+                    ? "bg-emerald-500 text-black shadow-[0_0_12px_rgba(16,185,129,0.3)]"
                     : "bg-elevated/40 text-muted-foreground hover:bg-white/10 hover:text-white"
                 }`}
               >
@@ -758,18 +761,18 @@ export function SupplyChainDashboard() {
               const isGroupMenuActive = activeGroupMenuKey === group.groupKey;
               const stockPct = Math.min(100, Math.round((group.totalStock / maxGroupStock) * 100));
 
-              // Stock bar color
+              // Stock bar color & badge label
               let stockBarColor = "bg-emerald-400";
               let stockBadgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-              let stockLabel = "Em estoque";
+              let stockLabel = `Em estoque (${group.totalStock} un)`;
               if (group.totalStock === 0) {
                 stockBarColor = "bg-red-400";
                 stockBadgeClass = "bg-red-500/10 text-red-400 border-red-500/20";
-                stockLabel = "Esgotado";
+                stockLabel = "Esgotado (0 un)";
               } else if (group.totalStock < 5) {
                 stockBarColor = "bg-amber-400";
                 stockBadgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
-                stockLabel = "Estoque baixo";
+                stockLabel = `Estoque baixo (${group.totalStock} un)`;
               }
 
               return (
@@ -785,7 +788,7 @@ export function SupplyChainDashboard() {
                     {/* Linha 1: Info principal */}
                     <div className="flex items-start justify-between gap-4 mb-4">
                       <div className="flex items-center gap-4">
-                        {/* Foto do Modelo (maior) */}
+                        {/* Foto do Modelo */}
                         <div 
                           onClick={(e) => e.stopPropagation()}
                           className="relative size-16 rounded-xl border border-white/10 bg-black/40 overflow-hidden shrink-0 group/img cursor-pointer"
@@ -1029,15 +1032,11 @@ export function SupplyChainDashboard() {
       {/* ━━━ MODAL FLUTUANTE CENTRALIZADO ("BOLHA"): NOVO PRODUTO ━━━━━━━━ */}
       {showNewProductModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-          {/* Backdrop Click para fechar */}
           <div 
             className="absolute inset-0" 
             onClick={() => setShowNewProductModal(false)} 
           />
-          
-          {/* Card Flutuante Centralizado (Bolha) */}
           <div className="relative bg-[#121212] border border-border rounded-3xl w-full max-w-lg shadow-2xl p-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200 space-y-5">
-            {/* Header do Modal */}
             <div className="flex items-center justify-between border-b border-border pb-4">
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -1054,10 +1053,8 @@ export function SupplyChainDashboard() {
               </button>
             </div>
 
-            {/* Formulario */}
             <form onSubmit={handleAddProduct} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                {/* Marca */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Marca</label>
                   <input 
@@ -1067,7 +1064,6 @@ export function SupplyChainDashboard() {
                   />
                 </div>
 
-                {/* Modelo */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Modelo *</label>
                   <input 
@@ -1079,7 +1075,6 @@ export function SupplyChainDashboard() {
                 </div>
               </div>
 
-              {/* Puffs */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Puffs</label>
                 <input 
@@ -1089,7 +1084,6 @@ export function SupplyChainDashboard() {
                 />
               </div>
 
-              {/* Preço e Custo */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Preço de Venda (R$) *</label>
@@ -1109,7 +1103,6 @@ export function SupplyChainDashboard() {
                 </div>
               </div>
 
-              {/* Upload de Imagem */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Foto do Pod</label>
                 <div 
@@ -1144,7 +1137,6 @@ export function SupplyChainDashboard() {
                 </div>
               </div>
 
-              {/* Botões de Ação do Modal */}
               <div className="flex gap-2.5 pt-3 border-t border-border">
                 <button 
                   type="button"
