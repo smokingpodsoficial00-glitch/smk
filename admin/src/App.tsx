@@ -1,13 +1,14 @@
 import { useState } from "react";
 import {
   LayoutDashboard, PackageSearch, Users, Settings, CircleDollarSign,
-  MoreHorizontal, Store, ChevronRight, PanelLeftOpen
+  MoreHorizontal, Store, ChevronRight, PanelLeftOpen, Bot
 } from "lucide-react";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { FinanceDashboard } from "@/components/FinanceDashboard";
 import { SupplyChainDashboard } from "@/components/SupplyChainDashboard";
 import { CRMDashboard } from "@/components/CRMDashboard";
 import { SettingsPage } from "@/components/SettingsPage";
+import { ChatbotPage } from "@/components/ChatbotPage";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 
 export default function App() {
@@ -164,6 +165,32 @@ export default function App() {
             <Users className="size-5 shrink-0" />
             {!sidebarCollapsed && <span className="font-semibold truncate">Clientes</span>}
           </button>
+
+          {/* Nova Aba Chatbot */}
+          <button 
+            onClick={(e) => {
+              if (sidebarCollapsed) e.stopPropagation();
+              setActiveTab("chatbot");
+            }}
+            title={sidebarCollapsed ? "Chatbot IA (Clique para abrir)" : undefined}
+            className={`flex items-center gap-3 py-3 rounded-xl transition-all cursor-pointer ${
+              sidebarCollapsed ? 'justify-center px-3' : 'px-4'
+            } ${
+              activeTab === 'chatbot' 
+                ? 'bg-emerald-500 text-black font-bold shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
+                : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Bot className="size-5 shrink-0 text-emerald-400" />
+            {!sidebarCollapsed && (
+              <span className="font-semibold truncate flex items-center gap-2">
+                Chatbot
+                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold">
+                  IA
+                </span>
+              </span>
+            )}
+          </button>
         </nav>
 
         {/* Botão de Expansão no Rodapé (Quando Colapsado) */}
@@ -210,6 +237,7 @@ export default function App() {
         {activeTab === 'financeiro' && <FinanceDashboard />}
         {activeTab === 'estoque' && <SupplyChainDashboard />}
         {activeTab === 'clientes' && <CRMDashboard />}
+        {activeTab === 'chatbot' && <ChatbotPage />}
         {activeTab === 'configuracoes' && <SettingsPage />}
       </main>
     </div>
