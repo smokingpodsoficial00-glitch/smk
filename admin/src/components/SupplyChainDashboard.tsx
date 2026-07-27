@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { 
-  PackageSearch, Box, Plus, Minus, Eye, EyeOff, Loader2, ImagePlus, Upload, 
+  PackageSearch, Plus, Minus, Eye, EyeOff, Loader2, ImagePlus, Upload, 
   Trash2, Search, Filter, ArrowUpDown, MoreVertical, Copy, Edit3, DollarSign, 
-  AlertTriangle, CheckCircle2, X, RefreshCw, TrendingUp, Layers, PieChart, 
-  ChevronRight, Calendar, Tag, ShieldAlert
+  CheckCircle2, X, TrendingUp, PieChart, ChevronRight, ChevronDown, ChevronUp, Tag
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatBRL } from "@/lib/cart";
@@ -34,6 +33,9 @@ export function SupplyChainDashboard() {
   const [filterTab, setFilterTab] = useState<
     "TODOS" | "EM_ESTOQUE" | "BAIXO_ESTOQUE" | "SEM_ESTOQUE" | "MAIS_VENDIDOS" | "MAIOR_LUCRO" | "REPOSICAO_NECESSARIA"
   >("TODOS");
+
+  // Estado para grupos expandidos no Accordion
+  const [expandedGroupKeys, setExpandedGroupKeys] = useState<Record<string, boolean>>({});
 
   // Estado para Pop-up de Edição de Estoque
   const [editingStockSku, setEditingStockSku] = useState<any | null>(null);
@@ -211,6 +213,14 @@ export function SupplyChainDashboard() {
     }
   };
 
+  const handleQuickAddFlavor = (groupBrand: string, groupName: string, groupPuffs: number) => {
+    setBrand(groupBrand);
+    setName(groupName);
+    setPuffs(groupPuffs ? groupPuffs.toString() : "5000");
+    setFlavor("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleUpdateStock = async (id: string, newStock: number) => {
     if (newStock < 0) return;
     try {
@@ -294,6 +304,10 @@ export function SupplyChainDashboard() {
     }
   };
 
+  const toggleGroup = (key: string) => {
+    setExpandedGroupKeys(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
   // Cálculos de Métricas ERP
   const totalProducts = products.length;
   const totalStockUnits = products.reduce((acc, p) => acc + (p.stock || 0), 0);
@@ -314,7 +328,7 @@ export function SupplyChainDashboard() {
     return acc;
   }, {});
 
-  // Filtragem e Ordenação da Tabela ERP
+  // Filtragem
   const filteredProducts = products.filter(p => {
     const currentStock = p.stock || 0;
 
@@ -333,25 +347,56 @@ export function SupplyChainDashboard() {
     }
 
     return true;
-  }).sort((a, b) => {
-    if (filterTab === 'MAIS_VENDIDOS') {
-      const topA = topSelling.find(t => t.product_id === a.id)?.total_sold || 0;
-      const topB = topSelling.find(t => t.product_id === b.id)?.total_sold || 0;
-      const diff = topB - topA;
-      if (diff !== 0) return diff;
-    } else if (filterTab === 'MAIOR_LUCRO') {
-      const profitA = (parseFloat(a.price) || 0) - (parseFloat(a.cost_price || 35));
-      const profitB = (parseFloat(b.price) || 0) - (parseFloat(b.cost_price || 35));
-      const diff = profitB - profitA;
-      if (diff !== 0) return diff;
+  });
+
+  // AGRUPAMENTO INTELIGENTE POR MARCA E MODELO
+  interface SKUGroup {
+    groupKey: string;
+    brand: string;
+    name: string;
+    puffs: number;
+    price: number;
+    cost_price: number;
+    image_url: string;
+    totalStock: number;
+    flavors: any[];
+  }
+
+  const groupedMap: Record<string, SKUGroup> = {};
+
+  filteredProducts.forEach(product => {
+    const brandName = (product.brand || "Genérico").trim();
+    const modelName = (product.name || "Pod").trim();
+    const groupKey = `${brandName.toLowerCase()}__${modelName.toLowerCase()}`;
+
+    if (!groupedMap[groupKey]) {
+      groupedMap[groupKey] = {
+        groupKey,
+        brand: brandName,
+        name: modelName,
+        puffs: product.puffs || 5000,
+        price: parseFloat(product.price) || 0,
+        cost_price: parseFloat(product.cost_price) || 35,
+        image_url: product.image_url || "",
+        totalStock: 0,
+        flavors: []
+      };
     }
 
-    const timeA = new Date(a.created_at || 0).getTime();
-    const timeB = new Date(b.created_at || 0).getTime();
-    const diff = timeB - timeA;
-    if (diff !== 0) return diff;
+    groupedMap[groupKey].totalStock += (product.stock || 0);
+    groupedMap[groupKey].flavors.push(product);
+    if (!groupedMap[groupKey].image_url && product.image_url) {
+      groupedMap[groupKey].image_url = product.image_url;
+    }
+  });
 
-    return (a.id || '').localeCompare(b.id || '');
+  const skuGroups = Object.values(groupedMap).sort((a, b) => {
+    if (filterTab === 'MAIOR_LUCRO') {
+      const profitA = a.price - a.cost_price;
+      const profitB = b.price - b.cost_price;
+      return profitB - profitA;
+    }
+    return b.totalStock - a.totalStock;
   });
 
   if (loading) {
@@ -373,56 +418,48 @@ export function SupplyChainDashboard() {
             Central de Gestão de Estoque e Vendas (ERP)
           </h2>
           <p className="text-xs text-muted-foreground mt-1">
-            Painel consolidado para monitoramento de SKUs, lucratividade, níveis de estoque e reposição estratégica.
+            Painel agrupado por Marcas e Modelos para rápido controle de estoque e reposição.
           </p>
         </div>
       </header>
 
       {/* FAIXA SUPERIOR: DASHBOARD DE 8 KPIS ESTRATÉGICOS */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-        {/* Card 1: Produtos */}
         <div className="bg-card border border-border rounded-2xl p-3 flex flex-col justify-between">
           <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Produtos</span>
           <div className="text-xl font-bold text-silver font-mono mt-1">{totalProducts}</div>
         </div>
 
-        {/* Card 2: Unidades */}
         <div className="bg-card border border-border rounded-2xl p-3 flex flex-col justify-between">
           <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Unidades</span>
           <div className="text-xl font-bold text-silver font-mono mt-1">{totalStockUnits} un</div>
         </div>
 
-        {/* Card 3: Valor Estoque */}
         <div className="bg-card border border-emerald-500/20 rounded-2xl p-3 flex flex-col justify-between">
           <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Valor Estoque</span>
           <div className="text-sm font-bold text-emerald-400 font-mono mt-1">{formatBRL(totalStockValue)}</div>
         </div>
 
-        {/* Card 4: Custo Total */}
         <div className="bg-card border border-border rounded-2xl p-3 flex flex-col justify-between">
           <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Custo Total</span>
           <div className="text-sm font-bold text-silver font-mono mt-1">{formatBRL(totalStockCost)}</div>
         </div>
 
-        {/* Card 5: Zerados */}
         <div className="bg-card border border-red-500/20 rounded-2xl p-3 flex flex-col justify-between">
           <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Zerados</span>
           <div className="text-xl font-bold text-red-400 font-mono mt-1">{outOfStockCount}</div>
         </div>
 
-        {/* Card 6: Estoque Baixo */}
         <div className="bg-card border border-amber-500/20 rounded-2xl p-3 flex flex-col justify-between">
           <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Estoque Baixo</span>
           <div className="text-xl font-bold text-amber-400 font-mono mt-1">{lowStockCount}</div>
         </div>
 
-        {/* Card 7: Mais Vendido */}
         <div className="bg-card border border-border rounded-2xl p-3 flex flex-col justify-between">
           <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider truncate">Mais Vendido</span>
           <div className="text-xs font-bold text-silver truncate mt-1">{topSellingFlavorName}</div>
         </div>
 
-        {/* Card 8: Última Entrada */}
         <div className="bg-card border border-border rounded-2xl p-3 flex flex-col justify-between">
           <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Última Entrada</span>
           <div className="text-xs font-bold text-muted-foreground mt-1">{lastEntryTime}</div>
@@ -432,7 +469,7 @@ export function SupplyChainDashboard() {
       {/* LAYOUT PRINCIPAL 75/25 (Main Content 75% | Form Sidebar 25%) */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
         
-        {/* COLUNA ESQUERDA (75%): PAINEL DE GESTÃO, GRÁFICOS E TABELA */}
+        {/* COLUNA ESQUERDA (75%): PAINEL DE GESTÃO, GRÁFICOS E TABELA AGRUPADA */}
         <div className="lg:col-span-3 space-y-6">
           
           {/* SEÇÃO DE GRÁFICOS E INDICADORES VISUAIS */}
@@ -503,7 +540,7 @@ export function SupplyChainDashboard() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Pesquisa inteligente por qualquer termo: Blueberry, Ignite, V50, 5000, Ice..."
+                placeholder="Pesquisa inteligente por marca, modelo ou sabor: Elf Bar, BC5000, Watermelon..."
                 className="w-full bg-[#0f0f0f] border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-emerald-500/50 transition-all shadow-inner"
               />
             </div>
@@ -511,7 +548,7 @@ export function SupplyChainDashboard() {
             {/* Abas de Filtros Rápidos ERP */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar text-xs">
               {[
-                { id: "TODOS", label: "Todos" },
+                { id: "TODOS", label: "Todos os Modelos" },
                 { id: "EM_ESTOQUE", label: "🟢 Em estoque" },
                 { id: "BAIXO_ESTOQUE", label: "🟡 Baixo estoque" },
                 { id: "SEM_ESTOQUE", label: "🔴 Sem estoque" },
@@ -534,193 +571,202 @@ export function SupplyChainDashboard() {
             </div>
           </div>
 
-          {/* TABELA ERP DE SKUS (DESKTOP) */}
-          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xl">
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-elevated/40 text-muted-foreground uppercase text-[10px] tracking-wider border-b border-border">
-                  <tr>
-                    <th className="py-3 px-3 text-center" style={{ width: '50px' }}>Foto</th>
-                    <th className="py-3 px-4 font-semibold">SKU / Marca / Sabor</th>
-                    <th className="py-3 px-3 font-semibold text-right">Venda</th>
-                    <th className="py-3 px-3 font-semibold text-right">Custo</th>
-                    <th className="py-3 px-4 font-semibold text-right">Lucro (Margem)</th>
-                    <th className="py-3 px-4 font-semibold text-center" style={{ width: '180px' }}>Estoque Visual</th>
-                    <th className="py-3 px-3 font-semibold text-center">Status</th>
-                    <th className="py-3 px-3 text-right">Ação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
-                  {filteredProducts.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="py-12 text-center text-xs text-muted-foreground">
-                        Nenhum SKU encontrado para os filtros aplicados.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredProducts.map((sku) => {
-                      const priceVal = parseFloat(sku.price) || 0;
-                      const costVal = parseFloat(sku.cost_price) || 35;
-                      const profit = priceVal - costVal;
-                      const marginPct = priceVal > 0 ? Math.round((profit / priceVal) * 100) : 0;
-                      const stockPct = Math.min(100, Math.round((sku.stock / 30) * 100));
+          {/* ESTOQUE AGRUPADO POR MARCA E MODELO (ACCORDION DE MODELOS) */}
+          <div className="space-y-4">
+            {skuGroups.length === 0 ? (
+              <div className="bg-card border border-border rounded-2xl p-12 text-center text-xs text-muted-foreground">
+                Nenhum produto encontrado para os filtros aplicados.
+              </div>
+            ) : (
+              skuGroups.map((group) => {
+                const isSearching = searchQuery.trim().length > 0;
+                const isExpanded = expandedGroupKeys[group.groupKey] ?? isSearching;
 
-                      let statusBadge;
-                      if (sku.stock >= 5) {
-                        statusBadge = (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            <div className="size-1.5 rounded-full bg-emerald-400" />
-                            Em estoque
+                const profit = group.price - group.cost_price;
+                const marginPct = group.price > 0 ? Math.round((profit / group.price) * 100) : 0;
+                const stockPct = Math.min(100, Math.round((group.totalStock / 50) * 100));
+
+                let groupStatusBadge;
+                if (group.totalStock >= 10) {
+                  groupStatusBadge = (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <div className="size-1.5 rounded-full bg-emerald-400" />
+                      Em estoque ({group.totalStock} un)
+                    </span>
+                  );
+                } else if (group.totalStock > 0) {
+                  groupStatusBadge = (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      <div className="size-1.5 rounded-full bg-amber-400" />
+                      Estoque Baixo ({group.totalStock} un)
+                    </span>
+                  );
+                } else {
+                  groupStatusBadge = (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse">
+                      <div className="size-1.5 rounded-full bg-red-400" />
+                      Esgotado
+                    </span>
+                  );
+                }
+
+                return (
+                  <div key={group.groupKey} className="bg-card border border-border rounded-2xl overflow-hidden shadow-xl transition-all">
+                    {/* LINHA HEADER DO MODELO (CATEGORIA) */}
+                    <div 
+                      onClick={() => toggleGroup(group.groupKey)}
+                      className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-white/[0.02] transition-colors select-none"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="size-12 rounded-xl border border-white/10 bg-black/40 overflow-hidden flex items-center justify-center shrink-0">
+                          {group.image_url ? (
+                            <img src={group.image_url} alt={group.name} className="size-full object-cover" />
+                          ) : (
+                            <ImagePlus className="size-5 text-muted-foreground/40" />
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-base text-silver">{group.brand} {group.name}</h3>
+                            <span className="text-[10px] bg-elevated border border-border text-muted-foreground px-2 py-0.5 rounded-md font-mono">
+                              {group.puffs} puffs
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {group.flavors.length} {group.flavors.length === 1 ? 'sabor cadastrado' : 'sabores cadastrados'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Métricas e Botão Expansor */}
+                      <div className="flex items-center gap-6 justify-between md:justify-end">
+                        <div className="flex items-center gap-4 text-xs font-mono">
+                          <div>
+                            <span className="text-[10px] uppercase text-muted-foreground block">Venda</span>
+                            <span className="font-semibold text-silver">{formatBRL(group.price)}</span>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] uppercase text-muted-foreground block">Lucro (Margem)</span>
+                            <span className="font-semibold text-emerald-400">{formatBRL(profit)} <span className="text-[10px] text-muted-foreground">({marginPct}%)</span></span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          {groupStatusBadge}
+
+                          <div className="p-1.5 rounded-lg bg-elevated hover:bg-white/10 text-muted-foreground hover:text-white transition-colors">
+                            {isExpanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SUB-TABELA DE SABORES DO MODELO (ACCORDION EXPANDIDO) */}
+                    {isExpanded && (
+                      <div className="bg-[#0c0c0c] border-t border-border/80 p-4 space-y-3 animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Sabores em Estoque para {group.brand} {group.name}
                           </span>
-                        );
-                      } else if (sku.stock > 0) {
-                        statusBadge = (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                            <div className="size-1.5 rounded-full bg-amber-400" />
-                            Estoque Baixo
-                          </span>
-                        );
-                      } else {
-                        statusBadge = (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse">
-                            <div className="size-1.5 rounded-full bg-red-400" />
-                            Esgotado
-                          </span>
-                        );
-                      }
 
-                      return (
-                        <tr 
-                          key={sku.id} 
-                          onClick={() => setSelectedDrawerSKU(sku)}
-                          className="group hover:bg-white/[0.03] transition-colors cursor-pointer select-none"
-                        >
-                          {/* Foto */}
-                          <td className="py-3 px-3 text-center">
-                            <div className="size-9 rounded-lg overflow-hidden border border-white/10 bg-black/40 mx-auto flex items-center justify-center">
-                              {sku.image_url ? (
-                                <img src={sku.image_url} alt={sku.flavor} className="size-full object-cover" />
-                              ) : (
-                                <ImagePlus className="size-4 text-muted-foreground/40" />
-                              )}
-                            </div>
-                          </td>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleQuickAddFlavor(group.brand, group.name, group.puffs);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/20 transition-all cursor-pointer"
+                          >
+                            <Plus className="size-3.5" />
+                            Adicionar Sabor a este Modelo
+                          </button>
+                        </div>
 
-                          {/* SKU / Nome */}
-                          <td className="py-3 px-4">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-silver text-sm">{sku.flavor}</span>
-                              <span className="text-[11px] text-muted-foreground">
-                                {sku.brand} · {sku.name} {sku.puffs ? `· ${sku.puffs} puffs` : ''}
-                              </span>
-                            </div>
-                          </td>
+                        {/* Lista de Sabores */}
+                        <div className="divide-y divide-white/5">
+                          {group.flavors.map((flavorSku) => {
+                            const flavorStock = flavorSku.stock || 0;
+                            let flavorBadge;
+                            if (flavorStock >= 5) {
+                              flavorBadge = <span className="text-emerald-400 text-[10px]">🟢 Em estoque</span>;
+                            } else if (flavorStock > 0) {
+                              flavorBadge = <span className="text-amber-400 text-[10px]">🟡 Estoque Baixo</span>;
+                            } else {
+                              flavorBadge = <span className="text-red-400 text-[10px]">🔴 Esgotado</span>;
+                            }
 
-                          {/* Venda */}
-                          <td className="py-3 px-3 font-mono text-right text-silver font-medium">
-                            {formatBRL(priceVal)}
-                          </td>
-
-                          {/* Custo */}
-                          <td className="py-3 px-3 font-mono text-right text-muted-foreground">
-                            {formatBRL(costVal)}
-                          </td>
-
-                          {/* Lucro & Margem */}
-                          <td className="py-3 px-4 font-mono text-right">
-                            <span className="text-emerald-400 font-semibold block">{formatBRL(profit)}</span>
-                            <span className="text-[10px] text-muted-foreground">({marginPct}%)</span>
-                          </td>
-
-                          {/* Estoque Visual */}
-                          <td className="py-3 px-4 text-center">
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 flex flex-col gap-1">
-                                <div className="flex justify-between text-[10px] font-mono">
-                                  <span className="text-silver font-semibold">{sku.stock} un</span>
+                            return (
+                              <div 
+                                key={flavorSku.id}
+                                onClick={() => setSelectedDrawerSKU(flavorSku)}
+                                className="py-3 px-2 flex items-center justify-between gap-4 hover:bg-white/[0.02] rounded-xl transition-colors cursor-pointer"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="size-8 rounded-lg overflow-hidden border border-white/10 bg-black/40 flex items-center justify-center shrink-0">
+                                    {flavorSku.image_url ? (
+                                      <img src={flavorSku.image_url} alt={flavorSku.flavor} className="size-full object-cover" />
+                                    ) : (
+                                      <Tag className="size-3.5 text-muted-foreground/40" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <span className="font-semibold text-white text-xs block">{flavorSku.flavor}</span>
+                                    {flavorBadge}
+                                  </div>
                                 </div>
-                                <div className="h-1.5 w-full bg-elevated rounded-full overflow-hidden">
-                                  <div 
-                                    className={`h-full rounded-full transition-all ${
-                                      sku.stock >= 5 ? 'bg-emerald-400' : sku.stock > 0 ? 'bg-amber-400' : 'bg-red-500'
-                                    }`}
-                                    style={{ width: `${stockPct}%` }} 
-                                  />
+
+                                {/* Controles de Estoque do Sabor */}
+                                <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                                  <div className="inline-flex items-center gap-1 bg-[#0f0f0f] border border-white/10 rounded-xl p-1">
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleUpdateStock(flavorSku.id, flavorStock - 1)}
+                                      disabled={flavorStock === 0}
+                                      className="grid place-items-center size-6 rounded-lg hover:bg-white/10 active:scale-95 disabled:opacity-20 cursor-pointer text-muted-foreground hover:text-white"
+                                    >
+                                      <Minus className="size-3" />
+                                    </button>
+
+                                    <span 
+                                      onClick={() => {
+                                        setEditingStockSku(flavorSku);
+                                        setNewStockValue(flavorStock.toString());
+                                      }}
+                                      className="w-10 text-center text-xs font-bold text-silver font-mono cursor-pointer hover:text-emerald-400"
+                                      title="Clique para editar a quantidade"
+                                    >
+                                      {flavorStock} un
+                                    </span>
+
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleUpdateStock(flavorSku.id, flavorStock + 1)}
+                                      className="grid place-items-center size-6 rounded-lg hover:bg-white/10 active:scale-95 cursor-pointer text-muted-foreground hover:text-white"
+                                    >
+                                      <Plus className="size-3" />
+                                    </button>
+                                  </div>
+
+                                  <button
+                                    onClick={() => setSelectedDrawerSKU(flavorSku)}
+                                    className="p-1.5 rounded-lg bg-elevated hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
+                                    title="Ver detalhes do sabor"
+                                  >
+                                    <ChevronRight className="size-4" />
+                                  </button>
                                 </div>
                               </div>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingStockSku(sku);
-                                  setNewStockValue(sku.stock.toString());
-                                }}
-                                className="px-2 py-1 rounded bg-elevated hover:bg-white/10 text-[10px] font-semibold text-silver border border-border shrink-0 transition-colors"
-                              >
-                                Editar
-                              </button>
-                            </div>
-                          </td>
-
-                          {/* Status */}
-                          <td className="py-3 px-3 text-center">
-                            {statusBadge}
-                          </td>
-
-                          {/* Ação */}
-                          <td className="py-3 px-3 text-right">
-                            <ChevronRight className="size-4 text-muted-foreground group-hover:text-white transition-colors" />
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* CARDS RESPONSIVOS MOBILE (block md:hidden) */}
-            <div className="block md:hidden p-4 space-y-3">
-              {filteredProducts.map((sku) => (
-                <div 
-                  key={sku.id}
-                  onClick={() => setSelectedDrawerSKU(sku)}
-                  className="bg-[#0f0f0f] border border-white/10 rounded-xl p-4 space-y-3 cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="size-12 rounded-lg border border-white/10 bg-black/40 overflow-hidden shrink-0 flex items-center justify-center">
-                      {sku.image_url ? (
-                        <img src={sku.image_url} alt={sku.flavor} className="size-full object-cover" />
-                      ) : (
-                        <ImagePlus className="size-5 text-muted-foreground/40" />
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-silver text-sm truncate">{sku.flavor}</h4>
-                      <p className="text-xs text-muted-foreground truncate">{sku.brand} · {sku.name}</p>
-                    </div>
-
-                    <span className="font-mono font-semibold text-emerald-400 text-sm">
-                      {formatBRL(sku.price || 0)}
-                    </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
-
-                  <div className="flex items-center justify-between border-t border-white/5 pt-2 text-xs">
-                    <span className="text-muted-foreground">Estoque: <strong className="text-white">{sku.stock} un</strong></span>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedDrawerSKU(sku);
-                      }}
-                      className="text-primary font-semibold flex items-center gap-1"
-                    >
-                      Ver detalhes <ChevronRight className="size-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -783,7 +829,7 @@ export function SupplyChainDashboard() {
                 />
               </div>
 
-              {/* Grid 2 colunas para Preço e Custo */}
+              {/* Preço e Custo */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Preço (R$) *</label>
