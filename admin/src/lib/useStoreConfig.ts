@@ -20,22 +20,32 @@ export interface StoreConfig {
 
 const DEFAULT_CONFIG: StoreConfig = {
   id: "local-config-id",
-  store_name: "Minha Loja",
-  store_slug: "minha-loja",
+  store_name: "Smoking Pods",
+  store_slug: "smoking-pods",
   logo_url: null,
   favicon_url: null,
-  primary_color: "#8b5cf6",
+  primary_color: "#10b981",
   whatsapp_number: "",
   pix_key: "",
   pix_name: "",
   address: "",
   instagram_url: "",
-  description: "Painel ERP & Catálogo Digital",
+  description: "",
 };
 
 const LOCAL_STORAGE_KEY = "store_config_fallback_v1";
+const CONFIG_SKU_ID = "00000000-0000-0000-0000-000000000000";
 
-// Tenta carregar do localStorage no startup
+// BroadcastChannel para sincronização instantânea em abas e portas do mesmo navegador
+let broadcastChannel: BroadcastChannel | null = null;
+try {
+  if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+    broadcastChannel = new BroadcastChannel("store_config_channel");
+  }
+} catch (e) {
+  console.warn("BroadcastChannel não suportado:", e);
+}
+
 function getLocalFallback(): StoreConfig {
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -54,16 +64,21 @@ function saveLocalFallback(cfg: StoreConfig) {
   }
 }
 
-// Cache global em memória
 let cachedConfig: StoreConfig | null = null;
 let fetchPromise: Promise<StoreConfig> | null = null;
 const listeners = new Set<() => void>();
 
 function notifyListeners() {
   listeners.forEach((fn) => fn());
+  if (broadcastChannel && cachedConfig) {
+    try {
+      broadcastChannel.postMessage(cachedConfig);
+    } catch {}
+  }
 }
 
 async function fetchConfig(): Promise<StoreConfig> {
+  // 1. Tentar ler da tabela dedicada `store_config`
   try {
     const { data, error } = await supabase
       .from("store_config")
@@ -78,10 +93,38 @@ async function fetchConfig(): Promise<StoreConfig> {
       return cachedConfig;
     }
   } catch (e) {
-    console.warn("Supabase store_config não acessível, usando fallback local:", e);
+    console.warn("Tabela store_config não disponível, tentando fallback em smoking_products:", e);
   }
 
-  // Fallback se o Supabase falhar/tabela não existir
+  // 2. Fallback: Ler do registro especial `__STORE_CONFIG__` na tabela `smoking_products`
+  try {
+    const { data, error } = await supabase
+      .from("smoking_products")
+      .select("*")
+      .eq("brand", "__STORE_CONFIG__")
+      .limit(1);
+
+    if (!error && data && data.length > 0) {
+      const row = data[0];
+      let parsedConfig: StoreConfig = { ...DEFAULT_CONFIG };
+      if (row.flavor) {
+        try {
+          parsedConfig = { ...DEFAULT_CONFIG, ...JSON.parse(row.flavor) };
+        } catch {
+          parsedConfig.store_name = row.name || DEFAULT_CONFIG.store_name;
+          parsedConfig.logo_url = row.image_url || null;
+        }
+      }
+      cachedConfig = parsedConfig;
+      saveLocalFallback(cachedConfig);
+      notifyListeners();
+      return cachedConfig;
+    }
+  } catch (e) {
+    console.warn("Fallback smoking_products indisponível:", e);
+  }
+
+  // 3. Fallback final: localStorage local
   cachedConfig = getLocalFallback();
   notifyListeners();
   return cachedConfig;
@@ -98,6 +141,22 @@ export function useStoreConfig() {
       if (cachedConfig) setConfig(cachedConfig);
     };
     listeners.add(onUpdate);
+
+    // Ouve mensagens de atualização do BroadcastChannel
+    if (broadcastChannel) {
+      const handleBroadcast = (e: MessageEvent) => {
+        if (e.data && typeof e.data === "object") {
+          cachedConfig = e.data as StoreConfig;
+          setConfig(cachedConfig);
+          saveLocalFallback(cachedConfig);
+        }
+      };
+      broadcastChannel.addEventListener("message", handleBroadcast);
+      return () => {
+        listeners.delete(onUpdate);
+        broadcastChannel?.removeEventListener("message", handleBroadcast);
+      };
+    }
 
     if (cachedConfig) {
       setConfig(cachedConfig);
@@ -130,43 +189,46 @@ export function useStoreConfig() {
         updated_at: new Date().toISOString(),
       };
 
-      // 1. Atualizar localStorage & estado local imediatamente
+      // 1. Atualizar cache local & BroadcastChannel imediatamente
       saveLocalFallback(newConfig);
       cachedConfig = newConfig;
       setConfig(newConfig);
       notifyListeners();
 
-      // 2. Tentar sincronizar com Supabase se a tabela existir
+      // 2. Tentar salvar na tabela dedicada `store_config`
       try {
-        let resData = null;
         if (config.id && config.id !== "local-config-id") {
-          const { data, error } = await supabase
+          await supabase
             .from("store_config")
             .update(updates)
-            .eq("id", config.id)
-            .select()
-            .single();
-
-          if (!error && data) resData = data;
+            .eq("id", config.id);
         } else {
-          // Tenta upsert se for local
-          const { data, error } = await supabase
+          await supabase
             .from("store_config")
-            .upsert([updates])
-            .select()
-            .single();
-
-          if (!error && data) resData = data;
-        }
-
-        if (resData) {
-          cachedConfig = resData as StoreConfig;
-          saveLocalFallback(cachedConfig);
-          setConfig(cachedConfig);
-          notifyListeners();
+            .upsert([updates]);
         }
       } catch (e) {
-        console.info("Salvo apenas localmente (Supabase indisponível):", e);
+        console.info("Info: Tabela store_config não encontrada ou sem permissão:", e);
+      }
+
+      // 3. SEMPRE salvar na tabela `smoking_products` como `__STORE_CONFIG__` para sincronização garantida!
+      try {
+        await supabase
+          .from("smoking_products")
+          .upsert({
+            id: CONFIG_SKU_ID,
+            brand: "__STORE_CONFIG__",
+            name: newConfig.store_name,
+            flavor: JSON.stringify(newConfig),
+            image_url: newConfig.logo_url || "",
+            price: 0,
+            cost_price: 0,
+            stock: 0,
+            puffs: 0,
+            is_active: false,
+          });
+      } catch (e) {
+        console.warn("Erro ao salvar fallback de configuração em smoking_products:", e);
       }
 
       setSaveStatus("success");
@@ -179,28 +241,54 @@ export function useStoreConfig() {
 
   const uploadLogo = useCallback(
     async (file: File): Promise<string | null> => {
-      // 1. Tentar upload no Supabase Storage
+      // 1. Tentar upload no Supabase Storage (bucket store-assets ou product-images)
       try {
         const ext = file.name.split(".").pop() || "png";
-        const filePath = `logo/logo_${Date.now()}.${ext}`;
+        const fileName = `logo_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.${ext}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from("store-assets")
-          .upload(filePath, file, { upsert: true });
+        // Tenta bucket store-assets primeiro, depois product-images
+        let bucketName = "store-assets";
+        let uploadRes = await supabase.storage.from(bucketName).upload(`logo/${fileName}`, file, { upsert: true });
 
-        if (!uploadError) {
-          const { data } = supabase.storage.from("store-assets").getPublicUrl(filePath);
+        if (uploadRes.error) {
+          bucketName = "product-images";
+          uploadRes = await supabase.storage.from(bucketName).upload(`logo/${fileName}`, file, { upsert: true });
+        }
+
+        if (!uploadRes.error) {
+          const { data } = supabase.storage.from(bucketName).getPublicUrl(`logo/${fileName}`);
           if (data?.publicUrl) return data.publicUrl;
         }
       } catch (e) {
-        console.warn("Upload Supabase indisponível, convertendo para Base64 local:", e);
+        console.warn("Storage Supabase indisponível, convertendo logo para Base64:", e);
       }
 
-      // 2. Fallback: Converte imagem para Base64 se o bucket do Supabase ainda não existir
+      // 2. Fallback: Converte imagem para Base64 comprimido
       return new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => {
-          resolve(reader.result as string);
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            let width = img.width;
+            let height = img.height;
+            const max = 400;
+            if (width > max || height > max) {
+              if (width > height) {
+                height = Math.round((height * max) / width);
+                width = max;
+              } else {
+                width = Math.round((width * max) / height);
+                height = max;
+              }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx?.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL("image/jpeg", 0.8));
+          };
+          img.src = reader.result as string;
         };
         reader.readAsDataURL(file);
       });
