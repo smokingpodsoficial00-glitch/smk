@@ -2,15 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import {
   Store, Upload, Palette, Phone, Key, MapPin, Globe,
   Save, CheckCircle2, AlertCircle, Loader2, ImagePlus,
-  Trash2, Eye, Type, X, Smartphone, CreditCard
+  Trash2, Eye, Type, X, Smartphone, CreditCard, Copy, ExternalLink, Check
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
-
-const PRESET_COLORS = [
-  "#8b5cf6", "#6366f1", "#3b82f6", "#06b6d4", "#14b8a6",
-  "#10b981", "#22c55e", "#eab308", "#f97316", "#ef4444",
-  "#ec4899", "#d946ef", "#a855f7", "#64748b", "#ffffff",
-];
 
 export function SettingsPage() {
   const { config, loading, saving, saveStatus, updateConfig, uploadLogo } = useStoreConfig();
@@ -20,9 +14,9 @@ export function SettingsPage() {
   const [primaryColor, setPrimaryColor] = useState("#10b981");
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [pixKey, setPixKey] = useState("");
-  const [pixName, setPixName] = useState("");
-  const [address, setAddress] = useState("");
-  const [instagramUrl, setInstagramUrl] = useState("");
+
+  // Copy link state
+  const [copied, setCopied] = useState(false);
 
   // Logo upload
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -31,8 +25,10 @@ export function SettingsPage() {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Custom color picker
-  const [showCustomColor, setShowCustomColor] = useState(false);
+  // Dynamic Catalog Link
+  const catalogUrl = typeof window !== 'undefined'
+    ? window.location.origin.replace(":5174", ":5173")
+    : "http://localhost:5173";
 
   // Sync form state when config loads
   useEffect(() => {
@@ -41,9 +37,6 @@ export function SettingsPage() {
       setPrimaryColor(config.primary_color || "#10b981");
       setWhatsappNumber(config.whatsapp_number || "");
       setPixKey(config.pix_key || "");
-      setPixName(config.pix_name || "");
-      setAddress(config.address || "");
-      setInstagramUrl(config.instagram_url || "");
       setLogoPreview(config.logo_url || null);
     }
   }, [config, loading]);
@@ -59,6 +52,12 @@ export function SettingsPage() {
   const handleRemoveLogo = () => {
     setLogoFile(null);
     setLogoPreview(null);
+  };
+
+  const handleCopyCatalogLink = () => {
+    navigator.clipboard.writeText(catalogUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   const handleSave = async () => {
@@ -87,9 +86,6 @@ export function SettingsPage() {
       primary_color: primaryColor,
       whatsapp_number: whatsappNumber.replace(/\D/g, ""),
       pix_key: pixKey,
-      pix_name: pixName,
-      address,
-      instagram_url: instagramUrl,
       logo_url: logoUrl,
     });
   };
@@ -101,9 +97,6 @@ export function SettingsPage() {
       primaryColor !== (config.primary_color || "#10b981") ||
       whatsappNumber !== (config.whatsapp_number || "") ||
       pixKey !== (config.pix_key || "") ||
-      pixName !== (config.pix_name || "") ||
-      address !== (config.address || "") ||
-      instagramUrl !== (config.instagram_url || "") ||
       logoFile !== null ||
       (logoPreview === null && config.logo_url !== null)
     );
@@ -128,7 +121,7 @@ export function SettingsPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-white">Configurações da Loja</h1>
-              <p className="text-xs text-muted-foreground mt-0.5">Defina a marca e a logo do seu negócio</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Defina a marca, logo e compartilhe seu catálogo</p>
             </div>
           </div>
 
@@ -254,7 +247,73 @@ export function SettingsPage() {
           </div>
         </section>
 
-        {/* ─── Seção 2: Contato & Pagamento (opcional) ─── */}
+        {/* ─── Seção 2: Link do Catálogo Front-End (Compartilhamento) ─── */}
+        <section className="bg-card border border-emerald-500/20 rounded-2xl p-6 space-y-5">
+          <div className="flex items-center justify-between pb-3 border-b border-border">
+            <div className="flex items-center gap-2.5">
+              <Globe className="size-4 text-emerald-400" />
+              <h2 className="font-bold text-base text-white">Link do seu Catálogo de Pods</h2>
+            </div>
+            <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-semibold">
+              🟢 Loja Online Ativa
+            </span>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Copie o link do seu catálogo para enviar aos seus clientes no WhatsApp ou colocar na bio do Instagram.
+          </p>
+
+          {/* Campo de URL com Botões de Ação */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-xs text-emerald-400 font-mono flex items-center justify-between overflow-hidden">
+              <span className="truncate">{catalogUrl}</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCopyCatalogLink}
+              className={`flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                copied
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                  : "bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_15px_rgba(16,185,129,0.2)] active:scale-[0.97]"
+              }`}
+            >
+              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+              {copied ? "Link Copiado!" : "Copiar Link"}
+            </button>
+
+            <a
+              href={catalogUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-elevated hover:bg-white/10 text-white font-semibold text-xs border border-border transition-all cursor-pointer"
+            >
+              <ExternalLink className="size-4 text-blue-400" />
+              Abrir Loja
+            </a>
+          </div>
+
+          {/* Mini Preview do Front-End */}
+          <div className="pt-3">
+            <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider block mb-3">
+              Preview em Tempo Real
+            </span>
+            <div className="rounded-2xl overflow-hidden border border-white/10 bg-[#0a0a0a] p-6 text-center space-y-3">
+              {logoPreview ? (
+                <div className="relative size-16 mx-auto rounded-2xl p-2 bg-black border border-white/15 shadow-xl flex items-center justify-center">
+                  <img src={logoPreview} alt="Logo" className="size-full object-contain" />
+                </div>
+              ) : (
+                <div className="size-16 mx-auto rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                  <Store className="size-7 text-emerald-400" />
+                </div>
+              )}
+              <h3 className="text-xl font-bold text-white tracking-tight">{storeName || "Minha Loja"}</h3>
+            </div>
+          </div>
+        </section>
+
+        {/* ─── Seção 3: Contato & Pagamentos ─── */}
         <section className="bg-card border border-border rounded-2xl p-6 space-y-6">
           <div className="flex items-center gap-2.5 pb-3 border-b border-border">
             <Phone className="size-4 text-emerald-400" />
@@ -273,7 +332,7 @@ export function SettingsPage() {
                 value={whatsappNumber}
                 onChange={(e) => setWhatsappNumber(e.target.value)}
                 placeholder="5511999999999"
-                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 font-semibold"
               />
             </div>
 
@@ -288,30 +347,9 @@ export function SettingsPage() {
                 value={pixKey}
                 onChange={(e) => setPixKey(e.target.value)}
                 placeholder="Chave Pix para pagamentos"
-                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-amber-500/50"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-amber-500/50 font-semibold"
               />
             </div>
-          </div>
-        </section>
-
-        {/* ─── Seção 3: Preview do Front-End ─── */}
-        <section className="bg-card border border-border rounded-2xl p-6 space-y-5">
-          <div className="flex items-center gap-2.5 pb-3 border-b border-border">
-            <Eye className="size-4 text-emerald-400" />
-            <h2 className="font-bold text-base text-white">Visualização no Front-End</h2>
-          </div>
-
-          <div className="rounded-2xl overflow-hidden border border-white/10 bg-[#0a0a0a] p-8 text-center space-y-4">
-            {logoPreview ? (
-              <div className="relative size-20 mx-auto rounded-2xl p-2 bg-black border border-white/15 shadow-2xl flex items-center justify-center">
-                <img src={logoPreview} alt="Logo" className="size-full object-contain" />
-              </div>
-            ) : (
-              <div className="size-20 mx-auto rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                <Store className="size-8 text-emerald-400" />
-              </div>
-            )}
-            <h3 className="text-2xl font-bold text-white tracking-tight">{storeName || "Minha Loja"}</h3>
           </div>
         </section>
 
