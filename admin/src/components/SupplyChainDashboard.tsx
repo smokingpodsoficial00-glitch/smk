@@ -901,10 +901,6 @@ export function SupplyChainDashboard() {
                             </div>
                           )}
                         </div>
-
-                        <div className="p-1.5 rounded-lg bg-elevated hover:bg-white/10 text-muted-foreground hover:text-white transition-colors cursor-pointer">
-                          {isExpanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-                        </div>
                       </div>
                     </div>
 
