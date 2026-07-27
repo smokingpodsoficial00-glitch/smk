@@ -17,18 +17,26 @@ export type InstanceStatusResponse = {
   };
 };
 
+// Credenciais pré-configuradas do container Docker local 'delivery-evolution-api'
 const DEFAULT_CONFIG: EvolutionConfig = {
   apiUrl: "http://localhost:8080",
-  apiKey: "",
+  apiKey: "delivery_api_key_secure_987",
   instanceName: "smoking-pods",
 };
 
-const STORAGE_KEY = "evolution_api_config_v1";
+const STORAGE_KEY = "evolution_api_config_v2";
 
 export function getEvolutionConfig(): EvolutionConfig {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        apiUrl: parsed.apiUrl || DEFAULT_CONFIG.apiUrl,
+        apiKey: parsed.apiKey || DEFAULT_CONFIG.apiKey,
+        instanceName: parsed.instanceName || DEFAULT_CONFIG.instanceName,
+      };
+    }
   } catch (e) {
     console.warn("Erro ao carregar EvolutionConfig:", e);
   }
@@ -43,9 +51,6 @@ export function saveEvolutionConfig(cfg: EvolutionConfig) {
   }
 }
 
-/**
- * Normaliza a URL base removendo barras finais
- */
 function cleanUrl(url: string): string {
   return url.trim().replace(/\/+$/, "");
 }
@@ -61,13 +66,14 @@ export async function fetchInstanceStatus(cfg: EvolutionConfig): Promise<{
 }> {
   const baseUrl = cleanUrl(cfg.apiUrl || DEFAULT_CONFIG.apiUrl);
   const instance = cfg.instanceName.trim() || DEFAULT_CONFIG.instanceName;
+  const key = cfg.apiKey.trim() || DEFAULT_CONFIG.apiKey;
 
   try {
     const res = await fetch(`${baseUrl}/instance/connectionState/${instance}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        apikey: cfg.apiKey.trim(),
+        apikey: key,
       },
     });
 
@@ -102,13 +108,18 @@ export async function connectInstance(cfg: EvolutionConfig): Promise<{
 }> {
   const baseUrl = cleanUrl(cfg.apiUrl || DEFAULT_CONFIG.apiUrl);
   const instance = cfg.instanceName.trim() || DEFAULT_CONFIG.instanceName;
+  const key = cfg.apiKey.trim() || DEFAULT_CONFIG.apiKey;
 
   try {
+    // 1. Tentar criar instância se ainda não existir
+    await createInstance(cfg);
+
+    // 2. Buscar o QR Code em Base64
     const res = await fetch(`${baseUrl}/instance/connect/${instance}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        apikey: cfg.apiKey.trim(),
+        apikey: key,
       },
     });
 
@@ -137,18 +148,20 @@ export async function connectInstance(cfg: EvolutionConfig): Promise<{
 export async function createInstance(cfg: EvolutionConfig): Promise<{ success: boolean; message?: string }> {
   const baseUrl = cleanUrl(cfg.apiUrl || DEFAULT_CONFIG.apiUrl);
   const instance = cfg.instanceName.trim() || DEFAULT_CONFIG.instanceName;
+  const key = cfg.apiKey.trim() || DEFAULT_CONFIG.apiKey;
 
   try {
     const res = await fetch(`${baseUrl}/instance/create`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        apikey: cfg.apiKey.trim(),
+        apikey: key,
       },
       body: JSON.stringify({
         instanceName: instance,
-        token: cfg.apiKey.trim(),
+        token: key,
         qrcode: true,
+        integration: "WHATSAPP-BAILEYS",
       }),
     });
 
@@ -172,6 +185,7 @@ export async function sendTextMessage(
 ): Promise<{ success: boolean; message?: string }> {
   const baseUrl = cleanUrl(cfg.apiUrl || DEFAULT_CONFIG.apiUrl);
   const instance = cfg.instanceName.trim() || DEFAULT_CONFIG.instanceName;
+  const key = cfg.apiKey.trim() || DEFAULT_CONFIG.apiKey;
 
   const cleanNumber = number.replace(/\D/g, "");
   if (!cleanNumber) {
@@ -183,7 +197,7 @@ export async function sendTextMessage(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        apikey: cfg.apiKey.trim(),
+        apikey: key,
       },
       body: JSON.stringify({
         number: cleanNumber,
@@ -215,13 +229,14 @@ export async function sendTextMessage(
 export async function logoutInstance(cfg: EvolutionConfig): Promise<boolean> {
   const baseUrl = cleanUrl(cfg.apiUrl || DEFAULT_CONFIG.apiUrl);
   const instance = cfg.instanceName.trim() || DEFAULT_CONFIG.instanceName;
+  const key = cfg.apiKey.trim() || DEFAULT_CONFIG.apiKey;
 
   try {
     const res = await fetch(`${baseUrl}/instance/logout/${instance}`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
-        apikey: cfg.apiKey.trim(),
+        apikey: key,
       },
     });
     return res.ok;
