@@ -1,4 +1,4 @@
-import React, { Component, ReactNode, useState } from "react";
+import React, { Component, type ReactNode, useState } from "react";
 import { Users, Bot, Target, Zap, Activity, AlertTriangle, RefreshCw } from "lucide-react";
 import type { RealClient } from "@/lib/crm";
 

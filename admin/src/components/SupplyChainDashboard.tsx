@@ -991,7 +991,7 @@ export function SupplyChainDashboard() {
                                 key={flavorSku.id}
                                 onClick={() => setSelectedDrawerSKU(flavorSku)}
                                 className={`py-2.5 px-3 flex items-center justify-between gap-4 rounded-xl transition-colors cursor-pointer ${
-                                  isFilteredMatch && filterTab !== 'TODOS' ? 'bg-white/[0.04] border border-white/10' : 'hover:bg-white/[0.02]'
+                                  isFilteredMatch && (filterTab as string) !== 'TODOS' ? 'bg-white/[0.04] border border-white/10' : 'hover:bg-white/[0.02]'
                                 }`}
                               >
                                 <div>

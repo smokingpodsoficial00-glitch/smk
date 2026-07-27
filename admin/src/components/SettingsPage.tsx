@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import {
-  Store, Upload, Palette, Phone, Key, MapPin, Instagram,
+  Store, Upload, Palette, Phone, Key, MapPin, Globe,
   Save, CheckCircle2, AlertCircle, Loader2, ImagePlus,
   Trash2, Eye, Type, FileText, X, Smartphone, CreditCard
 } from "lucide-react";
@@ -415,8 +415,8 @@ export function SettingsPage() {
             {/* Instagram */}
             <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-medium text-white/80 flex items-center gap-2">
-                <Instagram className="size-3.5 text-pink-400" />
-                Instagram
+                <Globe className="size-3.5 text-pink-400" />
+                Instagram / Website
               </label>
               <input
                 type="text"
