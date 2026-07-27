@@ -2,47 +2,219 @@ import { useState, useEffect, useRef } from "react";
 import {
   Bot, QrCode, RefreshCw, CheckCircle2,
   Send, Sparkles, MessageSquare, Power,
-  Clock, Shield, HeartHandshake, FileText, Check, Copy
+  Check, Copy
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 
 const DEFINITIVE_SYSTEM_PROMPT = `SCRIPT DEFINITIVO — IA SMOKING PODS (Eloisa)
+Este documento compila TODAS as respostas do dono da loja. Cada resposta programada aqui deve ser usada EXATAMENTE como escrita. Este documento será convertido no system prompt da OpenAI.
 
 REGRAS GLOBAIS (INQUEBRÁVEIS)
-RG1 — Sem emojis (Apenas mensagens programadas contendo emojis)
-RG2 — Máximo 2 linhas por mensagem
-RG3 — Sem exclamações ("!")
-RG4 — Erros de vírgula propositais para parecer humana (ex: "Olá tudo bem, como posso te ajudar?")
-RG5 — Fracionamento de mensagens (envia msg1, msg2 em sequência com delay)
-RG6 — Respostas programadas são lei (usar exatamente como escritas)
-RG7 — Respostas não-programadas (sem emoji, sem "!", max 2 linhas, minúsculo)
-RG8 — Tudo em minúsculo (exceto primeira letra do primeiro contato)
-RG9 — Tratamento: "você" / "vc" (nunca "tu")
-RG10 — Gírias autorizadas: blz, show, vc, amg
-RG11 — Abreviações: vc, pra, td, msg
-RG12 — Sem negrito, itálico ou listas
-RG13 — Sem promoções espontâneas
-RG14 — Somente produtos próprios do estoque
-RG15 — Assuntos proibidos: política, religião, concorrentes
-RG16 — Retomar fluxo de vendas se fizer pergunta avulsa
-RG17 — Nome: Eloisa, assistente virtual da Smoking Pods (não se apresenta espontaneamente)
-RG18 — Se perguntarem se é robô: fala a verdade que é a Eloisa assistente virtual
+RG1 — Sem emojis (A IA NUNCA usa emojis. EXCEÇÃO: mensagens programadas neste documento que contenham emoji).
+RG2 — Máximo 2 linhas por mensagem (EXCEÇÃO: mensagem da chave Pix).
+RG3 — Sem exclamações (A IA NUNCA usa "!").
+RG4 — Erros de vírgula propositais (Ex: "Olá tudo bem, como posso te ajudar?").
+RG5 — Fracionamento de mensagens (Cada frase vai como mensagem separada no WhatsApp).
+RG6 — Respostas programadas são lei (A IA usa a resposta EXATAMENTE como escrita).
+RG7 — Respostas não-programadas seguem as regras (sem emoji, sem "!", max 2 linhas, minúsculo).
+RG8 — Tudo em minúsculo (EXCEÇÃO: primeira letra da primeira mensagem de contato novo).
+RG9 — Tratamento: "você" / "vc" (nunca "tu").
+RG10 — Gírias autorizadas: blz, show, vc, amg.
+RG11 — Abreviações autorizadas: vc, pra, td, msg.
+RG12 — Sem negrito, itálico ou listas.
+RG13 — Sem promoções espontâneas.
+RG14 — Somente produtos próprios do estoque Smoking Pods.
+RG15 — Assuntos proibidos: política, religião, concorrentes, polícia.
+RG16 — Nunca deixar cliente sem resposta durante a compra.
+RG17 — Identidade: Eloisa, assistente virtual da Smoking Pods (NUNCA se apresenta espontaneamente).
+RG18 — Se perguntarem se é robô: fala a verdade que é a Eloisa, assistente virtual.
 
-SAUDAÇÕES POR HORÁRIO:
-06:00–11:59 → bom dia
-12:00–17:59 → boa tarde
-18:00–05:59 → boa noite
+TIMING E COMPORTAMENTO
+- Delay da primeira resposta: 20s | Mensagens subsequentes: 4s
+- Indicador "digitando...": 5s antes de enviar
+- Horário de funcionamento: 11:00 até 23:00 (24h com reserva fora do horário)
 
-LINK DO CARDÁPIO:
-https://smokingproject01.vercel.app/
+CATEGORIA 1 — PRIMEIRO CONTATO / SAUDAÇÃO
+Saudação conforme horário real:
+06:00–11:59 → "bom dia"
+12:00–17:59 → "boa tarde"
+18:00–05:59 → "boa noite"
 
-TABELA DE DURAÇÃO PUFFS:
-5.000 puffs → 10 dias
-7.500 puffs → 12 dias
-10.000 puffs → 14 dias
-15.000 puffs → 17 dias
-20.000 puffs → 21 dias
-30.000 puffs → 35 dias`;
+P1/P2/P3 — Saudação genérica (oi, boa noite, e aí)
+Cliente novo: Olá tudo bem, como posso te ajudar?
+Cliente recorrente: Opa, que bom ver você por aqui de novo, qual o pedido dessa vez?
+
+P4 — Cliente já diz que quer comprar
+Cliente novo:
+msg1: bom dia, perfeito
+msg2: posso enviar nossa tabela digital?
+Cliente recorrente:
+msg1: legal ver você por aqui de novo, fechou
+
+P5 — Cliente pergunta sobre sabor específico
+msg1: boa noite, tudo bem?
+msg2: (informa modelo do estoque)
+msg3: caso queira dar uma olhada com mais calma, temos nossa tabela digital
+
+P6 — "Tem pod aí?"
+temos sim, gostaria de dar uma olhada no cardápio?
+
+CATEGORIA 2 — ENVIO DA TABELA / CARDÁPIO
+Link: https://smokingproject01.vercel.app/
+Envio do cardápio:
+msg1: claro, vou te enviar a tabela aqui
+msg2: https://smokingproject01.vercel.app/
+msg3: se precisar de ajuda com algo só me avisar
+
+Follow-up pós-tabela (30 min sem resposta):
+msg1: conseguiu acessar ai amg?
+msg2: qualquer coisa estou á disposição
+
+CATEGORIA 3 — ESCOLHA DE PRODUTO
+P13/P14 — Escolheu produto
+perfeito, pode me enviar o seu endereço amg?
+
+P15 — Confirmação
+perfeito, 2 menta e 1 uva certo?
+
+P16 — Troca de sabor (Antes de 20 min)
+claro, sem problemas vou realizar á troca
+
+P16b — Troca de sabor (Depois de 20 min)
+msg1: infelizmente não consigo mudar o seu pedido agora
+msg2: seu pedido já foi embalado e já vai sair para entrega
+
+P17 — Produto fora de estoque
+infelizmente esse pod esgotou, pode ser outro modelo?
+
+CATEGORIA 4 — PREÇOS E VALORES
+P18 — "Quanto custa?"
+Se modelo exato: esse modelo está saindo por R$[valor]
+Se não exato: qual modelo exato vc tá procurando?
+
+P19 — "Qual o mais barato?"
+msg1: nosso modelo mais barato hoje é o [modelo]
+msg2: ele está saindo por R$[valor]
+
+P20 — "Tem desconto?"
+msg1: temos desconto sim!
+msg2: se levar 3 unidades consigo frete grátis, oque acha?
+
+P21 — Atacado (5+ unidades)
+entendi, para atacado conseguimos um valor de 10 reais de desconto por unidade
+
+P22 — "Tá caro"
+msg1: nossos produtos são 100% originais
+msg2: e trabalhamos com garantia na troca caso de algum problema, por isso o valor pode estar um pouco diferente dá concorrencia
+
+CATEGORIA 5 — PAGAMENTO
+P23 — Introdução do pagamento (Pix)
+msg1: o valor do seu pedido ficou em R$[valor_produto], com um frete de R$[frete], com um total de R$[total]
+msg2: SMOKING PODS AGRADECE SEU PEDIDO
+CHAVE PIX : [chave_pix]
+
+P24 — Cartão
+msg2: SMOKING PODS AGRADECE SEU PEDIDO
+PAGAMENTO : [link_checkout]
+
+P25 — Pedir comprovante
+vou precisar do comprovante beleza?
+
+P26 — Comprovante recebido
+msg1: muito obrigado! jajá enviaremos o link de rastreio
+msg2: tempo médio de 40 minutos á 1 hora para chegar seu pedido!
+
+P28 — "Posso pagar no cartão/dinheiro?"
+msg1: nossas opções de pagamento são pix, e link de pagamento
+msg2: no link de pagamento dá pra passar cartão de crédito e débito, também parcelamos, porém as taxas são repassadas beleza?
+
+CATEGORIA 6 — ENDEREÇO E ENTREGA
+P30/P31 — Pedir endereço
+msg1: agora preciso do seu endereço tá?
+msg2: se puder enviar o cep ao invés do nome da rua, ajuda muito á não ter problema com a entrega, para não acabar indo para o endereço errado
+
+P32b — Cliente não tem CEP
+sem problemas, me passa o endereço completo com bairro e cidade por favor?
+
+P34 — Localização (pin)
+msg1: poderia me enviar por escrito?
+msg2: para evitar erros na hora do motoboy levar o seu pedido
+
+P35 — Entrega e frete
+nossos pedidos são todos enviados pela uber amg
+
+P37 — Prazo de entrega
+40 minutos a 1 hora (nunca dizer menos)
+
+P38 — Região fora do ABC
+msg1: para essa região geralmente não entregamos, por conta de ser bem afastado da loja
+msg2: porém podemos verificar o valor da entrega, oque acha?
+
+P39 — Retirada no local
+infelizmente por segurança nossa não disponibilizamos a opção de retirada, somente envios amg
+
+CATEGORIA 7 — PÓS-PAGAMENTO
+P40 — Confirmado
+msg1: pagameto confirmado amg, a média é de uns 40 minutos á 1 hora para seu pedido ser entregue
+msg2: o link de rastreio será encaminhado assim que o motoboy sair para entrega
+msg3: agradecemos pela preferência amg
+
+P41 — Saiu para entrega
+msg1: seu pedido já saiu para entrega!
+msg2: [link_de_rastreio]
+
+CATEGORIA 8 — DÚVIDAS GERAIS
+P45 — Voces são de onde?
+somos aqui de sbc amg
+
+P46 — Horário de funcionamento
+nosso horário de funcionamento é das 11:00 até as 23hrs
+
+P47 — O pod é original?
+sim, só trabalhamos com produtos 100% originais!
+
+P48 — Tem garantia?
+msg1: sim, temos garantia para produtos que podem ir com defeito
+msg2: porém para á garantia valer, você tem de gravar um vídeo abrindo o produto e testando, para termos certeza de que o produto veio dá nossa loja
+
+P49 — Quantos puffs dura?
+5.000 -> 10 dias | 7.500 -> 12 dias | 10.000 -> 14 dias | 15.000 -> 17 dias | 20.000 -> 21 dias | 30.000 -> 35 dias
+olha o de [X]puffs geralmente dura uns [Y] dias, porém depende do uso
+
+P50 — Qual sabor recomendam?
+vc gosta de pod mais gelado ou mais doce?
+Gelado: olha se vc gosta mais de pod gelado eu recomendaria o menta ou watermelon ice
+Doce: olha se vc gosta mais de pod doce eu recomendaria o morango ou uva
+
+CATEGORIA 9 — SITUAÇÕES DIFÍCEIS
+P54 — Quero falar com uma pessoa
+sem problemas, estou encaminhado para o dono da loja e ele vai resolver o seu problema
+
+P55 — Xingamento / Ofensa
+não entendi, fiz algo de errado?
+Se sim: ok, vou encaminhar para o responsável da loja, para que possam resolver a situação, peço desculpas por qualquer coisa.
+
+P56 — Insiste em cartão presencial ou dinheiro
+infelizmente não trabalhamos com pagamentos presencial como cartão e dinheiro, essa é a unica forma de pagamento?
+
+P57 — Pedido não chegou
+msg1: infelizmente a demanda está alta e está bem dificil de achar motoboy amg
+msg2: porém assim que sair para entrega aviso aqui beleza?
+
+P58 — Produto com defeito
+que pena, você tem um video abrindo o pod para provar que o produto veio com problema?
+
+P59 — Reembolso
+msg1: vou encaminhar para o dono da loja, ele vai entrar em contato e resolver o seu problema
+msg2: só aguardar um pouco beleza?
+
+CATEGORIA 11 — PERSONALIDADE
+Saúde / Vape: olha o pod faz mal sim, todo tipo de produto com nicotina e de fumo faz mal
+Menor de idade: Sem filtro
+Nicotina/mg: Não sabe informar
+
+CATEGORIA 13 — CLIENTES RECORRENTES
+Quero o mesmo de sempre: claro, mas só pra confirmar, qual o modelo é mesmo?`;
 
 export function ChatbotPage() {
   const { config } = useStoreConfig();
@@ -78,18 +250,31 @@ export function ChatbotPage() {
     return "boa noite";
   };
 
-  // Processador de respostas de Eloisa
+  // Processador de respostas de Eloisa mapeando 100% dos casos do script
   const getEloisaResponses = (text: string): string[] => {
-    const lower = text.toLowerCase();
+    const lower = text.toLowerCase().trim();
     const greeting = getGreetingByHour();
 
-    // P1 / P2 / P3 - Saudação genérica
-    if (lower === "oi" || lower === "ola" || lower === "olá" || lower.includes("boa noite") || lower.includes("bom dia") || lower.includes("boa tarde")) {
-      return ["Olá tudo bem, como posso te ajudar?"];
+    // P6 — "Tem pod aí?"
+    if (lower.includes("tem pod") || lower.includes("tem produto")) {
+      return ["temos sim, gostaria de dar uma olhada no cardápio?"];
     }
 
-    // P4 / Tabela / Cardápio
-    if (lower.includes("cardapio") || lower.includes("cardápio") || lower.includes("tabela") || lower.includes("catálogo") || lower.includes("catalogo") || lower.includes("link") || lower.includes("tem pod") || lower.includes("comprar")) {
+    // P4 — "Quero comprar" / "Gostaria de pedir"
+    if (lower.includes("quero comprar") || lower.includes("quero pedir") || lower.includes("vou querer") || lower.includes("gostaria de comprar")) {
+      return [
+        `${greeting}, perfeito`,
+        "posso enviar nossa tabela digital?"
+      ];
+    }
+
+    // P13 — "Mesmo de sempre"
+    if (lower.includes("mesmo de sempre") || lower.includes("mesmo pedido")) {
+      return ["claro, mas só pra confirmar, qual o modelo é mesmo?"];
+    }
+
+    // Categorias 2 — Envio da Tabela / Cardápio
+    if (lower.includes("cardapio") || lower.includes("cardápio") || lower.includes("tabela") || lower.includes("catálogo") || lower.includes("catalogo") || lower.includes("link") || lower.includes("manda a tabela") || lower.includes("envia a tabela")) {
       return [
         "claro, vou te enviar a tabela aqui",
         catalogUrl,
@@ -97,31 +282,31 @@ export function ChatbotPage() {
       ];
     }
 
-    // P45 - Origem
-    if (lower.includes("de onde") || lower.includes("onde fica") || lower.includes("localizacao") || lower.includes("localização")) {
+    // P45 — "Vocês são de onde?" / Localização
+    if (lower.includes("onde fica") || lower.includes("de onde") || lower.includes("localizacao") || lower.includes("localização") || lower.includes("cidade") || lower.includes("bairro")) {
       return ["somos aqui de sbc amg"];
     }
 
-    // P46 - Horário
-    if (lower.includes("horario") || lower.includes("horário") || lower.includes("funciona")) {
+    // P46 — Horário de funcionamento
+    if (lower.includes("horario") || lower.includes("horário") || lower.includes("funcionamento") || lower.includes("aberto") || lower.includes("fecha")) {
       return ["nosso horário de funcionamento é das 11:00 até as 23hrs"];
     }
 
-    // P47 - Originalidade
-    if (lower.includes("original")) {
+    // P47 — "O pod é original?"
+    if (lower.includes("original") || lower.includes("paraguai") || lower.includes("falso")) {
       return ["sim, só trabalhamos com produtos 100% originais!"];
     }
 
-    // P48 - Garantia
-    if (lower.includes("garantia")) {
+    // P48 — "Tem garantia?"
+    if (lower.includes("garantia") || lower.includes("troca")) {
       return [
         "sim, temos garantia para produtos que podem ir com defeito",
         "porém para á garantia valer, você tem de gravar um vídeo abrindo o produto e testando, para termos certeza de que o produto veio dá nossa loja"
       ];
     }
 
-    // P49 - Puffs / Duração
-    if (lower.includes("puffs") || lower.includes("dura") || lower.includes("quanto tempo")) {
+    // P49 — Quantos puffs dura?
+    if (lower.includes("puffs") || lower.includes("dura") || lower.includes("durabilidade")) {
       if (lower.includes("5000") || lower.includes("5.000")) {
         return ["olha o de 5.000 puffs geralmente dura uns 10 dias, porém depende do uso"];
       }
@@ -140,50 +325,95 @@ export function ChatbotPage() {
       return ["olha o de 10.000 puffs geralmente dura uns 14 dias, porém depende do uso"];
     }
 
-    // P50 - Recomendação de Sabor (Doce vs Gelado)
-    if (lower.includes("sabor") || lower.includes("recomenda") || lower.includes("indica") || lower.includes("qual o melhor")) {
+    // P50 — Qual sabor recomendam? (Doce vs Gelado)
+    if (lower.includes("sabor") || lower.includes("recomenda") || lower.includes("indica") || lower.includes("qual o melhor") || lower.includes("qual vc prefere")) {
       if (lower.includes("gelado") || lower.includes("ice") || lower.includes("menta")) {
         return ["olha se vc gosta mais de pod gelado eu recomendaria o menta ou watermelon ice"];
       }
-      if (lower.includes("doce") || lower.includes("fruta")) {
+      if (lower.includes("doce") || lower.includes("fruta") || lower.includes("morango")) {
         return ["olha se vc gosta mais de pod doce eu recomendaria o morango ou uva"];
       }
       return ["vc gosta de pod mais gelado ou mais doce?"];
     }
 
-    // P20 - Desconto / Promoção
-    if (lower.includes("desconto") || lower.includes("promoção") || lower.includes("promocao") || lower.includes("mais barato")) {
+    // P20 — "Tem desconto?"
+    if (lower.includes("desconto") || lower.includes("promoção") || lower.includes("promocao")) {
       return [
         "temos desconto sim!",
         "se levar 3 unidades consigo frete grátis, oque acha?"
       ];
     }
 
-    // P23 / P28 - Pagamento
-    if (lower.includes("pagamento") || lower.includes("pix") || lower.includes("cartao") || lower.includes("cartão")) {
+    // P19 — "Qual o mais barato?"
+    if (lower.includes("mais barato") || lower.includes("baratinho")) {
+      return [
+        "nosso modelo mais barato hoje é o IGNITE V50",
+        "ele está saindo por R$ 80,00"
+      ];
+    }
+
+    // P22 — "Tá caro"
+    if (lower.includes("caro") || lower.includes("muito alto") || lower.includes("carinho")) {
+      return [
+        "nossos produtos são 100% originais",
+        "e trabalhamos com garantia na troca caso de algum problema, por isso o valor pode estar um pouco diferente dá concorrencia"
+      ];
+    }
+
+    // P39 — Retirada no local
+    if (lower.includes("retirar") || lower.includes("retirada") || lower.includes("posso ir ai") || lower.includes("buscar pessoalmente")) {
+      return ["infelizmente por segurança nossa não disponibilizamos a opção de retirada, somente envios amg"];
+    }
+
+    // P54 — Quero falar com uma pessoa / dono
+    if (lower.includes("atendente") || lower.includes("falar com pessoa") || lower.includes("humano") || lower.includes("dono") || lower.includes("gerente")) {
+      return ["sem problemas, estou encaminhado para o dono da loja e ele vai resolver o seu problema"];
+    }
+
+    // P57 — Pedido não chegou / Demora
+    if (lower.includes("demorando") || lower.includes("nao chegou") || lower.includes("não chegou") || lower.includes("cadê meu pedido") || lower.includes("cade meu pedido")) {
+      return [
+        "infelizmente a demanda está alta e está bem dificil de achar motoboy amg",
+        "porém assim que sair para entrega aviso aqui beleza?"
+      ];
+    }
+
+    // Saúde / Vape faz mal?
+    if (lower.includes("faz mal") || lower.includes("saude") || lower.includes("saúde") || lower.includes("vape faz mal")) {
+      return ["olha o pod faz mal sim, todo tipo de produto com nicotina e de fumo faz mal"];
+    }
+
+    // P23 / P28 — Pagamento (Pix / Cartão)
+    if (lower.includes("pagamento") || lower.includes("pix") || lower.includes("cartao") || lower.includes("cartão") || lower.includes("dinheiro")) {
+      if (lower.includes("dinheiro") || lower.includes("presencial")) {
+        return ["infelizmente não trabalhamos com pagamentos presencial como cartão e dinheiro, essa é a unica forma de pagamento?"];
+      }
       return [
         "nossas opções de pagamento são pix, e link de pagamento",
         "no link de pagamento dá pra passar cartão de crédito e débito, também parcelamos, porém as taxas são repassadas beleza?"
       ];
     }
 
-    // P17 / P18 - Preços
+    // P18 — "Quanto custa?" / Preço
     if (lower.includes("quanto custa") || lower.includes("preco") || lower.includes("preço") || lower.includes("valor")) {
       return [
-        `${greeting}, tudo bem?`,
-        "qual modelo exato vc tá procurando?",
-        `caso queira ver todos os valores, temos nossa tabela: ${catalogUrl}`
+        "qual modelo exato vc tá procurando?"
       ];
     }
 
-    // RG18 - Se perguntar se é robô
-    if (lower.includes("robo") || lower.includes("robô") || lower.includes("ia") || lower.includes("humano")) {
+    // RG18 — Se perguntar se é robô
+    if (lower.includes("robo") || lower.includes("robô") || lower.includes("ia")) {
       return ["sou a eloisa, assistente virtual da smoking pods, tô aqui pra te ajudar com tudo que precisar!"];
     }
 
-    // Resposta Padrão de Fluxo
+    // P1 / P2 / P3 — Oi / Olá / Boa noite / Boa tarde / Bom dia
+    if (lower === "oi" || lower === "ola" || lower === "olá" || lower.includes("boa noite") || lower.includes("bom dia") || lower.includes("boa tarde") || lower === "e ai" || lower === "e aí") {
+      return ["Olá tudo bem, como posso te ajudar?"];
+    }
+
+    // Resposta padrão caso nenhuma keyword específica seja disparada
     return [
-      "perfeito, vou te enviar nossa tabela digital pra vc dar uma olhada com calma",
+      "claro, vou te enviar nossa tabela digital pra vc dar uma olhada com calma",
       catalogUrl
     ];
   };
@@ -215,7 +445,7 @@ export function ChatbotPage() {
         if (index === botResponses.length - 1) {
           setIsTyping(false);
         }
-      }, (index + 1) * 1200);
+      }, (index + 1) * 1000);
     });
   };
 
@@ -249,11 +479,11 @@ export function ChatbotPage() {
             <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
               WhatsApp IA — Eloisa
               <span className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-semibold">
-                Script Definitivo v3.0
+                Script 100% Completo
               </span>
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Atendente virtual oficial da loja {storeName} (Sem emojis, respostas programadas, fracionadas)
+              Atendente virtual oficial da loja {storeName} (Todas as categorias e regras compiladas)
             </p>
           </div>
         </div>
@@ -370,7 +600,7 @@ export function ChatbotPage() {
           </section>
         </div>
 
-        {/* Lado Direito: Script Definitivo da Eloisa & Simulador (7 Colunas) */}
+        {/* Lado Direito: Script Definitivo Completo da Eloisa & Simulador (7 Colunas) */}
         <div className="lg:col-span-7 space-y-6">
           
           {/* Configurações do System Prompt */}
@@ -378,7 +608,7 @@ export function ChatbotPage() {
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
                 <Sparkles className="size-4 text-emerald-400" />
-                <h2 className="font-bold text-base text-white">System Prompt — Eloisa (Script Oficial)</h2>
+                <h2 className="font-bold text-base text-white">System Prompt Completo — Eloisa (OpenAI)</h2>
               </div>
               
               <div className="flex items-center gap-2">
@@ -387,7 +617,7 @@ export function ChatbotPage() {
                   className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-white/80 transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   {copiedPrompt ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
-                  {copiedPrompt ? "Copiado!" : "Copiar Script"}
+                  {copiedPrompt ? "Copiado!" : "Copiar Script Íntegra"}
                 </button>
                 <button
                   onClick={() => setAiEnabled(!aiEnabled)}
@@ -403,17 +633,17 @@ export function ChatbotPage() {
               </div>
             </div>
 
-            {/* Prompt Textarea */}
+            {/* Prompt Textarea Completo */}
             <div className="space-y-2">
               <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider flex items-center justify-between">
-                <span>Regras e Respostas Programadas (OpenAI Prompt)</span>
-                <span className="text-[10px] text-emerald-400 lowercase">Eloisa Vendas</span>
+                <span>Script Compilado em Tempo Real (100% Integra)</span>
+                <span className="text-[10px] text-emerald-400 lowercase">Eloisa System Prompt</span>
               </label>
               <textarea
-                rows={6}
+                rows={12}
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
-                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 resize-none font-mono custom-scrollbar"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 resize-none font-mono custom-scrollbar leading-relaxed"
               />
             </div>
           </section>
@@ -423,15 +653,15 @@ export function ChatbotPage() {
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
                 <MessageSquare className="size-4 text-emerald-400" />
-                <h2 className="font-bold text-base text-white">Simulador de Conversa (Testar Eloisa)</h2>
+                <h2 className="font-bold text-base text-white">Simulador de Conversa (Todas as Perguntas)</h2>
               </div>
               <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded-full font-semibold">
-                Testes em Tempo Real
+                Testes com Respostas Mapeadas
               </span>
             </div>
 
             {/* Chat Box */}
-            <div className="h-64 bg-[#0a0a0a] border border-white/10 rounded-2xl p-4 overflow-y-auto space-y-3 custom-scrollbar">
+            <div className="h-72 bg-[#0a0a0a] border border-white/10 rounded-2xl p-4 overflow-y-auto space-y-3 custom-scrollbar">
               {messages.map((msg, idx) => (
                 <div
                   key={idx}
@@ -464,7 +694,7 @@ export function ChatbotPage() {
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Envie uma mensagem de teste (ex: tem pod? quantos puffs dura?)..."
+                placeholder="Ex: tem pod aí? quero comprar, quanto custa? tem desconto? tá caro, qual o mais barato? pod faz mal?..."
                 className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50"
               />
               <button
