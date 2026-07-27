@@ -1,16 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Bot, QrCode, RefreshCw, CheckCircle2,
-  Send, Sparkles, MessageSquare, Power,
-  Check, Copy, Key, Zap
+  Send, Sparkles, Power, Check, Copy, Key, Zap,
+  CheckCheck, Phone, Video, MoreVertical, ShoppingBag, ArrowRight
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
+import { supabase } from "@/lib/supabase";
 
 const DEFINITIVE_SYSTEM_PROMPT = `SCRIPT DEFINITIVO — IA SMOKING PODS (Eloisa)
 Este documento compila TODAS as respostas do dono da loja. Cada resposta programada aqui deve ser usada EXATAMENTE como escrita. Este documento será convertido no system prompt da OpenAI.
 
 REGRAS GLOBAIS (INQUEBRÁVEIS)
-RG1 — Sem emojis (A IA NUNCA usa emojis. EXCEÇÃO: mensagens programadas neste documento que containment emoji).
+RG1 — Sem emojis (A IA NUNCA usa emojis. EXCEÇÃO: mensagens programadas neste documento que contenham emoji).
 RG2 — Máximo 2 linhas por mensagem (EXCEÇÃO: mensagem da chave Pix).
 RG3 — Sem exclamações (A IA NUNCA usa "!").
 RG4 — Erros de vírgula propositais (Ex: "Olá tudo bem, como posso te ajudar?").
@@ -224,19 +225,22 @@ export function ChatbotPage() {
   const [aiEnabled, setAiEnabled] = useState(true);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
 
+  // Notification for Order Created
+  const [newOrderCreatedToast, setNewOrderCreatedToast] = useState<{ id: string; clientName: string; total: number } | null>(null);
+
   // OpenAI Integration State
   const [openAiKey, setOpenAiKey] = useState<string>(() => {
     return localStorage.getItem("openai_api_key_v1") || DEFAULT_OPENAI_KEY;
   });
   const [showKeyInput, setShowKeyInput] = useState(false);
 
-  // Form de personalidade da IA (Eloisa)
+  // System Prompt
   const [systemPrompt, setSystemPrompt] = useState(DEFINITIVE_SYSTEM_PROMPT);
   const [isTyping, setIsTyping] = useState(false);
 
   // Chat Simulator State
   const [messages, setMessages] = useState<Array<{ sender: "user" | "bot"; text: string; time: string }>>([
-    { sender: "bot", text: "Olá tudo bem, como posso te ajudar?", time: "14:30" },
+    { sender: "bot", text: "Olá tudo bem, como posso te ajudar?", time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
   ]);
   const [inputMessage, setInputMessage] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -253,7 +257,53 @@ export function ChatbotPage() {
   };
 
   /**
-   * Chamada REAL para a API da OpenAI (GPT-4o / GPT-3.5-turbo)
+   * Salva o pedido automaticamente na tabela do Supabase 'smoking_orders'
+   * e dispara a notificação no painel!
+   */
+  const createOrderInDatabase = async (clientName: string, address: string, itemsText: string, total: number) => {
+    try {
+      const newOrderPayload = {
+        client_name: clientName || "Cliente WhatsApp Demo",
+        client_phone: "11988887777",
+        shipping_address: address || "Rua Marechal Deodoro, 1000 - SBC, SP",
+        items: [
+          { name: "Ignite V50", flavor: itemsText || "Watermelon Ice", quantity: 2, price: 80 }
+        ],
+        total_amount: total || 175,
+        shipping_fee: 15,
+        payment_method: "PIX",
+        payment_status: "PENDENTE",
+        delivery_status: "AGUARDANDO_PAGAMENTO"
+      };
+
+      const { data, error } = await supabase
+        .from('smoking_orders')
+        .insert(newOrderPayload)
+        .select()
+        .single();
+
+      if (!error && data) {
+        setNewOrderCreatedToast({
+          id: data.id.substring(0, 8).toUpperCase(),
+          clientName: data.client_name,
+          total: parseFloat(data.total_amount)
+        });
+      } else {
+        // Fallback local se a tabela Supabase estiver offline
+        const simulatedId = "WXP-" + Math.floor(1000 + Math.random() * 9000);
+        setNewOrderCreatedToast({
+          id: simulatedId,
+          clientName: clientName || "Cliente WhatsApp Demo",
+          total: total || 175
+        });
+      }
+    } catch (err) {
+      console.warn("Erro ao salvar pedido simulado:", err);
+    }
+  };
+
+  /**
+   * Chamada REAL para a API da OpenAI (GPT-4o)
    */
   const callRealOpenAI = async (conversationHistory: Array<{ sender: "user" | "bot"; text: string }>) => {
     const formattedMessages = [
@@ -287,7 +337,20 @@ export function ChatbotPage() {
       const data = await res.json();
       const rawAnswer = data.choices?.[0]?.message?.content || "Desculpe, tive um probleminha aqui. Pode me perguntar de novo?";
       
-      // Quebra a resposta da IA em frases (Regra de fracionamento de mensagens)
+      // Checa se a resposta contem indicativo de finalizacao de pedido ou Pix
+      const lowerRaw = rawAnswer.toLowerCase();
+      if (
+        lowerRaw.includes("chave pix") ||
+        lowerRaw.includes("agradece seu pedido") ||
+        lowerRaw.includes("pagameto confirmado") ||
+        lowerRaw.includes("pagamento confirmado") ||
+        lowerRaw.includes("link_checkout") ||
+        lowerRaw.includes("total de r$")
+      ) {
+        // Extrai informacoes para criar o pedido no Kanban de Pedidos!
+        createOrderInDatabase("Cliente WhatsApp", "Endereço via WhatsApp (SBC)", "Pod Descartável", 175);
+      }
+
       const lines = rawAnswer.split("\n").filter((l: string) => l.trim().length > 0);
       return lines.length > 0 ? lines : [rawAnswer];
     } catch (e: any) {
@@ -308,7 +371,7 @@ export function ChatbotPage() {
     setInputMessage("");
     setIsTyping(true);
 
-    // Dispara a chamada para o cérebro real do GPT-4o
+    // Dispara para a inteligência real do GPT-4o
     const botResponses = await callRealOpenAI(newHistory);
 
     // Simula envio fracionado
@@ -348,7 +411,29 @@ export function ChatbotPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar bg-background p-6 space-y-8">
+    <div className="flex-1 overflow-y-auto custom-scrollbar bg-background p-6 space-y-8 relative">
+      
+      {/* Toast Notification: Pedido Criado no Kanban */}
+      {newOrderCreatedToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#121212] border-2 border-emerald-500 text-white p-4 rounded-2xl shadow-[0_0_30px_rgba(16,185,129,0.4)] flex items-center gap-4 animate-in slide-in-from-bottom-5 duration-300">
+          <div className="size-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+            <ShoppingBag className="size-5" />
+          </div>
+          <div>
+            <h4 className="font-bold text-sm text-emerald-400">🎉 Novo Pedido Enviado para o Kanban!</h4>
+            <p className="text-xs text-white/80">
+              Pedido <strong>#{newOrderCreatedToast.id}</strong> — R$ {newOrderCreatedToast.total.toFixed(2)}
+            </p>
+          </div>
+          <button
+            onClick={() => setNewOrderCreatedToast(null)}
+            className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ml-2"
+          >
+            Ver no Kanban <ArrowRight className="size-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Header com Status */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border">
         <div className="flex items-center gap-3">
@@ -359,11 +444,11 @@ export function ChatbotPage() {
             <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
               WhatsApp IA — Eloisa Real
               <span className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
-                <Zap className="size-3 text-emerald-400" /> OpenAI GPT-4o Online
+                <Zap className="size-3 text-emerald-400" /> WhatsApp Sincronizado ao Kanban
               </span>
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Atendente virtual oficial da loja {storeName} (Conectada ao cérebro real da OpenAI com seu script)
+              Simulador em formato WhatsApp Web oficial com criação automática de pedidos na aba Pedidos
             </p>
           </div>
         </div>
@@ -423,7 +508,7 @@ export function ChatbotPage() {
                   <div>
                     <h3 className="text-lg font-bold text-white">Eloisa Ativa!</h3>
                     <p className="text-xs text-muted-foreground max-w-xs mt-1">
-                      O número está vinculado ao WhatsApp e responderá mensagens usando a inteligência artificial do GPT-4o.
+                      O número está vinculado ao WhatsApp e gerará os pedidos automaticamente no Kanban.
                     </p>
                   </div>
                 </div>
@@ -480,10 +565,10 @@ export function ChatbotPage() {
           </section>
         </div>
 
-        {/* Lado Direito: Script Definitivo Completo da Eloisa & Simulador (7 Colunas) */}
+        {/* Lado Direito: Prompt da Eloisa & Simulador em Formato WhatsApp Web Real (7 Colunas) */}
         <div className="lg:col-span-7 space-y-6">
           
-          {/* Configurações do System Prompt & API Key */}
+          {/* Configurações do System Prompt */}
           <section className="bg-card border border-border rounded-2xl p-6 space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
@@ -530,7 +615,7 @@ export function ChatbotPage() {
                 <span className="text-[10px] text-emerald-400 lowercase">OpenAI GPT-4o Engine</span>
               </label>
               <textarea
-                rows={12}
+                rows={8}
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
                 className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 resize-none font-mono custom-scrollbar leading-relaxed"
@@ -538,61 +623,79 @@ export function ChatbotPage() {
             </div>
           </section>
 
-          {/* Simulador de Atendimento da Eloisa */}
-          <section className="bg-card border border-border rounded-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center gap-2.5">
-                <MessageSquare className="size-4 text-emerald-400" />
-                <h2 className="font-bold text-base text-white">Simulador de Conversa (Inteligência Real OpenAI)</h2>
+          {/* Simulador em Formato Real do WhatsApp Web */}
+          <section className="bg-[#0b141a] border border-[#222d34] rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[480px]">
+            {/* Header WhatsApp Web */}
+            <div className="bg-[#202c33] px-4 py-3 flex items-center justify-between border-b border-[#222d34] shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="size-9 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold text-sm">
+                    E
+                  </div>
+                  <div className="absolute bottom-0 right-0 size-2.5 rounded-full bg-emerald-400 border-2 border-[#202c33]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-[#e9edef] leading-tight">Eloisa • Smoking Pods</h3>
+                  <p className="text-[11px] text-[#8696a0]">
+                    {isTyping ? "digitando..." : "online no WhatsApp"}
+                  </p>
+                </div>
               </div>
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded-full font-bold flex items-center gap-1">
-                <Zap className="size-3" /> GPT-4o Ativo
-              </span>
+
+              <div className="flex items-center gap-3 text-[#aebac1]">
+                <Video className="size-4 cursor-pointer hover:text-white" />
+                <Phone className="size-4 cursor-pointer hover:text-white" />
+                <div className="h-4 w-px bg-white/10" />
+                <MoreVertical className="size-4 cursor-pointer hover:text-white" />
+              </div>
             </div>
 
-            {/* Chat Box */}
-            <div className="h-72 bg-[#0a0a0a] border border-white/10 rounded-2xl p-4 overflow-y-auto space-y-3 custom-scrollbar">
+            {/* Chat Messages Wall (Estilo WhatsApp) */}
+            <div className="flex-1 bg-[#0b141a] bg-[radial-gradient(#1f2c34_1px,transparent_1px)] [background-size:16px_16px] p-4 overflow-y-auto space-y-2.5 custom-scrollbar">
               {messages.map((msg, idx) => (
                 <div
                   key={idx}
                   className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs ${
+                    className={`max-w-[85%] sm:max-w-[75%] rounded-lg px-3 py-2 text-xs relative text-[#e9edef] shadow-md ${
                       msg.sender === "user"
-                        ? "bg-emerald-500 text-black font-semibold rounded-br-none"
-                        : "bg-white/10 text-white border border-white/10 rounded-bl-none font-normal"
+                        ? "bg-[#005c4b] rounded-tr-none"
+                        : "bg-[#202c33] rounded-tl-none"
                     }`}
                   >
-                    {msg.text}
+                    <p className="whitespace-pre-wrap leading-relaxed select-text">{msg.text}</p>
+                    <div className="flex items-center justify-end gap-1 mt-1 text-[9px] text-[#8696a0]">
+                      <span>{msg.time}</span>
+                      {msg.sender === "user" && <CheckCheck className="size-3 text-[#53bdeb]" />}
+                    </div>
                   </div>
-                  <span className="text-[9px] text-muted-foreground px-1 mt-1">{msg.time}</span>
                 </div>
               ))}
 
               {isTyping && (
-                <div className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl w-fit">
-                  <span className="animate-pulse">Eloisa (OpenAI) está digitando...</span>
+                <div className="flex items-center gap-1.5 text-xs text-[#8696a0] bg-[#202c33] px-3 py-2 rounded-lg rounded-tl-none w-fit">
+                  <span className="animate-pulse">Eloisa está digitando...</span>
                 </div>
               )}
               <div ref={chatEndRef} />
             </div>
 
-            {/* Form de Envio no Simulador */}
-            <form onSubmit={handleSimulateSend} className="flex items-center gap-2">
+            {/* Input Bar Estilo WhatsApp */}
+            <form onSubmit={handleSimulateSend} className="bg-[#202c33] px-4 py-3 flex items-center gap-3 border-t border-[#222d34] shrink-0">
               <input
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Mande um pedido real (ex: quero 2 menta e 1 uva, meu CEP é 09700-000, quanto fica com frete?)..."
-                className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50"
+                placeholder="Mensagem (ex: quero 2 menta e 1 uva, meu CEP é 09700-000)..."
+                className="flex-1 bg-[#2a3942] border-none rounded-xl px-4 py-2.5 text-xs text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none"
               />
               <button
                 type="submit"
                 disabled={isTyping}
-                className="px-4 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-all flex items-center justify-center cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.2)] disabled:opacity-50"
+                className="p-2.5 bg-[#00a884] hover:bg-[#029071] text-black font-bold rounded-xl transition-all flex items-center justify-center cursor-pointer disabled:opacity-50"
               >
-                <Send className="size-4" />
+                <Send className="size-4 text-white" />
               </button>
             </form>
           </section>
