@@ -320,25 +320,86 @@ export function ChatbotPage() {
       if (products && products.length > 0) {
         inStockProducts = products;
         const stockLines = products.map(p => 
-          `- ${p.brand ? p.brand + ' ' : ''}${p.name} | Sabor: ${p.flavor} | R$ ${parseFloat(p.price).toFixed(2)} (${p.stock} un em estoque)`
+          `${p.brand ? p.brand + ' ' : ''}${p.name} (sabor: ${p.flavor}) - R$ ${parseFloat(p.price).toFixed(2)}`
         );
         stockContext = `\n\nESTOQUE EM TEMPO REAL DISPONÍVEL NA SMOKING PODS (ATUALIZADO AGORA):\n` +
           stockLines.join("\n") +
-          `\n\nREGRA ABSOLUTA DE CONSULTA DE ESTOQUE ("TEM POD X?", "OLA TEMPOD Y?", "MAS TEM?"):` +
-          `\n1. Quando o cliente perguntar se TEM determinado pod/modelo (ex: "ola tempod elfbar bc15k?", "tem pod x?", "mas tem?"):` +
-          `\n   - NUNCA responda sobre a durabilidade/dias de puffs! O cliente NÃO perguntou quanto dura!` +
-          `\n   - Verifique se o modelo está na lista de ESTOQUE acima.` +
-          `\n   - Se o modelo NÃO estiver no estoque (ex: Elf Bar BC15k): Diga imediatamente: "infelizmente esse pod a gente não tem no estoque amg, hoje a pronta entrega temos essas opções:" e liste os pods do estoque acima!` +
-          `\n   - Se o modelo ESTIVER no estoque: Diga que temos sim e pergunte qual sabor o cliente prefere!` +
-          `\n2. NUNCA invente marcas, modelos ou sabores fora da lista de estoque acima.`;
+          `\n\nREGRAS CRÍTICAS DE ESTOQUE E FORMATO DA RESPOSTA:` +
+          `\n1. Escreva 100% em LETRAS MINÚSCULA! (sem maiúsculas no início, ex: "temos sim amg", nunca "Infelizmente" ou "Elfbar").` +
+          `\n2. NUNCA use marcadores de lista como traços (- ), asteriscos (* ) ou números (1. ). Escreva mensagens de texto normais de WhatsApp!` +
+          `\n3. NUNCA invente marcas, modelos ou sabores fora da lista de estoque acima.`;
       } else {
-        stockContext = `\n\nESTOQUE EM TEMPO REAL: Atualmente todos os produtos da loja estão sem estoque. Informe o cliente educadamente.`;
+        stockContext = `\n\nESTOQUE EM TEMPO REAL: Atualmente todos os produtos da loja estão sem estoque. Informe o cliente educadamente em minúsculo.`;
       }
     } catch (e) {
       console.warn("Erro ao carregar estoque em tempo real:", e);
     }
 
-    // 2. Calcula a saudação do horário real do dia
+    // 2. Pre-checagem inteligente via JavaScript para modelo solicitado
+    let directStockInstruction = "";
+    const allUserMsgs = conversationHistory.filter(m => m.sender === 'user');
+    const lastUserMsg = allUserMsgs[allUserMsgs.length - 1]?.text || "";
+    const lastMsgLower = lastUserMsg.toLowerCase();
+
+    // Função de fuzzy match para lidar com erros de digitação
+    const fuzzyMatch = (query: string, target: string): boolean => {
+      const q = query.replace(/[^a-z0-9]/g, '');
+      const t = target.replace(/[^a-z0-9]/g, '');
+      if (!q || !t) return false;
+      // Match direto
+      if (q.includes(t) || t.includes(q)) return true;
+      // Match parcial: pelo menos 70% dos caracteres batem em sequência
+      let matches = 0;
+      let tIdx = 0;
+      for (let i = 0; i < q.length && tIdx < t.length; i++) {
+        if (q[i] === t[tIdx]) { matches++; tIdx++; }
+      }
+      return matches >= t.length * 0.7;
+    };
+
+    if (inStockProducts.length > 0) {
+      // Busca match por nome ou marca no estoque com fuzzy matching
+      const matchedProducts = inStockProducts.filter(p => {
+        const pName = (p.name || '').toLowerCase();
+        const pBrand = (p.brand || '').toLowerCase();
+        return fuzzyMatch(lastMsgLower, pName) || fuzzyMatch(lastMsgLower, pBrand);
+      });
+
+      // Agrupa por modelo único
+      const uniqueModels = [...new Set(matchedProducts.map(p => p.name))];
+
+      if (matchedProducts.length > 0) {
+        const modelName = matchedProducts[0].name;
+        const brandName = matchedProducts[0].brand || '';
+        const flavorsInformal = matchedProducts.map(p => p.flavor.toLowerCase()).join(' e ');
+        const priceStr = parseFloat(matchedProducts[0].price).toFixed(0);
+        directStockInstruction = `\n\n[SISTEMA: CONFIRMAÇÃO DIRETA — PRODUTO ENCONTRADO NO ESTOQUE!]` +
+          `\nO cliente pediu "${lastUserMsg}". O sistema CONFIRMOU que "${brandName} ${modelName}" EXISTE no estoque.` +
+          `\nSabores disponíveis desse modelo: ${flavorsInformal}. Preço: R$ ${priceStr} cada.` +
+          `\n\nINSTRUÇÃO OBRIGATÓRIA (siga EXATAMENTE):` +
+          `\n- Responda que TEMOS SIM, nunca diga que não tem!` +
+          `\n- Fale de forma SUPER INFORMAL como no WhatsApp, 100% minúsculo, sem listas com traço/asterisco!` +
+          `\n- Exemplo de resposta IDEAL: "temos sim amg! do ${modelName.toLowerCase()} a gente tem nos sabores ${flavorsInformal}, cada um sai por ${priceStr} reais, qual vc curte mais?"` +
+          `\n- NUNCA formate como lista (nada de "- Elfbar BC15K | Sabor: ..."). Fale como uma amiga no WhatsApp!`;
+      } else if (lastMsgLower.match(/tem|quer|pod|prec|busc|elfb|ignit|bc\d|v\d|vap/)) {
+        // Produto não encontrado no estoque
+        const disponiveisInformal = inStockProducts.reduce((acc: any[], p) => {
+          const key = `${p.brand} ${p.name}`;
+          if (!acc.find(a => a.key === key)) acc.push({ key, brand: p.brand, name: p.name, flavors: [p.flavor], price: p.price });
+          else acc.find(a => a.key === key)!.flavors.push(p.flavor);
+          return acc;
+        }, []).map(g => `${g.brand ? g.brand.toLowerCase() + ' ' : ''}${g.name.toLowerCase()} (sabores: ${g.flavors.join(', ').toLowerCase()}) por ${parseFloat(g.price).toFixed(0)} reais`).join(', ');
+        directStockInstruction = `\n\n[SISTEMA: PRODUTO NÃO ENCONTRADO NO ESTOQUE]` +
+          `\nO cliente pediu "${lastUserMsg}" mas esse modelo/marca NÃO existe no estoque da loja.` +
+          `\n\nINSTRUÇÃO OBRIGATÓRIA (siga EXATAMENTE):` +
+          `\n- Diga que esse pod a gente não trabalha ou tá esgotado.` +
+          `\n- Sugira os pods disponíveis de forma SUPER INFORMAL, como uma amiga no WhatsApp!` +
+          `\n- Exemplo IDEAL: "esse pod a gente não trabalha amg, mas hoje a pronta entrega temos ${disponiveisInformal}, quer algum desses?"` +
+          `\n- NUNCA formate como lista com traços! Fale tudo junto numa frase natural!`;
+      }
+    }
+
+    // 3. Calcula a saudação do horário real do dia
     const currentHour = new Date().getHours();
     let timeGreeting = "boa noite";
     if (currentHour >= 6 && currentHour < 12) {
@@ -360,9 +421,7 @@ ${isOngoingConversation
     let cepContext = "";
     let addressCompletedContext = "";
     
-    // Procura se o cliente já enviou CEP em qualquer momento da conversa
-    const allUserMsgs = conversationHistory.filter(m => m.sender === 'user');
-    const lastUserMsg = allUserMsgs[allUserMsgs.length - 1]?.text || "";
+    // Reutiliza allUserMsgs e lastUserMsg já declarados acima
     
     let foundCep = "";
     for (const uMsg of allUserMsgs) {
@@ -418,7 +477,7 @@ ${isOngoingConversation
         `\nmsg2: qual o número da casa/prédio? e tem algum complemento amg (tipo ap, bloco, no beco, fundos)?`;
     }
 
-    const dynamicSystemPrompt = systemPrompt + timeContext + stockContext + cepContext + addressCompletedContext;
+    const dynamicSystemPrompt = systemPrompt + timeContext + stockContext + directStockInstruction + cepContext + addressCompletedContext;
 
     const formattedMessages = [
       { role: "system", content: dynamicSystemPrompt },
