@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Bot, QrCode, RefreshCw, CheckCircle2,
   Send, Sparkles, Power, Check, Copy, Key, Zap,
-  CheckCheck, Phone, Video, MoreVertical, ShoppingBag, ArrowRight
+  CheckCheck, Phone, Video, MoreVertical, ShoppingBag, ArrowRight, RotateCcw
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
@@ -239,10 +239,8 @@ export function ChatbotPage() {
   const [systemPrompt, setSystemPrompt] = useState(DEFINITIVE_SYSTEM_PROMPT);
   const [isTyping, setIsTyping] = useState(false);
 
-  // Chat Simulator State
-  const [messages, setMessages] = useState<Array<{ sender: "user" | "bot"; text: string; time: string }>>([
-    { sender: "bot", text: "Olá tudo bem, como posso te ajudar?", time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-  ]);
+  // Chat Simulator State (inicia limpo para o usuário dar o primeiro oi)
+  const [messages, setMessages] = useState<Array<{ sender: "user" | "bot"; text: string; time: string }>>([]);
   const [inputMessage, setInputMessage] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -764,8 +762,15 @@ REGRAS CRÍTICAS DE SAUDAÇÃO E FLUXO:
               </div>
 
               <div className="flex items-center gap-3 text-[#aebac1]">
-                <Video className="size-4 cursor-pointer hover:text-white" />
-                <Phone className="size-4 cursor-pointer hover:text-white" />
+                <button
+                  type="button"
+                  onClick={() => setMessages([])}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95"
+                  title="Limpar e reiniciar conversa do zero"
+                >
+                  <RotateCcw className="size-3.5" />
+                  Resetar Chat
+                </button>
                 <div className="h-4 w-px bg-white/10" />
                 <MoreVertical className="size-4 cursor-pointer hover:text-white" />
               </div>
@@ -773,6 +778,20 @@ REGRAS CRÍTICAS DE SAUDAÇÃO E FLUXO:
 
             {/* Chat Messages Wall (Estilo WhatsApp) */}
             <div className="flex-1 bg-[#0b141a] bg-[radial-gradient(#1f2c34_1px,transparent_1px)] [background-size:16px_16px] p-4 overflow-y-auto space-y-2.5 custom-scrollbar">
+              {messages.length === 0 && (
+                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
+                  <div className="size-12 rounded-full bg-[#202c33] border border-white/10 flex items-center justify-center text-[#8696a0]">
+                    <Bot className="size-6 text-emerald-400" />
+                  </div>
+                  <div className="max-w-xs">
+                    <p className="text-xs font-semibold text-[#e9edef]">Conversa iniciada do zero!</p>
+                    <p className="text-[11px] text-[#8696a0] mt-1">
+                      Envie uma mensagem abaixo (ex: "oi", "boa tarde" ou "tem pod aí?") para testar o primeiro contato com a Eloisa.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {messages.map((msg, idx) => (
                 <div
                   key={idx}
