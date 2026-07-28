@@ -111,11 +111,14 @@ msg2: e trabalhamos com garantia na troca caso de algum problema, por isso o val
 CATEGORIA 5 — PAGAMENTO
 P23 — Introdução do pagamento (Pix)
 msg1: o valor do seu pedido ficou em R$[valor_produto], com um frete de R$[frete], com um total de R$[total]
-msg2: SMOKING PODS AGRADECE SEU PEDIDO
+msg2 (MENSAGEM ÚNICA EM BLOCO COM PIX — NUNCA SEPARAR EM DUAS MENSAGENS):
+SMOKING PODS AGRADECE SEU PEDIDO
 CHAVE PIX : [chave_pix]
 
 P24 — Cartão
-msg2: SMOKING PODS AGRADECE SEU PEDIDO
+msg1: o valor do seu pedido ficou em R$[valor_produto], com um frete de R$[frete], com um total de R$[total]
+msg2 (MENSAGEM ÚNICA EM BLOCO COM LINK):
+SMOKING PODS AGRADECE SEU PEDIDO
 PAGAMENTO : [link_checkout]
 
 P25 — Pedir comprovante
@@ -628,9 +631,11 @@ ${isOngoingConversation
           `\nNúmero e Complemento informados pelo cliente: "${userNumberText}"` +
           `\n\nINSTRUÇÕES CRÍTICAS DE FLUXO:` +
           `\n1. NUNCA mais peça CEP ou endereço! Não pergunte por rua ou bairro novamente.` +
-          `\n2. Responda de forma curta e informal em duas linhas separadas (usando quebras de linha \\n):` +
+          `\n2. Responda de forma curta e informal em duas mensagens (usando quebras de linha \\n):` +
           `\n   fechou amg, anotei aqui o endereço: ${detectedStreetAndBairro}, nº ${userNumberText}` +
-          `\n3. Avance imediatamente para apresentar o valor total do pedido com frete (+ R$ 15 frete) e envie a CHAVE PIX/LINK DE PAGAMENTO!`;
+          `\n   o valor do seu pedido ficou em R$ 70,00, com um frete de R$ 15,00, com um total de R$ 85,00` +
+          `\n   SMOKING PODS AGRADECE SEU PEDIDO\\nCHAVE PIX : 1234567890` +
+          `\n\nATENÇÃO SUPREMA: NUNCA SEPARE "SMOKING PODS AGRADECE SEU PEDIDO" DA "CHAVE PIX"! Elas DEVEM vir obrigatoriamente na MESMA MENSAGEM, juntas em um único bloco contínuo separado apenas por uma quebra de linha.`;
       } else if (botAskedForNumber) {
         // Estado 2: O bot pediu o número, mas o usuário ainda não respondeu o número
         const isUserConfirmingStreet = lastMsgLower.match(/sim|isso|eh|é|certo|ok|blz/);
@@ -796,7 +801,21 @@ ${isOngoingConversation
         createOrderInDatabase(clientName, finalAddress, orderItems, orderTotal);
       }
 
-      const lines = rawAnswer.split("\n").filter((l: string) => l.trim().length > 0);
+      let lines: string[] = [];
+      if (rawAnswer.includes("[QUEBRA]")) {
+        lines = rawAnswer.split("[QUEBRA]").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+      } else if (rawAnswer.includes("SMOKING PODS AGRADECE SEU PEDIDO")) {
+        const match = rawAnswer.match(/([\s\S]*?)(SMOKING PODS AGRADECE SEU PEDIDO[\s\S]*)/i);
+        if (match) {
+          const firstPart = match[1].split("\n").map(l => l.trim()).filter(l => l.length > 0);
+          const pixPart = match[2].trim();
+          lines = [...firstPart, pixPart];
+        } else {
+          lines = rawAnswer.split("\n").filter((l: string) => l.trim().length > 0);
+        }
+      } else {
+        lines = rawAnswer.split("\n").filter((l: string) => l.trim().length > 0);
+      }
       return lines.length > 0 ? lines : [rawAnswer];
     } catch (e: any) {
       console.error("Erro na OpenAI:", e);

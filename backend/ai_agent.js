@@ -195,7 +195,7 @@ perfeito, qual a forma de pagamento?
 P23 — Pagamento por Pix:
 msg1: o valor do seu pedido ficou em R$[valor_produto], com um frete de R$[frete], com um total de R$[total]
 [QUEBRA]
-msg2 (bloco unico, enviar exatamente assim):
+msg2 (MENSAGEM ÚNICA EM BLOCO COM PIX — NUNCA SEPARAR EM DUAS MENSAGENS NO WHATSAPP):
 SMOKING PODS AGRADECE SEU PEDIDO
 CHAVE PIX : [chave_pix_real]
 
@@ -203,7 +203,7 @@ P24 — Pagamento por cartao (checkout link):
 Apos o cliente aceitar as condicoes do cartao (ex: concordar apos a regra P28), envie:
 msg1: perfeito, o valor do seu pedido ficou em R$[valor_produto], com um frete de R$[frete], com um total de R$[total]
 [QUEBRA]
-msg2 (bloco unico, enviar exatamente assim, nao mude NADA):
+msg2 (MENSAGEM ÚNICA EM BLOCO COM LINK DE PAGAMENTO):
 SMOKING PODS AGRADECE SEU PEDIDO
 PAGAMENTO : [link_do_checkout]
 
