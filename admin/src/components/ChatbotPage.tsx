@@ -132,8 +132,7 @@ msg2: no link de pagamento dá pra passar cartão de crédito e débito, também
 
 CATEGORIA 6 — ENDEREÇO E ENTREGA
 P30/P31 — Pedir endereço (APENAS se o cliente ainda NÃO enviou o CEP ou endereço. NUNCA enviar se o CEP ou endereço já foi informado)
-msg1: agora preciso do seu endereço tá?
-msg2: se puder enviar o cep ao invés do nome da rua, ajuda muito á não ter problema com a entrega, para não acabar indo para o endereço errado
+msg1: perfeito amg, me manda o seu cep pra gente não correr risco e ficar bem certinha a localização do motoboy?
 
 P32b — Cliente não tem CEP
 sem problemas, me passa o endereço completo com bairro e cidade por favor?
@@ -417,18 +416,22 @@ ${isOngoingConversation
   ? `ATENÇÃO SUPREMA: ESTA CONVERSA JÁ ESTÁ EM ANDAMENTO (MENSAGEM Nº ${conversationHistory.length})! NUNCA COMECE SUA RESPOSTA COM "bom dia", "boa tarde", "boa noite", "olá tudo bem" OU QUALQUER OUTRA SAUDAÇÃO! É PROIBIDO CUMPRIMENTAR NOVAMENTE. RESPONDA DIRETO À PERGUNTA DO CLIENTE COM LETRA MINÚSCULA!` 
   : `Esta é a 1ª mensagem da conversa. Comece com a primeira letra maiúscula: "${timeGreeting.charAt(0).toUpperCase() + timeGreeting.slice(1)}, tudo bem? como posso te ajudar?"`}`;
 
-    // 3. Detecção Inteligente de CEP e Número/Complemento de Residência
+    // 3. Detecção Inteligente de CEP e Residência via Máquina de Estados no Histórico
     let cepContext = "";
     let addressCompletedContext = "";
     
-    // Reutiliza allUserMsgs e lastUserMsg já declarados acima
-    
+    // Procura se o cliente enviou CEP na conversa
     let foundCep = "";
-    for (const uMsg of allUserMsgs) {
-      const match = uMsg.text.match(/\b\d{5}[-.\s]?\d{3}\b/);
-      if (match) {
-        foundCep = match[0].replace(/\D/g, "");
-        break;
+    let cepMsgIndex = -1;
+    for (let i = 0; i < conversationHistory.length; i++) {
+      const msg = conversationHistory[i];
+      if (msg.sender === 'user') {
+        const match = msg.text.match(/\b\d{5}[-.\s]?\d{3}\b/);
+        if (match) {
+          foundCep = match[0].replace(/\D/g, "");
+          cepMsgIndex = i;
+          break;
+        }
       }
     }
 
@@ -453,28 +456,74 @@ ${isOngoingConversation
       }
     }
 
-    // Checa se a mensagem contém número da residência ou complemento (ex: "205 no beco", "150 ap 42", "205", "número 30")
-    const hasNumberMatch = lastUserMsg.match(/\b\d+\b/);
-    const isNumberOrComplementoMsg = hasNumberMatch || lastUserMsg.toLowerCase().includes("beco") || lastUserMsg.toLowerCase().includes("ap") || lastUserMsg.toLowerCase().includes("bloco") || lastUserMsg.toLowerCase().includes("fundos") || lastUserMsg.toLowerCase().includes("casa");
+    // Agora analisamos o histórico após o envio do CEP
+    let botAskedForNumber = false;
+    let userProvidedNumber = false;
+    let userNumberText = "";
 
-    if (foundCep && isNumberOrComplementoMsg && !lastUserMsg.match(/\b\d{5}[-.\s]?\d{3}\b/)) {
-      // O CLIENTE ACABA DE ENVIAR O NÚMERO E COMPLEMENTO!
-      addressCompletedContext = `\n\n[ENDEREÇO COMPLETO IDENTIFICADO COM SUCESSO!]:` +
-        `\nO cliente forneceu o CEP e agora informou o número e complemento: "${lastUserMsg}".` +
-        `\nRua do CEP: ${detectedStreetAndBairro}.` +
-        `\nREGRAS CRÍTICAS DE NÃO REPETIR ENDEREÇO:` +
-        `\n1. NUNCA envie a frase "agora preciso do seu endereço tá?" ou "envie o cep"! O ENDEREÇO JÁ ESTÁ COMPLETO!` +
-        `\n2. Responda em tom informal e descontraído:` +
-        `\n   msg1: fechou amg, anotei aqui o endereço: ${detectedStreetAndBairro}, ${lastUserMsg}` +
-        `\n3. Avance DIRETO para a apresentação do valor total com frete e envio da CHAVE PIX/LINK DE PAGAMENTO!`;
-    } else if (foundCep && lastUserMsg.match(/\b\d{5}[-.\s]?\d{3}\b/)) {
-      // O CLIENTE ACABA DE ENVIAR O CEP!
-      cepContext = `\n\n[LOCALIZAÇÃO CEP OBTIDA VIA GPS]:` +
-        `\nO cliente enviou o CEP ${foundCep}. A rua localizada foi: "${detectedStreetAndBairro}".` +
-        `\nREGRA INFORMAL E NATURAL DE RESPOSTA:` +
-        `\nResponda em tom amigo e informal em 2 mensagens:` +
-        `\nmsg1: ahh sim, localizei aqui amg! essa rua né: ${detectedStreetAndBairro}?` +
-        `\nmsg2: qual o número da casa/prédio? e tem algum complemento amg (tipo ap, bloco, no beco, fundos)?`;
+    if (cepMsgIndex !== -1) {
+      // Procura se o bot pediu o número após o envio do CEP
+      for (let i = cepMsgIndex + 1; i < conversationHistory.length; i++) {
+        const msg = conversationHistory[i];
+        if (msg.sender === 'bot' && (msg.text.toLowerCase().includes("número") || msg.text.toLowerCase().includes("numero"))) {
+          botAskedForNumber = true;
+        }
+        // Procura se o usuário respondeu o número/complemento após o bot ter pedido
+        if (botAskedForNumber && msg.sender === 'user') {
+          const hasNumber = msg.text.match(/\b\d+\b/);
+          const hasComplementoWords = msg.text.toLowerCase().includes("beco") || msg.text.toLowerCase().includes("ap") || msg.text.toLowerCase().includes("bloco") || msg.text.toLowerCase().includes("fundos") || msg.text.toLowerCase().includes("casa");
+          if (hasNumber || hasComplementoWords) {
+            userProvidedNumber = true;
+            userNumberText = msg.text;
+          }
+        }
+      }
+    }
+
+    // Define as instruções com base nos estados identificados no histórico
+    if (foundCep) {
+      if (userProvidedNumber) {
+        // Estado 3: Endereço completo obtido com sucesso!
+        addressCompletedContext = `\n\n[SISTEMA: ENDEREÇO TOTALMENTE COMPLETO E ANOTADO!]` +
+          `\nRua/Bairro: ${detectedStreetAndBairro}` +
+          `\nNúmero e Complemento informados pelo cliente: "${userNumberText}"` +
+          `\n\nINSTRUÇÕES CRÍTICAS DE FLUXO:` +
+          `\n1. NUNCA mais peça CEP ou endereço! Não pergunte por rua ou bairro novamente.` +
+          `\n2. Responda de forma curta e informal em duas linhas separadas (usando quebras de linha \\n):` +
+          `\n   fechou amg, anotei aqui o endereço: ${detectedStreetAndBairro}, nº ${userNumberText}` +
+          `\n3. Avance imediatamente para apresentar o valor total do pedido com frete (+ R$ 15 frete) e envie a CHAVE PIX/LINK DE PAGAMENTO!`;
+      } else if (botAskedForNumber) {
+        // Estado 2: O bot pediu o número, mas o usuário ainda não respondeu o número
+        const isUserConfirmingStreet = lastMsgLower.match(/sim|isso|eh|é|certo|ok|blz/);
+        
+        if (isUserConfirmingStreet) {
+          // O usuário acabou de confirmar a rua (ex: "isso"). Agora o bot PRECISA pedir o número e o complemento de forma obrigatória!
+          cepContext = `\n\n[SISTEMA: CONFIRMAÇÃO DE RUA RECEBIDA]` +
+            `\nO cliente confirmou a rua do CEP ("${detectedStreetAndBairro}").` +
+            `\n\nINSTRUÇÃO OBRIGATÓRIA (siga à risca):` +
+            `\nVocê PRECISA pedir o número e complemento da casa/prédio de forma informal no WhatsApp.` +
+            `\nSua resposta DEVE conter exatamente esta pergunta:` +
+            `\nqual o número da casa/prédio amg? e tem algum complemento (tipo ap, bloco, no beco, fundos)?`;
+        } else {
+          // Se o usuário ainda não mandou o número e não é apenas confirmação da rua, reforce o pedido do número de forma amigável
+          cepContext = `\n\n[SISTEMA: AGUARDANDO NÚMERO E COMPLEMENTO]` +
+            `\nO cliente ainda não enviou o número da residência.` +
+            `\nINSTRUÇÃO OBRIGATÓRIA:` +
+            `\nPeça o número e complemento do endereço informalmente para concluir o pedido.`;
+        }
+      } else {
+        // Estado 1: O cliente acabou de enviar o CEP. O bot precisa confirmar a rua e pedir o número!
+        cepContext = `\n\n[SISTEMA: CEP DETECTADO]` +
+          `\nO cliente enviou o CEP ${foundCep}. A rua localizada foi: "${detectedStreetAndBairro}".` +
+          `\n\nINSTRUÇÃO OBRIGATÓRIA DE RESPOSTA (siga à risca, use quebra de linha para separar as duas frases):` +
+          `\nahh sim, localizei aqui amg! essa rua né: ${detectedStreetAndBairro}?` +
+          `\nqual o número da casa/prédio? e tem algum complemento amg (tipo ap, bloco, no beco, fundos)?`;
+      }
+    } else {
+      // Estado 0: Ainda não temos o CEP do cliente.
+      cepContext = `\n\n[SISTEMA: PEDIR CEP AO CLIENTE]` +
+        `\nQuando for o momento de pedir o endereço do cliente para a entrega, use exatamente este tom de WhatsApp:` +
+        `\n"perfeito amg, me manda o seu cep pra gente não correr risco e ficar bem certinha a localização do motoboy?"`;
     }
 
     const dynamicSystemPrompt = systemPrompt + timeContext + stockContext + directStockInstruction + cepContext + addressCompletedContext;
