@@ -340,14 +340,14 @@ export function ChatbotPage() {
     const lastUserMsg = allUserMsgs[allUserMsgs.length - 1]?.text || "";
     const lastMsgLower = lastUserMsg.toLowerCase();
 
-    // Função de fuzzy match para lidar com erros de digitação
+    // Função de fuzzy match para lidar com erros de digitação (aceita 70% de similaridade)
     const fuzzyMatch = (query: string, target: string): boolean => {
-      const q = query.replace(/[^a-z0-9]/g, '');
-      const t = target.replace(/[^a-z0-9]/g, '');
+      const q = query.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const t = target.toLowerCase().replace(/[^a-z0-9]/g, '');
       if (!q || !t) return false;
-      // Match direto
+      // Match direto ou contido
       if (q.includes(t) || t.includes(q)) return true;
-      // Match parcial: pelo menos 70% dos caracteres batem em sequência
+      // Similaridade em sequencia
       let matches = 0;
       let tIdx = 0;
       for (let i = 0; i < q.length && tIdx < t.length; i++) {
@@ -357,44 +357,73 @@ export function ChatbotPage() {
     };
 
     if (inStockProducts.length > 0) {
-      // Busca match por nome ou marca no estoque com fuzzy matching
-      const matchedProducts = inStockProducts.filter(p => {
+      // 1. Verifica se o usuário escolheu algum sabor disponível (mesmo com pequenos erros de digitação)
+      const matchedByFlavor = inStockProducts.filter(p => {
+        const flavorLower = p.flavor.toLowerCase();
+        return lastMsgLower.includes(flavorLower) || 
+               fuzzyMatch(lastMsgLower, flavorLower) || 
+               flavorLower.split(" ").some(word => word.length > 3 && lastMsgLower.includes(word));
+      });
+
+      // 2. Busca match por nome ou marca no estoque
+      const matchedByModel = inStockProducts.filter(p => {
         const pName = (p.name || '').toLowerCase();
         const pBrand = (p.brand || '').toLowerCase();
         return fuzzyMatch(lastMsgLower, pName) || fuzzyMatch(lastMsgLower, pBrand);
       });
 
-      // Agrupa por modelo único
-      const uniqueModels = [...new Set(matchedProducts.map(p => p.name))];
+      if (matchedByFlavor.length > 0 && !lastMsgLower.match(/(elf\s*bar|elfbar|ignite|bc\s*15|bc15|v50|v80|waka|oxbar|lost\s*mary|10k|15k|20k|30k)/i)) {
+        // O cliente citou um sabor que temos em estoque!
+        // Descobre qual modelo estava sendo discutido no histórico
+        let activeModel = matchedByFlavor[0].name;
+        const botMsgs = conversationHistory.filter(m => m.sender === 'bot');
+        if (botMsgs.length > 0) {
+          const lastBotText = botMsgs[botMsgs.length - 1].text.toLowerCase();
+          const foundModel = inStockProducts.find(p => lastBotText.includes(p.name.toLowerCase()));
+          if (foundModel) activeModel = foundModel.name;
+        }
 
-      if (matchedProducts.length > 0) {
-        const modelName = matchedProducts[0].name;
-        const brandName = matchedProducts[0].brand || '';
-        const flavorsInformal = matchedProducts.map(p => p.flavor.toLowerCase()).join(' e ');
-        const priceStr = parseFloat(matchedProducts[0].price).toFixed(0);
+        const finalProduct = matchedByFlavor.find(p => p.name === activeModel) || matchedByFlavor[0];
+        const priceStr = parseFloat(finalProduct.price).toFixed(0);
+
+        directStockInstruction = `\n\n[SISTEMA: SABOR DE PRODUTO SELECIONADO!]` +
+          `\nO cliente escolheu o sabor "${finalProduct.flavor}" do modelo "${finalProduct.name}".` +
+          `\n\nREGRA OBRIGATÓRIA (siga à risca):` +
+          `\n- Confirme a escolha de 1 unidade em tom amigo, informal e 100% minúsculo.` +
+          `\n- Peça o CEP para entrega de forma informal.` +
+          `\n- Exemplo de resposta IDEAL: "fechou amg, 1 ${finalProduct.name.toLowerCase()} de ${finalProduct.flavor.toLowerCase()} então! me manda seu cep pra gente ver a entrega?"` +
+          `\n- NUNCA diga que o produto não existe! Confirme a escolha.`;
+
+      } else if (matchedByModel.length > 0) {
+        // O cliente perguntou especificamente de um modelo disponível
+        const modelName = matchedByModel[0].name;
+        const brandName = matchedByModel[0].brand || '';
+        const flavorsInformal = matchedByModel.map(p => p.flavor.toLowerCase()).join(' e ');
+        const priceStr = parseFloat(matchedByModel[0].price).toFixed(0);
+
         directStockInstruction = `\n\n[SISTEMA: CONFIRMAÇÃO DIRETA — PRODUTO ENCONTRADO NO ESTOQUE!]` +
           `\nO cliente pediu "${lastUserMsg}". O sistema CONFIRMOU que "${brandName} ${modelName}" EXISTE no estoque.` +
           `\nSabores disponíveis desse modelo: ${flavorsInformal}. Preço: R$ ${priceStr} cada.` +
           `\n\nINSTRUÇÃO OBRIGATÓRIA (siga EXATAMENTE):` +
           `\n- Responda que TEMOS SIM, nunca diga que não tem!` +
           `\n- Fale de forma SUPER INFORMAL como no WhatsApp, 100% minúsculo, sem listas com traço/asterisco!` +
-          `\n- Exemplo de resposta IDEAL: "temos sim amg! do ${modelName.toLowerCase()} a gente tem nos sabores ${flavorsInformal}, cada um sai por ${priceStr} reais, qual vc curte mais?"` +
-          `\n- NUNCA formate como lista (nada de "- Elfbar BC15K | Sabor: ..."). Fale como uma amiga no WhatsApp!`;
-      } else if (lastMsgLower.match(/tem|quer|pod|prec|busc|elfb|ignit|bc\d|v\d|vap/)) {
-        // Produto não encontrado no estoque
+          `\n- Exemplo de resposta IDEAL: "temos sim amg! do ${modelName.toLowerCase()} a gente tem nos sabores ${flavorsInformal}, cada um sai por ${priceStr} reais, qual vc curte mais?"`;
+
+      } else if (lastMsgLower.match(/(elf\s*bar|elfbar|ignite|bc\s*15|bc15|v50|v80|waka|oxbar|lost\s*mary|10k|15k|20k|30k)/i)) {
+        // O cliente pediu um modelo/marca específico que NÃO está em estoque
         const disponiveisInformal = inStockProducts.reduce((acc: any[], p) => {
           const key = `${p.brand} ${p.name}`;
           if (!acc.find(a => a.key === key)) acc.push({ key, brand: p.brand, name: p.name, flavors: [p.flavor], price: p.price });
           else acc.find(a => a.key === key)!.flavors.push(p.flavor);
           return acc;
         }, []).map(g => `${g.brand ? g.brand.toLowerCase() + ' ' : ''}${g.name.toLowerCase()} (sabores: ${g.flavors.join(', ').toLowerCase()}) por ${parseFloat(g.price).toFixed(0)} reais`).join(', ');
+
         directStockInstruction = `\n\n[SISTEMA: PRODUTO NÃO ENCONTRADO NO ESTOQUE]` +
           `\nO cliente pediu "${lastUserMsg}" mas esse modelo/marca NÃO existe no estoque da loja.` +
           `\n\nINSTRUÇÃO OBRIGATÓRIA (siga EXATAMENTE):` +
-          `\n- Diga que esse pod a gente não trabalha ou tá esgotado.` +
-          `\n- Sugira os pods disponíveis de forma SUPER INFORMAL, como uma amiga no WhatsApp!` +
-          `\n- Exemplo IDEAL: "esse pod a gente não trabalha amg, mas hoje a pronta entrega temos ${disponiveisInformal}, quer algum desses?"` +
-          `\n- NUNCA formate como lista com traços! Fale tudo junto numa frase natural!`;
+          `\n- Diga de forma bem amigável que esse modelo específico a gente não tem no momento.` +
+          `\n- Sugira os pods e sabores disponíveis de forma SUPER INFORMAL e corrida:` +
+          `\n  "esse modelo a gente não tem no momento amg, mas a pronta entrega hoje temos ${disponiveisInformal}, quer algum desses?"`;
       }
     }
 
