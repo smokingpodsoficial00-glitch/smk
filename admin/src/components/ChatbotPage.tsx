@@ -449,7 +449,71 @@ ${isOngoingConversation
   ? `ATENÇÃO SUPREMA: ESTA CONVERSA JÁ ESTÁ EM ANDAMENTO (MENSAGEM Nº ${conversationHistory.length})! NUNCA COMECE SUA RESPOSTA COM "bom dia", "boa tarde", "boa noite", "olá tudo bem" OU QUALQUER OUTRA SAUDAÇÃO! É PROIBIDO CUMPRIMENTAR NOVAMENTE. RESPONDA DIRETO À PERGUNTA DO CLIENTE COM LETRA MINÚSCULA!` 
   : `Esta é a 1ª mensagem da conversa. Comece com a primeira letra maiúscula: "${timeGreeting.charAt(0).toUpperCase() + timeGreeting.slice(1)}, tudo bem? como posso te ajudar?"`}`;
 
-    // 3. Detecção Inteligente de CEP e Residência via Máquina de Estados no Histórico
+    // 3. Detecção Inteligente do Nome do Cliente
+    let clientName = "Cliente WhatsApp";
+    let nameContext = "";
+    let botAskedForName = false;
+    let userProvidedName = false;
+    let nameMsgIndex = -1;
+
+    // Scan do histórico para verificar se o bot já perguntou o nome
+    for (let i = 0; i < conversationHistory.length; i++) {
+      const msg = conversationHistory[i];
+      if (msg.sender === 'bot' && (msg.text.toLowerCase().includes("qual o seu nome") || msg.text.toLowerCase().includes("como posso te chamar") || msg.text.toLowerCase().includes("como te chamo"))) {
+        botAskedForName = true;
+      }
+      // Se o bot já perguntou o nome, a próxima mensagem do usuário (ou subsequente) deve ser o nome!
+      if (botAskedForName && msg.sender === 'user' && nameMsgIndex === -1) {
+        const cleanName = msg.text.replace(/meu nome é|meu nome e|sou o|sou a|pode chamar de|aqui é o|aqui é a/gi, "").trim();
+        if (cleanName.length > 0 && cleanName.length < 35) {
+          clientName = cleanName;
+          userProvidedName = true;
+          nameMsgIndex = i;
+        }
+      }
+    }
+
+    // Se o usuário falou espontaneamente o nome (ex: "meu nome é felipe" ou "aqui é o joão")
+    if (!userProvidedName) {
+      for (let i = 0; i < conversationHistory.length; i++) {
+        const msg = conversationHistory[i];
+        if (msg.sender === 'user') {
+          const match = msg.text.match(/(?:meu nome é|meu nome e|sou o|sou a|aqui é o|aqui é a)\s+([a-zA-ZáàâãéèêíïóôõöúçñÁÀÂÃÉÈÍÓÔÕÚÇÑ\s]+)/i);
+          if (match) {
+            clientName = match[1].trim();
+            userProvidedName = true;
+            nameMsgIndex = i;
+            break;
+          }
+        }
+      }
+    }
+
+    // Define o contexto do nome
+    if (userProvidedName) {
+      nameContext = `\n\n[SISTEMA: NOME DO CLIENTE IDENTIFICADO]` +
+        `\nNome do cliente: "${clientName}".` +
+        `\nINSTRUÇÃO CRÍTICA:` +
+        `\n1. NUNCA mais pergunte o nome! Trate o cliente pelo nome "${clientName}" nas respostas seguintes.` +
+        `\n2. Use o nome "${clientName}" para se referir a ele de forma amigável no chat.`;
+    } else {
+      // Se ainda não temos o nome, e o usuário já escolheu o produto, devemos pedir o nome antes de pedir o CEP!
+      const userSelectedProduct = conversationHistory.some(m => 
+        m.sender === 'user' && inStockProducts.some(p => 
+          m.text.toLowerCase().includes(p.flavor.toLowerCase()) || 
+          fuzzyMatch(m.text, p.flavor.toLowerCase())
+        )
+      );
+
+      if (userSelectedProduct) {
+        nameContext = `\n\n[SISTEMA: PEDIR NOME DO CLIENTE]` +
+          `\nO cliente já escolheu o produto/sabor. Agora, você PRECISA pedir o nome dele antes de pedir o CEP.` +
+          `\nINSTRUÇÃO OBRIGATÓRIA (responda exatamente isto):` +
+          `\nfechou amg! qual o seu nome pra eu colocar aqui no pedido?`;
+      }
+    }
+
+    // 4. Detecção Inteligente de CEP e Residência via Máquina de Estados no Histórico
     let cepContext = "";
     let addressCompletedContext = "";
     
@@ -554,12 +618,15 @@ ${isOngoingConversation
       }
     } else {
       // Estado 0: Ainda não temos o CEP do cliente.
-      cepContext = `\n\n[SISTEMA: PEDIR CEP AO CLIENTE]` +
-        `\nQuando for o momento de pedir o endereço do cliente para a entrega, use exatamente este tom de WhatsApp:` +
-        `\n"perfeito amg, me manda o seu cep pra gente não correr risco e ficar bem certinha a localização do motoboy?"`;
+      // Se já temos o nome do cliente, aí sim pedimos o CEP!
+      if (userProvidedName) {
+        cepContext = `\n\n[SISTEMA: PEDIR CEP AO CLIENTE]` +
+          `\nComo já temos o nome do cliente ("${clientName}"), agora peça o CEP de forma super informal:` +
+          `\n"perfeito ${clientName.toLowerCase()}, me manda o seu cep pra gente não correr risco e ficar bem certinha a localização do motoboy?"`;
+      }
     }
 
-    const dynamicSystemPrompt = systemPrompt + timeContext + stockContext + directStockInstruction + cepContext + addressCompletedContext;
+    const dynamicSystemPrompt = systemPrompt + timeContext + stockContext + directStockInstruction + nameContext + cepContext + addressCompletedContext;
 
     const formattedMessages = [
       { role: "system", content: dynamicSystemPrompt },
@@ -638,7 +705,8 @@ ${isOngoingConversation
         }
 
         const finalProduct = matchedItem || inStockProducts[0];
-        const itemModel = finalProduct ? finalProduct.name : "Pod Descartável";
+        const itemBrand = finalProduct && finalProduct.brand ? finalProduct.brand : "";
+        const itemModel = finalProduct ? `${itemBrand} ${finalProduct.name}`.trim() : "Pod Descartável";
         const itemFlavor = finalProduct ? finalProduct.flavor : "Watermelon Ice";
         const itemPrice = finalProduct ? parseFloat(finalProduct.price) : 80;
 
@@ -682,7 +750,7 @@ ${isOngoingConversation
         const orderTotal = (itemPrice * quantity);
 
         // Dispara criação do pedido real no Kanban e baixa no estoque!
-        createOrderInDatabase("Cliente WhatsApp", finalAddress, orderItems, orderTotal);
+        createOrderInDatabase(clientName, finalAddress, orderItems, orderTotal);
       }
 
       const lines = rawAnswer.split("\n").filter((l: string) => l.trim().length > 0);
