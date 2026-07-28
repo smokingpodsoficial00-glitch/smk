@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
+import { deductStockForOrderItems } from "@/lib/stockSync";
 
 const DEFINITIVE_SYSTEM_PROMPT = `SCRIPT DEFINITIVO — IA SMOKING PODS (Eloisa)
 Este documento compila TODAS as respostas do dono da loja. Cada resposta programada aqui deve ser usada EXATAMENTE como escrita. Este documento será convertido no system prompt da OpenAI.
@@ -275,6 +276,9 @@ export function ChatbotPage() {
         payment_status: "PENDENTE",
         delivery_status: "AGUARDANDO_PAGAMENTO"
       };
+
+      // Dispara a baixa automática no estoque do Supabase (Etapa 2)
+      await deductStockForOrderItems(newOrderPayload.items);
 
       const { data, error } = await supabase
         .from('smoking_orders')

@@ -6,6 +6,7 @@ import {
   Trash2, RotateCcw, Package, DollarSign, Eye, EyeOff
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { deductStockForOrderItems } from "@/lib/stockSync";
 
 export interface AdminOrder {
   id: string;
@@ -119,6 +120,10 @@ export function KanbanBoard() {
     let paymentUpdate: any = {};
     if (newDeliveryStatus === 'PREPARANDO') {
       paymentUpdate.payment_status = 'PAGO';
+      const targetOrder = orders.find(o => o.realId === realId);
+      if (targetOrder && targetOrder.items) {
+        deductStockForOrderItems(targetOrder.items);
+      }
     } else if (newDeliveryStatus === 'AGUARDANDO_PAGAMENTO') {
       paymentUpdate.payment_status = 'PENDENTE';
     }
