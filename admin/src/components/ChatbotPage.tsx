@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
+import { calculateShippingQuote } from "@/lib/shipping";
 
 const DEFINITIVE_SYSTEM_PROMPT = `SCRIPT DEFINITIVO — IA SMOKING PODS (Eloisa)
 Este documento compila TODAS as respostas do dono da loja. Cada resposta programada aqui deve ser usada EXATAMENTE como escrita. Este documento será convertido no system prompt da OpenAI.
@@ -632,14 +633,58 @@ ${isOngoingConversation
     if (foundCep) {
       if (userProvidedNumber) {
         // Estado 3: Endereço completo obtido com sucesso!
+        // Calcula o frete REAL via OSRM (mesma lógica do backend/uberService.js)
+        let freteReal = 15.00;
+        let distanciaReal = 3.0;
+        try {
+          const quote = await calculateShippingQuote(foundCep);
+          freteReal = quote.fee;
+          distanciaReal = quote.distanceKm;
+          console.log(`🚗 [Emulador] Frete real calculado: R$ ${freteReal.toFixed(2)} | ${distanciaReal} km`);
+        } catch (err) {
+          console.warn("⚠️ Erro ao calcular frete real no emulador, usando fallback R$ 15:", err);
+        }
+
+        // Calcula o valor total do pedido com base nos produtos selecionados
+        let valorProdutos = 0;
+        let qtdTotal = 0;
+        for (let i = conversationHistory.length - 1; i >= 0; i--) {
+          if (conversationHistory[i].sender !== 'user') continue;
+          const text = conversationHistory[i].text.toLowerCase();
+          const found = inStockProducts.find(p =>
+            text.includes(p.flavor.toLowerCase()) || fuzzyMatch(text, p.flavor.toLowerCase())
+          );
+          if (found) {
+            const qtyMatch = text.match(/\b(\d+)\s*(unidade|un|x|pod|pods)?\b/);
+            const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+            valorProdutos = parseFloat(found.price) * (qty > 0 && qty < 10 ? qty : 1);
+            qtdTotal = qty > 0 && qty < 10 ? qty : 1;
+            break;
+          }
+        }
+        if (valorProdutos === 0 && inStockProducts.length > 0) {
+          valorProdutos = parseFloat(inStockProducts[0].price);
+          qtdTotal = 1;
+        }
+
+        // Regra de frete grátis: 3+ peças
+        const freteAplicado = qtdTotal >= 3 ? 0 : freteReal;
+        const totalFinal = valorProdutos + freteAplicado;
+        const freteStr = freteAplicado === 0 ? "GRÁTIS (3+ pods)" : `R$ ${freteAplicado.toFixed(2)}`;
+
         addressCompletedContext = `\n\n[SISTEMA: ENDEREÇO TOTALMENTE COMPLETO E ANOTADO!]` +
           `\nRua/Bairro: ${detectedStreetAndBairro}` +
           `\nNúmero e Complemento informados pelo cliente: "${userNumberText}"` +
+          `\nDistância calculada pelo OSRM: ${distanciaReal} km` +
+          `\n\n[SISTEMA: FRETE CALCULADO COM SUCESSO]` +
+          `\nValor dos produtos: R$ ${valorProdutos.toFixed(2)}` +
+          `\nFrete calculado (${distanciaReal} km): ${freteStr}` +
+          `\nTotal do pedido: R$ ${totalFinal.toFixed(2)}` +
           `\n\nINSTRUÇÕES CRÍTICAS DE FLUXO:` +
           `\n1. NUNCA mais peça CEP ou endereço! Não pergunte por rua ou bairro novamente.` +
-          `\n2. Responda de forma curta e informal em duas mensagens (usando quebras de linha \\n):` +
+          `\n2. Responda de forma curta e informal (usando quebras de linha \\n):` +
           `\n   fechou amg, anotei aqui o endereço: ${detectedStreetAndBairro}, nº ${userNumberText}` +
-          `\n   o valor do seu pedido ficou em R$ 70,00, com um frete de R$ 15,00, com um total de R$ 85,00` +
+          `\n   o valor do seu pedido ficou em R$ ${valorProdutos.toFixed(2)}, com um frete de ${freteStr}, com um total de R$ ${totalFinal.toFixed(2)}` +
           `\n   SMOKING PODS AGRADECE SEU PEDIDO\\nCHAVE PIX : 1234567890` +
           `\n\nATENÇÃO SUPREMA: NUNCA SEPARE "SMOKING PODS AGRADECE SEU PEDIDO" DA "CHAVE PIX"! Elas DEVEM vir obrigatoriamente na MESMA MENSAGEM, juntas em um único bloco contínuo separado apenas por uma quebra de linha.`;
       } else if (botAskedForNumber) {
