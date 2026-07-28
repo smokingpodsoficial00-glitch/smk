@@ -307,11 +307,40 @@ export function ChatbotPage() {
   };
 
   /**
-   * Chamada REAL para a API da OpenAI (GPT-4o)
+   * Chamada REAL para a API da OpenAI (GPT-4o) com Injeção de Estoque em Tempo Real
    */
   const callRealOpenAI = async (conversationHistory: Array<{ sender: "user" | "bot"; text: string }>) => {
+    // 1. Busca os produtos ativos e em estoque direto do Supabase
+    let stockContext = "";
+    let inStockProducts: any[] = [];
+    try {
+      const { data: products } = await supabase
+        .from('smoking_products')
+        .select('id, name, brand, flavor, stock, price, puffs')
+        .gt('stock', 0);
+
+      if (products && products.length > 0) {
+        inStockProducts = products;
+        const stockLines = products.map(p => 
+          `- ${p.brand ? p.brand + ' ' : ''}${p.name} | Sabor: ${p.flavor} | R$ ${parseFloat(p.price).toFixed(2)} (${p.stock} un em estoque)`
+        );
+        stockContext = `\n\nESTOQUE EM TEMPO REAL DISPONÍVEL NA SMOKING PODS (ATUALIZADO AGORA):\n` +
+          stockLines.join("\n") +
+          `\n\nREGRA RESTRITA DE ESTOQUE (RG14):` +
+          `\n1. Você SÓ PODE confirmar vendas, recomendar ou citar pods e sabores que estejam EXATAMENTE na lista de ESTOQUE acima.` +
+          `\n2. Se o cliente pedir um modelo ou sabor que NÃO está na lista (ex: "Elf Bar BC 15" ou sabores inexistentes), diga que esse modelo não temos e sugira as opções da lista de estoque acima.` +
+          `\n3. NUNCA invente marcas, modelos ou sabores fora da lista acima.`;
+      } else {
+        stockContext = `\n\nESTOQUE EM TEMPO REAL: Atualmente todos os produtos da loja estão sem estoque. Informe o cliente educadamente.`;
+      }
+    } catch (e) {
+      console.warn("Erro ao carregar estoque em tempo real:", e);
+    }
+
+    const dynamicSystemPrompt = systemPrompt + stockContext;
+
     const formattedMessages = [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: dynamicSystemPrompt },
       ...conversationHistory.map((m) => ({
         role: m.sender === "user" ? "user" : "assistant",
         content: m.text,
@@ -328,7 +357,7 @@ export function ChatbotPage() {
         body: JSON.stringify({
           model: "gpt-4o-mini",
           messages: formattedMessages,
-          temperature: 0.4,
+          temperature: 0.3,
           max_tokens: 250,
         }),
       });
@@ -351,8 +380,19 @@ export function ChatbotPage() {
         lowerRaw.includes("link_checkout") ||
         lowerRaw.includes("total de r$")
       ) {
-        // Extrai informacoes para criar o pedido no Kanban de Pedidos!
-        createOrderInDatabase("Cliente WhatsApp", "Endereço via WhatsApp (SBC)", "Pod Descartável", 175);
+        // Tenta encontrar qual pod do estoque real o cliente pediu na conversa
+        const fullConvText = conversationHistory.map(c => c.text.toLowerCase()).join(" ");
+        const matchedItem = inStockProducts.find(p => 
+          fullConvText.includes((p.flavor || '').toLowerCase()) ||
+          fullConvText.includes((p.name || '').toLowerCase())
+        ) || inStockProducts[0];
+
+        const itemModel = matchedItem ? matchedItem.name : "Pod Descartável";
+        const itemFlavor = matchedItem ? matchedItem.flavor : "Watermelon Ice";
+        const itemPrice = matchedItem ? parseFloat(matchedItem.price) : 80;
+
+        // Dispara criação do pedido real no Kanban e baixa no estoque!
+        createOrderInDatabase("Cliente WhatsApp", "Rua Marechal Deodoro, 1000 - SBC", `${itemModel} (${itemFlavor})`, itemPrice + 15);
       }
 
       const lines = rawAnswer.split("\n").filter((l: string) => l.trim().length > 0);
