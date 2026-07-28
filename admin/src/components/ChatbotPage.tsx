@@ -940,16 +940,34 @@ ${isOngoingConversation
     });
   };
 
-  const handleGenerateNewQr = () => {
+  const handleGenerateNewQr = async () => {
     setIsQrLoading(true);
-    setTimeout(() => {
-      setQrCodeVersion((prev) => prev + 1);
+    try {
+      await fetch("http://localhost:3006/api/logout", { method: "POST" });
+      setIsConnected(false);
+      setRealIsReady(false);
+      setRealQrImageUrl(null);
+    } catch (e) {
+      console.warn("Erro ao solicitar novo QR:", e);
+    } finally {
       setIsQrLoading(false);
-    }, 800);
+    }
   };
 
-  const handleToggleConnection = () => {
-    setIsConnected(!isConnected);
+  const handleToggleConnection = async () => {
+    setIsQrLoading(true);
+    try {
+      if (isConnected) {
+        await fetch("http://localhost:3006/api/logout", { method: "POST" });
+        setIsConnected(false);
+        setRealIsReady(false);
+        setRealQrImageUrl(null);
+      }
+    } catch (e) {
+      console.warn("Erro ao alterar conexão:", e);
+    } finally {
+      setIsQrLoading(false);
+    }
   };
 
   const handleCopyPrompt = () => {

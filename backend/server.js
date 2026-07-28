@@ -30,6 +30,9 @@ const client = new Client({
     }
 });
 
+const path = require('path');
+const fs = require('fs');
+
 let latestQr = null;
 let isWhatsAppReady = false;
 
@@ -54,6 +57,51 @@ app.get('/api/qr', (req, res) => {
         isReady: isWhatsAppReady,
         qrImageUrl: latestQr ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(latestQr)}` : null
     });
+});
+
+app.post('/api/logout', async (req, res) => {
+    try {
+        console.log('🔴 Recebido comando de desconexão do WhatsApp...');
+        isWhatsAppReady = false;
+        latestQr = null;
+
+        try {
+            await client.logout();
+        } catch (e) {
+            console.warn('Aviso no logout:', e.message);
+        }
+        try {
+            await client.destroy();
+        } catch (e) {
+            console.warn('Aviso no destroy:', e.message);
+        }
+
+        // Deleta a pasta de sessão salva .wwebjs_auth
+        const authPath = path.join(__dirname, '.wwebjs_auth');
+        if (fs.existsSync(authPath)) {
+            try {
+                fs.rmSync(authPath, { recursive: true, force: true });
+                console.log('🧹 Pasta de sessão .wwebjs_auth removida.');
+            } catch (e) {
+                console.warn('Aviso ao remover pasta auth:', e.message);
+            }
+        }
+
+        // Reinicia o cliente do WhatsApp para gerar um novo QR Code
+        console.log('🔄 Reiniciando motor do WhatsApp para gerar novo QR Code...');
+        setTimeout(() => {
+            try {
+                client.initialize();
+            } catch (err) {
+                console.error('Erro ao reiniciar client:', err);
+            }
+        }, 1500);
+
+        res.json({ success: true, message: 'WhatsApp desconectado com sucesso. Gerando novo QR Code...' });
+    } catch (err) {
+        console.error('Erro no logout API:', err);
+        res.status(500).json({ error: 'Falha ao desconectar.' });
+    }
 });
 
 // =============================================
