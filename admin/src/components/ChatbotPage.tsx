@@ -255,6 +255,45 @@ export function ChatbotPage() {
     localStorage.setItem("openai_api_key_v1", key);
   };
 
+  const playNotificationSound = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // Oscilador 1: Som principal (agudo e limpo)
+      const osc1 = audioCtx.createOscillator();
+      const gain1 = audioCtx.createGain();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+      osc1.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.12); // A5
+      
+      gain1.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.45);
+      
+      osc1.connect(gain1);
+      gain1.connect(audioCtx.destination);
+      
+      // Oscilador 2: Segundo tom harmônico (suave)
+      const osc2 = audioCtx.createOscillator();
+      const gain2 = audioCtx.createGain();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(1174.66, audioCtx.currentTime); // D6
+      
+      gain2.gain.setValueAtTime(0.06, audioCtx.currentTime);
+      gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+      
+      osc2.connect(gain2);
+      gain2.connect(audioCtx.destination);
+      
+      osc1.start();
+      osc2.start();
+      
+      osc1.stop(audioCtx.currentTime + 0.45);
+      osc2.stop(audioCtx.currentTime + 0.35);
+    } catch (e) {
+      console.warn("Erro ao reproduzir áudio da notificação:", e);
+    }
+  };
+
   /**
    * Salva o pedido automaticamente na tabela do Supabase 'smoking_orders'
    * e dispara a notificação no painel!
@@ -288,6 +327,7 @@ export function ChatbotPage() {
         .single();
 
       if (!error && data) {
+        playNotificationSound();
         setNewOrderCreatedToast({
           id: data.id.substring(0, 8).toUpperCase(),
           clientName: data.client_name,
@@ -296,6 +336,7 @@ export function ChatbotPage() {
       } else {
         // Fallback local se a tabela Supabase estiver offline
         const simulatedId = "WXP-" + Math.floor(1000 + Math.random() * 9000);
+        playNotificationSound();
         setNewOrderCreatedToast({
           id: simulatedId,
           clientName: clientName || "Cliente WhatsApp Demo",
@@ -817,19 +858,17 @@ ${isOngoingConversation
       
       {/* Toast Notification: Pedido Criado no Kanban */}
       {newOrderCreatedToast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#121212] border-2 border-emerald-500 text-white p-4 rounded-2xl shadow-[0_0_30px_rgba(16,185,129,0.4)] flex items-center gap-4 animate-in slide-in-from-bottom-5 duration-300">
-          <div className="size-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
-            <ShoppingBag className="size-5" />
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-[#0c0c0c]/90 backdrop-blur-md border border-emerald-500/30 text-white px-5 py-3 rounded-2xl shadow-[0_10px_40px_rgba(16,185,129,0.15)] flex items-center gap-4 animate-in slide-in-from-top-5 duration-300">
+          <div className="size-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+            <ShoppingBag className="size-4.5" />
           </div>
-          <div>
-            <h4 className="font-bold text-sm text-emerald-400">🎉 Novo Pedido Enviado para o Kanban!</h4>
-            <p className="text-xs text-white/80">
-              Pedido <strong>#{newOrderCreatedToast.id}</strong> — R$ {newOrderCreatedToast.total.toFixed(2)}
-            </p>
+          <div className="text-xs font-medium tracking-wide">
+            <span className="text-emerald-400 font-bold">Pedido novo no painel!</span>
+            <span className="text-white/60 ml-2">#{newOrderCreatedToast.id} • R$ {newOrderCreatedToast.total.toFixed(2)}</span>
           </div>
           <button
             onClick={() => setNewOrderCreatedToast(null)}
-            className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ml-2"
+            className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-400/20 hover:text-emerald-400 text-emerald-400/80 border border-emerald-500/20 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ml-2"
           >
             Ver no Kanban <ArrowRight className="size-3.5" />
           </button>
