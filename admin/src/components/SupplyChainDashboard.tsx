@@ -146,6 +146,7 @@ export function SupplyChainDashboard() {
       const { data: prodData } = await supabase
         .from("smoking_products")
         .select("*")
+        .neq("brand", "__STORE_CONFIG__")
         .order("created_at", { ascending: false })
         .order("id", { ascending: true });
       const { data: topData } = await supabase

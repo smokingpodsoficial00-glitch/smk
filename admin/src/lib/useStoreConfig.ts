@@ -249,42 +249,6 @@ export function useStoreConfig() {
         console.info("Tabela store_config não encontrada:", e);
       }
 
-      // 3. Salva na tabela `smoking_products` sob `brand: '__STORE_CONFIG__'` (sem cost_price)
-      try {
-        const { data: configProducts } = await supabase
-          .from("smoking_products")
-          .select("id")
-          .eq("brand", "__STORE_CONFIG__")
-          .limit(1);
-
-        if (configProducts && configProducts.length > 0) {
-          await supabase
-            .from("smoking_products")
-            .update({
-              name: newConfig.store_name,
-              flavor: JSON.stringify(newConfig),
-              image_url: newConfig.logo_url || "",
-              is_active: false,
-            })
-            .eq("id", configProducts[0].id);
-        } else {
-          await supabase
-            .from("smoking_products")
-            .insert({
-              brand: "__STORE_CONFIG__",
-              name: newConfig.store_name,
-              flavor: JSON.stringify(newConfig),
-              image_url: newConfig.logo_url || "",
-              price: 0,
-              stock: 0,
-              puffs: 0,
-              is_active: false,
-            });
-        }
-      } catch (e) {
-        console.warn("Erro no fallback smoking_products:", e);
-      }
-
       setSaveStatus("success");
       setSaving(false);
       setTimeout(() => setSaveStatus("idle"), 3000);
