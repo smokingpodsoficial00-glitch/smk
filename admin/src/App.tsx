@@ -35,40 +35,26 @@ export default function App() {
         title={sidebarCollapsed ? "Clique em qualquer lugar para expandir o menu" : undefined}
       >
         {/* Header da Sidebar */}
-        <div className={`h-16 flex items-center border-b border-white/10 w-full px-3.5 ${
-          sidebarCollapsed ? 'justify-between px-2' : 'justify-between'
-        }`}>
+        <div className="h-16 flex items-center border-b border-white/5 w-full px-4">
           {!sidebarCollapsed ? (
-            <>
-              <div className="flex items-center gap-2.5 min-w-0">
-                {config?.logo_url ? (
-                  <img 
-                    src={config.logo_url} 
-                    alt={displayName} 
-                    className="w-7 h-7 rounded-lg object-contain shrink-0" 
-                  />
-                ) : (
-                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-                    <Store className="size-4 text-emerald-400" />
-                  </div>
-                )}
-                <h1 className="text-base font-bold tracking-tight text-white truncate">
-                  {displayName}
-                </h1>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSidebarCollapsed(true);
-                }}
-                className="p-1.5 rounded-xl text-muted-foreground hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
-                title="Recolher menu lateral"
-              >
-                <MoreHorizontal className="size-5" />
-              </button>
-            </>
+            <div className="flex items-center gap-2.5 min-w-0">
+              {config?.logo_url ? (
+                <img 
+                  src={config.logo_url} 
+                  alt={displayName} 
+                  className="w-7 h-7 rounded-lg object-contain shrink-0" 
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                  <Store className="size-4 text-emerald-400" />
+                </div>
+              )}
+              <h1 className="text-sm font-bold tracking-tight text-white truncate">
+                {displayName}
+              </h1>
+            </div>
           ) : (
-            <div className="flex items-center justify-between w-full px-1">
+            <div className="flex items-center justify-center w-full">
               {config?.logo_url ? (
                 <img 
                   src={config.logo_url} 
@@ -78,16 +64,6 @@ export default function App() {
               ) : (
                 <Store className="size-4 text-emerald-400 shrink-0" />
               )}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSidebarCollapsed(false);
-                }}
-                className="p-1 rounded-lg text-emerald-400 hover:bg-emerald-500/15 transition-all cursor-pointer"
-                title="Expandir menu lateral"
-              >
-                <MoreHorizontal className="size-5" />
-              </button>
             </div>
           )}
         </div>
@@ -195,21 +171,25 @@ export default function App() {
           </button>
         </nav>
 
-        {/* Botão de Expansão no Rodapé (Quando Colapsado) */}
-        {sidebarCollapsed && (
-          <div className="p-2 border-t border-white/5 w-full flex flex-col items-center gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setSidebarCollapsed(false);
-              }}
-              className="w-full py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 transition-all flex items-center justify-center cursor-pointer shadow-[0_0_10px_rgba(16,185,129,0.15)]"
-              title="Expandir Menu Lateral"
-            >
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
-        )}
+        {/* Botão de Toggle do Menu Lateral */}
+        <div className="px-3 py-2 w-full flex flex-col items-center">
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className={`w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-all flex items-center justify-center cursor-pointer border border-white/5 shadow-sm active:scale-95 ${
+              sidebarCollapsed ? '' : 'gap-2 text-[11px] font-bold uppercase tracking-wider'
+            }`}
+            title={sidebarCollapsed ? "Expandir Menu" : "Recolher Menu"}
+          >
+            {sidebarCollapsed ? (
+              <ChevronRight className="size-4 text-emerald-400" />
+            ) : (
+              <>
+                <ChevronRight className="size-4 rotate-180 text-emerald-400" />
+                <span>Recolher</span>
+              </>
+            )}
+          </button>
+        </div>
 
         {/* Rodapé / Configurações */}
         <div className={`p-3 border-t border-white/5 w-full ${sidebarCollapsed ? 'flex justify-center' : ''}`}>
