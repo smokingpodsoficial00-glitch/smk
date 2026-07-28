@@ -227,7 +227,7 @@ export function ChatbotPage() {
   const [orderCreatedThisSession, setOrderCreatedThisSession] = useState(false);
 
   // Notification for Order Created
-  const [newOrderCreatedToast, setNewOrderCreatedToast] = useState<{ id: string; clientName: string; total: number } | null>(null);
+  const [newOrderCreatedToast, setNewOrderCreatedToast] = useState<{ id: string; clientName: string; total: number; productName: string } | null>(null);
 
   // OpenAI Integration State
   const [openAiKey, setOpenAiKey] = useState<string>(() => {
@@ -326,12 +326,16 @@ export function ChatbotPage() {
         .select()
         .single();
 
+      const primaryItem = orderItems[0];
+      const itemDetail = primaryItem ? `${primaryItem.name} (${primaryItem.flavor})` : "Pod Descartável";
+
       if (!error && data) {
         playNotificationSound();
         setNewOrderCreatedToast({
           id: data.id.substring(0, 8).toUpperCase(),
           clientName: data.client_name,
-          total: parseFloat(data.total_amount)
+          total: parseFloat(data.total_amount),
+          productName: itemDetail
         });
       } else {
         // Fallback local se a tabela Supabase estiver offline
@@ -340,7 +344,8 @@ export function ChatbotPage() {
         setNewOrderCreatedToast({
           id: simulatedId,
           clientName: clientName || "Cliente WhatsApp Demo",
-          total: total || 175
+          total: total || 175,
+          productName: itemDetail
         });
       }
     } catch (err) {
@@ -858,20 +863,19 @@ ${isOngoingConversation
       
       {/* Toast Notification: Pedido Criado no Kanban */}
       {newOrderCreatedToast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-[#0c0c0c]/90 backdrop-blur-md border border-emerald-500/30 text-white px-5 py-3 rounded-2xl shadow-[0_10px_40px_rgba(16,185,129,0.15)] flex items-center gap-4 animate-in slide-in-from-top-5 duration-300">
+        <div 
+          onClick={() => setNewOrderCreatedToast(null)}
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-[#0c0c0c]/95 backdrop-blur-md border border-emerald-500/30 text-white px-5 py-3.5 rounded-2xl shadow-[0_10px_40px_rgba(16,185,129,0.2)] flex items-center gap-3.5 animate-in slide-in-from-top-5 duration-300 cursor-pointer hover:border-emerald-500/50 transition-all"
+        >
           <div className="size-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
             <ShoppingBag className="size-4.5" />
           </div>
-          <div className="text-xs font-medium tracking-wide">
-            <span className="text-emerald-400 font-bold">Pedido novo no painel!</span>
-            <span className="text-white/60 ml-2">#{newOrderCreatedToast.id} • R$ {newOrderCreatedToast.total.toFixed(2)}</span>
+          <div className="text-xs font-semibold tracking-wide">
+            <span>Pedido novo no painel:</span>
+            <span className="text-emerald-400 ml-1.5 font-bold">{newOrderCreatedToast.productName}</span>
           </div>
-          <button
-            onClick={() => setNewOrderCreatedToast(null)}
-            className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-400/20 hover:text-emerald-400 text-emerald-400/80 border border-emerald-500/20 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ml-2"
-          >
-            Ver no Kanban <ArrowRight className="size-3.5" />
-          </button>
+          <div className="h-4 w-px bg-white/10 ml-1" />
+          <span className="text-[10px] text-white/40 hover:text-white/80 transition-colors font-bold px-1">X</span>
         </div>
       )}
 
