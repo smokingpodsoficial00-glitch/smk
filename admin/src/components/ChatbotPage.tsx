@@ -131,7 +131,7 @@ msg1: nossas opções de pagamento são pix, e link de pagamento
 msg2: no link de pagamento dá pra passar cartão de crédito e débito, também parcelamos, porém as taxas são repassadas beleza?
 
 CATEGORIA 6 — ENDEREÇO E ENTREGA
-P30/P31 — Pedir endereço
+P30/P31 — Pedir endereço (APENAS se o cliente ainda NÃO enviou o CEP ou endereço. NUNCA enviar se o CEP ou endereço já foi informado)
 msg1: agora preciso do seu endereço tá?
 msg2: se puder enviar o cep ao invés do nome da rua, ajuda muito á não ter problema com a entrega, para não acabar indo para o endereço errado
 
@@ -352,46 +352,69 @@ REGRAS CRÍTICAS DE SAUDAÇÃO E FLUXO:
 1. Se a conversa JÁ ESTIVER EM ANDAMENTO (o cliente já foi cumprimentado e está continuando o diálogo), NUNCA REPITA saudações como "${timeGreeting}, tudo bem?", "boa noite", "bom dia" ou "olá tudo bem". Vá DIRETO ao ponto e responda à pergunta do cliente!
 2. NUNCA diga "boa noite" se for de manhã ou à tarde. Use SEMPRE a saudação "${timeGreeting}" se for o primeiro contato.`;
 
-    // 3. Detecção e Busca Automática de CEP (API Grátis ViaCEP)
+    // 3. Detecção Inteligente de CEP e Número/Complemento de Residência
     let cepContext = "";
-    let detectedAddress = "";
-    const lastUserMsg = conversationHistory.filter(m => m.sender === 'user').slice(-1)[0]?.text || "";
-    const cepMatch = lastUserMsg.match(/\b\d{5}[-.\s]?\d{3}\b/);
-
-    if (cepMatch) {
-      const cleanCep = cepMatch[0].replace(/\D/g, "");
-      try {
-        const cepRes = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-        if (cepRes.ok) {
-          const cepData = await cepRes.json();
-          if (!cepData.erro) {
-            const street = cepData.logradouro ? cepData.logradouro + ", " : "";
-            const neighborhood = cepData.bairro ? cepData.bairro + " - " : "";
-            const cityState = `${cepData.localidade}/${cepData.uf}`;
-            detectedAddress = `${street}${neighborhood}${cityState}`;
-
-            cepContext = `\n\n[SISTEMA DE LOCALIZAÇÃO GPS / VIACEP CONECTADO]:` +
-              `\nO cliente enviou o CEP ${cepMatch[0]}. A API de Endereços encontrou a rua e bairro:` +
-              `\n"${detectedAddress}".` +
-              `\nREGRA OBRIGATÓRIA E INQUEBRÁVEL DE PERGUNTA DE NÚMERO E COMPLEMENTO:` +
-              `\nVocê DEVE enviar a confirmação da rua E PERGUNTAR O NÚMERO E COMPLEMENTO:` +
-              `\nmsg1: perfeito, localizei aqui: ${detectedAddress}` +
-              `\nmsg2: qual o número da casa/prédio e complemento (ap, bloco) por favor amg?` +
-              `\nATENÇÃO: É ESTRITAMENTE PROIBIDO avançar para a confirmação final do produto, frete ou Pix sem ter perguntado e obtido o NÚMERO e COMPLEMENTO da residência!`;
-          }
-        }
-      } catch (err) {
-        console.warn("Erro ao consultar CEP no ViaCEP:", err);
+    let addressCompletedContext = "";
+    
+    // Procura se o cliente já enviou CEP em qualquer momento da conversa
+    const allUserMsgs = conversationHistory.filter(m => m.sender === 'user');
+    const lastUserMsg = allUserMsgs[allUserMsgs.length - 1]?.text || "";
+    
+    let foundCep = "";
+    for (const uMsg of allUserMsgs) {
+      const match = uMsg.text.match(/\b\d{5}[-.\s]?\d{3}\b/);
+      if (match) {
+        foundCep = match[0].replace(/\D/g, "");
+        break;
       }
     }
 
-    const addressRuleContext = `\n\nREGRA GERAL DE NÚMERO E COMPLEMENTO:` +
-      `\n- Todo pedido exige número da residência e complemento (se houver apartamento/bloco).` +
-      `\n- Se o cliente disse "isso", "sim" ou confirmou o CEP, mas AINDA NÃO mandou o número da casa/apartamento, pergunte IMEDIATAMENTE:` +
-      `\n"e qual seria o número da casa/prédio e complemento por favor amg?"` +
-      `\n- SÓ avance para o valor total/pagamento após o cliente informar o número!`;
+    let detectedStreetAndBairro = "";
+    let detectedAddress = "";
 
-    const dynamicSystemPrompt = systemPrompt + timeContext + stockContext + cepContext + addressRuleContext;
+    if (foundCep) {
+      try {
+        const cepRes = await fetch(`https://viacep.com.br/ws/${foundCep}/json/`);
+        if (cepRes.ok) {
+          const cepData = await cepRes.json();
+          if (!cepData.erro) {
+            const street = cepData.logradouro || "";
+            const neighborhood = cepData.bairro || "";
+            const cityState = `${cepData.localidade}/${cepData.uf}`;
+            detectedStreetAndBairro = `${street}${neighborhood ? ' - ' + neighborhood : ''}`;
+            detectedAddress = `${street}${neighborhood ? ', ' + neighborhood : ''} - ${cityState}`;
+          }
+        }
+      } catch (err) {
+        console.warn("Erro ao consultar CEP:", err);
+      }
+    }
+
+    // Checa se a mensagem contém número da residência ou complemento (ex: "205 no beco", "150 ap 42", "205", "número 30")
+    const hasNumberMatch = lastUserMsg.match(/\b\d+\b/);
+    const isNumberOrComplementoMsg = hasNumberMatch || lastUserMsg.toLowerCase().includes("beco") || lastUserMsg.toLowerCase().includes("ap") || lastUserMsg.toLowerCase().includes("bloco") || lastUserMsg.toLowerCase().includes("fundos") || lastUserMsg.toLowerCase().includes("casa");
+
+    if (foundCep && isNumberOrComplementoMsg && !lastUserMsg.match(/\b\d{5}[-.\s]?\d{3}\b/)) {
+      // O CLIENTE ACABA DE ENVIAR O NÚMERO E COMPLEMENTO!
+      addressCompletedContext = `\n\n[ENDEREÇO COMPLETO IDENTIFICADO COM SUCESSO!]:` +
+        `\nO cliente forneceu o CEP e agora informou o número e complemento: "${lastUserMsg}".` +
+        `\nRua do CEP: ${detectedStreetAndBairro}.` +
+        `\nREGRAS CRÍTICAS DE NÃO REPETIR ENDEREÇO:` +
+        `\n1. NUNCA envie a frase "agora preciso do seu endereço tá?" ou "envie o cep"! O ENDEREÇO JÁ ESTÁ COMPLETO!` +
+        `\n2. Responda em tom informal e descontraído:` +
+        `\n   msg1: fechou amg, anotei aqui o endereço: ${detectedStreetAndBairro}, ${lastUserMsg}` +
+        `\n3. Avance DIRETO para a apresentação do valor total com frete e envio da CHAVE PIX/LINK DE PAGAMENTO!`;
+    } else if (foundCep && lastUserMsg.match(/\b\d{5}[-.\s]?\d{3}\b/)) {
+      // O CLIENTE ACABA DE ENVIAR O CEP!
+      cepContext = `\n\n[LOCALIZAÇÃO CEP OBTIDA VIA GPS]:` +
+        `\nO cliente enviou o CEP ${foundCep}. A rua localizada foi: "${detectedStreetAndBairro}".` +
+        `\nREGRA INFORMAL E NATURAL DE RESPOSTA:` +
+        `\nResponda em tom amigo e informal em 2 mensagens:` +
+        `\nmsg1: ahh sim, localizei aqui amg! essa rua né: ${detectedStreetAndBairro}?` +
+        `\nmsg2: qual o número da casa/prédio? e tem algum complemento amg (tipo ap, bloco, no beco, fundos)?`;
+    }
+
+    const dynamicSystemPrompt = systemPrompt + timeContext + stockContext + cepContext + addressCompletedContext;
 
     const formattedMessages = [
       { role: "system", content: dynamicSystemPrompt },
