@@ -224,6 +224,7 @@ export function ChatbotPage() {
   const [qrCodeVersion, setQrCodeVersion] = useState(1);
   const [aiEnabled, setAiEnabled] = useState(true);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [orderCreatedThisSession, setOrderCreatedThisSession] = useState(false);
 
   // Notification for Order Created
   const [newOrderCreatedToast, setNewOrderCreatedToast] = useState<{ id: string; clientName: string; total: number } | null>(null);
@@ -258,16 +259,19 @@ export function ChatbotPage() {
    * Salva o pedido automaticamente na tabela do Supabase 'smoking_orders'
    * e dispara a notificação no painel!
    */
-  const createOrderInDatabase = async (clientName: string, address: string, itemsText: string, total: number) => {
+  const createOrderInDatabase = async (
+    clientName: string, 
+    address: string, 
+    orderItems: Array<{ name: string; flavor: string; quantity: number; price: number }>, 
+    total: number
+  ) => {
     try {
       const newOrderPayload = {
-        client_name: clientName || "Cliente WhatsApp Demo",
+        client_name: clientName || "Cliente WhatsApp",
         client_phone: "11988887777",
-        shipping_address: address || "Rua Marechal Deodoro, 1000 - SBC, SP",
-        items: [
-          { name: "Ignite V50", flavor: itemsText || "Watermelon Ice", quantity: 2, price: 80 }
-        ],
-        total_amount: total || 175,
+        shipping_address: address || "Endereço Não Informado",
+        items: orderItems,
+        total_amount: total,
         shipping_fee: 15,
         payment_method: "PIX",
         payment_status: "PENDENTE",
@@ -591,26 +595,94 @@ ${isOngoingConversation
       // Checa se a resposta contem indicativo de finalizacao de pedido ou Pix
       const lowerRaw = rawAnswer.toLowerCase();
       if (
-        lowerRaw.includes("chave pix") ||
-        lowerRaw.includes("agradece seu pedido") ||
-        lowerRaw.includes("pagameto confirmado") ||
-        lowerRaw.includes("pagamento confirmado") ||
-        lowerRaw.includes("link_checkout") ||
-        lowerRaw.includes("total de r$")
+        !orderCreatedThisSession && (
+          lowerRaw.includes("chave pix") ||
+          lowerRaw.includes("agradece seu pedido") ||
+          lowerRaw.includes("pagameto confirmado") ||
+          lowerRaw.includes("pagamento confirmado") ||
+          lowerRaw.includes("link_checkout") ||
+          lowerRaw.includes("total de r$")
+        )
       ) {
-        // Tenta encontrar qual pod do estoque real o cliente pediu na conversa
-        const fullConvText = conversationHistory.map(c => c.text.toLowerCase()).join(" ");
-        const matchedItem = inStockProducts.find(p => 
-          fullConvText.includes((p.flavor || '').toLowerCase()) ||
-          fullConvText.includes((p.name || '').toLowerCase())
-        ) || inStockProducts[0];
+        setOrderCreatedThisSession(true);
 
-        const itemModel = matchedItem ? matchedItem.name : "Pod Descartável";
-        const itemFlavor = matchedItem ? matchedItem.flavor : "Watermelon Ice";
-        const itemPrice = matchedItem ? parseFloat(matchedItem.price) : 80;
+        // 1. Tenta encontrar qual pod do estoque real o cliente pediu na conversa de trás para frente
+        let matchedItem = null;
+        for (let i = conversationHistory.length - 1; i >= 0; i--) {
+          if (conversationHistory[i].sender !== 'user') continue;
+          const text = conversationHistory[i].text.toLowerCase();
+          
+          const found = inStockProducts.find(p => {
+            const nameMatch = text.includes(p.name.toLowerCase()) || text.includes((p.brand || '').toLowerCase());
+            const flavorMatch = text.includes(p.flavor.toLowerCase()) || fuzzyMatch(text, p.flavor.toLowerCase());
+            return nameMatch && flavorMatch;
+          });
+          if (found) {
+            matchedItem = found;
+            break;
+          }
+        }
+
+        if (!matchedItem) {
+          for (let i = conversationHistory.length - 1; i >= 0; i--) {
+            if (conversationHistory[i].sender !== 'user') continue;
+            const text = conversationHistory[i].text.toLowerCase();
+            const found = inStockProducts.find(p => 
+              text.includes(p.flavor.toLowerCase()) || fuzzyMatch(text, p.flavor.toLowerCase())
+            );
+            if (found) {
+              matchedItem = found;
+              break;
+            }
+          }
+        }
+
+        const finalProduct = matchedItem || inStockProducts[0];
+        const itemModel = finalProduct ? finalProduct.name : "Pod Descartável";
+        const itemFlavor = finalProduct ? finalProduct.flavor : "Watermelon Ice";
+        const itemPrice = finalProduct ? parseFloat(finalProduct.price) : 80;
+
+        // 2. Extrai quantidade do histórico
+        let quantity = 1;
+        for (let i = conversationHistory.length - 1; i >= 0; i--) {
+          if (conversationHistory[i].sender !== 'user') continue;
+          const text = conversationHistory[i].text.toLowerCase();
+          const qtyMatch = text.match(/\b(\d+)\s*(unidade|un|x|pod|pods)?\b/);
+          if (qtyMatch) {
+            const val = parseInt(qtyMatch[1]);
+            if (val > 0 && val < 10) {
+              quantity = val;
+              break;
+            }
+          }
+          if (text.includes("dois") || text.includes("duas")) {
+            quantity = 2;
+            break;
+          }
+          if (text.includes("tres") || text.includes("três")) {
+            quantity = 3;
+            break;
+          }
+        }
+
+        // 3. Constrói o endereço real do histórico/GPS
+        const finalAddress = detectedStreetAndBairro 
+          ? `${detectedStreetAndBairro}, nº ${userNumberText || 'S/N'}`
+          : "Endereço Não Informado";
+
+        const orderItems = [
+          {
+            name: itemModel,
+            flavor: itemFlavor,
+            quantity: quantity,
+            price: itemPrice
+          }
+        ];
+
+        const orderTotal = (itemPrice * quantity);
 
         // Dispara criação do pedido real no Kanban e baixa no estoque!
-        createOrderInDatabase("Cliente WhatsApp", "Rua Marechal Deodoro, 1000 - SBC", `${itemModel} (${itemFlavor})`, itemPrice + 15);
+        createOrderInDatabase("Cliente WhatsApp", finalAddress, orderItems, orderTotal);
       }
 
       const lines = rawAnswer.split("\n").filter((l: string) => l.trim().length > 0);
@@ -907,7 +979,10 @@ ${isOngoingConversation
               <div className="flex items-center gap-3 text-[#aebac1]">
                 <button
                   type="button"
-                  onClick={() => setMessages([])}
+                  onClick={() => {
+                    setMessages([]);
+                    setOrderCreatedThisSession(false);
+                  }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95"
                   title="Limpar e reiniciar conversa do zero"
                 >
