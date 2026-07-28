@@ -285,27 +285,7 @@ export function KanbanBoard() {
 
       {/* Conteúdo da Aba: KANBAN EM ANDAMENTO */}
       {activeTab === 'kanban' && (
-        <div className="flex-1 overflow-hidden p-6 flex flex-col gap-6 min-h-0 bg-[#070707]/30">
-          {/* KPIs */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
-            <div className="bg-[#0b0b0b] border border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-[0_4px_20px_rgba(0,0,0,0.2)]">
-              <span className="text-[9px] uppercase font-bold text-white/40 tracking-wider">Pedidos hoje</span>
-              <span className="text-2xl font-bold text-white font-mono mt-1">{orders.length}</span>
-            </div>
-            <div className="bg-[#0b0b0b] border border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-[0_4px_20px_rgba(0,0,0,0.2)]">
-              <span className="text-[9px] uppercase font-bold text-white/40 tracking-wider">Tempo médio</span>
-              <span className="text-2xl font-bold text-white font-mono mt-1">18 min</span>
-            </div>
-            <div className="bg-[#0b0b0b] border border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-[0_4px_20px_rgba(0,0,0,0.2)]">
-              <span className="text-[9px] uppercase font-bold text-emerald-400/80 tracking-wider">Ticket médio</span>
-              <span className="text-2xl font-bold text-emerald-400 font-mono mt-1">R$ 132</span>
-            </div>
-            <div className="bg-[#0b0b0b] border border-white/5 rounded-2xl p-4 flex flex-col justify-between shadow-[0_4px_20px_rgba(0,0,0,0.2)]">
-              <span className="text-[9px] uppercase font-bold text-white/40 tracking-wider">Pedidos ativos</span>
-              <span className="text-2xl font-bold text-white font-mono mt-1">{activeOrders.length}</span>
-            </div>
-          </div>
-
+        <div className="flex-1 overflow-hidden p-6 flex flex-col gap-4 min-h-0 bg-[#070707]/30">
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 xl:gap-6 min-h-0">
             {columns.map(col => {
               const colOrders = orders.filter(o => o.status === col.status);
