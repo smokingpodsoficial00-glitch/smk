@@ -93,23 +93,23 @@ export default function App() {
         </div>
         
         {/* Navegação Principal */}
-        <nav className={`flex-1 p-3 flex flex-col gap-2 w-full ${sidebarCollapsed ? 'items-center' : ''}`}>
+        <nav className={`flex-1 py-4 flex flex-col gap-1.5 w-full ${sidebarCollapsed ? 'items-center px-1' : ''}`}>
           <button 
             onClick={(e) => {
               if (sidebarCollapsed) e.stopPropagation();
               setActiveTab("pedidos");
             }}
-            title={sidebarCollapsed ? "Pedidos (Clique para abrir)" : undefined}
-            className={`flex items-center gap-3 py-3 rounded-xl transition-all cursor-pointer ${
-              sidebarCollapsed ? 'justify-center px-3' : 'px-4'
+            title={sidebarCollapsed ? "Pedidos" : undefined}
+            className={`flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
+              sidebarCollapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
             } ${
               activeTab === 'pedidos' 
-                ? 'bg-emerald-500 text-black font-bold shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
-                : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+                ? 'bg-white/5 text-emerald-400 font-bold border-l-2 border-emerald-500 pl-3.5' 
+                : 'text-muted-foreground hover:bg-white/5 hover:text-white border-l-2 border-transparent pl-4'
             }`}
           >
-            <LayoutDashboard className="size-5 shrink-0" />
-            {!sidebarCollapsed && <span className="font-semibold truncate">Pedidos</span>}
+            <LayoutDashboard className="size-4 shrink-0" />
+            {!sidebarCollapsed && <span className="truncate">Pedidos</span>}
           </button>
           
           <button 
@@ -117,17 +117,17 @@ export default function App() {
               if (sidebarCollapsed) e.stopPropagation();
               setActiveTab("financeiro");
             }}
-            title={sidebarCollapsed ? "Financeiro (Clique para abrir)" : undefined}
-            className={`flex items-center gap-3 py-3 rounded-xl transition-all cursor-pointer ${
-              sidebarCollapsed ? 'justify-center px-3' : 'px-4'
+            title={sidebarCollapsed ? "Financeiro" : undefined}
+            className={`flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
+              sidebarCollapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
             } ${
               activeTab === 'financeiro' 
-                ? 'bg-emerald-500 text-black font-bold shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
-                : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+                ? 'bg-white/5 text-emerald-400 font-bold border-l-2 border-emerald-500 pl-3.5' 
+                : 'text-muted-foreground hover:bg-white/5 hover:text-white border-l-2 border-transparent pl-4'
             }`}
           >
-            <CircleDollarSign className="size-5 shrink-0" />
-            {!sidebarCollapsed && <span className="font-semibold truncate">Financeiro</span>}
+            <CircleDollarSign className="size-4 shrink-0" />
+            {!sidebarCollapsed && <span className="truncate">Financeiro</span>}
           </button>
 
           <button 
@@ -135,17 +135,17 @@ export default function App() {
               if (sidebarCollapsed) e.stopPropagation();
               setActiveTab("estoque");
             }}
-            title={sidebarCollapsed ? "Reposição (Clique para abrir)" : undefined}
-            className={`flex items-center gap-3 py-3 rounded-xl transition-all cursor-pointer ${
-              sidebarCollapsed ? 'justify-center px-3' : 'px-4'
+            title={sidebarCollapsed ? "Reposição" : undefined}
+            className={`flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
+              sidebarCollapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
             } ${
               activeTab === 'estoque' 
-                ? 'bg-emerald-500 text-black font-bold shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
-                : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+                ? 'bg-white/5 text-emerald-400 font-bold border-l-2 border-emerald-500 pl-3.5' 
+                : 'text-muted-foreground hover:bg-white/5 hover:text-white border-l-2 border-transparent pl-4'
             }`}
           >
-            <PackageSearch className="size-5 shrink-0" />
-            {!sidebarCollapsed && <span className="font-semibold truncate">Reposição</span>}
+            <PackageSearch className="size-4 shrink-0" />
+            {!sidebarCollapsed && <span className="truncate">Reposição</span>}
           </button>
 
           <button 
@@ -153,18 +153,20 @@ export default function App() {
               if (sidebarCollapsed) e.stopPropagation();
               setActiveTab("clientes");
             }}
-            title={sidebarCollapsed ? "Clientes (Clique para abrir)" : undefined}
-            className={`flex items-center gap-3 py-3 rounded-xl transition-all cursor-pointer ${
-              sidebarCollapsed ? 'justify-center px-3' : 'px-4'
+            title={sidebarCollapsed ? "Clientes" : undefined}
+            className={`flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
+              sidebarCollapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
             } ${
               activeTab === 'clientes' 
-                ? 'bg-emerald-500 text-black font-bold shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
-                : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+                ? 'bg-white/5 text-emerald-400 font-bold border-l-2 border-emerald-500 pl-3.5' 
+                : 'text-muted-foreground hover:bg-white/5 hover:text-white border-l-2 border-transparent pl-4'
             }`}
           >
-            <Users className="size-5 shrink-0" />
-            {!sidebarCollapsed && <span className="font-semibold truncate">Clientes</span>}
+            <Users className="size-4 shrink-0" />
+            {!sidebarCollapsed && <span className="truncate">Clientes</span>}
           </button>
+
+          <div className="h-px bg-white/5 my-2 w-[85%] mx-auto" />
 
           {/* Nova Aba Chatbot */}
           <button 
@@ -172,18 +174,18 @@ export default function App() {
               if (sidebarCollapsed) e.stopPropagation();
               setActiveTab("chatbot");
             }}
-            title={sidebarCollapsed ? "Chatbot IA (Clique para abrir)" : undefined}
-            className={`flex items-center gap-3 py-3 rounded-xl transition-all cursor-pointer ${
-              sidebarCollapsed ? 'justify-center px-3' : 'px-4'
+            title={sidebarCollapsed ? "Chatbot IA" : undefined}
+            className={`flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
+              sidebarCollapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
             } ${
               activeTab === 'chatbot' 
-                ? 'bg-emerald-500 text-black font-bold shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
-                : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+                ? 'bg-white/5 text-emerald-400 font-bold border-l-2 border-emerald-500 pl-3.5' 
+                : 'text-muted-foreground hover:bg-white/5 hover:text-white border-l-2 border-transparent pl-4'
             }`}
           >
-            <Bot className="size-5 shrink-0 text-emerald-400" />
+            <Bot className="size-4 shrink-0 text-emerald-400" />
             {!sidebarCollapsed && (
-              <span className="font-semibold truncate flex items-center gap-2">
+              <span className="truncate flex items-center gap-2">
                 Chatbot
                 <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold">
                   IA
@@ -195,7 +197,7 @@ export default function App() {
 
         {/* Botão de Expansão no Rodapé (Quando Colapsado) */}
         {sidebarCollapsed && (
-          <div className="p-2 border-t border-white/10 w-full flex flex-col items-center gap-2">
+          <div className="p-2 border-t border-white/5 w-full flex flex-col items-center gap-2">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -204,29 +206,29 @@ export default function App() {
               className="w-full py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 transition-all flex items-center justify-center cursor-pointer shadow-[0_0_10px_rgba(16,185,129,0.15)]"
               title="Expandir Menu Lateral"
             >
-              <ChevronRight className="size-5" />
+              <ChevronRight className="size-4" />
             </button>
           </div>
         )}
 
         {/* Rodapé / Configurações */}
-        <div className={`p-3 border-t border-white/10 w-full ${sidebarCollapsed ? 'flex justify-center' : ''}`}>
+        <div className={`p-3 border-t border-white/5 w-full ${sidebarCollapsed ? 'flex justify-center' : ''}`}>
           <button 
             onClick={(e) => {
               if (sidebarCollapsed) e.stopPropagation();
               setActiveTab("configuracoes");
             }}
             title={sidebarCollapsed ? "Configurações" : undefined}
-            className={`flex items-center gap-3 py-3 rounded-xl w-full transition-all cursor-pointer ${
-              sidebarCollapsed ? 'justify-center px-3' : 'px-4'
+            className={`flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
+              sidebarCollapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
             } ${
               activeTab === 'configuracoes'
-                ? 'bg-emerald-500 text-black font-bold shadow-[0_0_15px_rgba(16,185,129,0.3)]'
-                : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+                ? 'bg-white/5 text-emerald-400 font-bold border-l-2 border-emerald-500 pl-3.5'
+                : 'text-muted-foreground hover:bg-white/5 hover:text-white border-l-2 border-transparent pl-4'
             }`}
           >
-            <Settings className="size-5 shrink-0" />
-            {!sidebarCollapsed && <span className="font-semibold truncate">Configurações</span>}
+            <Settings className="size-4 shrink-0" />
+            {!sidebarCollapsed && <span className="truncate">Configurações</span>}
           </button>
         </div>
       </aside>
