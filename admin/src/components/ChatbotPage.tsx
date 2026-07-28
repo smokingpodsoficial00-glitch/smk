@@ -352,7 +352,39 @@ REGRAS CRÍTICAS DE SAUDAÇÃO E FLUXO:
 1. Se a conversa JÁ ESTIVER EM ANDAMENTO (o cliente já foi cumprimentado e está continuando o diálogo), NUNCA REPITA saudações como "${timeGreeting}, tudo bem?", "boa noite", "bom dia" ou "olá tudo bem". Vá DIRETO ao ponto e responda à pergunta do cliente!
 2. NUNCA diga "boa noite" se for de manhã ou à tarde. Use SEMPRE a saudação "${timeGreeting}" se for o primeiro contato.`;
 
-    const dynamicSystemPrompt = systemPrompt + timeContext + stockContext;
+    // 3. Detecção e Busca Automática de CEP (API Grátis ViaCEP)
+    let cepContext = "";
+    let detectedAddress = "";
+    const lastUserMsg = conversationHistory.filter(m => m.sender === 'user').slice(-1)[0]?.text || "";
+    const cepMatch = lastUserMsg.match(/\b\d{5}[-.\s]?\d{3}\b/);
+
+    if (cepMatch) {
+      const cleanCep = cepMatch[0].replace(/\D/g, "");
+      try {
+        const cepRes = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+        if (cepRes.ok) {
+          const cepData = await cepRes.json();
+          if (!cepData.erro) {
+            const street = cepData.logradouro ? cepData.logradouro + ", " : "";
+            const neighborhood = cepData.bairro ? cepData.bairro + " - " : "";
+            const cityState = `${cepData.localidade}/${cepData.uf}`;
+            detectedAddress = `${street}${neighborhood}${cityState}`;
+
+            cepContext = `\n\n[SISTEMA DE LOCALIZAÇÃO GPS / VIACEP CONECTADO]:` +
+              `\nO cliente enviou o CEP ${cepMatch[0]}. A API de Endereços encontrou o local exato:` +
+              `\n"${detectedAddress}".` +
+              `\nREGRA OBRIGATÓRIA DE CONFIRMAÇÃO DO ENDEREÇO:` +
+              `\nVocê DEVE responder confirmando o endereço encontrado:` +
+              `\nmsg1: perfeito, localizei aqui: ${detectedAddress}` +
+              `\nmsg2: qual o número e complemento por favor amg?`;
+          }
+        }
+      } catch (err) {
+        console.warn("Erro ao consultar CEP no ViaCEP:", err);
+      }
+    }
+
+    const dynamicSystemPrompt = systemPrompt + timeContext + stockContext + cepContext;
 
     const formattedMessages = [
       { role: "system", content: dynamicSystemPrompt },
