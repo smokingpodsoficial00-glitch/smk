@@ -51,18 +51,24 @@ export async function fetchLiveClients(): Promise<RealClient[]> {
       return [];
     }
 
-    // Agrupar pedidos por número de telefone do cliente
+    // Agrupar pedidos por cliente (telefone real ou combinação de telefone+nome para simulações de teste)
     const clientGroups = new Map<string, any[]>();
 
     for (const order of orders) {
       if (!order) continue;
       const phoneRaw = String(order.client_phone || order.customer_phone || order.phone || '5511999999999');
       const phoneClean = phoneRaw.replace(/\D/g, '') || '5511999999999';
+      const clientName = String(order.client_name || order.customer_name || '').trim().toLowerCase();
 
-      if (!clientGroups.has(phoneClean)) {
-        clientGroups.set(phoneClean, []);
+      // Se for número de telefone genérico de testes do emulador (ex: 11988887777 ou 5511999999999),
+      // agrupa pelo NOME do cliente para não misturar testes de clientes diferentes em um único perfil!
+      const isTestPhone = phoneClean === '11988887777' || phoneClean === '5511999999999' || phoneClean === '5511988887777';
+      const groupKey = (isTestPhone && clientName) ? `test_${clientName}` : phoneClean;
+
+      if (!clientGroups.has(groupKey)) {
+        clientGroups.set(groupKey, []);
       }
-      clientGroups.get(phoneClean)!.push(order);
+      clientGroups.get(groupKey)!.push(order);
     }
 
     const result: RealClient[] = [];

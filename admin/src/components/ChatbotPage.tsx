@@ -314,9 +314,13 @@ export function ChatbotPage() {
     total: number
   ) => {
     try {
+      // Gera um número de telefone simulado único por nome de cliente para evitar misturar clientes de teste no CRM
+      const nameHash = (clientName || "Cliente Demo").split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      const simulatedPhone = `119888${String(nameHash).padStart(5, '0').slice(-5)}`;
+
       const newOrderPayload = {
         client_name: clientName || "Cliente WhatsApp",
-        client_phone: "11988887777",
+        client_phone: simulatedPhone,
         shipping_address: address || "Endereço Não Informado",
         items: orderItems,
         total_amount: total,
