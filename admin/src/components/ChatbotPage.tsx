@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Bot, QrCode, RefreshCw, CheckCircle2,
   Send, Sparkles, Power, Check, Copy, Key, Zap,
-  CheckCheck, Phone, Video, MoreVertical, ShoppingBag, ArrowRight, RotateCcw
+  CheckCheck, Phone, Video, MoreVertical, ShoppingBag, ArrowRight, RotateCcw, Loader2
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
