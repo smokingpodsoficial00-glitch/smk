@@ -30,7 +30,12 @@ const client = new Client({
     }
 });
 
+let latestQr = null;
+let isWhatsAppReady = false;
+
 client.on('qr', (qr) => {
+    latestQr = qr;
+    isWhatsAppReady = false;
     console.log('----------------------------------------------------');
     console.log('🤖 Escaneie o QR Code abaixo com o seu WhatsApp:');
     console.log('----------------------------------------------------');
@@ -38,7 +43,17 @@ client.on('qr', (qr) => {
 });
 
 client.on('ready', () => {
+    latestQr = null;
+    isWhatsAppReady = true;
     console.log('✅ Inteligência Artificial conectada ao WhatsApp com sucesso!');
+});
+
+app.get('/api/qr', (req, res) => {
+    res.json({
+        qr: latestQr,
+        isReady: isWhatsAppReady,
+        qrImageUrl: latestQr ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(latestQr)}` : null
+    });
 });
 
 // =============================================

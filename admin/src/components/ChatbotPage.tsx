@@ -255,6 +255,35 @@ export function ChatbotPage() {
 
   const storeName = config?.store_name || "Smoking Pods";
 
+  const [realQrImageUrl, setRealQrImageUrl] = useState<string | null>(null);
+  const [realIsReady, setRealIsReady] = useState(false);
+
+  useEffect(() => {
+    const checkQr = async () => {
+      try {
+        const res = await fetch("http://localhost:3006/api/qr");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.isReady) {
+            setRealIsReady(true);
+            setIsConnected(true);
+            setRealQrImageUrl(null);
+          } else if (data.qrImageUrl) {
+            setRealQrImageUrl(data.qrImageUrl);
+            setRealIsReady(false);
+            setIsConnected(false);
+          }
+        }
+      } catch (e) {
+        // Backend iniciando
+      }
+    };
+
+    checkQr();
+    const interval = setInterval(checkQr, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
@@ -1030,31 +1059,24 @@ ${isOngoingConversation
                 </div>
               ) : (
                 <>
-                  {/* SVG QR Code */}
-                  <div className="relative p-4 bg-white rounded-xl shadow-2xl border-4 border-white transition-all duration-300">
-                    <svg viewBox="0 0 100 100" className="size-48 sm:size-56">
-                      <path d="M 0 0 H 30 V 30 H 0 Z M 10 10 H 20 V 20 H 10 Z" fill="#000" />
-                      <path d="M 70 0 H 100 V 30 H 70 Z M 80 10 H 90 V 20 H 80 Z" fill="#000" />
-                      <path d="M 0 70 H 30 V 100 H 0 Z M 10 80 H 20 V 90 H 10 Z" fill="#000" />
-                      <rect x="40" y="10" width="10" height="20" fill="#000" />
-                      <rect x="50" y="40" width="20" height="10" fill="#000" />
-                      <rect x="10" y="40" width="10" height="20" fill="#000" />
-                      <rect x="80" y="50" width="10" height="30" fill="#000" />
-                      <rect x="40" y="70" width="20" height="20" fill="#000" />
-                      <rect x="70" y="80" width="20" height="10" fill="#000" />
-                      <rect x="30" y="30" width="15" height="15" fill={qrCodeVersion % 2 === 0 ? "#10b981" : "#000"} />
-                    </svg>
-                    
-                    {/* Badge Central */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="p-2 rounded-xl bg-black border border-white/20 shadow-xl">
-                        <Bot className="size-5 text-emerald-400" />
+                  {/* Real WhatsApp QR Code Image */}
+                  <div className="relative p-3 bg-white rounded-2xl shadow-2xl border-4 border-white transition-all duration-300 flex items-center justify-center min-h-[220px]">
+                    {realQrImageUrl ? (
+                      <img 
+                        src={realQrImageUrl} 
+                        alt="QR Code WhatsApp" 
+                        className="size-52 sm:size-60 object-contain rounded-lg"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center gap-2 p-8 text-black/60">
+                        <Loader2 className="size-8 text-emerald-500 animate-spin" />
+                        <span className="text-xs font-bold font-mono">Gerando QR Code Real...</span>
                       </div>
-                    </div>
+                    )}
                   </div>
 
-                  <p className="text-[11px] text-muted-foreground text-center mt-4">
-                    QR Code v{qrCodeVersion} • Validade renovada a cada 45s
+                  <p className="text-[11px] text-muted-foreground text-center mt-4 font-mono">
+                    {realQrImageUrl ? "🟢 Escaneie o QR Code acima no WhatsApp da loja" : "⏳ Conectando ao serviço WhatsApp na porta 3006..."}
                   </p>
                 </>
               )}
