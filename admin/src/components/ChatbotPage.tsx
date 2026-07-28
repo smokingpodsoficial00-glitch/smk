@@ -124,9 +124,15 @@ PAGAMENTO : [link_checkout]
 P25 — Pedir comprovante
 vou precisar do comprovante beleza?
 
-P26 — Comprovante recebido
+P26 — Comprovante recebido (foto, print ou documento)
+Se o cliente enviar uma FOTO, IMAGEM, PRINT, DOCUMENTO ou ARQUIVO após a chave Pix ter sido enviada:
 msg1: muito obrigado! jajá enviaremos o link de rastreio
 msg2: tempo médio de 40 minutos á 1 hora para chegar seu pedido!
+
+P26B — Cliente envia mensagem de TEXTO após o Pix (sem foto/doc)
+Se o cliente enviar apenas uma mensagem de texto (ex: "paguei", "fiz o pix", "pronto", "transferi"), SEM ter enviado foto ou documento:
+msg1: vc conseguiu fazer o pagamento amg?
+msg2: preciso do print do comprovante pra confirmar aqui beleza
 
 P28 — "Posso pagar no cartão/dinheiro?"
 msg1: nossas opções de pagamento são pix, e link de pagamento

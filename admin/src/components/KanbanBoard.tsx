@@ -766,12 +766,24 @@ function OrderCard({
       {/* Ações baseadas no Status */}
       <div className="mt-1 flex flex-col gap-2">
         {order.status === 'AGUARDANDO_PAGAMENTO' && (
-          <button 
-            onClick={() => onUpdate(order.realId, 'PREPARANDO')}
-            className="w-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer shadow-[0_4px_15px_rgba(16,185,129,0.05)] active:scale-[0.98]"
-          >
-            ✓ Confirmar Pagamento
-          </button>
+          <div className="flex flex-col gap-2">
+            <button 
+              onClick={() => onUpdate(order.realId, 'PREPARANDO')}
+              className="w-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer shadow-[0_4px_15px_rgba(16,185,129,0.05)] active:scale-[0.98]"
+            >
+              ✓ Confirmar Pagamento (Pix Caiu)
+            </button>
+            {order.phone && (
+              <a
+                href={`https://wa.me/${order.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Oi ${order.clientName}, tudo certo? Estou verificando o seu pagamento do pedido #${order.id}, consegue me mandar o comprovante?`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full bg-[#161616] hover:bg-[#222] text-white/60 hover:text-white text-xs font-semibold py-2.5 rounded-xl border border-[#2e2e2e] transition-colors cursor-pointer flex items-center justify-center gap-2"
+              >
+                💬 Verificar Pix no WhatsApp
+              </a>
+            )}
+          </div>
         )}
 
         {order.status === 'PREPARANDO' && (
