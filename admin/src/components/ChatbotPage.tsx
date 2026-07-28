@@ -371,12 +371,13 @@ REGRAS CRÍTICAS DE SAUDAÇÃO E FLUXO:
             detectedAddress = `${street}${neighborhood}${cityState}`;
 
             cepContext = `\n\n[SISTEMA DE LOCALIZAÇÃO GPS / VIACEP CONECTADO]:` +
-              `\nO cliente enviou o CEP ${cepMatch[0]}. A API de Endereços encontrou o local exato:` +
+              `\nO cliente enviou o CEP ${cepMatch[0]}. A API de Endereços encontrou a rua e bairro:` +
               `\n"${detectedAddress}".` +
-              `\nREGRA OBRIGATÓRIA DE CONFIRMAÇÃO DO ENDEREÇO:` +
-              `\nVocê DEVE responder confirmando o endereço encontrado:` +
+              `\nREGRA OBRIGATÓRIA E INQUEBRÁVEL DE PERGUNTA DE NÚMERO E COMPLEMENTO:` +
+              `\nVocê DEVE enviar a confirmação da rua E PERGUNTAR O NÚMERO E COMPLEMENTO:` +
               `\nmsg1: perfeito, localizei aqui: ${detectedAddress}` +
-              `\nmsg2: qual o número e complemento por favor amg?`;
+              `\nmsg2: qual o número da casa/prédio e complemento (ap, bloco) por favor amg?` +
+              `\nATENÇÃO: É ESTRITAMENTE PROIBIDO avançar para a confirmação final do produto, frete ou Pix sem ter perguntado e obtido o NÚMERO e COMPLEMENTO da residência!`;
           }
         }
       } catch (err) {
@@ -384,7 +385,13 @@ REGRAS CRÍTICAS DE SAUDAÇÃO E FLUXO:
       }
     }
 
-    const dynamicSystemPrompt = systemPrompt + timeContext + stockContext + cepContext;
+    const addressRuleContext = `\n\nREGRA GERAL DE NÚMERO E COMPLEMENTO:` +
+      `\n- Todo pedido exige número da residência e complemento (se houver apartamento/bloco).` +
+      `\n- Se o cliente disse "isso", "sim" ou confirmou o CEP, mas AINDA NÃO mandou o número da casa/apartamento, pergunte IMEDIATAMENTE:` +
+      `\n"e qual seria o número da casa/prédio e complemento por favor amg?"` +
+      `\n- SÓ avance para o valor total/pagamento após o cliente informar o número!`;
+
+    const dynamicSystemPrompt = systemPrompt + timeContext + stockContext + cepContext + addressRuleContext;
 
     const formattedMessages = [
       { role: "system", content: dynamicSystemPrompt },
