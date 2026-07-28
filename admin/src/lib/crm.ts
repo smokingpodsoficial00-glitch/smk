@@ -99,7 +99,7 @@ export async function fetchLiveClients(): Promise<RealClient[]> {
       // Extrair último pod comprado
       const itemsList = Array.isArray(latestOrder.items) ? latestOrder.items : [];
       const firstItem = itemsList.length > 0 ? itemsList[0] : null;
-      const lastProduct = firstItem ? `${firstItem.name || 'Pod'} ${firstItem.flavor || ''}` : 'Vape Descartável';
+      const lastProduct = firstItem ? `${firstItem.name || 'Pod'} ${firstItem.flavor || ''}` : 'Ignite V50';
       const lastFlavor = firstItem?.flavor || 'Frutado';
       const lastPuffs = firstItem?.puffs || 5000;
 

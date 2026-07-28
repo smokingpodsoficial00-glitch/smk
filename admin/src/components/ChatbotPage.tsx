@@ -6,7 +6,6 @@ import {
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
-import { deductStockForOrderItems } from "@/lib/stockSync";
 
 const DEFINITIVE_SYSTEM_PROMPT = `SCRIPT DEFINITIVO — IA SMOKING PODS (Eloisa)
 Este documento compila TODAS as respostas do dono da loja. Cada resposta programada aqui deve ser usada EXATAMENTE como escrita. Este documento será convertido no system prompt da OpenAI.
@@ -317,9 +316,6 @@ export function ChatbotPage() {
         delivery_status: "AGUARDANDO_PAGAMENTO"
       };
 
-      // Dispara a baixa automática no estoque do Supabase (Etapa 2)
-      await deductStockForOrderItems(newOrderPayload.items);
-
       const { data, error } = await supabase
         .from('smoking_orders')
         .insert(newOrderPayload)
@@ -327,7 +323,7 @@ export function ChatbotPage() {
         .single();
 
       const primaryItem = orderItems[0];
-      const itemDetail = primaryItem ? `${primaryItem.name} (${primaryItem.flavor})` : "Pod Descartável";
+      const itemDetail = primaryItem ? `${primaryItem.name} (${primaryItem.flavor})` : "Ignite V50";
 
       if (!error && data) {
         playNotificationSound();
@@ -752,7 +748,7 @@ ${isOngoingConversation
 
         const finalProduct = matchedItem || inStockProducts[0];
         const itemBrand = finalProduct && finalProduct.brand ? finalProduct.brand : "";
-        const itemModel = finalProduct ? `${itemBrand} ${finalProduct.name}`.trim() : "Pod Descartável";
+        const itemModel = finalProduct ? `${itemBrand} ${finalProduct.name}`.trim() : "Ignite V50";
         const itemFlavor = finalProduct ? finalProduct.flavor : "Watermelon Ice";
         const itemPrice = finalProduct ? parseFloat(finalProduct.price) : 80;
 
@@ -786,6 +782,7 @@ ${isOngoingConversation
 
         const orderItems = [
           {
+            product_id: finalProduct ? finalProduct.id : null,
             name: itemModel,
             flavor: itemFlavor,
             quantity: quantity,
@@ -795,7 +792,7 @@ ${isOngoingConversation
 
         const orderTotal = (itemPrice * quantity);
 
-        // Dispara criação do pedido real no Kanban e baixa no estoque!
+        // Dispara criação do pedido real no Kanban
         createOrderInDatabase(clientName, finalAddress, orderItems, orderTotal);
       }
 

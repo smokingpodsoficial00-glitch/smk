@@ -88,7 +88,7 @@ export function ClientProfileModal({ client, onClose }: { client: RealClient, on
                     </div>
 
                     <div className="text-sm font-medium text-white">
-                      {items.map(i => `${i.quantity || 1}x ${i.name || 'Pod'} ${i.flavor || ''}`).join(', ') || 'Pod Descartável'}
+                      {items.map(i => `${i.quantity || 1}x ${i.name || 'Pod'} ${i.flavor || ''}`).join(', ') || 'Ignite V50'}
                     </div>
 
                     <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-white/5">
