@@ -530,15 +530,15 @@ ${isOngoingConversation
           cepContext = `\n\n[SISTEMA: CONFIRMAÇÃO DE RUA RECEBIDA]` +
             `\nO cliente confirmou a rua do CEP ("${detectedStreetAndBairro}").` +
             `\n\nINSTRUÇÃO OBRIGATÓRIA (siga à risca):` +
-            `\nVocê PRECISA pedir o número e complemento da casa/prédio de forma informal no WhatsApp.` +
+            `\nVocê PRECISA pedir o número e complemento de forma super curta e informal no WhatsApp.` +
             `\nSua resposta DEVE conter exatamente esta pergunta:` +
-            `\nqual o número da casa/prédio amg? e tem algum complemento (tipo ap, bloco, no beco, fundos)?`;
+            `\nqual o número do seu endereço amg? tem algum complemento?`;
         } else {
           // Se o usuário ainda não mandou o número e não é apenas confirmação da rua, reforce o pedido do número de forma amigável
           cepContext = `\n\n[SISTEMA: AGUARDANDO NÚMERO E COMPLEMENTO]` +
             `\nO cliente ainda não enviou o número da residência.` +
             `\nINSTRUÇÃO OBRIGATÓRIA:` +
-            `\nPeça o número e complemento do endereço informalmente para concluir o pedido.`;
+            `\nSua resposta DEVE ser exatamente: "qual o número do seu endereço amg? tem algum complemento?"`;
         }
       } else {
         // Estado 1: O cliente acabou de enviar o CEP. O bot precisa confirmar a rua e pedir o número!
@@ -546,7 +546,7 @@ ${isOngoingConversation
           `\nO cliente enviou o CEP ${foundCep}. A rua localizada foi: "${detectedStreetAndBairro}".` +
           `\n\nINSTRUÇÃO OBRIGATÓRIA DE RESPOSTA (siga à risca, use quebra de linha para separar as duas frases):` +
           `\nahh sim, localizei aqui amg! essa rua né: ${detectedStreetAndBairro}?` +
-          `\nqual o número da casa/prédio? e tem algum complemento amg (tipo ap, bloco, no beco, fundos)?`;
+          `\nqual o número do seu endereço amg? tem algum complemento?`;
       }
     } else {
       // Estado 0: Ainda não temos o CEP do cliente.
