@@ -54,8 +54,8 @@ Cliente recorrente:
 msg1: legal ver você por aqui de novo, fechou
 
 P5 — Cliente pergunta sobre sabor específico
-msg1: boa noite, tudo bem?
-msg2: (informa modelo do estoque)
+msg1: (APENAS se primeiro contato: "bom dia/boa tarde/boa noite, tudo bem?" conforme horário real. Se conversa já em andamento, NÃO envie mensagem de saudação)
+msg2: (informa os sabores reais disponíveis em estoque)
 msg3: caso queira dar uma olhada com mais calma, temos nossa tabela digital
 
 P6 — "Tem pod aí?"
@@ -337,7 +337,22 @@ export function ChatbotPage() {
       console.warn("Erro ao carregar estoque em tempo real:", e);
     }
 
-    const dynamicSystemPrompt = systemPrompt + stockContext;
+    // 2. Calcula a saudação do horário real do dia
+    const currentHour = new Date().getHours();
+    let timeGreeting = "boa noite";
+    if (currentHour >= 6 && currentHour < 12) {
+      timeGreeting = "bom dia";
+    } else if (currentHour >= 12 && currentHour < 18) {
+      timeGreeting = "boa tarde";
+    }
+
+    const timeContext = `\n\nHORÁRIO ATUAL DO SISTEMA: ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.
+SAUDAÇÃO CORRETA DO HORÁRIO AGORA: "${timeGreeting}".
+REGRAS CRÍTICAS DE SAUDAÇÃO E FLUXO:
+1. Se a conversa JÁ ESTIVER EM ANDAMENTO (o cliente já foi cumprimentado e está continuando o diálogo), NUNCA REPITA saudações como "${timeGreeting}, tudo bem?", "boa noite", "bom dia" ou "olá tudo bem". Vá DIRETO ao ponto e responda à pergunta do cliente!
+2. NUNCA diga "boa noite" se for de manhã ou à tarde. Use SEMPRE a saudação "${timeGreeting}" se for o primeiro contato.`;
+
+    const dynamicSystemPrompt = systemPrompt + timeContext + stockContext;
 
     const formattedMessages = [
       { role: "system", content: dynamicSystemPrompt },
