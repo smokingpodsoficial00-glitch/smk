@@ -147,7 +147,7 @@ export function KanbanBoard() {
       const { error } = await supabase
         .from('smoking_orders')
         .update({
-          delivery_status: newDeliveryStatus,
+          delivery_status: newDeliveryStatus === 'CONCLUIDO' ? 'ENTREGUE' : newDeliveryStatus,
           ...paymentUpdate
         })
         .eq('id', realId);
@@ -156,23 +156,19 @@ export function KanbanBoard() {
         console.warn("Aviso ao atualizar status no Supabase:", error.message);
       }
 
-      // Disparar Webhook caso despache para Rota
+      // Disparar Webhook caso despache para Rota (Assíncrono, sem bloquear a transação)
       if (newDeliveryStatus === 'EM_ROTA') {
         const order = orders.find(o => o.realId === realId);
         if (order) {
-          try {
-            await fetch('http://localhost:3006/api/webhook/dispatch', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                orderId: order.id,
-                clientPhone: order.phone,
-                deliveryType: deliveryType || 'proprio'
-              })
-            });
-          } catch (e) {
-            console.error('Falha ao disparar webhook de despacho:', e);
-          }
+          fetch('http://localhost:3006/api/webhook/dispatch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: order.id,
+              clientPhone: order.phone,
+              deliveryType: deliveryType || 'proprio'
+            })
+          }).catch(e => console.error('Falha ao disparar webhook de despacho:', e));
         }
       }
     } catch (err) {
@@ -736,13 +732,11 @@ function OrderCard({
       <div className="flex flex-col gap-3 py-1">
         <div className="text-[9px] font-bold tracking-wider text-white/30 uppercase">Itens</div>
         {order.items.map((item, idx) => (
-          <div key={idx} className="flex items-start justify-between text-xs">
-            <div className="flex gap-2.5">
-              <span className="text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded-md min-w-[20px] text-center text-[10px]">{item.quantity}x</span>
-              <div className="flex flex-col">
-                <span className="font-semibold text-white/80">{item.flavor}</span>
-                <span className="text-[10px] text-white/40 mt-0.5">{item.model}</span>
-              </div>
+          <div key={idx} className="flex gap-2 text-xs items-center">
+            <span className="text-emerald-400 font-bold text-xs shrink-0 select-none">{item.quantity}x</span>
+            <div className="flex flex-col">
+              <span className="font-semibold text-white/80">{item.flavor}</span>
+              <span className="text-[10px] text-white/40 mt-0.5">{item.model}</span>
             </div>
           </div>
         ))}
