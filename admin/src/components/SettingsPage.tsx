@@ -14,6 +14,11 @@ export function SettingsPage() {
   const [primaryColor, setPrimaryColor] = useState("#10b981");
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [pixKey, setPixKey] = useState("");
+  const [address, setAddress] = useState("");
+  const [originCep, setOriginCep] = useState("");
+  const [baseFare, setBaseFare] = useState("8.50");
+  const [includedKm, setIncludedKm] = useState("3.0");
+  const [extraKmFee, setExtraKmFee] = useState("1.40");
 
   // Copy link state
   const [copied, setCopied] = useState(false);
@@ -38,6 +43,11 @@ export function SettingsPage() {
       setWhatsappNumber(config.whatsapp_number || "");
       setPixKey(config.pix_key || "");
       setLogoPreview(config.logo_url || null);
+      setAddress(config.address || "Rua Alexandra Lunardi Fanani, 57 - Assunção, São Bernardo do Campo - SP, 09810-200");
+      setOriginCep(config.origin_cep || "09810-200");
+      setBaseFare(String(config.base_fare ?? 8.50));
+      setIncludedKm(String(config.included_km ?? 3.0));
+      setExtraKmFee(String(config.extra_km_fee ?? 1.40));
     }
   }, [config, loading]);
 
@@ -87,6 +97,11 @@ export function SettingsPage() {
       whatsapp_number: whatsappNumber.replace(/\D/g, ""),
       pix_key: pixKey,
       logo_url: logoUrl,
+      address: address.trim(),
+      origin_cep: originCep.trim(),
+      base_fare: parseFloat(baseFare) || 8.50,
+      included_km: parseFloat(includedKm) || 3.0,
+      extra_km_fee: parseFloat(extraKmFee) || 1.40,
     });
   };
 
@@ -97,6 +112,11 @@ export function SettingsPage() {
       primaryColor !== (config.primary_color || "#10b981") ||
       whatsappNumber !== (config.whatsapp_number || "") ||
       pixKey !== (config.pix_key || "") ||
+      address !== (config.address || "") ||
+      originCep !== (config.origin_cep || "") ||
+      baseFare !== String(config.base_fare ?? 8.50) ||
+      includedKm !== String(config.included_km ?? 3.0) ||
+      extraKmFee !== String(config.extra_km_fee ?? 1.40) ||
       logoFile !== null ||
       (logoPreview === null && config.logo_url !== null)
     );
@@ -349,6 +369,108 @@ export function SettingsPage() {
                 placeholder="Chave Pix para pagamentos"
                 className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-amber-500/50 font-semibold"
               />
+            </div>
+          </div>
+        </section>
+
+        {/* ─── Seção 4: Logística, Origem & Regras de Frete ─── */}
+        <section className="bg-card border border-border rounded-2xl p-6 space-y-6">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-border">
+            <MapPin className="size-4 text-blue-400" />
+            <div>
+              <h2 className="font-bold text-base text-white">Logística, Origem do Estoque & Cálculo de Frete</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Endereço de saída dos pedidos e regras de tarifa em KM para a IA calcular</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Endereço de Origem */}
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-2">
+                <MapPin className="size-3.5 text-blue-400" />
+                Endereço Completo de Saída dos Motoboys *
+              </label>
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Rua, Número - Bairro, Cidade - UF"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-blue-500/50 font-semibold"
+              />
+            </div>
+
+            {/* CEP de Origem */}
+            <div className="space-y-2">
+              <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-2">
+                <Globe className="size-3.5 text-blue-400" />
+                CEP da Origem *
+              </label>
+              <input
+                type="text"
+                value={originCep}
+                onChange={(e) => setOriginCep(e.target.value)}
+                placeholder="09810-200"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-blue-500/50 font-semibold"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 pt-2 border-t border-white/5">
+            {/* Tarifa Base */}
+            <div className="space-y-2">
+              <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">
+                Tarifa Base (R$)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-3 text-xs text-muted-foreground font-bold">R$</span>
+                <input
+                  type="number"
+                  step="0.50"
+                  value={baseFare}
+                  onChange={(e) => setBaseFare(e.target.value)}
+                  placeholder="8.50"
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl pl-9 pr-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 font-semibold"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">Preço inicial fixo cobrado do cliente.</p>
+            </div>
+
+            {/* KM Incluso */}
+            <div className="space-y-2">
+              <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">
+                KM Incluso na Base
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.5"
+                  value={includedKm}
+                  onChange={(e) => setIncludedKm(e.target.value)}
+                  placeholder="3.0"
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 font-semibold"
+                />
+                <span className="absolute right-3.5 top-3 text-xs text-muted-foreground font-bold">KM</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Distância máxima coberta pela tarifa base.</p>
+            </div>
+
+            {/* Taxa por KM Extra */}
+            <div className="space-y-2">
+              <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">
+                Taxa por KM Excedente
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-3 text-xs text-muted-foreground font-bold">R$</span>
+                <input
+                  type="number"
+                  step="0.10"
+                  value={extraKmFee}
+                  onChange={(e) => setExtraKmFee(e.target.value)}
+                  placeholder="1.40"
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl pl-9 pr-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 font-semibold"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">Valor por cada KM além da distância inclusa.</p>
             </div>
           </div>
         </section>

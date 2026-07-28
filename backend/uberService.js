@@ -63,8 +63,8 @@ async function getAddressFromCep(cep) {
 /**
  * Obtém a distância real em KM via OSRM (Open Source Routing Machine)
  */
-async function getDistanceOSRM(destLat, destLon) {
-    const url = `http://router.project-osrm.org/route/v1/driving/${ORIGIN_LON},${ORIGIN_LAT};${destLon},${destLat}?overview=false`;
+async function getDistanceOSRM(destLat, destLon, originLat = ORIGIN_LAT, originLon = ORIGIN_LON) {
+    const url = `http://router.project-osrm.org/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=false`;
     try {
         const response = await axios.get(url, { timeout: 4000 });
         if (response.data.routes && response.data.routes.length > 0) {
@@ -77,33 +77,58 @@ async function getDistanceOSRM(destLat, destLon) {
 }
 
 /**
- * Puxa configurações dinâmicas de preço do Supabase (com fallback hardcoded)
+ * Puxa configurações dinâmicas de preço e origem do estoque do Supabase (com fallback hardcoded)
  */
 async function getDynamicShippingConfig() {
     let config = {
         base_fare: 8.50,
         included_km: 3.00,
-        extra_km_fee: 1.40
+        extra_km_fee: 1.40,
+        originLat: ORIGIN_LAT,
+        originLon: ORIGIN_LON,
+        originAddress: ORIGIN_ADDRESS
     };
     
     if (!supabase) return config;
 
     try {
-        const { data, error } = await supabase
+        // 1. Tenta ler da tabela store_config
+        const { data: storeData } = await supabase
+            .from('store_config')
+            .select('*')
+            .limit(1)
+            .single();
+
+        if (storeData) {
+            if (storeData.base_fare) config.base_fare = parseFloat(storeData.base_fare);
+            if (storeData.included_km) config.included_km = parseFloat(storeData.included_km);
+            if (storeData.extra_km_fee) config.extra_km_fee = parseFloat(storeData.extra_km_fee);
+            if (storeData.address) config.originAddress = storeData.address;
+
+            const originCep = storeData.origin_cep || (storeData.address ? storeData.address.match(/\b\d{5}-?\d{3}\b/)?.[0] : null);
+            if (originCep) {
+                const geo = await getAddressFromCep(originCep);
+                if (geo && geo.lat && geo.lng) {
+                    config.originLat = geo.lat;
+                    config.originLon = geo.lng;
+                }
+            }
+        }
+
+        // 2. Tenta ler da tabela shipping_config
+        const { data: shipData } = await supabase
             .from('shipping_config')
             .select('*')
             .limit(1)
             .single();
 
-        if (error) {
-            console.log("ℹ️ Tabela shipping_config não encontrada ou vazia no Supabase. Usando valores padrões.");
-        } else if (data) {
-            config.base_fare = parseFloat(data.base_fare) || 8.50;
-            config.included_km = parseFloat(data.included_km) || 3.00;
-            config.extra_km_fee = parseFloat(data.extra_km_fee) || 1.40;
+        if (shipData) {
+            if (shipData.base_fare) config.base_fare = parseFloat(shipData.base_fare);
+            if (shipData.included_km) config.included_km = parseFloat(shipData.included_km);
+            if (shipData.extra_km_fee) config.extra_km_fee = parseFloat(shipData.extra_km_fee);
         }
     } catch (err) {
-        console.log("ℹ️ Erro ao tentar ler shipping_config no Supabase. Usando padrões.");
+        console.log("ℹ️ Erro ao tentar ler configurações de frete no Supabase. Usando padrões.");
     }
     return config;
 }
@@ -155,17 +180,17 @@ async function calculateShippingQuote(rawAddressOrCep) {
     }
 
     // --- PLANO B: SIMULADOR DINÂMICO OSRM (REALISTA DA IA) ---
+    // Obtém parâmetros do Supabase (ou fallback padrão) e coordenadas de origem da loja
+    const config = await getDynamicShippingConfig();
+
     let distanceKm = 3.0; // Distância padrão segura caso tudo falhe
 
     if (cepData && cepData.lat && cepData.lng) {
-        const osrmDist = await getDistanceOSRM(cepData.lat, cepData.lng);
+        const osrmDist = await getDistanceOSRM(cepData.lat, cepData.lng, config.originLat, config.originLon);
         if (osrmDist !== null) {
             distanceKm = osrmDist;
         }
     }
-
-    // Obtém parâmetros do Supabase (ou fallback padrão)
-    const config = await getDynamicShippingConfig();
 
     let simulatedFee = 0;
     

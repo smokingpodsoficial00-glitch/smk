@@ -12,6 +12,10 @@ export interface StoreConfig {
   pix_key: string;
   pix_name: string;
   address: string;
+  origin_cep?: string;
+  base_fare?: number;
+  included_km?: number;
+  extra_km_fee?: number;
   instagram_url: string;
   description: string;
   created_at?: string;
@@ -28,7 +32,11 @@ const DEFAULT_CONFIG: StoreConfig = {
   whatsapp_number: "",
   pix_key: "",
   pix_name: "",
-  address: "",
+  address: "Rua Alexandra Lunardi Fanani, 57 - Assunção, São Bernardo do Campo - SP, 09810-200",
+  origin_cep: "09810-200",
+  base_fare: 8.50,
+  included_km: 3.0,
+  extra_km_fee: 1.40,
   instagram_url: "",
   description: "",
 };
