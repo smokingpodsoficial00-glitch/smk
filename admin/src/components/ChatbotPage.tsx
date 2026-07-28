@@ -179,7 +179,7 @@ P48 — Tem garantia?
 msg1: sim, temos garantia para produtos que podem ir com defeito
 msg2: porém para á garantia valer, você tem de gravar um vídeo abrindo o produto e testando, para termos certeza de que o produto veio dá nossa loja
 
-P49 — Quantos puffs dura?
+P49 — Quantos puffs dura? (APENAS se o cliente perguntar expressamente "quanto tempo dura?" ou "quantos dias dura?". NUNCA usar quando o cliente perguntar se TEM o pod em estoque!)
 5.000 -> 10 dias | 7.500 -> 12 dias | 10.000 -> 14 dias | 15.000 -> 17 dias | 20.000 -> 21 dias | 30.000 -> 35 dias
 olha o de [X]puffs geralmente dura uns [Y] dias, porém depende do uso
 
@@ -324,10 +324,13 @@ export function ChatbotPage() {
         );
         stockContext = `\n\nESTOQUE EM TEMPO REAL DISPONÍVEL NA SMOKING PODS (ATUALIZADO AGORA):\n` +
           stockLines.join("\n") +
-          `\n\nREGRA RESTRITA DE ESTOQUE (RG14):` +
-          `\n1. Você SÓ PODE confirmar vendas, recomendar ou citar pods e sabores que estejam EXATAMENTE na lista de ESTOQUE acima.` +
-          `\n2. Se o cliente pedir um modelo ou sabor que NÃO está na lista (ex: "Elf Bar BC 15" ou sabores inexistentes), diga que esse modelo não temos e sugira as opções da lista de estoque acima.` +
-          `\n3. NUNCA invente marcas, modelos ou sabores fora da lista acima.`;
+          `\n\nREGRA ABSOLUTA DE CONSULTA DE ESTOQUE ("TEM POD X?", "OLA TEMPOD Y?", "MAS TEM?"):` +
+          `\n1. Quando o cliente perguntar se TEM determinado pod/modelo (ex: "ola tempod elfbar bc15k?", "tem pod x?", "mas tem?"):` +
+          `\n   - NUNCA responda sobre a durabilidade/dias de puffs! O cliente NÃO perguntou quanto dura!` +
+          `\n   - Verifique se o modelo está na lista de ESTOQUE acima.` +
+          `\n   - Se o modelo NÃO estiver no estoque (ex: Elf Bar BC15k): Diga imediatamente: "infelizmente esse pod a gente não tem no estoque amg, hoje a pronta entrega temos essas opções:" e liste os pods do estoque acima!` +
+          `\n   - Se o modelo ESTIVER no estoque: Diga que temos sim e pergunte qual sabor o cliente prefere!` +
+          `\n2. NUNCA invente marcas, modelos ou sabores fora da lista de estoque acima.`;
       } else {
         stockContext = `\n\nESTOQUE EM TEMPO REAL: Atualmente todos os produtos da loja estão sem estoque. Informe o cliente educadamente.`;
       }
@@ -344,11 +347,14 @@ export function ChatbotPage() {
       timeGreeting = "boa tarde";
     }
 
+    const isOngoingConversation = conversationHistory.length > 1;
+
     const timeContext = `\n\nHORÁRIO ATUAL DO SISTEMA: ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.
-SAUDAÇÃO CORRETA DO HORÁRIO AGORA: "${timeGreeting}".
-REGRAS CRÍTICAS DE SAUDAÇÃO E FLUXO:
-1. Se a conversa JÁ ESTIVER EM ANDAMENTO (o cliente já foi cumprimentado e está continuando o diálogo), NUNCA REPITA saudações como "${timeGreeting}, tudo bem?", "boa noite", "bom dia" ou "olá tudo bem". Vá DIRETO ao ponto e responda à pergunta do cliente!
-2. NUNCA diga "boa noite" se for de manhã ou à tarde. Use SEMPRE a saudação "${timeGreeting}" se for o primeiro contato.`;
+SAUDAÇÃO CORRETA DO HORÁRIO: "${timeGreeting}".
+REGRA IMPERATIVA DE SAUDAÇÃO:
+${isOngoingConversation 
+  ? `ATENÇÃO SUPREMA: ESTA CONVERSA JÁ ESTÁ EM ANDAMENTO (MENSAGEM Nº ${conversationHistory.length})! NUNCA COMECE SUA RESPOSTA COM "bom dia", "boa tarde", "boa noite", "olá tudo bem" OU QUALQUER OUTRA SAUDAÇÃO! É PROIBIDO CUMPRIMENTAR NOVAMENTE. RESPONDA DIRETO À PERGUNTA DO CLIENTE COM LETRA MINÚSCULA!` 
+  : `Esta é a 1ª mensagem da conversa. Comece com a primeira letra maiúscula: "${timeGreeting.charAt(0).toUpperCase() + timeGreeting.slice(1)}, tudo bem? como posso te ajudar?"`}`;
 
     // 3. Detecção Inteligente de CEP e Número/Complemento de Residência
     let cepContext = "";
