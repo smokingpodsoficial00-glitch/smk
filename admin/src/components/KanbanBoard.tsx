@@ -16,6 +16,7 @@ export interface AdminOrder {
   address: string;
   items: { model: string; flavor: string; quantity: number; price: number }[];
   totalAmount: number;
+  shippingFee: number;
   paymentMethod: string;
   receiptUrl: string | null;
   paymentStatus: string;
@@ -74,7 +75,8 @@ export function KanbanBoard() {
               quantity: i.quantity || 1,
               price: i.price ? parseFloat(i.price) : 90
             })) : [],
-            totalAmount: parseFloat(o.total_amount) + parseFloat(o.shipping_fee || 0),
+            totalAmount: parseFloat(o.total_amount || 0),
+            shippingFee: parseFloat(o.shipping_fee || 0),
             paymentMethod: o.payment_method,
             receiptUrl: o.receipt_url,
             paymentStatus: o.payment_status,
@@ -775,17 +777,40 @@ function OrderCard({
         ))}
       </div>
 
-      {/* Endereço */}
-      <div className="flex items-start gap-2 text-xs text-white/50 bg-[#121212]/30 p-2.5 rounded-xl border border-white/5">
-        <MapPin className="size-3.5 shrink-0 mt-0.5 text-white/40" />
-        <span className="leading-snug">{order.address}</span>
+      {/* Endereço e Taxa de Entrega */}
+      <div className="flex flex-col gap-2 bg-[#121212]/40 p-3 rounded-xl border border-white/5">
+        <div className="flex items-start justify-between gap-2 text-xs text-white/60">
+          <div className="flex items-start gap-2 min-w-0 flex-1">
+            <MapPin className="size-3.5 shrink-0 mt-0.5 text-white/40" />
+            <span className="leading-snug">{order.address}</span>
+          </div>
+        </div>
+
+        {/* Badge da Taxa de Entrega */}
+        <div className="flex items-center justify-between pt-1 border-t border-white/5 text-[11px]">
+          <span className="text-white/40 flex items-center gap-1 font-medium">
+            <Bike className="size-3 text-emerald-400" /> Taxa de Entrega:
+          </span>
+          <span className={`font-semibold px-2 py-0.5 rounded-md text-[10px] ${
+            order.shippingFee > 0 
+              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
+              : 'bg-blue-500/10 border border-blue-500/20 text-blue-400'
+          }`}>
+            {order.shippingFee > 0 ? formatBRL(order.shippingFee) : 'Grátis (3+ pods)'}
+          </span>
+        </div>
       </div>
 
       {/* Total e Comprovante */}
       <div className="flex items-center justify-between border-t border-[#1a1a1a] pt-3.5">
         <div className="flex flex-col">
           <span className="text-[9px] uppercase text-white/40 tracking-wider font-semibold">Total ({order.paymentMethod})</span>
-          <span className="font-mono font-bold text-base text-emerald-400 mt-0.5">{formatBRL(order.totalAmount)}</span>
+          <div className="flex items-baseline gap-1.5 mt-0.5">
+            <span className="font-mono font-bold text-base text-emerald-400">{formatBRL(order.totalAmount)}</span>
+            <span className="text-[10px] text-white/30 font-mono">
+              ({order.shippingFee > 0 ? `inclui ${formatBRL(order.shippingFee)} entrega` : 'frete grátis'})
+            </span>
+          </div>
         </div>
         
         {order.receiptUrl && (
