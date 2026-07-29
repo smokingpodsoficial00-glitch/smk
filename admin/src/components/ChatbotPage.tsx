@@ -749,7 +749,7 @@ ${isOngoingConversation
             : "Endereço Não Informado";
 
           // Dispara criação do pedido real no Kanban com TODOS os itens extraídos e frete real
-          createOrderInDatabase(clientName, finalAddress, orderItems, totalFinal, freteAplicado);
+          createOrderInDatabase(clientName, finalAddress, orderItems, valorProdutos, freteAplicado);
         }
       } else if (botAskedForNumber) {
         // Estado 2: O bot pediu o número, mas o usuário ainda não respondeu o número

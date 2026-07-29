@@ -75,7 +75,7 @@ export function KanbanBoard() {
               quantity: i.quantity || 1,
               price: i.price ? parseFloat(i.price) : 90
             })) : [],
-            totalAmount: parseFloat(o.total_amount || 0),
+            totalAmount: parseFloat(o.total_amount || 0) + parseFloat(o.shipping_fee || 0),
             shippingFee: parseFloat(o.shipping_fee || 0),
             paymentMethod: o.payment_method,
             receiptUrl: o.receipt_url,
