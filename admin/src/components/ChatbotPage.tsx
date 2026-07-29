@@ -709,7 +709,7 @@ ${isOngoingConversation
           console.warn("⚠️ Erro ao calcular frete real no emulador, usando fallback R$ 15:", err);
         }
 
-        // Calcula o valor total do pedido com base nos produtos selecionados
+        // Calcula o valor total do pedido com base nos produtos e quantidade selecionada
         let valorProdutos = 0;
         let qtdTotal = 0;
         for (let i = conversationHistory.length - 1; i >= 0; i--) {
@@ -719,10 +719,11 @@ ${isOngoingConversation
             text.includes(p.flavor.toLowerCase()) || fuzzyMatch(text, p.flavor.toLowerCase())
           );
           if (found) {
-            const qtyMatch = text.match(/\b(\d+)\s*(unidade|un|x|pod|pods)?\b/);
-            const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
-            valorProdutos = parseFloat(found.price) * (qty > 0 && qty < 10 ? qty : 1);
-            qtdTotal = qty > 0 && qty < 10 ? qty : 1;
+            const qtyMatch = text.match(/\b(\d+)\s*(unidade|unidades|un|x|pod|pods|de|da|do)?\b/);
+            const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+            const validQty = (qty > 0 && qty < 500 && qty !== 2025 && qty !== 2026) ? qty : 1;
+            valorProdutos = parseFloat(found.price) * validQty;
+            qtdTotal = validQty;
             break;
           }
         }
@@ -748,9 +749,109 @@ ${isOngoingConversation
           `\n1. NUNCA mais peça CEP ou endereço! Não pergunte por rua ou bairro novamente.` +
           `\n2. Responda de forma curta e informal (usando quebras de linha \\n):` +
           `\n   fechou amg, anotei aqui o endereço: ${detectedStreetAndBairro}, nº ${userNumberText}` +
-          `\n   o valor do seu pedido ficou em R$ ${valorProdutos.toFixed(2)}, com um frete de ${freteStr}, com um total de R$ ${totalFinal.toFixed(2)}` +
-          `\n   SMOKING PODS AGRADECE SEU PEDIDO\\nCHAVE PIX : 1234567890` +
-          `\n\nATENÇÃO SUPREMA: NUNCA SEPARE "SMOKING PODS AGRADECE SEU PEDIDO" DA "CHAVE PIX"! Elas DEVEM vir obrigatoriamente na MESMA MENSAGEM, juntas em um único bloco contínuo separado apenas por uma quebra de linha.`;
+          `\n   ficou R$ ${valorProdutos.toFixed(2)} (${qtdTotal} pod${qtdTotal > 1 ? 's' : ''}) + ${freteStr} de entrega` +
+          `\n   total: R$ ${totalFinal.toFixed(2)}` +
+          `\n   pode mandar o pix nessa chave:` +
+          `\n   [CHAVE PIX CNPJ / ALEATÓRIA DA LOJA]` +
+          `\n   assim que mandar o comprovante já coloco seu pedido em separação!`;
+
+        // Se o endereço está 100% preenchido e ainda não foi enviado nenhum toast de pedido para este chat:
+        const hasCreatedOrderForThisChat = conversationHistory.some(m => m.sender === 'bot' && (m.text.includes("chave") || m.text.includes("comprovante")));
+        
+        if (!hasCreatedOrderForThisChat) {
+          // 1. Identifica modelo/sabor do histórico
+          let finalProduct = null;
+          for (let i = conversationHistory.length - 1; i >= 0; i--) {
+            if (conversationHistory[i].sender !== 'user') continue;
+            const text = conversationHistory[i].text.toLowerCase();
+            const match = inStockProducts.find(p => text.includes(p.flavor.toLowerCase()) || fuzzyMatch(text, p.flavor.toLowerCase()));
+            if (match) {
+              finalProduct = match;
+              break;
+            }
+          }
+
+          if (!finalProduct && inStockProducts.length > 0) {
+            finalProduct = inStockProducts[0];
+          }
+
+          const itemBrand = finalProduct && finalProduct.brand ? finalProduct.brand : "";
+          const itemModel = finalProduct ? `${itemBrand} ${finalProduct.name}`.trim() : "Ignite V50";
+          const itemFlavor = finalProduct ? finalProduct.flavor : "Watermelon Ice";
+          const itemPrice = finalProduct ? parseFloat(finalProduct.price) : 80;
+
+          // 2. Extrai quantidade inteligente do histórico
+          let quantity = 1;
+          
+          for (let i = conversationHistory.length - 1; i >= 0; i--) {
+            if (conversationHistory[i].sender !== 'user') continue;
+            const text = conversationHistory[i].text.toLowerCase();
+            
+            const isProductMsg = inStockProducts.some(p => 
+              text.includes(p.flavor.toLowerCase()) || 
+              fuzzyMatch(text, p.flavor.toLowerCase()) ||
+              text.includes(p.name.toLowerCase())
+            );
+
+            if (isProductMsg) {
+              const qtyMatch = text.match(/\b(\d+)\s*(unidade|unidades|un|x|pod|pods|peça|peças|de|da|do)?\b/);
+              if (qtyMatch) {
+                const val = parseInt(qtyMatch[1], 10);
+                if (val > 0 && val < 500 && val !== 2025 && val !== 2026) {
+                  quantity = val;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (quantity === 1) {
+            for (let i = 0; i < conversationHistory.length; i++) {
+              if (conversationHistory[i].sender !== 'user') continue;
+              const text = conversationHistory[i].text.toLowerCase();
+              
+              if (text.match(/\b\d{5}[-.\s]?\d{3}\b/) || (botAskedForNumber && i >= cepMsgIndex)) continue;
+
+              const qtyMatch = text.match(/\b(\d+)\s*(unidade|unidades|un|x|pod|pods|peça|peças)?\b/);
+              if (qtyMatch) {
+                const val = parseInt(qtyMatch[1], 10);
+                if (val > 0 && val < 500 && val !== 2025 && val !== 2026) {
+                  quantity = val;
+                  break;
+                }
+              }
+              if (text.includes("dois") || text.includes("duas")) { quantity = 2; break; }
+              if (text.includes("tres") || text.includes("três")) { quantity = 3; break; }
+              if (text.includes("quatro")) { quantity = 4; break; }
+              if (text.includes("cinco")) { quantity = 5; break; }
+              if (text.includes("dez")) { quantity = 10; break; }
+              if (text.includes("quinze")) { quantity = 15; break; }
+              if (text.includes("dezesseis")) { quantity = 16; break; }
+              if (text.includes("dezenove")) { quantity = 19; break; }
+              if (text.includes("vinte")) { quantity = 20; break; }
+            }
+          }
+
+          // 3. Constrói o endereço real do histórico/GPS
+          const finalAddress = detectedStreetAndBairro 
+            ? `${detectedStreetAndBairro}, nº ${userNumberText || 'S/N'}`
+            : "Endereço Não Informado";
+
+          const orderItems = [
+            {
+              product_id: finalProduct ? finalProduct.id : null,
+              name: itemModel,
+              flavor: itemFlavor,
+              quantity: quantity,
+              price: itemPrice
+            }
+          ];
+
+          const orderTotal = (itemPrice * quantity);
+
+          // Dispara criação do pedido real no Kanban
+          createOrderInDatabase(clientName, finalAddress, orderItems, orderTotal);
+        }
       } else if (botAskedForNumber) {
         // Estado 2: O bot pediu o número, mas o usuário ainda não respondeu o número
         const isUserConfirmingStreet = lastMsgLower.match(/sim|isso|eh|é|certo|ok|blz/);
