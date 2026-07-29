@@ -34,12 +34,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const add = useCallback((p: Product) => {
     setItems(prev => {
       const ex = prev.find(i => i.product.id === p.id);
-      if (ex) return prev.map(i => i.product.id === p.id ? { ...i, quantity: i.quantity + 1 } : i);
+      const maxStock = typeof p.stock === 'number' ? p.stock : parseInt(String(p.stock || '999'), 10);
+      if (ex) {
+        if (ex.quantity >= maxStock) return prev;
+        return prev.map(i => i.product.id === p.id ? { ...i, quantity: i.quantity + 1 } : i);
+      }
+      if (maxStock <= 0) return prev;
       return [...prev, { product: p, quantity: 1 }];
     });
   }, []);
   const remove = useCallback((id: string) => setItems(p => p.filter(i => i.product.id !== id)), []);
-  const increment = useCallback((id: string) => setItems(p => p.map(i => i.product.id === id ? { ...i, quantity: i.quantity + 1 } : i)), []);
+  const increment = useCallback((id: string) => setItems(prev => prev.map(i => {
+    if (i.product.id === id) {
+      const maxStock = typeof i.product.stock === 'number' ? i.product.stock : parseInt(String(i.product.stock || '999'), 10);
+      if (i.quantity >= maxStock) return i;
+      return { ...i, quantity: i.quantity + 1 };
+    }
+    return i;
+  })), []);
   const decrement = useCallback((id: string) => setItems(p => p.map(i => i.product.id === id ? { ...i, quantity: i.quantity - 1 } : i).filter(i => i.quantity > 0)), []);
   const clear = useCallback(() => setItems([]), []);
 

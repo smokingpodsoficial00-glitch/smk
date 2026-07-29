@@ -59,10 +59,12 @@ function FlavorItem({ product }: { product: Product }) {
   const { items, add, increment, decrement } = useCart();
   const cartItem = items.find(i => i.product.id === product.id);
   const quantity = cartItem?.quantity || 0;
-  const outOfStock = product.stock === 0;
+  const stockQty = typeof product.stock === "number" ? product.stock : parseInt(String(product.stock || "0"), 10);
+  const outOfStock = stockQty <= 0;
+  const isMaxStockReached = quantity >= stockQty;
 
   const handleAdd = () => {
-    if (outOfStock) return;
+    if (outOfStock || isMaxStockReached) return;
     add(product);
   };
 
@@ -71,9 +73,11 @@ function FlavorItem({ product }: { product: Product }) {
       <div className="flex flex-col min-w-0 flex-1">
         <span className="text-sm font-semibold truncate">{product.flavor}</span>
         {outOfStock ? (
-           <span className="text-[11px] text-red-400">Esgotado</span>
+           <span className="text-[11px] text-red-400 font-medium">Esgotado</span>
         ) : (
-           <span className="text-[11px] text-muted-foreground">Em estoque</span>
+           <span className="text-[11px] text-emerald-400/90 font-medium">
+             Em estoque ({stockQty} un)
+           </span>
         )}
       </div>
       <div className="flex items-center gap-4 shrink-0 pl-3">
@@ -81,11 +85,20 @@ function FlavorItem({ product }: { product: Product }) {
         
         {quantity > 0 ? (
           <div className="flex items-center gap-2 bg-elevated rounded-full p-1 border border-border/50">
-            <button onClick={() => decrement(product.id)} className="grid place-items-center size-6 rounded-full bg-background hover:bg-muted text-muted-foreground transition-colors">
+            <button onClick={() => decrement(product.id)} className="grid place-items-center size-6 rounded-full bg-background hover:bg-muted text-muted-foreground transition-colors cursor-pointer">
               <Minus className="size-3" />
             </button>
-            <span className="text-xs font-semibold w-3 text-center">{quantity}</span>
-            <button onClick={() => increment(product.id)} className="grid place-items-center size-6 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
+            <span className="text-xs font-semibold w-4 text-center font-mono">{quantity}</span>
+            <button 
+              onClick={() => increment(product.id)} 
+              disabled={isMaxStockReached}
+              className={`grid place-items-center size-6 rounded-full transition-all ${
+                isMaxStockReached 
+                  ? "bg-muted/40 text-muted-foreground/30 cursor-not-allowed" 
+                  : "bg-primary text-primary-foreground hover:opacity-90 cursor-pointer"
+              }`}
+              title={isMaxStockReached ? `Estoque máximo (${stockQty} un) atingido` : "Adicionar mais"}
+            >
               <Plus className="size-3" />
             </button>
           </div>
@@ -95,7 +108,7 @@ function FlavorItem({ product }: { product: Product }) {
             disabled={outOfStock}
             className={`relative grid place-items-center size-8 rounded-full transition-all duration-300 ${
               outOfStock ? "bg-muted text-muted-foreground cursor-not-allowed"
-                         : "bg-primary text-primary-foreground hover:scale-105 active:scale-95"
+                         : "bg-primary text-primary-foreground hover:scale-105 active:scale-95 cursor-pointer"
             }`}
           >
             <Plus className="size-4" />

@@ -485,11 +485,11 @@ async function getAiResponse(phone, message) {
         const { supabase } = require('./supabase');
         const { data: products, error } = await supabase
             .from('smoking_products')
-            .select('name, flavor, price');
+            .select('name, flavor, price, stock');
         
         if (products && products.length > 0) {
             products.forEach(p => {
-                stockInfo += `- ${p.name} (${p.flavor}): R$ ${p.price}\n`;
+                stockInfo += `- ${p.name} (${p.flavor}): R$ ${p.price} [Estoque: ${p.stock || 0} un]\n`;
             });
         } else {
             stockInfo += "Estoque não encontrado ou vazio.\n";
@@ -502,7 +502,7 @@ async function getAiResponse(phone, message) {
     
     // Injeta temporariamente o estoque na system message com Lembretes Críticos
     const originalSystemPrompt = conversationHistory[phone][0].content;
-    const strictReminders = "\n\n[LEMBRETE OBRIGATÓRIO DO SISTEMA PARA ESTA RESPOSTA:\n1. NÃO USE EMOJIS. Nunca.\n2. Tudo em minúsculo.\n3. NUNCA ofereça a tabela se já ofereceu no passado.\n4. NUNCA pergunte 'algo mais?' ou 'alguma dúvida?'.\n5. Se o cliente falar 'quero o [produto]' ou 'pode me ver [produto]', não diga 'temos disponível', pule direto para pedir o endereço (P30).]";
+    const strictReminders = "\n\n[LEMBRETE OBRIGATÓRIO DO SISTEMA PARA ESTA RESPOSTA:\n1. NÃO USE EMOJIS. Nunca.\n2. Tudo em minúsculo.\n3. NUNCA ofereça a tabela se já ofereceu no passado.\n4. NUNCA pergunte 'algo mais?' ou 'alguma dúvida?'.\n5. REGRA DE QUANTIDADES EM ESTOQUE: Se o cliente pedir uma quantidade MAIOR do que o estoque em unidades disponível (ex: pediu 19 unidades mas só tem 7 ou 14 em estoque), NUNCA DIGA QUE ESTÁ ESGOTADO! Diga em tom amigável e minúsculo que só possui X unidades em estoque e pergunte se ele quer levar as X disponíveis ou prefere outro sabor.\n6. Se o cliente falar 'quero o [produto]' ou 'pode me ver [produto]', não diga 'temos disponível', pule direto para pedir o endereço (P30).]";
     conversationHistory[phone][0].content = originalSystemPrompt + stockInfo + strictReminders;
 
     try {

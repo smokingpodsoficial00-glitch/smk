@@ -424,14 +424,15 @@ export function ChatbotPage() {
       if (products && products.length > 0) {
         inStockProducts = products;
         const stockLines = products.map(p => 
-          `${p.brand ? p.brand + ' ' : ''}${p.name} (sabor: ${p.flavor}) - R$ ${parseFloat(p.price).toFixed(2)}`
+          `${p.brand ? p.brand + ' ' : ''}${p.name} (sabor: ${p.flavor}) - R$ ${parseFloat(p.price).toFixed(2)} [Estoque disponível: ${p.stock} unidades]`
         );
         stockContext = `\n\nESTOQUE EM TEMPO REAL DISPONÍVEL NA SMOKING PODS (ATUALIZADO AGORA):\n` +
           stockLines.join("\n") +
-          `\n\nREGRAS CRÍTICAS DE ESTOQUE E FORMATO DA RESPOSTA:` +
+          `\n\nREGRAS CRÍTICAS DE ESTOQUE E QUANTIDADES:` +
           `\n1. Escreva 100% em LETRAS MINÚSCULA! (sem maiúsculas no início, ex: "temos sim amg", nunca "Infelizmente" ou "Elfbar").` +
           `\n2. NUNCA use marcadores de lista como traços (- ), asteriscos (* ) ou números (1. ). Escreva mensagens de texto normais de WhatsApp!` +
-          `\n3. NUNCA invente marcas, modelos ou sabores fora da lista de estoque acima.`;
+          `\n3. NUNCA invente marcas, modelos ou sabores fora da lista de estoque acima.` +
+          `\n4. REGRA DE QUANTIDADES EM ESTOQUE: Se o cliente pedir uma quantidade MAIOR do que o estoque disponível (ex: pediu 19 unidades mas você só tem 7 ou 14 em estoque), NUNCA DIGA QUE ESTÁ ESGOTADO! Informe a quantidade exata que você possui em estoque e pergunte se ele deseja levar essa quantidade disponível ou escolher outro sabor. Exemplo: "olha amg, desse sabor eu só tenho 14 unidades em estoque no momento, vc quer levar as 14 ou prefere outro sabor?"`;
       } else {
         stockContext = `\n\nESTOQUE EM TEMPO REAL: Atualmente todos os produtos da loja estão sem estoque. Informe o cliente educadamente em minúsculo.`;
       }
@@ -458,7 +459,7 @@ export function ChatbotPage() {
       for (let i = 0; i < q.length && tIdx < t.length; i++) {
         if (q[i] === t[tIdx]) { matches++; tIdx++; }
       }
-      return matches >= t.length * 0.7;
+      return (matches / Math.max(q.length, t.length)) >= 0.7;
     };
 
     if (inStockProducts.length > 0) {
@@ -489,15 +490,29 @@ export function ChatbotPage() {
         }
 
         const finalProduct = matchedByFlavor.find(p => p.name === activeModel) || matchedByFlavor[0];
-        const priceStr = parseFloat(finalProduct.price).toFixed(0);
+        const availableStock = typeof finalProduct.stock === 'number' ? finalProduct.stock : parseInt(String(finalProduct.stock || '0'), 10);
+        
+        // Extrai quantidade se o cliente especificou um número
+        const qtyMatch = lastMsgLower.match(/\b(\d+)\s*(unidade|un|x|pod|pods)?\b/);
+        const requestedQty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
 
-        directStockInstruction = `\n\n[SISTEMA: SABOR DE PRODUTO SELECIONADO!]` +
-          `\nO cliente escolheu o sabor "${finalProduct.flavor}" do modelo "${finalProduct.name}".` +
-          `\n\nREGRA OBRIGATÓRIA (siga à risca):` +
-          `\n- Confirme a escolha de 1 unidade em tom amigo, informal e 100% minúsculo.` +
-          `\n- Peça o CEP para entrega de forma informal.` +
-          `\n- Exemplo de resposta IDEAL: "fechou amg, 1 ${finalProduct.name.toLowerCase()} de ${finalProduct.flavor.toLowerCase()} então! me manda seu cep pra gente ver a entrega?"` +
-          `\n- NUNCA diga que o produto não existe! Confirme a escolha.`;
+        if (requestedQty > availableStock && availableStock > 0) {
+          directStockInstruction = `\n\n[SISTEMA: QUANTIDADE SOLICITADA MAIOR QUE O ESTOQUE DISPONÍVEL!]` +
+            `\nO cliente pediu ${requestedQty} unidades de "${finalProduct.name} (${finalProduct.flavor})", mas o estoque atual é de APENAS ${availableStock} unidades.` +
+            `\n\nINSTRUÇÃO OBRIGATÓRIA:` +
+            `\n- NUNCA diga apenas que está esgotado!` +
+            `\n- Responda em minúsculas informando amigavelmente que no momento só possui ${availableStock} unidades em estoque.` +
+            `\n- Pergunte se ele quer levar as ${availableStock} unidades disponíveis ou outro sabor.` +
+            `\n- Exemplo de resposta IDEAL: "olha amg, do ${finalProduct.name.toLowerCase()} de ${finalProduct.flavor.toLowerCase()} eu só tenho ${availableStock} unidades em estoque agora! vc quer garantir as ${availableStock} ou prefere outro sabor?"`;
+        } else {
+          directStockInstruction = `\n\n[SISTEMA: SABOR DE PRODUTO SELECIONADO!]` +
+            `\nO cliente escolheu o sabor "${finalProduct.flavor}" do modelo "${finalProduct.name}".` +
+            `\n\nREGRA OBRIGATÓRIA (siga à risca):` +
+            `\n- Confirme a escolha de ${requestedQty} unidade(s) em tom amigo, informal e 100% minúsculo.` +
+            `\n- Peça o CEP para entrega de forma informal.` +
+            `\n- Exemplo de resposta IDEAL: "fechou amg, ${requestedQty} ${finalProduct.name.toLowerCase()} de ${finalProduct.flavor.toLowerCase()} então! me manda seu cep pra gente ver a entrega?"` +
+            `\n- NUNCA diga que o produto não existe! Confirme a escolha.`;
+        }
 
       } else if (matchedByModel.length > 0) {
         // O cliente perguntou especificamente de um modelo disponível
