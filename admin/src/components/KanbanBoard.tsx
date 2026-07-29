@@ -796,7 +796,7 @@ function OrderCard({
               ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
               : 'bg-blue-500/10 border border-blue-500/20 text-blue-400'
           }`}>
-            {order.shippingFee > 0 ? formatBRL(order.shippingFee) : 'Grátis (3+ pods)'}
+            {order.shippingFee > 0 ? formatBRL(order.shippingFee) : 'Grátis'}
           </span>
         </div>
       </div>
@@ -805,12 +805,7 @@ function OrderCard({
       <div className="flex items-center justify-between border-t border-[#1a1a1a] pt-3.5">
         <div className="flex flex-col">
           <span className="text-[9px] uppercase text-white/40 tracking-wider font-semibold">Total ({order.paymentMethod})</span>
-          <div className="flex items-baseline gap-1.5 mt-0.5">
-            <span className="font-mono font-bold text-base text-emerald-400">{formatBRL(order.totalAmount)}</span>
-            <span className="text-[10px] text-white/30 font-mono">
-              ({order.shippingFee > 0 ? `inclui ${formatBRL(order.shippingFee)} entrega` : 'frete grátis'})
-            </span>
-          </div>
+          <span className="font-mono font-bold text-base text-emerald-400 mt-0.5">{formatBRL(order.totalAmount)}</span>
         </div>
         
         {order.receiptUrl && (
