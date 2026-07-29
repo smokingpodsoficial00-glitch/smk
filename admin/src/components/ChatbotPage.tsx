@@ -356,7 +356,8 @@ export function ChatbotPage() {
     clientName: string, 
     address: string, 
     orderItems: Array<{ name: string; flavor: string; quantity: number; price: number }>, 
-    total: number
+    total: number,
+    shippingFee: number = 0
   ) => {
     try {
       // Gera um número de telefone simulado único por nome de cliente para evitar misturar clientes de teste no CRM
@@ -369,7 +370,7 @@ export function ChatbotPage() {
         shipping_address: address || "Endereço Não Informado",
         items: orderItems,
         total_amount: total,
-        shipping_fee: 15,
+        shipping_fee: shippingFee,
         payment_method: "PIX",
         payment_status: "PENDENTE",
         delivery_status: "AGUARDANDO_PAGAMENTO"
@@ -747,8 +748,8 @@ ${isOngoingConversation
             ? `${detectedStreetAndBairro}, nº ${userNumberText || 'S/N'}`
             : "Endereço Não Informado";
 
-          // Dispara criação do pedido real no Kanban com TODOS os itens extraídos
-          createOrderInDatabase(clientName, finalAddress, orderItems, totalFinal);
+          // Dispara criação do pedido real no Kanban com TODOS os itens extraídos e frete real
+          createOrderInDatabase(clientName, finalAddress, orderItems, totalFinal, freteAplicado);
         }
       } else if (botAskedForNumber) {
         // Estado 2: O bot pediu o número, mas o usuário ainda não respondeu o número
