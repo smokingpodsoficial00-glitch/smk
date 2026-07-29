@@ -6,6 +6,7 @@ import {
   Trash2, RotateCcw, Package, DollarSign, Eye, EyeOff
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { returnStockForOrderItems } from "@/lib/stockSync";
 
 export interface AdminOrder {
   id: string;
@@ -171,6 +172,28 @@ export function KanbanBoard() {
     }
   };
 
+  const handleDeleteOrder = async (realId: string) => {
+    const targetOrder = orders.find(o => o.realId === realId);
+    if (!targetOrder) return;
+    
+    if (confirm(`Deseja realmente recusar/excluir o pedido #${targetOrder.id}? Os itens serão devolvidos ao estoque.`)) {
+      if (targetOrder.status !== 'ENTREGUE') {
+        await returnStockForOrderItems(targetOrder.items);
+      }
+      
+      const { error } = await supabase
+        .from('smoking_orders')
+        .delete()
+        .eq('id', realId);
+        
+      if (!error) {
+        setOrders(prev => prev.filter(o => o.realId !== realId));
+      } else {
+        alert("Erro ao excluir do banco de dados: " + error.message);
+      }
+    }
+  };
+
   const columns = [
     { title: "Aguardando Pagamento", status: "AGUARDANDO_PAGAMENTO", color: "bg-white/40 shadow-[0_0_8px_rgba(255,255,255,0.2)]" },
     { title: "Preparando", status: "PREPARANDO", color: "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]" },
@@ -301,6 +324,7 @@ export function KanbanBoard() {
                         order={order} 
                         onUpdate={(realId, newStatus) => updateStatus(realId, newStatus)} 
                         onDispatchClick={() => setSelectedOrderForDispatch(order.realId)}
+                        onDelete={handleDeleteOrder}
                       />
                     ))}
                     {colOrders.length === 0 && (
@@ -528,10 +552,22 @@ export function KanbanBoard() {
                                       <div className="h-px bg-border my-1" />
 
                                       <button
-                                        onClick={() => {
+                                        onClick={async () => {
                                           if (confirm(`Deseja realmente excluir o histórico do pedido #${order.id}?`)) {
-                                            saveCompletedIds(getCompletedIds().filter(id => id !== order.realId));
-                                            setOrders(prev => prev.filter(o => o.realId !== order.realId));
+                                            if (order.status !== 'ENTREGUE') {
+                                              await returnStockForOrderItems(order.items);
+                                            }
+                                            const { error } = await supabase
+                                              .from('smoking_orders')
+                                              .delete()
+                                              .eq('id', order.realId);
+                                            
+                                            if (!error) {
+                                              saveCompletedIds(getCompletedIds().filter(id => id !== order.realId));
+                                              setOrders(prev => prev.filter(o => o.realId !== order.realId));
+                                            } else {
+                                              alert("Erro ao excluir do banco de dados: " + error.message);
+                                            }
                                           }
                                           setActiveActionMenuId(null);
                                         }}
@@ -691,11 +727,13 @@ function getRelativeTime(dateString: string): string {
 function OrderCard({ 
   order, 
   onUpdate, 
-  onDispatchClick 
+  onDispatchClick,
+  onDelete
 }: { 
   order: AdminOrder; 
   onUpdate: (realId: string, s: AdminOrder['status']) => void;
   onDispatchClick: () => void;
+  onDelete: (realId: string) => void;
 }) {
   const getProgressColor = (status: AdminOrder['status']) => {
     if (status === 'AGUARDANDO_PAGAMENTO') return 'bg-white/30 w-1/4';
@@ -783,6 +821,13 @@ function OrderCard({
                 💬 Verificar Pix no WhatsApp
               </a>
             )}
+            <button 
+              onClick={() => onDelete(order.realId)}
+              className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98]"
+            >
+              <Trash2 className="size-3.5" />
+              Recusar Pedido (Devolver Estoque)
+            </button>
           </div>
         )}
 
