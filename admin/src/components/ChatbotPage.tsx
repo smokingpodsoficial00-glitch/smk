@@ -248,10 +248,25 @@ export function ChatbotPage() {
   const [systemPrompt, setSystemPrompt] = useState(DEFINITIVE_SYSTEM_PROMPT);
   const [isTyping, setIsTyping] = useState(false);
 
-  // Chat Simulator State (inicia limpo para o usuário dar o primeiro oi)
-  const [messages, setMessages] = useState<Array<{ sender: "user" | "bot"; text: string; time: string }>>([]);
+  // Chat Simulator State (persiste no localStorage para evitar resets ao trocar de aba)
+  const [messages, setMessages] = useState<Array<{ sender: "user" | "bot"; text: string; time: string }>>(() => {
+    try {
+      const saved = localStorage.getItem("chatbot_sim_messages");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [inputMessage, setInputMessage] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("chatbot_sim_messages", JSON.stringify(messages));
+    } catch (e) {
+      console.warn("Erro ao salvar mensagens do chatbot no localStorage:", e);
+    }
+  }, [messages]);
 
   const storeName = config?.store_name || "Smoking Pods";
 
