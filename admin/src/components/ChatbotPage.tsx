@@ -117,11 +117,10 @@ export function ChatbotPage() {
   // Notification for Order Created
   const [newOrderCreatedToast, setNewOrderCreatedToast] = useState<{ id: string; clientName: string; total: number; productName: string } | null>(null);
 
-  // OpenAI Integration State
-  const [openAiKey, setOpenAiKey] = useState<string>(() => {
-    return localStorage.getItem("openai_api_key_v1") || DEFAULT_OPENAI_KEY;
+  // OpenAI Integration State (lê da variável de ambiente de forma segura)
+  const [openAiKey] = useState<string>(() => {
+    return localStorage.getItem("openai_api_key_v1") || (import.meta as any).env?.VITE_OPENAI_API_KEY || "";
   });
-  const [showKeyInput, setShowKeyInput] = useState(false);
 
   // System Prompt
   const [systemPrompt, setSystemPrompt] = useState(DEFINITIVE_SYSTEM_PROMPT);
@@ -1209,66 +1208,9 @@ ${isOngoingConversation
           </section>
         </div>
 
-        {/* Lado Direito: Prompt da Eloisa & Simulador em Formato WhatsApp Web Real (7 Colunas) */}
-        <div className="lg:col-span-7 space-y-6">
-          
-          {/* Configurações do System Prompt */}
-          <section className="bg-card border border-border rounded-2xl p-6 space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center gap-2.5">
-                <Sparkles className="size-4 text-emerald-400" />
-                <h2 className="font-bold text-base text-white">System Prompt Completo — Eloisa (OpenAI)</h2>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleCopyPrompt}
-                  className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-white/80 transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  {copiedPrompt ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
-                  {copiedPrompt ? "Copiado!" : "Copiar Script Íntegra"}
-                </button>
-                <button
-                  onClick={() => setShowKeyInput(!showKeyInput)}
-                  className="p-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 transition-all cursor-pointer"
-                  title="Configurar Chave da OpenAI"
-                >
-                  <Key className="size-4" />
-                </button>
-              </div>
-            </div>
-
-            {showKeyInput && (
-              <div className="p-3 bg-[#0a0a0a] border border-emerald-500/30 rounded-xl space-y-1.5">
-                <label className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5">
-                  <Key className="size-3" /> Chave de API da OpenAI (GPT-4o):
-                </label>
-                <input
-                  type="password"
-                  value={openAiKey}
-                  onChange={(e) => handleSaveOpenAiKey(e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-            )}
-
-            {/* Prompt Textarea Completo */}
-            <div className="space-y-2">
-              <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider flex items-center justify-between">
-                <span>Script Compilado em Tempo Real (100% Íntegra)</span>
-                <span className="text-[10px] text-emerald-400 lowercase">OpenAI GPT-4o Engine</span>
-              </label>
-              <textarea
-                rows={8}
-                value={systemPrompt}
-                onChange={(e) => setSystemPrompt(e.target.value)}
-                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 resize-none font-mono custom-scrollbar leading-relaxed"
-              />
-            </div>
-          </section>
-
-          {/* Simulador em Formato Real do WhatsApp Web */}
-          <section className="bg-[#0b141a] border border-[#222d34] rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[480px]">
+        {/* Lado Direito: Simulador em Formato WhatsApp Web Real (7 Colunas) no Topo */}
+        <div className="lg:col-span-7">
+          <section className="bg-[#0b141a] border border-[#222d34] rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[640px]">
             {/* Header WhatsApp Web */}
             <div className="bg-[#202c33] px-4 py-3 flex items-center justify-between border-b border-[#222d34] shrink-0">
               <div className="flex items-center gap-3">
