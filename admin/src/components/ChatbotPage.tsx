@@ -358,7 +358,6 @@ export function ChatbotPage() {
   ) => {
     const orderItems: Array<{ product_id: any; name: string; flavor: string; quantity: number; price: number }> = [];
 
-    // Função de fuzzy match local (mesma lógica usada na detecção de sabor)
     const fuzzy = (query: string, target: string): boolean => {
       const q = query.toLowerCase().replace(/[^a-z0-9]/g, '');
       const t = target.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -372,7 +371,6 @@ export function ChatbotPage() {
       return (matches / Math.max(q.length, t.length)) >= 0.7;
     };
 
-    // Mapa de números por extenso
     const numberWords: Record<string, number> = {
       'um': 1, 'uma': 1, 'dois': 2, 'duas': 2, 'tres': 3, 'três': 3,
       'quatro': 4, 'cinco': 5, 'seis': 6, 'sete': 7, 'oito': 8, 'nove': 9,
@@ -381,55 +379,106 @@ export function ChatbotPage() {
       'dezenove': 19, 'vinte': 20
     };
 
-    // Extrai quantidade de um trecho de texto
-    const extractQty = (text: string, flavorLower: string): number => {
-      // Tenta padrão: "7 melancia", "7x melancia", "7 de melancia"
-      const escaped = flavorLower.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const specificMatch = text.match(new RegExp(`(\\d+)\\s*(?:unidades?|un|x|pods?)?\\s*(?:de|da|do)?\\s*${escaped}`, 'i'));
-      if (specificMatch) {
-        const val = parseInt(specificMatch[1], 10);
-        if (val > 0 && val < 500 && val !== 2025 && val !== 2026) return val;
-      }
-      // Tenta padrão invertido: "melancia 7"
-      const invertedMatch = text.match(new RegExp(`${escaped}\\s*(?:x|-)\\s*(\\d+)`, 'i'));
-      if (invertedMatch) {
-        const val = parseInt(invertedMatch[1], 10);
-        if (val > 0 && val < 500) return val;
-      }
-      // Tenta número por extenso antes do sabor
-      for (const [word, num] of Object.entries(numberWords)) {
-        if (text.includes(word) && text.indexOf(word) < text.indexOf(flavorLower)) return num;
-      }
-      return 1;
-    };
-
-    // Percorre todas as mensagens do usuário (mais recentes primeiro)
+    // 1. Verifica se o usuário solicitou "X de cada" (ex: "7 de cada", "7 de cada um", "sete de cada")
+    let deCadaQty: number | null = null;
     for (let i = conversationHistory.length - 1; i >= 0; i--) {
       if (conversationHistory[i].sender !== 'user') continue;
       const text = conversationHistory[i].text.toLowerCase();
+      
+      const deCadaMatch = text.match(/\b(\d+)\s*(?:unidades?|un|x|pods?)?\s*de\s*cada\b/i);
+      if (deCadaMatch) {
+        deCadaQty = parseInt(deCadaMatch[1], 10);
+        break;
+      }
+      for (const [word, num] of Object.entries(numberWords)) {
+        if (text.includes(`${word} de cada`) || text.includes(`${word} de cada um`)) {
+          deCadaQty = num;
+          break;
+        }
+      }
+      if (deCadaQty !== null) break;
+    }
+
+    // Se o usuário pediu "X de cada", identifica os produtos citados na conversa (do bot ou do usuário)
+    if (deCadaQty !== null && deCadaQty > 0) {
+      // Coleta o texto recente do bot onde produtos foram oferecidos
+      const recentBotText = conversationHistory
+        .filter(m => m.sender === 'bot')
+        .slice(-3)
+        .map(m => m.text.toLowerCase())
+        .join(' ');
+
+      const recentUserText = conversationHistory
+        .filter(m => m.sender === 'user')
+        .map(m => m.text.toLowerCase())
+        .join(' ');
+
+      const fullContext = `${recentBotText} ${recentUserText}`;
 
       for (const p of inStockProducts) {
         const flavorLower = p.flavor.toLowerCase();
-        // Verifica se este sabor aparece na mensagem
-        const flavorFound = text.includes(flavorLower) || fuzzy(text, flavorLower) ||
-          flavorLower.split(' ').some((w: string) => w.length > 3 && text.includes(w));
-
-        if (flavorFound && !orderItems.some(item => item.product_id === p.id)) {
-          const qty = extractQty(text, flavorLower);
-          const itemBrand = p.brand ? p.brand : '';
-          const itemModel = `${itemBrand} ${p.name}`.trim();
-          orderItems.push({
-            product_id: p.id,
-            name: itemModel,
-            flavor: p.flavor,
-            quantity: qty,
-            price: parseFloat(p.price)
-          });
+        if (fullContext.includes(flavorLower) || fuzzy(fullContext, flavorLower)) {
+          if (!orderItems.some(item => item.product_id === p.id)) {
+            const itemBrand = p.brand ? p.brand : '';
+            const itemModel = `${itemBrand} ${p.name}`.trim();
+            orderItems.push({
+              product_id: p.id,
+              name: itemModel,
+              flavor: p.flavor,
+              quantity: deCadaQty,
+              price: parseFloat(p.price)
+            });
+          }
         }
       }
     }
 
-    // Fallback: se nenhum produto foi encontrado, usa o primeiro do estoque
+    // 2. Se não foi "de cada" ou faltam sabores, analisa histórico para sabores explícitos
+    if (orderItems.length === 0) {
+      const extractQty = (text: string, flavorLower: string): number => {
+        const escaped = flavorLower.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const specificMatch = text.match(new RegExp(`(\\d+)\\s*(?:unidades?|un|x|pods?)?\\s*(?:de|da|do)?\\s*${escaped}`, 'i'));
+        if (specificMatch) {
+          const val = parseInt(specificMatch[1], 10);
+          if (val > 0 && val < 500 && val !== 2025 && val !== 2026) return val;
+        }
+        const invertedMatch = text.match(new RegExp(`${escaped}\\s*(?:x|-)\\s*(\\d+)`, 'i'));
+        if (invertedMatch) {
+          const val = parseInt(invertedMatch[1], 10);
+          if (val > 0 && val < 500) return val;
+        }
+        for (const [word, num] of Object.entries(numberWords)) {
+          if (text.includes(word) && text.indexOf(word) < text.indexOf(flavorLower)) return num;
+        }
+        return 1;
+      };
+
+      for (let i = conversationHistory.length - 1; i >= 0; i--) {
+        if (conversationHistory[i].sender !== 'user') continue;
+        const text = conversationHistory[i].text.toLowerCase();
+
+        for (const p of inStockProducts) {
+          const flavorLower = p.flavor.toLowerCase();
+          const flavorFound = text.includes(flavorLower) || fuzzy(text, flavorLower) ||
+            flavorLower.split(' ').some((w: string) => w.length > 3 && text.includes(w));
+
+          if (flavorFound && !orderItems.some(item => item.product_id === p.id)) {
+            const qty = extractQty(text, flavorLower);
+            const itemBrand = p.brand ? p.brand : '';
+            const itemModel = `${itemBrand} ${p.name}`.trim();
+            orderItems.push({
+              product_id: p.id,
+              name: itemModel,
+              flavor: p.flavor,
+              quantity: qty,
+              price: parseFloat(p.price)
+            });
+          }
+        }
+      }
+    }
+
+    // 3. Fallback inteligente: se NENHUM produto foi identificado, usa o primeiro em estoque SEM clonar
     if (orderItems.length === 0 && inStockProducts.length > 0) {
       const fallback = inStockProducts[0];
       orderItems.push({
@@ -838,10 +887,10 @@ ${isOngoingConversation
           `\n   [CHAVE PIX CNPJ / ALEATÓRIA DA LOJA]` +
           `\n   assim que mandar o comprovante já coloco seu pedido em separação!`;
 
-        // Se o endereço está 100% preenchido e ainda não foi enviado nenhum toast de pedido para este chat:
+        // Se o endereço está 100% preenchido, o nome do cliente foi fornecido, e ainda não foi criado pedido:
         const hasCreatedOrderForThisChat = conversationHistory.some(m => m.sender === 'bot' && (m.text.includes("chave") || m.text.includes("comprovante")));
         
-        if (!hasCreatedOrderForThisChat) {
+        if (!hasCreatedOrderForThisChat && userProvidedName) {
           const finalAddress = detectedStreetAndBairro 
             ? `${detectedStreetAndBairro}, nº ${userNumberText || 'S/N'}`
             : "Endereço Não Informado";
