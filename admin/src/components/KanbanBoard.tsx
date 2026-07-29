@@ -84,7 +84,7 @@ export function KanbanBoard() {
             status: isCompleted ? 'CONCLUIDO' : (o.delivery_status || 'AGUARDANDO_PAGAMENTO'),
             time: new Date(o.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
             createdAt: o.created_at,
-            requestedDiscount: !!o.requested_discount
+            requestedDiscount: !!o.requested_discount || o.receipt_url === 'SOLICITOU_DESCONTO'
           };
         });
         setOrders(mapped);
@@ -210,7 +210,7 @@ export function KanbanBoard() {
 
     await supabase
       .from('smoking_orders')
-      .update({ total_amount: newProductsOnly, requested_discount: false })
+      .update({ total_amount: newProductsOnly, receipt_url: null })
       .eq('id', realId);
   };
 
@@ -228,7 +228,7 @@ export function KanbanBoard() {
 
     await supabase
       .from('smoking_orders')
-      .update({ shipping_fee: 0, requested_discount: false })
+      .update({ shipping_fee: 0, receipt_url: null })
       .eq('id', realId);
   };
 

@@ -403,7 +403,7 @@ export function ChatbotPage() {
         payment_method: "PIX",
         payment_status: "PENDENTE",
         delivery_status: "AGUARDANDO_PAGAMENTO",
-        requested_discount: requestedDiscount
+        receipt_url: requestedDiscount ? "SOLICITOU_DESCONTO" : null
       };
 
       const { data, error } = await supabase
