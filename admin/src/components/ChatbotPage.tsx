@@ -7,7 +7,7 @@ import {
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
 import { calculateShippingQuote } from "@/lib/shipping";
-import { deductStockForOrderItems } from "@/lib/stockSync";
+// stockSync: triggers SQL cuidam da dedução/devolução automaticamente
 
 const DEFINITIVE_SYSTEM_PROMPT = `SCRIPT DEFINITIVO — IA SMOKING PODS (Eloisa)
 Este documento compila TODAS as respostas do dono da loja. Cada resposta programada aqui deve ser usada EXATAMENTE como escrita. Este documento será convertido no system prompt da OpenAI.
@@ -346,6 +346,104 @@ export function ChatbotPage() {
     } catch (e) {
       console.warn("Erro ao reproduzir áudio da notificação:", e);
     }
+  };
+
+  /**
+   * Extrai TODOS os produtos e quantidades solicitados no histórico de conversa.
+   * Suporta pedidos multi-sabor (ex: "7 melancia e 7 green apple").
+   */
+  const extractAllOrderItemsFromHistory = (
+    conversationHistory: Array<{ sender: string; text: string }>,
+    inStockProducts: any[]
+  ) => {
+    const orderItems: Array<{ product_id: any; name: string; flavor: string; quantity: number; price: number }> = [];
+
+    // Função de fuzzy match local (mesma lógica usada na detecção de sabor)
+    const fuzzy = (query: string, target: string): boolean => {
+      const q = query.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const t = target.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!q || !t) return false;
+      if (q.includes(t) || t.includes(q)) return true;
+      let matches = 0;
+      let tIdx = 0;
+      for (let i = 0; i < q.length && tIdx < t.length; i++) {
+        if (q[i] === t[tIdx]) { matches++; tIdx++; }
+      }
+      return (matches / Math.max(q.length, t.length)) >= 0.7;
+    };
+
+    // Mapa de números por extenso
+    const numberWords: Record<string, number> = {
+      'um': 1, 'uma': 1, 'dois': 2, 'duas': 2, 'tres': 3, 'três': 3,
+      'quatro': 4, 'cinco': 5, 'seis': 6, 'sete': 7, 'oito': 8, 'nove': 9,
+      'dez': 10, 'onze': 11, 'doze': 12, 'treze': 13, 'quatorze': 14,
+      'quinze': 15, 'dezesseis': 16, 'dezessete': 17, 'dezoito': 18,
+      'dezenove': 19, 'vinte': 20
+    };
+
+    // Extrai quantidade de um trecho de texto
+    const extractQty = (text: string, flavorLower: string): number => {
+      // Tenta padrão: "7 melancia", "7x melancia", "7 de melancia"
+      const escaped = flavorLower.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const specificMatch = text.match(new RegExp(`(\\d+)\\s*(?:unidades?|un|x|pods?)?\\s*(?:de|da|do)?\\s*${escaped}`, 'i'));
+      if (specificMatch) {
+        const val = parseInt(specificMatch[1], 10);
+        if (val > 0 && val < 500 && val !== 2025 && val !== 2026) return val;
+      }
+      // Tenta padrão invertido: "melancia 7"
+      const invertedMatch = text.match(new RegExp(`${escaped}\\s*(?:x|-)\\s*(\\d+)`, 'i'));
+      if (invertedMatch) {
+        const val = parseInt(invertedMatch[1], 10);
+        if (val > 0 && val < 500) return val;
+      }
+      // Tenta número por extenso antes do sabor
+      for (const [word, num] of Object.entries(numberWords)) {
+        if (text.includes(word) && text.indexOf(word) < text.indexOf(flavorLower)) return num;
+      }
+      return 1;
+    };
+
+    // Percorre todas as mensagens do usuário (mais recentes primeiro)
+    for (let i = conversationHistory.length - 1; i >= 0; i--) {
+      if (conversationHistory[i].sender !== 'user') continue;
+      const text = conversationHistory[i].text.toLowerCase();
+
+      for (const p of inStockProducts) {
+        const flavorLower = p.flavor.toLowerCase();
+        // Verifica se este sabor aparece na mensagem
+        const flavorFound = text.includes(flavorLower) || fuzzy(text, flavorLower) ||
+          flavorLower.split(' ').some((w: string) => w.length > 3 && text.includes(w));
+
+        if (flavorFound && !orderItems.some(item => item.product_id === p.id)) {
+          const qty = extractQty(text, flavorLower);
+          const itemBrand = p.brand ? p.brand : '';
+          const itemModel = `${itemBrand} ${p.name}`.trim();
+          orderItems.push({
+            product_id: p.id,
+            name: itemModel,
+            flavor: p.flavor,
+            quantity: qty,
+            price: parseFloat(p.price)
+          });
+        }
+      }
+    }
+
+    // Fallback: se nenhum produto foi encontrado, usa o primeiro do estoque
+    if (orderItems.length === 0 && inStockProducts.length > 0) {
+      const fallback = inStockProducts[0];
+      orderItems.push({
+        product_id: fallback.id,
+        name: `${fallback.brand || ''} ${fallback.name}`.trim(),
+        flavor: fallback.flavor,
+        quantity: 1,
+        price: parseFloat(fallback.price)
+      });
+    }
+
+    const totalProductsPrice = orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+
+    return { orderItems, totalProductsPrice };
   };
 
   /**

@@ -6,7 +6,7 @@ import {
   Trash2, RotateCcw, Package, DollarSign, Eye, EyeOff
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { returnStockForOrderItems } from "@/lib/stockSync";
+// stockSync: trigger SQL trg_stock_on_order_delete cuida da devolução automática
 
 export interface AdminOrder {
   id: string;
@@ -179,10 +179,7 @@ export function KanbanBoard() {
     if (!targetOrder) return;
     
     if (confirm(`Deseja realmente recusar/excluir o pedido #${targetOrder.id}? Os itens serão devolvidos ao estoque.`)) {
-      if (targetOrder.status !== 'ENTREGUE') {
-        await returnStockForOrderItems(targetOrder.items);
-      }
-      
+      // A trigger SQL trg_stock_on_order_delete já devolve o estoque automaticamente ao deletar a row
       const { error } = await supabase
         .from('smoking_orders')
         .delete()
