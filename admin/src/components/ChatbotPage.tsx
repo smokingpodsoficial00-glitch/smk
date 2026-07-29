@@ -117,9 +117,13 @@ export function ChatbotPage() {
   // Notification for Order Created
   const [newOrderCreatedToast, setNewOrderCreatedToast] = useState<{ id: string; clientName: string; total: number; productName: string } | null>(null);
 
-  // OpenAI Integration State (lê da variável de ambiente de forma segura)
+  // OpenAI Integration State (lê de forma segura sem expor na UI)
   const [openAiKey] = useState<string>(() => {
-    return localStorage.getItem("openai_api_key_v1") || (import.meta as any).env?.VITE_OPENAI_API_KEY || "";
+    const envKey = (import.meta as any).env?.VITE_OPENAI_API_KEY;
+    const localKey = localStorage.getItem("openai_api_key_v1");
+    if (localKey && localKey.startsWith("sk-")) return localKey;
+    if (envKey && envKey.startsWith("sk-")) return envKey;
+    return "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";
   });
 
   // System Prompt
