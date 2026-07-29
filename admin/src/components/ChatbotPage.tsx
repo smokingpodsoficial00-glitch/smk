@@ -736,6 +736,11 @@ ${isOngoingConversation
           console.warn("⚠️ Erro ao calcular frete real no emulador:", err);
         }
 
+        // Extrai TODOS os produtos e quantidades solicitadas do histórico (multi-itens ex: 7 melancia + 7 green apple)
+        const extracted = extractAllOrderItemsFromHistory(conversationHistory, inStockProducts);
+        const orderItems = extracted.orderItems;
+        const valorProdutos = extracted.totalProductsPrice;
+
         // Verifica se o cliente solicitou desconto ou frete grátis na conversa
         const userAskedDiscount = conversationHistory.some(m => {
           if (m.sender !== 'user') return false;
@@ -982,25 +987,45 @@ ${isOngoingConversation
     setInputMessage("");
     setIsTyping(true);
 
-    // Dispara para a inteligência real do GPT-4o
-    const botResponses = await callRealOpenAI(newHistory);
+    // Timer de segurança de 15 segundos para evitar ficar travado em 'digitando...'
+    const safetyTimeout = setTimeout(() => {
+      setIsTyping(false);
+    }, 15000);
 
-    // Simula envio fracionado
-    botResponses.forEach((respText, index) => {
-      setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "bot",
-            text: respText,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          },
-        ]);
-        if (index === botResponses.length - 1) {
-          setIsTyping(false);
-        }
-      }, (index + 1) * 800);
-    });
+    try {
+      // Dispara para a inteligência real do GPT-4o
+      const botResponses = await callRealOpenAI(newHistory);
+      clearTimeout(safetyTimeout);
+
+      // Filtra mensagens vazias ou [IGNORAR]
+      const validResponses = (botResponses || []).filter(r => r && !r.includes("[IGNORAR]"));
+
+      if (validResponses.length === 0) {
+        setIsTyping(false);
+        return;
+      }
+
+      // Simula envio fracionado
+      validResponses.forEach((respText, index) => {
+        setTimeout(() => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              sender: "bot",
+              text: respText,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            },
+          ]);
+          if (index === validResponses.length - 1) {
+            setIsTyping(false);
+          }
+        }, (index + 1) * 800);
+      });
+    } catch (err) {
+      console.error("Erro ao simular resposta do bot:", err);
+      clearTimeout(safetyTimeout);
+      setIsTyping(false);
+    }
   };
 
   const handleGenerateNewQr = async () => {
