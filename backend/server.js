@@ -61,7 +61,7 @@ app.get('/api/qr', (req, res) => {
 
 app.post('/api/logout', async (req, res) => {
     try {
-        console.log('🔴 Recebido comando de desconexão do WhatsApp...');
+        console.log('🔴 Recebido comando de desconexão e limpeza total de sessão do WhatsApp...');
         isWhatsAppReady = false;
         latestQr = null;
 
@@ -76,8 +76,8 @@ app.post('/api/logout', async (req, res) => {
             console.warn('Aviso no destroy:', e.message);
         }
 
-        // Deleta a pasta de sessão salva .wwebjs_auth
         const authPath = path.join(__dirname, '.wwebjs_auth');
+        const cachePath = path.join(__dirname, '.wwebjs_cache');
         if (fs.existsSync(authPath)) {
             try {
                 fs.rmSync(authPath, { recursive: true, force: true });
@@ -86,18 +86,20 @@ app.post('/api/logout', async (req, res) => {
                 console.warn('Aviso ao remover pasta auth:', e.message);
             }
         }
-
-        // Reinicia o cliente do WhatsApp para gerar um novo QR Code
-        console.log('🔄 Reiniciando motor do WhatsApp para gerar novo QR Code...');
-        setTimeout(() => {
+        if (fs.existsSync(cachePath)) {
             try {
-                client.initialize();
-            } catch (err) {
-                console.error('Erro ao reiniciar client:', err);
+                fs.rmSync(cachePath, { recursive: true, force: true });
+                console.log('🧹 Pasta de cache .wwebjs_cache removida.');
+            } catch (e) {
+                console.warn('Aviso ao remover pasta cache:', e.message);
             }
-        }, 1500);
+        }
 
-        res.json({ success: true, message: 'WhatsApp desconectado com sucesso. Gerando novo QR Code...' });
+        res.json({ success: true, message: 'WhatsApp desconectado com sucesso. O backend irá gerar um novo QR Code ao reiniciar.' });
+
+        setTimeout(() => {
+            process.exit(0);
+        }, 1000);
     } catch (err) {
         console.error('Erro no logout API:', err);
         res.status(500).json({ error: 'Falha ao desconectar.' });
