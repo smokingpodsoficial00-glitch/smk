@@ -776,15 +776,14 @@ ${isOngoingConversation
           `\n   [CHAVE PIX CNPJ / ALEATÓRIA DA LOJA]` +
           `\n   assim que mandar o comprovante já coloco seu pedido em separação!`;
 
-        // Se o endereço está 100% preenchido, o nome do cliente foi fornecido, e ainda não foi criado pedido:
-        const hasCreatedOrderForThisChat = conversationHistory.some(m => m.sender === 'bot' && (m.text.includes("chave") || m.text.includes("comprovante")));
-        
-        if (!hasCreatedOrderForThisChat && userProvidedName) {
+        // Se o endereço está 100% preenchido e o nome do cliente foi fornecido, dispara a criação do pedido no Kanban:
+        if (!orderCreatedThisSession && userProvidedName) {
+          setOrderCreatedThisSession(true);
           const finalAddress = detectedStreetAndBairro 
             ? `${detectedStreetAndBairro}, nº ${userNumberText || 'S/N'}`
             : "Endereço Não Informado";
 
-          // Dispara criação do pedido real no Kanban com TODOS os itens extraídos, frete real e tag de desconto solicitado
+          // Dispara criação do pedido real no Kanban com status AGUARDANDO_PAGAMENTO
           createOrderInDatabase(clientName, finalAddress, orderItems, valorProdutos, freteAplicado, userAskedDiscount);
         }
       } else if (botAskedForNumber) {
@@ -857,16 +856,16 @@ ${isOngoingConversation
       const data = await res.json();
       const rawAnswer = data.choices?.[0]?.message?.content || "Desculpe, tive um probleminha aqui. Pode me perguntar de novo?";
       
-      // Checa se a resposta contem indicativo de finalizacao de pedido ou Pix
+      // Checa se a resposta contem indicativo de finalizacao de pedido, Pix ou total
       const lowerRaw = rawAnswer.toLowerCase();
       if (
         !orderCreatedThisSession && (
-          lowerRaw.includes("chave pix") ||
+          lowerRaw.includes("pix") ||
+          lowerRaw.includes("total") ||
+          lowerRaw.includes("chave") ||
           lowerRaw.includes("agradece seu pedido") ||
-          lowerRaw.includes("pagameto confirmado") ||
           lowerRaw.includes("pagamento confirmado") ||
-          lowerRaw.includes("link_checkout") ||
-          lowerRaw.includes("total de r$")
+          lowerRaw.includes("link_checkout")
         )
       ) {
         setOrderCreatedThisSession(true);
