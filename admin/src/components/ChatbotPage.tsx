@@ -504,7 +504,8 @@ export function ChatbotPage() {
     address: string, 
     orderItems: Array<{ name: string; flavor: string; quantity: number; price: number }>, 
     total: number,
-    shippingFee: number = 0
+    shippingFee: number = 0,
+    requestedDiscount: boolean = false
   ) => {
     try {
       // Gera um número de telefone simulado único por nome de cliente para evitar misturar clientes de teste no CRM
@@ -520,7 +521,8 @@ export function ChatbotPage() {
         shipping_fee: shippingFee,
         payment_method: "PIX",
         payment_status: "PENDENTE",
-        delivery_status: "AGUARDANDO_PAGAMENTO"
+        delivery_status: "AGUARDANDO_PAGAMENTO",
+        requested_discount: requestedDiscount
       };
 
       const { data, error } = await supabase
@@ -856,16 +858,20 @@ ${isOngoingConversation
           console.warn("⚠️ Erro ao calcular frete real no emulador:", err);
         }
 
-        // Extrai TODOS os produtos e quantidades solicitadas do histórico (multi-itens ex: 7 melancia + 7 green apple)
-        const extracted = extractAllOrderItemsFromHistory(conversationHistory, inStockProducts);
-        const orderItems = extracted.orderItems;
-        const valorProdutos = extracted.totalProductsPrice;
-        const qtdTotal = orderItems.reduce((sum, i) => sum + i.quantity, 0);
+        // Verifica se o cliente solicitou desconto ou frete grátis na conversa
+        const userAskedDiscount = conversationHistory.some(m => {
+          if (m.sender !== 'user') return false;
+          const t = m.text.toLowerCase();
+          return t.includes("desconto") || t.includes("descontinho") || t.includes("preço melhor") ||
+                 t.includes("preco melhor") || t.includes("abaixar") || t.includes("diminuir") ||
+                 t.includes("faz por") || t.includes("cupom") || t.includes("frete gratis") ||
+                 t.includes("frete grátis") || t.includes("melhorar o valor") || t.includes("barato");
+        });
 
-        // Regra de frete grátis: 3+ peças
-        const freteAplicado = qtdTotal >= 3 ? 0 : freteReal;
+        // O frete é cobrado normalmente (sem desconto automático de frete grátis de 3+ pods)
+        const freteAplicado = freteReal;
         const totalFinal = valorProdutos + freteAplicado;
-        const freteStr = freteAplicado === 0 ? "GRÁTIS (3+ pods)" : `R$ ${freteAplicado.toFixed(2)}`;
+        const freteStr = `R$ ${freteAplicado.toFixed(2)}`;
         const itemsSummary = orderItems.map(i => `${i.quantity}x ${i.flavor}`).join(', ');
 
         addressCompletedContext = `\n\n[SISTEMA: ENDEREÇO TOTALMENTE COMPLETO E ANOTADO!]` +
@@ -877,6 +883,7 @@ ${isOngoingConversation
           `\nValor dos produtos: R$ ${valorProdutos.toFixed(2)}` +
           `\nFrete calculado (${distanciaReal} km): ${freteStr}` +
           `\nTotal do pedido: R$ ${totalFinal.toFixed(2)}` +
+          (userAskedDiscount ? `\n\n[SISTEMA: CLIENTE SOLICITOU DESCONTO!]\nNÃO DÊ DESCONTO POR CONTA PRÓPRIA. Se o cliente perguntar de desconto, diga que vai verificar com o gerente.` : '') +
           `\n\nINSTRUÇÕES CRÍTICAS DE FLUXO:` +
           `\n1. NUNCA mais peça CEP ou endereço! Não pergunte por rua ou bairro novamente.` +
           `\n2. Responda de forma curta e informal (usando quebras de linha \\n):` +
@@ -895,8 +902,8 @@ ${isOngoingConversation
             ? `${detectedStreetAndBairro}, nº ${userNumberText || 'S/N'}`
             : "Endereço Não Informado";
 
-          // Dispara criação do pedido real no Kanban com TODOS os itens extraídos e frete real
-          createOrderInDatabase(clientName, finalAddress, orderItems, valorProdutos, freteAplicado);
+          // Dispara criação do pedido real no Kanban com TODOS os itens extraídos, frete real e tag de desconto solicitado
+          createOrderInDatabase(clientName, finalAddress, orderItems, valorProdutos, freteAplicado, userAskedDiscount);
         }
       } else if (botAskedForNumber) {
         // Estado 2: O bot pediu o número, mas o usuário ainda não respondeu o número

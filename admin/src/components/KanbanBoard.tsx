@@ -23,6 +23,7 @@ export interface AdminOrder {
   status: 'AGUARDANDO_PAGAMENTO' | 'PREPARANDO' | 'EM_ROTA' | 'ENTREGUE' | 'CONCLUIDO' | 'CANCELADO';
   time: string;
   createdAt: string;
+  requestedDiscount?: boolean;
 }
 
 const getCompletedIds = (): string[] => {
@@ -82,7 +83,8 @@ export function KanbanBoard() {
             paymentStatus: o.payment_status,
             status: isCompleted ? 'CONCLUIDO' : (o.delivery_status || 'AGUARDANDO_PAGAMENTO'),
             time: new Date(o.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            createdAt: o.created_at
+            createdAt: o.created_at,
+            requestedDiscount: !!o.requested_discount
           };
         });
         setOrders(mapped);
@@ -191,6 +193,43 @@ export function KanbanBoard() {
         alert("Erro ao excluir do banco de dados: " + error.message);
       }
     }
+  };
+
+  const handleGrantDiscount = async (realId: string, amount: number) => {
+    const targetOrder = orders.find(o => o.realId === realId);
+    if (!targetOrder) return;
+
+    const currentProductsOnly = Math.max(0, targetOrder.totalAmount - targetOrder.shippingFee);
+    const newProductsOnly = Math.max(0, currentProductsOnly - amount);
+    
+    setOrders(prev => prev.map(o => o.realId === realId ? {
+      ...o,
+      totalAmount: newProductsOnly + o.shippingFee,
+      requestedDiscount: false
+    } : o));
+
+    await supabase
+      .from('smoking_orders')
+      .update({ total_amount: newProductsOnly, requested_discount: false })
+      .eq('id', realId);
+  };
+
+  const handleGrantFreeShipping = async (realId: string) => {
+    const targetOrder = orders.find(o => o.realId === realId);
+    if (!targetOrder) return;
+
+    const productsOnly = targetOrder.totalAmount - targetOrder.shippingFee;
+    setOrders(prev => prev.map(o => o.realId === realId ? {
+      ...o,
+      shippingFee: 0,
+      totalAmount: productsOnly,
+      requestedDiscount: false
+    } : o));
+
+    await supabase
+      .from('smoking_orders')
+      .update({ shipping_fee: 0, requested_discount: false })
+      .eq('id', realId);
   };
 
   const columns = [
@@ -324,6 +363,8 @@ export function KanbanBoard() {
                         onUpdate={(realId, newStatus) => updateStatus(realId, newStatus)} 
                         onDispatchClick={() => setSelectedOrderForDispatch(order.realId)}
                         onDelete={handleDeleteOrder}
+                        onGrantDiscount={handleGrantDiscount}
+                        onGrantFreeShipping={handleGrantFreeShipping}
                       />
                     ))}
                     {colOrders.length === 0 && (
@@ -727,12 +768,16 @@ function OrderCard({
   order, 
   onUpdate, 
   onDispatchClick,
-  onDelete
+  onDelete,
+  onGrantDiscount,
+  onGrantFreeShipping
 }: { 
   order: AdminOrder; 
   onUpdate: (realId: string, s: AdminOrder['status']) => void;
   onDispatchClick: () => void;
   onDelete: (realId: string) => void;
+  onGrantDiscount: (realId: string, amount: number) => void;
+  onGrantFreeShipping: (realId: string) => void;
 }) {
   const getProgressColor = (status: AdminOrder['status']) => {
     if (status === 'AGUARDANDO_PAGAMENTO') return 'bg-white/30 w-1/4';
@@ -759,6 +804,33 @@ function OrderCard({
           {getRelativeTime(order.createdAt)}
         </div>
       </div>
+
+      {/* 🏷️ MÓDULO DE DECISÃO DO DONO: ALERTA DE SOLICITAÇÃO DE DESCONTO */}
+      {order.requestedDiscount && (
+        <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl flex flex-col gap-2 animate-pulse">
+          <div className="flex items-center justify-between">
+            <span className="text-amber-400 font-bold text-[11px] flex items-center gap-1.5">
+              🏷️ SOLICITOU DESCONTO
+            </span>
+            <span className="text-[9px] text-amber-300/70 font-mono font-semibold">Decisão do Dono</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+            <button
+              onClick={() => onGrantDiscount(order.realId, 10)}
+              className="bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-bold py-2 px-2 rounded-lg transition-all text-center cursor-pointer shadow-sm active:scale-95"
+            >
+              🟢 R$ 10 OFF
+            </button>
+            <button
+              onClick={() => onGrantFreeShipping(order.realId)}
+              className="bg-blue-500 hover:bg-blue-400 text-black text-[10px] font-bold py-2 px-2 rounded-lg transition-all text-center cursor-pointer shadow-sm active:scale-95"
+            >
+              🚚 Frete Grátis
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Itens do Pedido */}
       <div className="flex flex-col gap-3 py-1">
