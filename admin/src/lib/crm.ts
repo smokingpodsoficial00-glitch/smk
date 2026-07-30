@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 export type RealClient = {
   id: string;
   phone: string;
+  cleanPhone: string;
   name: string;
   address: string;
   spent: number;
@@ -13,6 +14,10 @@ export type RealClient = {
   lastFlavor: string;
   lastPuffs: number;
   expectedCycleDays: number;
+  estimatedDaysLeft: number;
+  isEndingSoon: boolean;
+  whatsappMessage: string;
+  whatsappUrl: string;
   segment: 'champion' | 'loyal' | 'new' | 'at_risk';
   orders: any[];
 };
@@ -52,7 +57,7 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       return [];
     }
 
-    // Agrupar pedidos por cliente (telefone real ou combinação de telefone+nome para simulações de teste)
+    // Agrupar pedidos por cliente por número de WhatsApp único
     const clientGroups = new Map<string, any[]>();
 
     for (const order of orders) {
@@ -61,8 +66,8 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       const phoneClean = phoneRaw.replace(/\D/g, '') || '5511999999999';
       const clientName = String(order.client_name || order.customer_name || '').trim().toLowerCase();
 
-      // Se for número de telefone genérico de testes do emulador (ex: 11988887777 ou 5511999999999),
-      // agrupa pelo NOME do cliente para não misturar testes de clientes diferentes em um único perfil!
+      // Se for número de teste genérico do emulador (ex: 11988887777 ou 5511999999999),
+      // agrupa pelo NOME para diferenciar clientes fictícios de teste
       const isTestPhone = phoneClean === '11988887777' || phoneClean === '5511999999999' || phoneClean === '5511988887777';
       const groupKey = (isTestPhone && clientName) ? `test_${clientName}` : phoneClean;
 
@@ -84,9 +89,11 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       const latestOrder = clientOrders[0] || {};
       const registeredCustomer = customerMap.get(phone);
 
-      const name = registeredCustomer?.name || latestOrder.client_name || latestOrder.customer_name || `Cliente ${phone.slice(-4)}`;
-      const address = registeredCustomer?.address || latestOrder.shipping_address || latestOrder.delivery_address || 'Endereço não informado';
       const rawPhone = latestOrder.client_phone || latestOrder.customer_phone || phone || '5511999999999';
+      const cleanPhone = String(rawPhone).replace(/\D/g, '');
+
+      const name = registeredCustomer?.name || latestOrder.client_name || latestOrder.customer_name || `Cliente ${cleanPhone.slice(-4)}`;
+      const address = registeredCustomer?.address || latestOrder.shipping_address || latestOrder.delivery_address || 'Endereço não informado';
 
       // Calcular Gasto Total (LTV)
       const validOrders = clientOrders.filter(o => 
@@ -110,12 +117,28 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       const lastFlavor = firstItem?.flavor || 'Frutado';
       const lastPuffs = firstItem?.puffs || 5000;
 
-      // Estimar ciclo de secagem do vape (Puffs / consumo médio)
-      const expectedCycleDays = lastPuffs >= 10000 ? 35 : lastPuffs >= 8000 ? 25 : 20;
+      // Estimar ciclo de duração do pod
+      let expectedCycleDays = 14;
+      if (lastPuffs >= 15000) {
+        expectedCycleDays = 30;
+      } else if (lastPuffs >= 10000) {
+        expectedCycleDays = 22;
+      } else if (lastPuffs >= 8000) {
+        expectedCycleDays = 18;
+      } else {
+        expectedCycleDays = 12;
+      }
 
-      // Calcular Segmento RFM
+      const estimatedDaysLeft = Math.max(0, expectedCycleDays - daysSinceLastOrder);
+      const isEndingSoon = estimatedDaysLeft <= 4 || daysSinceLastOrder >= expectedCycleDays;
+
+      // Mensagem personalizada de recompra no WhatsApp
+      const whatsappMessage = `E aí ${name}! Tudo certo? 💨 Vi que já faz um tempinho desde a sua última compra do ${lastProduct}. Seu pod já tá na final? Já quer ir garantindo o próximo para não ficar na mão? Me avisa aqui!`;
+      const whatsappUrl = `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}?text=${encodeURIComponent(whatsappMessage)}`;
+
+      // Calcular Categorização de Fidelidade
       let segment: 'champion' | 'loyal' | 'new' | 'at_risk' = 'new';
-      if (daysSinceLastOrder > 30) {
+      if (daysSinceLastOrder > 25) {
         segment = 'at_risk';
       } else if (spent >= 300 || ordersCount >= 3) {
         segment = 'champion';
@@ -128,6 +151,7 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       result.push({
         id: phone,
         phone: String(rawPhone),
+        cleanPhone,
         name: String(name),
         address: String(address),
         spent: isNaN(spent) ? 0 : spent,
@@ -138,6 +162,10 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
         lastFlavor: String(lastFlavor),
         lastPuffs,
         expectedCycleDays,
+        estimatedDaysLeft,
+        isEndingSoon,
+        whatsappMessage,
+        whatsappUrl,
         segment,
         orders: clientOrders,
       });

@@ -1,5 +1,5 @@
 import React, { Component, type ReactNode, useState } from "react";
-import { Users, Target, Activity, AlertTriangle, RefreshCw } from "lucide-react";
+import { Users, Crown, RefreshCw, AlertTriangle } from "lucide-react";
 import type { RealClient } from "@/lib/crm";
 
 // Componentes do CRM
@@ -57,8 +57,8 @@ export function CRMDashboard() {
   const [selectedClient, setSelectedClient] = useState<RealClient | null>(null);
 
   const tabs = [
-    { id: 'rfm', label: 'Matriz RFM', icon: <Target className="size-4" /> },
-    { id: 'replenishment', label: 'Reposição Preditiva', icon: <Activity className="size-4" /> },
+    { id: 'rfm', label: 'Ranking & Fidelidade', icon: <Crown className="size-4 text-amber-400" /> },
+    { id: 'replenishment', label: 'Aviso de Fim de Pod & Recompra', icon: <RefreshCw className="size-4 text-emerald-400" /> },
   ] as const;
 
   return (
@@ -70,10 +70,10 @@ export function CRMDashboard() {
             <div>
               <h2 className="text-2xl font-semibold text-silver flex items-center gap-2">
                 <Users className="size-6 text-primary" />
-                Gestão de Clientes (CRM em Tempo Real)
+                Gestão de Clientes (CRM WhatsApp)
               </h2>
               <p className="text-sm text-muted-foreground mt-1 tracking-wide">
-                Métricas reais de Lifetime Value, Recompra e Ciclo de Vida por WhatsApp.
+                Ranking de clientes leais, histórico de compras e previsão de término de pods para recompra.
               </p>
             </div>
             
@@ -91,9 +91,9 @@ export function CRMDashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                   activeSubTab === tab.id 
-                    ? 'bg-primary/10 text-primary border border-primary/20' 
+                    ? 'bg-white/10 text-white border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.1)]' 
                     : 'text-muted-foreground hover:bg-white/5 border border-transparent'
                 }`}
               >

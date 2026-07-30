@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Star, TrendingUp, UserCheck, Crown, ShieldAlert, Phone, Loader2, MessageSquare } from "lucide-react";
+import { Star, UserCheck, Crown, ShieldAlert, Phone, Loader2, MessageSquare, Trophy } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { fetchLiveClients, type RealClient } from "@/lib/crm";
 import { supabase } from "@/lib/supabase";
@@ -40,7 +40,7 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
     return (
       <div className="flex flex-col items-center justify-center p-12">
         <Loader2 className="size-8 text-primary animate-spin mb-2" />
-        <p className="text-sm text-muted-foreground">Carregando Matriz RFM de clientes reais...</p>
+        <p className="text-sm text-muted-foreground">Carregando Ranking de Clientes...</p>
       </div>
     );
   }
@@ -55,21 +55,21 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Cards de Métricas do CRM */}
+      {/* Cards de Categorização por Recorrência e LTV */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div 
           onClick={() => setFilterSegment(filterSegment === 'champion' ? 'all' : 'champion')}
-          className={`bg-card border p-5 rounded-2xl cursor-pointer transition-all ${filterSegment === 'champion' ? 'border-yellow-500/50 bg-yellow-500/5' : 'border-border hover:border-white/10'}`}
+          className={`bg-card border p-5 rounded-2xl cursor-pointer transition-all ${filterSegment === 'champion' ? 'border-amber-500/50 bg-amber-500/5' : 'border-border hover:border-white/10'}`}
         >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Crown className="size-4 text-yellow-500" />
-              <h3 className="text-sm font-medium">Champions (VIPs)</h3>
+              <Crown className="size-4 text-amber-400" />
+              <h3 className="text-sm font-bold text-white">🥇 Clientes VIPs</h3>
             </div>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400">LTV Alto</span>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">LTV Alto</span>
           </div>
           <div className="text-2xl font-bold text-white">{champions.length} clientes</div>
-          <p className="text-xs text-muted-foreground mt-1">Clientes de maior valor e frequência de recompra.</p>
+          <p className="text-xs text-muted-foreground mt-1">Os clientes que mais compram e geram maior faturamento.</p>
         </div>
 
         <div 
@@ -79,12 +79,12 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 text-muted-foreground">
               <UserCheck className="size-4 text-emerald-400" />
-              <h3 className="text-sm font-medium">Clientes Leais</h3>
+              <h3 className="text-sm font-bold text-white">🔄 Clientes Recorrentes</h3>
             </div>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Recorrentes</span>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Frequentes</span>
           </div>
           <div className="text-2xl font-bold text-white">{loyals.length} clientes</div>
-          <p className="text-xs text-muted-foreground mt-1">Base sólida que faz pedidos periodicamente.</p>
+          <p className="text-xs text-muted-foreground mt-1">Clientes fiéis que fazem pedidos periodicamente.</p>
         </div>
 
         <div 
@@ -94,28 +94,31 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 text-muted-foreground">
               <ShieldAlert className="size-4 text-red-400" />
-              <h3 className="text-sm font-medium">Em Risco (Win-back)</h3>
+              <h3 className="text-sm font-bold text-white">⚠️ Clientes em Risco</h3>
             </div>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-red-500/10 text-red-400">Sem pedido 30d+</span>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">Sumidos +25d</span>
           </div>
           <div className="text-2xl font-bold text-white">{atRisk.length} clientes</div>
-          <p className="text-xs text-muted-foreground mt-1">Oportunidade para enviar cupom de reposição.</p>
+          <p className="text-xs text-muted-foreground mt-1">Não compram há tempo. Excelente oportunidade de reconquista!</p>
         </div>
       </div>
 
-      {/* Tabela Principal de Clientes Reais */}
-      <div className="bg-card border border-border rounded-2xl overflow-hidden">
-        <div className="p-5 border-b border-border flex items-center justify-between bg-elevated/30">
+      {/* Tabela Principal de Clientes */}
+      <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xl">
+        <div className="p-5 border-b border-border flex items-center justify-between bg-black/40">
           <div>
-            <h3 className="font-semibold text-silver">Listagem de Clientes Reais ({filteredClients.length})</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Clique em um cliente para ver o histórico completo de pedidos e endereço.</p>
+            <h3 className="font-bold text-white text-base flex items-center gap-2">
+              <Trophy className="size-4 text-amber-400" />
+              Ranking Completo de Clientes ({filteredClients.length})
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Cada telefone WhatsApp gera um único registro acumulando o LTV total gasto.</p>
           </div>
           {filterSegment !== 'all' && (
             <button 
               onClick={() => setFilterSegment('all')}
-              className="text-xs text-primary hover:underline font-semibold"
+              className="text-xs text-white hover:underline font-semibold bg-white/10 px-3 py-1.5 rounded-lg border border-white/20"
             >
-              Mostrar Todos os Clientes
+              Mostrar Todos
             </button>
           )}
         </div>
@@ -127,21 +130,21 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="text-xs text-muted-foreground uppercase bg-elevated/50">
+              <thead className="text-xs text-muted-foreground uppercase bg-white/5 border-b border-border">
                 <tr>
-                  <th className="px-6 py-4 font-medium">Cliente & Telefone</th>
-                  <th className="px-6 py-4 font-medium">Segmento RFM</th>
-                  <th className="px-6 py-4 font-medium">LTV (Gasto Total)</th>
-                  <th className="px-6 py-4 font-medium">Pedidos</th>
-                  <th className="px-6 py-4 font-medium">Última Compra</th>
-                  <th className="px-6 py-4 font-medium text-right">Ações</th>
+                  <th className="px-6 py-4 font-bold text-white">Cliente & Telefone</th>
+                  <th className="px-6 py-4 font-bold text-white">Classificação</th>
+                  <th className="px-6 py-4 font-bold text-white">LTV (Total Gasto)</th>
+                  <th className="px-6 py-4 font-bold text-white">Pedidos</th>
+                  <th className="px-6 py-4 font-bold text-white">Última Compra</th>
+                  <th className="px-6 py-4 font-bold text-white text-right">Ação WhatsApp</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredClients.map(client => {
                   if (!client) return null;
                   const phoneClean = (client.phone || '').replace(/\D/g, '');
-                  const waUrl = `https://wa.me/${phoneClean}?text=${encodeURIComponent(`Olá ${client.name || 'Cliente'}, tudo bem? Aqui é da Smoking Pods!`)}`;
+                  const waUrl = client.whatsappUrl || `https://wa.me/${phoneClean}?text=${encodeURIComponent(`Olá ${client.name || 'Cliente'}, tudo bem? Aqui é da Smoking Pods!`)}`;
 
                   return (
                     <tr 
@@ -150,11 +153,11 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
                     >
                       <td className="px-6 py-4" onClick={() => onSelectClient(client)}>
                         <div className="flex items-center gap-3">
-                          <div className="size-9 rounded-full bg-elevated flex items-center justify-center font-bold text-silver border border-white/10 group-hover:border-primary/50 transition-colors">
+                          <div className="size-9 rounded-full bg-white/10 flex items-center justify-center font-bold text-white border border-white/20 group-hover:border-white transition-colors">
                             {(client.name || 'C').charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <div className="font-semibold text-white group-hover:text-primary transition-colors">
+                            <div className="font-bold text-white group-hover:text-amber-400 transition-colors">
                               {client.name || 'Cliente'}
                             </div>
                             <div className="text-xs text-muted-foreground font-mono flex items-center gap-1 mt-0.5">
@@ -167,38 +170,38 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
 
                       <td className="px-6 py-4" onClick={() => onSelectClient(client)}>
                         {client.segment === 'champion' && (
-                          <span className="bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 w-fit">
-                            <Crown className="size-3.5" /> VIP Champion
+                          <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 w-fit">
+                            <Crown className="size-3.5" /> 🥇 VIP (LTV Alto)
                           </span>
                         )}
                         {client.segment === 'loyal' && (
-                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 w-fit">
-                            <UserCheck className="size-3.5" /> Leal
+                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 w-fit">
+                            <UserCheck className="size-3.5" /> 🔄 Recorrente
                           </span>
                         )}
                         {client.segment === 'new' && (
-                          <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 w-fit">
-                            <Star className="size-3.5" /> Novato
+                          <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 w-fit">
+                            <Star className="size-3.5" /> ✨ Novato
                           </span>
                         )}
                         {client.segment === 'at_risk' && (
-                          <span className="bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 w-fit">
-                            <ShieldAlert className="size-3.5" /> Em Risco
+                          <span className="bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 w-fit">
+                            <ShieldAlert className="size-3.5" /> ⚠️ Em Risco
                           </span>
                         )}
                       </td>
 
-                      <td className="px-6 py-4 font-mono font-bold text-emerald-400" onClick={() => onSelectClient(client)}>
+                      <td className="px-6 py-4 font-mono font-extrabold text-emerald-400 text-base" onClick={() => onSelectClient(client)}>
                         {formatBRL(client.spent || 0)}
                       </td>
 
-                      <td className="px-6 py-4 font-mono text-silver" onClick={() => onSelectClient(client)}>
+                      <td className="px-6 py-4 font-mono font-semibold text-white" onClick={() => onSelectClient(client)}>
                         {client.ordersCount || 1} {client.ordersCount === 1 ? 'pedido' : 'pedidos'}
                       </td>
 
                       <td className="px-6 py-4 text-xs text-muted-foreground" onClick={() => onSelectClient(client)}>
-                        <div>{client.lastOrderDate || 'Hoje'}</div>
-                        <div className="text-[11px] text-muted-foreground/60 mt-0.5">
+                        <div className="font-semibold text-white">{client.lastOrderDate || 'Hoje'}</div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
                           {client.daysSinceLastOrder === 0 ? 'Hoje' : `há ${client.daysSinceLastOrder || 0} dias`}
                         </div>
                       </td>
@@ -210,11 +213,11 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/20 transition-all"
-                            title="Abrir WhatsApp"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold shadow-[0_0_15px_rgba(16,185,129,0.2)] transition-all cursor-pointer"
+                            title="Abrir conversa no WhatsApp"
                           >
                             <MessageSquare className="size-3.5" />
-                            WhatsApp
+                            <span>WhatsApp</span>
                           </a>
                         </div>
                       </td>
