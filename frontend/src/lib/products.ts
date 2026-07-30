@@ -63,8 +63,6 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
       return data
         .filter((item: any) => {
           if (item.is_active === false) return false;
-          const fName = (item.flavor || '').trim().toLowerCase();
-          if (fName === 'padrão' || fName === 'padrao' || fName === '') return false;
           return true;
         })
         .map((item: any) => ({
