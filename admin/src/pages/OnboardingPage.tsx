@@ -14,7 +14,8 @@ import {
   ArrowLeft, 
   Check, 
   Loader2,
-  Sparkles
+  Sparkles,
+  Search
 } from 'lucide-react';
 
 export function OnboardingPage() {
@@ -62,7 +63,110 @@ export function OnboardingPage() {
   // Payment State
   const [pixKey, setPixKey] = useState(company?.pix_key || '');
 
+  // Autocomplete & CEP State
+  const [loadingCep, setLoadingCep] = useState(false);
+  const [cepSuccessMsg, setCepSuccessMsg] = useState<string | null>(null);
+  const [addressSuggestions, setAddressSuggestions] = useState<Array<{ display_name: string; postcode?: string }>>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   const totalSteps = 6;
+
+  // Busca CEP via ViaCEP / AwesomeAPI
+  const fetchAddressByCep = async (cepInput: string) => {
+    const clean = cepInput.replace(/\D/g, '');
+    if (clean.length !== 8) return;
+
+    setLoadingCep(true);
+    setCepSuccessMsg(null);
+
+    try {
+      // 1. Tenta ViaCEP
+      const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.erro && data.logradouro) {
+          const formatted = `${data.logradouro}, ${data.bairro} - ${data.localidade}, ${data.uf}`;
+          setAddress(formatted);
+          setCepSuccessMsg(`Endereço localizado: ${data.logradouro}, ${data.bairro}`);
+          setLoadingCep(false);
+          return;
+        }
+      }
+
+      // 2. Fallback AwesomeAPI
+      const res2 = await fetch(`https://cep.awesomeapi.com.br/json/${clean}`);
+      if (res2.ok) {
+        const data2 = await res2.json();
+        if (data2.address) {
+          const formatted = `${data2.address}, ${data2.district} - ${data2.city}, ${data2.state}`;
+          setAddress(formatted);
+          setCepSuccessMsg(`Endereço localizado: ${data2.address}`);
+          setLoadingCep(false);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Erro ao buscar CEP:', e);
+    } finally {
+      setLoadingCep(false);
+    }
+  };
+
+  // Autocomplete de Endereço via Nominatim (OSM)
+  const fetchAddressSuggestions = async (query: string) => {
+    if (query.trim().length < 4) {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    setLoadingSuggestions(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=br&limit=5&addressdetails=1`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped = data.map((item: any) => ({
+            display_name: item.display_name,
+            postcode: item.address?.postcode || '',
+          }));
+          setAddressSuggestions(mapped);
+          setShowSuggestions(true);
+        } else {
+          setAddressSuggestions([]);
+          setShowSuggestions(false);
+        }
+      }
+    } catch (e) {
+      console.warn('Erro na busca de sugestões:', e);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setAddress(val);
+    setCepSuccessMsg(null);
+
+    if (val.length >= 4) {
+      fetchAddressSuggestions(val);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSelectSuggestion = (sugg: { display_name: string; postcode?: string }) => {
+    setAddress(sugg.display_name);
+    if (sugg.postcode) {
+      setOriginCep(sugg.postcode);
+    }
+    setShowSuggestions(false);
+    setCepSuccessMsg('Endereço selecionado!');
+  };
 
   const handleNext = () => {
     if (step < totalSteps) setStep(prev => prev + 1);
@@ -195,7 +299,7 @@ export function OnboardingPage() {
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   placeholder="Ex: Vape King Lounge"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-medium"
                 />
               </div>
 
@@ -207,7 +311,7 @@ export function OnboardingPage() {
                     value={logoUrl}
                     onChange={(e) => setLogoUrl(e.target.value)}
                     placeholder="https://exemplo.com/logo.png"
-                    className="flex-1 bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
+                    className="flex-1 bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-medium"
                   />
                   <div className="size-11 rounded-xl bg-[#141414] border border-[#262626] flex items-center justify-center shrink-0">
                     {logoUrl ? (
@@ -221,7 +325,7 @@ export function OnboardingPage() {
             </div>
           )}
 
-          {/* STEP 2: Localização */}
+          {/* STEP 2: Localização com Busca por CEP & Autocomplete em Tempo Real */}
           {step === 2 && (
             <div className="space-y-4 animate-fadeIn">
               <div className="flex items-center gap-3 mb-2">
@@ -230,30 +334,97 @@ export function OnboardingPage() {
                 </div>
                 <div>
                   <h2 className="font-bold text-base text-white">Endereço da Operação</h2>
-                  <p className="text-xs text-white/50">Endereço de partida dos entregadores para cálculo de frete</p>
+                  <p className="text-xs text-white/50">Digite o CEP para buscar automaticamente ou escreva o nome da rua</p>
                 </div>
               </div>
 
+              {/* CEP Input com Auto-Busca */}
               <div>
-                <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Endereço Completo</label>
+                <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider flex items-center justify-between">
+                  <span>CEP de Origem (Busca automática)</span>
+                  {loadingCep && (
+                    <span className="text-[11px] text-white flex items-center gap-1">
+                      <Loader2 className="size-3 animate-spin text-white" /> Buscando CEP...
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={originCep}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setOriginCep(val);
+                      if (val.replace(/\D/g, '').length === 8) {
+                        fetchAddressByCep(val);
+                      }
+                    }}
+                    placeholder="00000-000"
+                    maxLength={9}
+                    className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-mono tracking-wider"
+                  />
+                  {originCep.replace(/\D/g, '').length === 8 && !loadingCep && (
+                    <button
+                      type="button"
+                      onClick={() => fetchAddressByCep(originCep)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 border border-white/20 text-xs px-3 py-1.5 rounded-lg text-white font-semibold transition-colors flex items-center gap-1"
+                    >
+                      <Search className="size-3" />
+                      <span>Buscar CEP</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Success Badge */}
+              {cepSuccessMsg && (
+                <div className="p-3 bg-white/10 border border-white/20 rounded-xl text-xs font-semibold text-white flex items-center gap-2 animate-fadeIn">
+                  <Check className="size-4 text-white shrink-0" />
+                  <span>{cepSuccessMsg}</span>
+                </div>
+              )}
+
+              {/* Endereço Completo com Live Autocomplete Dropdown */}
+              <div className="relative">
+                <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider flex items-center justify-between">
+                  <span>Endereço Completo</span>
+                  {loadingSuggestions && (
+                    <span className="text-[11px] text-white/50 flex items-center gap-1">
+                      <Loader2 className="size-3 animate-spin" /> Buscando sugestões...
+                    </span>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Rua, Número, Bairro - Cidade, Estado"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
+                  onChange={handleAddressChange}
+                  onFocus={() => {
+                    if (addressSuggestions.length > 0) setShowSuggestions(true);
+                  }}
+                  placeholder="Escreva a rua ou número para ver sugestões..."
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-medium"
                 />
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">CEP de Origem</label>
-                <input
-                  type="text"
-                  value={originCep}
-                  onChange={(e) => setOriginCep(e.target.value)}
-                  placeholder="00000-000"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
-                />
+                {/* Floating Autocomplete Dropdown */}
+                {showSuggestions && addressSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-[#1e1e1e]">
+                    {addressSuggestions.map((sugg, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleSelectSuggestion(sugg)}
+                        className="p-3 hover:bg-[#1a1a1a] cursor-pointer transition-colors text-xs text-white flex items-start gap-2.5"
+                      >
+                        <MapPin className="size-4 text-white/60 shrink-0 mt-0.5" />
+                        <div>
+                          <div className="font-semibold text-white">{sugg.display_name}</div>
+                          {sugg.postcode && (
+                            <div className="text-[11px] text-white/40 font-mono mt-0.5">CEP: {sugg.postcode}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -278,7 +449,7 @@ export function OnboardingPage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="(11) 99999-9999"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-medium"
                 />
               </div>
 
@@ -289,7 +460,7 @@ export function OnboardingPage() {
                   value={instagram}
                   onChange={(e) => setInstagram(e.target.value)}
                   placeholder="@minhalojaoficial"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-medium"
                 />
               </div>
             </div>
@@ -315,7 +486,7 @@ export function OnboardingPage() {
                   value={businessHours}
                   onChange={(e) => setBusinessHours(e.target.value)}
                   placeholder="Ex: 11:00 às 23:00 (Segunda a Sábado)"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-medium"
                 />
               </div>
             </div>
