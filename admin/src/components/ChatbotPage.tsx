@@ -7,6 +7,7 @@ import {
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
 import { calculateShippingQuote } from "@/lib/shipping";
+import { useAuth } from "@/contexts/AuthContext";
 // stockSync: triggers SQL cuidam da dedução/devolução automaticamente
 
 const DEFINITIVE_SYSTEM_PROMPT = `SCRIPT DEFINITIVO — IA SMOKING PODS (Eloisa — Especialista em Vendas)
@@ -107,6 +108,7 @@ const DEFAULT_OPENAI_KEY = "sk-proj-zr6Fp9L428mCMfD27whPxB3UJM31fk7Ace-knox1VB9h
 
 export function ChatbotPage() {
   const { config } = useStoreConfig();
+  const { company } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [isQrLoading, setIsQrLoading] = useState(false);
   const [qrCodeVersion, setQrCodeVersion] = useState(1);
@@ -404,7 +406,8 @@ export function ChatbotPage() {
         payment_method: "PIX",
         payment_status: "PENDENTE",
         delivery_status: "AGUARDANDO_PAGAMENTO",
-        receipt_url: requestedDiscount ? "SOLICITOU_DESCONTO" : null
+        receipt_url: requestedDiscount ? "SOLICITOU_DESCONTO" : null,
+        ...(company?.id ? { company_id: company.id } : {})
       };
 
       const { data, error } = await supabase
