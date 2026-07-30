@@ -3,7 +3,8 @@ import {
   PackageSearch, Plus, Minus, Eye, EyeOff, Loader2, ImagePlus, Upload, 
   Trash2, Search, Filter, ArrowUpDown, MoreVertical, Copy, Edit3, DollarSign, 
   CheckCircle2, X, TrendingUp, PieChart, ChevronRight, ChevronDown, ChevronUp, 
-  Tag, Box, Camera, Download, FileText, BarChart3
+  Tag, Box, Camera, Download, FileText, BarChart3, Check, Share2, Smartphone, 
+  Monitor, Store, ExternalLink
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatBRL } from "@/lib/cart";
@@ -74,6 +75,28 @@ export function SupplyChainDashboard() {
 
   // Estado para modelo expandido no Ranking de Vendas por Modelo
   const [expandedRankingModelKey, setExpandedRankingModelKey] = useState<string | null>(null);
+
+  // Estado para Modal de Pré-visualização do Catálogo Público (Front do Cliente)
+  const [showCatalogPreviewModal, setShowCatalogPreviewModal] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
+  const [copiedCatalogLink, setCopiedCatalogLink] = useState(false);
+
+  const catalogUrl = `${window.location.origin}/catalogo`;
+
+  const handleCopyCatalogLink = () => {
+    try {
+      navigator.clipboard.writeText(catalogUrl);
+      setCopiedCatalogLink(true);
+      setTimeout(() => setCopiedCatalogLink(false), 2500);
+    } catch (e) {
+      console.warn('Erro ao copiar link:', e);
+    }
+  };
+
+  const handleShareWhatsAppCatalog = () => {
+    const text = `Confira nosso catálogo oficial de pods atualizado e faça seu pedido online:\n${catalogUrl}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
 
   // ─── Helpers ────────────────────────────────────────────
   const getGroupDisplayName = (brand: string, name: string) => {
@@ -642,10 +665,10 @@ export function SupplyChainDashboard() {
   return (
     <div className="flex-1 overflow-y-auto bg-background custom-scrollbar relative">
 
-      {/* ━━━ STICKY HEADER COM APENAS O BOTÃO NOVO PRODUTO ━━━━━━━━━━━━━━ */}
+      {/* ━━━ STICKY HEADER COM BOTÕES DE CATÁLOGO E NOVO PRODUTO ━━━━━━━━━━━━━━ */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border">
         <div className="px-4 md:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                 <PackageSearch className="size-5 text-emerald-400" />
@@ -656,14 +679,36 @@ export function SupplyChainDashboard() {
               </p>
             </div>
 
-            {/* Apenas o Botão + Novo Produto no Topo Superior Direito */}
-            <button
-              onClick={() => setShowNewProductModal(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] cursor-pointer active:scale-[0.97]"
-            >
-              <Plus className="size-4" />
-              Novo Produto
-            </button>
+            {/* Ações do Topo Superior Direito */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Botão Ver Catálogo (Front do Cliente) */}
+              <button
+                onClick={() => setShowCatalogPreviewModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/20 cursor-pointer active:scale-[0.97] shadow-[0_0_15px_rgba(255,255,255,0.1)]"
+              >
+                <Eye className="size-4 text-emerald-400" />
+                <span>Ver Catálogo (Front do Cliente)</span>
+              </button>
+
+              {/* Botão Compartilhar Link */}
+              <button
+                onClick={handleCopyCatalogLink}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#141414] hover:bg-[#1f1f1f] text-white text-xs font-semibold transition-all border border-[#2a2a2a] cursor-pointer"
+                title="Copiar Link do Catálogo"
+              >
+                {copiedCatalogLink ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4 text-white/70" />}
+                <span>{copiedCatalogLink ? "Link Copiado!" : "Compartilhar Link"}</span>
+              </button>
+
+              {/* Botão + Novo Produto */}
+              <button
+                onClick={() => setShowNewProductModal(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] cursor-pointer active:scale-[0.97]"
+              >
+                <Plus className="size-4" />
+                <span>Novo Produto</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1572,6 +1617,190 @@ export function SupplyChainDashboard() {
                 <Trash2 className="size-4" />
                 Excluir SKU
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ━━━ MODAL VER CATÁLOGO (FRONT DO CLIENTE PREVIEW) ━━━━━━━━━━━━━━ */}
+      {showCatalogPreviewModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex flex-col items-center justify-center p-2 sm:p-6 animate-fadeIn">
+          {/* Header Superior do Preview */}
+          <div className="w-full max-w-5xl bg-[#0e0e0e] border border-[#222] rounded-2xl p-4 mb-4 flex items-center justify-between shadow-2xl shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <Store className="size-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                  Pré-visualização do Catálogo (Front-End)
+                  <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-bold">
+                    🟢 Loja Online Ativa
+                  </span>
+                </h3>
+                <p className="text-[11px] text-white/50">É exatamente assim que os seus clientes visualizam a loja no celular e no computador.</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Seletor Dispositivo (Mobile / Desktop) */}
+              <div className="hidden sm:flex items-center bg-[#181818] p-1 rounded-xl border border-[#2a2a2a]">
+                <button
+                  onClick={() => setPreviewDevice('mobile')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    previewDevice === 'mobile' ? 'bg-white text-black shadow-md' : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  <Smartphone className="size-3.5" /> Mobile
+                </button>
+                <button
+                  onClick={() => setPreviewDevice('desktop')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    previewDevice === 'desktop' ? 'bg-white text-black shadow-md' : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  <Monitor className="size-3.5" /> Desktop
+                </button>
+              </div>
+
+              {/* Botão Copiar Link */}
+              <button
+                onClick={handleCopyCatalogLink}
+                className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                {copiedCatalogLink ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                <span className="hidden sm:inline">{copiedCatalogLink ? "Copiado!" : "Copiar Link"}</span>
+              </button>
+
+              {/* Botão WhatsApp */}
+              <button
+                onClick={handleShareWhatsAppCatalog}
+                className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+              >
+                <Share2 className="size-3.5" />
+                <span className="hidden sm:inline">Enviar no Zap</span>
+              </button>
+
+              {/* Fechar */}
+              <button
+                onClick={() => setShowCatalogPreviewModal(false)}
+                className="p-2 rounded-xl bg-[#1a1a1a] hover:bg-[#282828] text-white/70 hover:text-white transition-all cursor-pointer border border-[#2a2a2a]"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Container Simulador (Mockup de Tela) */}
+          <div className={`w-full flex-1 overflow-hidden transition-all duration-300 flex items-center justify-center ${
+            previewDevice === 'mobile' ? 'max-w-[420px] h-[85vh]' : 'max-w-5xl h-[85vh]'
+          }`}>
+            <div className="w-full h-full bg-[#050505] border border-[#222] rounded-3xl overflow-hidden shadow-2xl flex flex-col relative">
+              
+              {/* Header da Loja do Cliente */}
+              <div className="p-4 bg-[#0a0a0a] border-b border-[#1f1f1f] flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center font-bold text-white text-base">
+                    {company?.logo_url ? (
+                      <img src={company.logo_url} alt="Logo" className="size-8 object-contain rounded" />
+                    ) : (
+                      '💨'
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-white text-sm tracking-tight">{company?.name || 'Smoking Pods'}</h4>
+                    <div className="flex items-center gap-2 text-[11px] text-white/50">
+                      <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+                        <div className="size-1.5 rounded-full bg-emerald-400 animate-pulse" /> Aberto agora
+                      </span>
+                      <span>•</span>
+                      <span>Entrega rápida</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-xs text-white font-bold flex items-center gap-1.5">
+                  🛒 Carrinho (0)
+                </div>
+              </div>
+
+              {/* Corpo do Catálogo do Cliente */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar">
+                
+                {/* Banner de Boas-Vindas */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-white/10 via-white/5 to-transparent border border-white/10 relative overflow-hidden">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                    Catálogo Oficial
+                  </span>
+                  <h3 className="text-lg font-extrabold text-white mt-1">Pods Descartáveis & Recarregáveis</h3>
+                  <p className="text-xs text-white/60 mt-0.5">Selecione seu modelo favorito e peça direto pelo WhatsApp.</p>
+                </div>
+
+                {/* Filtros em Pílulas */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar text-xs">
+                  <span className="px-3.5 py-1.5 rounded-full bg-white text-black font-bold shrink-0 cursor-pointer">Todos os Pods</span>
+                  <span className="px-3.5 py-1.5 rounded-full bg-[#141414] border border-[#222] text-white/70 hover:text-white shrink-0 cursor-pointer">Ignite</span>
+                  <span className="px-3.5 py-1.5 rounded-full bg-[#141414] border border-[#222] text-white/70 hover:text-white shrink-0 cursor-pointer">Elfbar / Lost Mary</span>
+                  <span className="px-3.5 py-1.5 rounded-full bg-[#141414] border border-[#222] text-white/70 hover:text-white shrink-0 cursor-pointer">+10.000 Puffs</span>
+                </div>
+
+                {/* Grid de Pods (Lista Exibida para o Cliente) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {products.length === 0 ? (
+                    <div className="col-span-full p-8 text-center text-white/40 text-xs">
+                      Nenhum produto cadastrado no catálogo ainda.
+                    </div>
+                  ) : (
+                    products.map((prod: any) => {
+                      return (
+                        <div key={prod.id} className="bg-[#0b0b0b] border border-[#1f1f1f] rounded-2xl p-3.5 flex flex-col justify-between hover:border-white/20 transition-all">
+                          <div>
+                            {/* Imagem do Pod */}
+                            <div className="w-full h-36 bg-[#121212] rounded-xl mb-3 overflow-hidden border border-[#1a1a1a] flex items-center justify-center relative">
+                              {prod.image_url ? (
+                                <img src={prod.image_url} alt={prod.name} className="w-full h-full object-contain p-2" />
+                              ) : (
+                                <Box className="size-10 text-white/20" />
+                              )}
+                              <span className="absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/80 text-white border border-white/10">
+                                💨 {prod.puffs || 5000} Puffs
+                              </span>
+                            </div>
+
+                            <div className="text-xs font-bold text-white/50 uppercase tracking-wider">{prod.brand}</div>
+                            <h4 className="font-extrabold text-white text-sm">{prod.name}</h4>
+                            <p className="text-xs text-white/60 mt-0.5">{prod.flavor || 'Diversos sabores'}</p>
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-[#191919] flex items-center justify-between">
+                            <div>
+                              <span className="text-[10px] text-white/40 block uppercase">A partir de</span>
+                              <span className="text-base font-extrabold text-emerald-400">{formatBRL(prod.price)}</span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => alert(`Simulação do Cliente: ${prod.name} adicionado ao carrinho!`)}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+                            >
+                              <span>+ Pedir</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Footer Fixo da Loja */}
+              <div className="p-3 bg-[#0a0a0a] border-t border-[#1f1f1f] text-center text-[11px] text-white/40 flex items-center justify-between">
+                <span>© {company?.name || 'Smoking Pods'} • Loja Virtual</span>
+                <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                  ⚡ Powered by Smoking SaaS
+                </span>
+              </div>
+
             </div>
           </div>
         </div>
