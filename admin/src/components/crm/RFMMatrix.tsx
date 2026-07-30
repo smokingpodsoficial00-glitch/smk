@@ -3,15 +3,17 @@ import { Star, TrendingUp, UserCheck, Crown, ShieldAlert, Phone, Loader2, Messag
 import { formatBRL } from "@/lib/cart";
 import { fetchLiveClients, type RealClient } from "@/lib/crm";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "../../contexts/AuthContext";
 
 export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealClient) => void }) {
+  const { company } = useAuth();
   const [clients, setClients] = useState<RealClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterSegment, setFilterSegment] = useState<string>('all');
 
   const loadClients = async () => {
     try {
-      const live = await fetchLiveClients();
+      const live = await fetchLiveClients(company?.id);
       setClients(Array.isArray(live) ? live : []);
     } catch (err) {
       console.error("Erro no loadClients:", err);
@@ -32,7 +34,7 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [company?.id]);
 
   if (loading) {
     return (

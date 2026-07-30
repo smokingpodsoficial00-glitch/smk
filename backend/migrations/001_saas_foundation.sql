@@ -212,7 +212,7 @@ CREATE POLICY "Users can view members of their company"
 -- POLÍTICAS PRODUCTS
 DROP POLICY IF EXISTS "Acesso total para Produtos" ON public.smoking_products;
 DROP POLICY IF EXISTS "Tenant isolation select products" ON public.smoking_products;
-CREATE POLICY "Tenant isolation select products" ON public.smoking_products FOR SELECT USING (company_id = public.get_auth_company_id() OR company_id IS NULL);
+CREATE POLICY "Tenant isolation select products" ON public.smoking_products FOR SELECT USING (company_id = public.get_auth_company_id());
 
 DROP POLICY IF EXISTS "Tenant isolation insert products" ON public.smoking_products;
 CREATE POLICY "Tenant isolation insert products" ON public.smoking_products FOR INSERT WITH CHECK (company_id = public.get_auth_company_id());
@@ -226,7 +226,7 @@ CREATE POLICY "Tenant isolation delete products" ON public.smoking_products FOR 
 -- POLÍTICAS ORDERS
 DROP POLICY IF EXISTS "Acesso total Service Role para Pedidos" ON public.smoking_orders;
 DROP POLICY IF EXISTS "Tenant isolation select orders" ON public.smoking_orders;
-CREATE POLICY "Tenant isolation select orders" ON public.smoking_orders FOR SELECT USING (company_id = public.get_auth_company_id() OR company_id IS NULL);
+CREATE POLICY "Tenant isolation select orders" ON public.smoking_orders FOR SELECT USING (company_id = public.get_auth_company_id());
 
 DROP POLICY IF EXISTS "Tenant isolation insert orders" ON public.smoking_orders;
 CREATE POLICY "Tenant isolation insert orders" ON public.smoking_orders FOR INSERT WITH CHECK (company_id = public.get_auth_company_id());
@@ -240,7 +240,7 @@ CREATE POLICY "Tenant isolation delete orders" ON public.smoking_orders FOR DELE
 -- POLÍTICAS CLIENTS
 DROP POLICY IF EXISTS "Acesso total Service Role para Clientes" ON public.smoking_clients;
 DROP POLICY IF EXISTS "Tenant isolation select clients" ON public.smoking_clients;
-CREATE POLICY "Tenant isolation select clients" ON public.smoking_clients FOR SELECT USING (company_id = public.get_auth_company_id() OR company_id IS NULL);
+CREATE POLICY "Tenant isolation select clients" ON public.smoking_clients FOR SELECT USING (company_id = public.get_auth_company_id());
 
 DROP POLICY IF EXISTS "Tenant isolation insert clients" ON public.smoking_clients;
 CREATE POLICY "Tenant isolation insert clients" ON public.smoking_clients FOR INSERT WITH CHECK (company_id = public.get_auth_company_id());
@@ -253,7 +253,7 @@ DROP POLICY IF EXISTS "Qualquer um pode ler" ON public.store_config;
 DROP POLICY IF EXISTS "Qualquer um pode atualizar" ON public.store_config;
 DROP POLICY IF EXISTS "Qualquer um pode inserir" ON public.store_config;
 DROP POLICY IF EXISTS "Tenant isolation select store_config" ON public.store_config;
-CREATE POLICY "Tenant isolation select store_config" ON public.store_config FOR SELECT USING (company_id = public.get_auth_company_id() OR company_id IS NULL);
+CREATE POLICY "Tenant isolation select store_config" ON public.store_config FOR SELECT USING (company_id = public.get_auth_company_id());
 
 DROP POLICY IF EXISTS "Tenant isolation update store_config" ON public.store_config;
 CREATE POLICY "Tenant isolation update store_config" ON public.store_config FOR UPDATE USING (company_id = public.get_auth_company_id());

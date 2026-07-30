@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatBRL } from "@/lib/cart";
+import { useAuth } from "../contexts/AuthContext";
 
 // ─── Donut chart colors ───────────────────────────────────
 const DONUT_COLORS = ["#34d399", "#60a5fa", "#a78bfa", "#fbbf24", "#f87171", "#f472b6", "#38bdf8"];
@@ -17,6 +18,7 @@ const MEDAL_STYLES = [
 ];
 
 export function SupplyChainDashboard() {
+  const { company } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [topSelling, setTopSelling] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,18 +109,22 @@ export function SupplyChainDashboard() {
 
   const uploadProductImage = async (file: File): Promise<string> => {
     try {
-      const fileExt = file.name.split('.').pop() || 'png';
-      const fileName = `pod_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-      const filePath = `pods/${fileName}`;
-      const { data, error } = await supabase.storage.from('product-images').upload(filePath, file, { upsert: true });
-      if (!error && data) {
-        const { data: publicUrlData } = supabase.storage.from('product-images').getPublicUrl(filePath);
-        if (publicUrlData?.publicUrl) return publicUrlData.publicUrl;
-      }
+      const compressedBase64 = await compressImage(file);
+      const blob = await (await fetch(compressedBase64)).blob();
+      const fileExt = "jpg";
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `product_images/${fileName}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from("products")
+        .upload(filePath, blob, { contentType: "image/jpeg", upsert: true });
+
+      if (uploadErr) return compressedBase64;
+      const { data: publicUrlData } = supabase.storage.from("products").getPublicUrl(filePath);
+      return publicUrlData?.publicUrl || compressedBase64;
     } catch (e) {
-      console.warn("Storage Supabase não disponível, usando Base64 comprimido:", e);
+      return await compressImage(file);
     }
-    return await compressImage(file);
   };
 
   const processSelectedFile = (file: File) => {
@@ -128,14 +134,15 @@ export function SupplyChainDashboard() {
     reader.readAsDataURL(file);
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) processSelectedFile(file);
   };
 
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
+    e.preventDefault(); setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (file && file.type.startsWith("image/")) processSelectedFile(file);
   };
@@ -143,12 +150,19 @@ export function SupplyChainDashboard() {
   // ─── Data Fetching ──────────────────────────────────────
   const fetchData = async () => {
     try {
-      const { data: prodData } = await supabase
+      let query = supabase
         .from("smoking_products")
         .select("*")
-        .neq("brand", "__STORE_CONFIG__")
+        .neq("brand", "__STORE_CONFIG__");
+
+      if (company?.id) {
+        query = query.eq("company_id", company.id);
+      }
+
+      const { data: prodData } = await query
         .order("created_at", { ascending: false })
         .order("id", { ascending: true });
+
       const { data: topData } = await supabase
         .from("vw_top_selling_flavors")
         .select("*")
@@ -166,7 +180,7 @@ export function SupplyChainDashboard() {
     fetchData();
     const intervalId = setInterval(() => fetchData(), 3000);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [company?.id]);
 
   // ─── Handlers ───────────────────────────────────────────
   const handleAddProduct = async (e: React.FormEvent) => {
@@ -190,6 +204,7 @@ export function SupplyChainDashboard() {
         name: newModelName, brand: newBrandName, flavor: "Padrão",
         price: newPriceVal, cost_price: newCostVal, stock: 0,
         puffs: newPuffsVal, image_url: imageUrl, is_active: true,
+        company_id: company?.id || null,
       };
 
       let { data, error } = await supabase.from("smoking_products").insert(insertPayload).select();
@@ -252,6 +267,7 @@ export function SupplyChainDashboard() {
         cost_price: addingFlavorGroup.cost_price || 35.00,
         stock: parseInt(newFlavorStock) || 0, puffs: addingFlavorGroup.puffs || 5000,
         image_url: addingFlavorGroup.image_url || "", is_active: true,
+        company_id: company?.id || null,
       };
       let { data, error } = await supabase.from("smoking_products").insert(insertPayload).select();
       if (error && (error.message?.includes("cost_price") || error.code === "PGRST204")) {

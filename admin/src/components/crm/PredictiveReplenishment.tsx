@@ -2,13 +2,15 @@ import { useState, useEffect } from "react";
 import { Bot, Clock, MessageSquare, Send, Loader2, RefreshCw } from "lucide-react";
 import { fetchLiveClients, type RealClient } from "@/lib/crm";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "../../contexts/AuthContext";
 
 export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (client: RealClient) => void }) {
+  const { company } = useAuth();
   const [clients, setClients] = useState<RealClient[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadClients = async () => {
-    const live = await fetchLiveClients();
+    const live = await fetchLiveClients(company?.id);
     setClients(live);
     setLoading(false);
   };
@@ -24,7 +26,7 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [company?.id]);
 
   if (loading) {
     return (

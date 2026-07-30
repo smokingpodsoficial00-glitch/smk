@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { DollarSign, TrendingDown, TrendingUp, AlertTriangle, PackageCheck, Loader2 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
 
 interface OrderItem {
   product_id?: string;
@@ -12,6 +13,7 @@ interface OrderItem {
 }
 
 export function FinanceDashboard() {
+  const { company } = useAuth();
   const [loading, setLoading] = useState(true);
 
   // Financial Metrics State
@@ -29,15 +31,16 @@ export function FinanceDashboard() {
 
   const fetchFinanceData = async () => {
     try {
-      // 1. Fetch Orders from Supabase
-      const { data: ordersData } = await supabase
-        .from('smoking_orders')
-        .select('*');
+      // 1. Fetch Orders from Supabase for active company
+      let ordersQuery = supabase.from('smoking_orders').select('*');
+      let productsQuery = supabase.from('smoking_products').select('*');
+      if (company?.id) {
+        ordersQuery = ordersQuery.eq('company_id', company.id);
+        productsQuery = productsQuery.eq('company_id', company.id);
+      }
 
-      // 2. Fetch Products from Supabase to get cost_price
-      const { data: productsData } = await supabase
-        .from('smoking_products')
-        .select('*');
+      const { data: ordersData } = await ordersQuery;
+      const { data: productsData } = await productsQuery;
 
       // Create product cost map by id and by name/brand
       const costMap = new Map<string, number>();

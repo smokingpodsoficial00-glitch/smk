@@ -20,13 +20,14 @@ export type RealClient = {
 // Exportacao de tempo de execucao para evitar qualquer erro no Vite
 export const RealClient = {};
 
-export async function fetchLiveClients(): Promise<RealClient[]> {
+export async function fetchLiveClients(companyId?: string): Promise<RealClient[]> {
   try {
-    // 1. Buscar todos os pedidos do Supabase
-    const { data: orders, error: ordersErr } = await supabase
-      .from('smoking_orders')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // 1. Buscar todos os pedidos do Supabase da empresa
+    let query = supabase.from('smoking_orders').select('*');
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
+    const { data: orders, error: ordersErr } = await query.order('created_at', { ascending: false });
 
     if (ordersErr) {
       console.error("Erro ao buscar smoking_orders:", ordersErr);

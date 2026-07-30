@@ -6,6 +6,7 @@ import {
   Trash2, RotateCcw, Package, DollarSign, Eye, EyeOff
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
 // stockSync: trigger SQL trg_stock_on_order_delete cuida da devolução automática
 
 export interface AdminOrder {
@@ -42,6 +43,7 @@ const saveCompletedIds = (ids: string[]) => {
 };
 
 export function KanbanBoard() {
+  const { company } = useAuth();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrderForDispatch, setSelectedOrderForDispatch] = useState<string | null>(null);
@@ -55,10 +57,11 @@ export function KanbanBoard() {
 
   const fetchOrders = async () => {
     try {
-      const { data } = await supabase
-        .from('smoking_orders')
-        .select('*')
-        .order('created_at', { ascending: false });
+      let query = supabase.from('smoking_orders').select('*');
+      if (company?.id) {
+        query = query.eq('company_id', company.id);
+      }
+      const { data } = await query.order('created_at', { ascending: false });
 
       if (data) {
         const completedIds = getCompletedIds();
