@@ -197,98 +197,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // LOGIN (Funciona em QUALQUER DISPOSITIVO / NAVEGADOR)
+  // LOGIN (Real Supabase Auth + Supabase DB)
   const signIn = async (email: string, pass: string) => {
     const cleanEmail = email.trim().toLowerCase();
 
-    // 1. Tenta autenticação nativa no Supabase Auth Cloud
+    // 1. Autenticação nativa no Supabase Auth Cloud
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email: cleanEmail,
       password: pass,
     });
 
-    if (!authError && authData?.user) {
-      setUser(authData.user);
-      await fetchUserData(authData.user);
-      return { error: null };
+    if (authError || !authData?.user) {
+      return { 
+        error: new Error(
+          authError?.message?.includes('Invalid login credentials')
+            ? 'E-mail ou senha incorretos.'
+            : authError?.message || 'Erro ao realizar login.'
+        ) 
+      };
     }
 
-    // 2. Fallback Universal Cross-Device: busca empresa no Supabase DB
-    try {
-      const { data: dbCompany } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('email', cleanEmail)
-        .maybeSingle();
-
-      // Verifica credenciais salvas no Supabase DB ou credenciais locais
-      const savedCredsStr = localStorage.getItem(LOCAL_CREDS_KEY);
-      const savedCreds = savedCredsStr ? JSON.parse(savedCredsStr) : null;
-      const isLocalMatch = savedCreds && savedCreds.email?.toLowerCase() === cleanEmail && savedCreds.password === pass;
-
-      if (dbCompany || isLocalMatch) {
-        // Se houver senha salva no DB e ela não bater com a digitada (e não for local match)
-        if (dbCompany && dbCompany.auth_password && dbCompany.auth_password !== pass && !isLocalMatch) {
-          return { error: new Error('E-mail ou senha incorretos.') };
-        }
-
-        const activeCompany = dbCompany || {
-          id: `comp-${Date.now()}`,
-          name: savedCreds?.companyName || 'Smoking Pods',
-          email: cleanEmail,
-          phone: savedCreds?.phone || '',
-          onboarding_done: true,
-        };
-
-        const mockUserId = `usr-${cleanEmail.replace(/[^a-z0-9]/g, '')}`;
-        const activeUser = {
-          id: mockUserId,
-          email: cleanEmail,
-          app_metadata: {},
-          user_metadata: { full_name: activeCompany.manager_name || savedCreds?.managerName || 'Administrador' },
-          aud: 'authenticated',
-          created_at: new Date().toISOString(),
-        } as User;
-
-        const activeCompanyUser: CompanyUser = {
-          id: `cuser-${Date.now()}`,
-          company_id: activeCompany.id,
-          auth_user_id: mockUserId,
-          name: activeCompany.manager_name || savedCreds?.managerName || 'Administrador',
-          email: cleanEmail,
-          role: 'admin',
-        };
-
-        setUser(activeUser);
-        setCompany(activeCompany as Company);
-        setCompanyUser(activeCompanyUser);
-        saveLocalSession(activeUser, activeCompany as Company, activeCompanyUser);
-
-        return { error: null };
-      }
-    } catch (e) {
-      console.warn('Erro no login cross-device:', e);
-    }
-
-    return { error: new Error('E-mail ou senha incorretos.') };
+    setUser(authData.user);
+    await fetchUserData(authData.user);
+    return { error: null };
   };
 
-  // CADASTRO MULTI-TENANT (Registra no Supabase DB para acesso universal)
+  // CADASTRO MULTI-TENANT (Registra REAL no Supabase Auth e no Supabase DB)
   const signUp = async (data: RegisterData) => {
     const cleanEmail = data.email.trim().toLowerCase();
 
     try {
-      // Salva credenciais locais no dispositivo atual
-      localStorage.setItem(LOCAL_CREDS_KEY, JSON.stringify({
-        email: cleanEmail,
-        password: data.password,
-        companyName: data.companyName,
-        managerName: data.managerName,
-        phone: data.phone,
-      }));
-
-      // 1. Tenta cadastrar no Supabase Auth Cloud
-      let activeAuthUser: User | null = null;
-      const { data: authData } = await supabase.auth.signUp({
+      // 1. Cadastra no Supabase Auth Cloud
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: cleanEmail,
         password: data.password,
         options: {
@@ -299,72 +239,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      if (authData?.user) {
-        activeAuthUser = authData.user;
-      } else {
-        activeAuthUser = {
-          id: `usr-${cleanEmail.replace(/[^a-z0-9]/g, '')}`,
-          email: cleanEmail,
-          app_metadata: {},
-          user_metadata: { full_name: data.managerName, company_name: data.companyName },
-          aud: 'authenticated',
-          created_at: new Date().toISOString(),
-        } as User;
+      if (authError || !authData?.user) {
+        return { error: new Error(authError?.message || 'Erro ao criar conta no Supabase Auth.') };
       }
 
-      // 2. Insere/Atualiza a empresa no Supabase DB com auth_password para liberar login cross-device
-      let finalCompany: Company | null = null;
+      const activeAuthUser = authData.user;
 
-      const { data: newComp } = await supabase
+      // 2. Insere a nova empresa na tabela `companies` do Supabase DB
+      const { data: newComp, error: compErr } = await supabase
         .from('companies')
-        .upsert({
+        .insert({
           name: data.companyName,
           email: cleanEmail,
           phone: data.phone,
-          auth_password: data.password,
-          manager_name: data.managerName,
           onboarding_done: false,
-        }, { onConflict: 'email' })
+        })
         .select()
         .single();
 
-      if (newComp) {
-        finalCompany = newComp as Company;
-      } else {
-        const { data: existingComp } = await supabase.from('companies').select('*').eq('email', cleanEmail).maybeSingle();
+      let finalCompany: Company | null = (newComp as Company) || null;
+
+      if (!finalCompany) {
+        const { data: existingComp } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('email', cleanEmail)
+          .maybeSingle();
+
         if (existingComp) finalCompany = existingComp as Company;
       }
 
       if (!finalCompany) {
-        finalCompany = {
-          id: `comp-${Date.now()}`,
-          name: data.companyName,
-          email: cleanEmail,
-          phone: data.phone,
-          auth_password: data.password,
-          manager_name: data.managerName,
-          onboarding_done: false,
-        };
+        return { error: new Error('Não foi possível criar a empresa no banco de dados.') };
       }
 
-      const finalCompUser: CompanyUser = {
+      // 3. Vincula o usuário à empresa na tabela `company_users` do Supabase DB
+      const { data: compUser, error: compUserErr } = await supabase
+        .from('company_users')
+        .insert({
+          company_id: finalCompany.id,
+          auth_user_id: activeAuthUser.id,
+          name: data.managerName,
+          email: cleanEmail,
+          role: 'admin',
+        })
+        .select()
+        .single();
+
+      const finalCompUser: CompanyUser = (compUser as CompanyUser) || {
         id: `cuser-${Date.now()}`,
         company_id: finalCompany.id,
         auth_user_id: activeAuthUser.id,
         name: data.managerName,
         email: cleanEmail,
         role: 'admin',
-        auth_password: data.password,
       };
-
-      await supabase.from('company_users').upsert({
-        company_id: finalCompany.id,
-        auth_user_id: activeAuthUser.id,
-        name: data.managerName,
-        email: cleanEmail,
-        role: 'admin',
-        auth_password: data.password,
-      }, { onConflict: 'company_id,auth_user_id' }).catch(() => {});
 
       setUser(activeAuthUser);
       setCompany(finalCompany);
@@ -374,16 +303,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: null };
     } catch (err: any) {
       console.error('Erro no signUp:', err);
-      const mockUsr = { id: `usr-${Date.now()}`, email: cleanEmail } as User;
-      const mockComp = { id: `comp-${Date.now()}`, name: data.companyName, email: cleanEmail, auth_password: data.password, onboarding_done: false };
-      const mockCompUser = { id: 'cuser-mock', company_id: mockComp.id, auth_user_id: mockUsr.id, name: data.managerName, email: cleanEmail, role: 'admin' as UserRole };
-
-      setUser(mockUsr);
-      setCompany(mockComp);
-      setCompanyUser(mockCompUser);
-      saveLocalSession(mockUsr, mockComp, mockCompUser);
-
-      return { error: null };
+      return { error: new Error(err.message || 'Erro ao cadastrar empresa.') };
     }
   };
 
