@@ -76,6 +76,9 @@ export function SupplyChainDashboard() {
   // Estado para Modal Card dedicado de Gestão de Sabores por Modelo
   const [viewingFlavorsGroup, setViewingFlavorsGroup] = useState<any | null>(null);
 
+  // Estado para modelo expandido no Ranking de Vendas por Modelo
+  const [expandedRankingModelKey, setExpandedRankingModelKey] = useState<string | null>(null);
+
   // Estado para Alterações Pendentes de Estoque (Botão Salvar no Canto Inferior Direito)
   const [pendingStockChanges, setPendingStockChanges] = useState<Record<string, number>>({});
   const [isSavingStock, setIsSavingStock] = useState(false);
