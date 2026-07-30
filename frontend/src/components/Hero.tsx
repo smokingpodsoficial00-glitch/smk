@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Search, ShoppingBag, Store } from "lucide-react";
 import { BRANDS } from "@/lib/products";
 import { useCart } from "@/lib/cart";
