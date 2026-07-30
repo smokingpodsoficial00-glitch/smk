@@ -242,25 +242,26 @@ export function useStoreConfig() {
       setConfig(newConfig);
       notifyListeners();
 
-      // 2. Salva na tabela dedicada `store_config` no Supabase
+      // 2. Salva na tabela dedicada `store_config` e na tabela `companies` no Supabase
       try {
-        const { data: existingRows } = await supabase
+        const rowId = (config && config.id && config.id !== 'local-config-id') ? config.id : 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+        await supabase
           .from("store_config")
-          .select("id")
-          .limit(1);
+          .upsert({
+            id: rowId,
+            company_id: rowId,
+            ...newConfig,
+            updated_at: new Date().toISOString()
+          });
 
-        if (existingRows && existingRows.length > 0) {
-          await supabase
-            .from("store_config")
-            .update(updates)
-            .eq("id", existingRows[0].id);
-        } else {
-          await supabase
-            .from("store_config")
-            .insert([updates]);
+        if (updates.store_name) {
+          await supabase.from("companies").update({
+            name: updates.store_name,
+            ...(updates.logo_url ? { logo_url: updates.logo_url } : {})
+          }).neq("id", "00000000-0000-0000-0000-000000000000");
         }
       } catch (e) {
-        console.info("Tabela store_config não encontrada:", e);
+        console.info("Erro ao salvar store_config no Supabase:", e);
       }
 
       setSaveStatus("success");
