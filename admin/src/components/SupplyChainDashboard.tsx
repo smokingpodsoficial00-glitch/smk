@@ -447,7 +447,7 @@ export function SupplyChainDashboard() {
   };
 
   // ─── Computed Metrics ───────────────────────────────────
-  const totalProducts = products.length;
+  const totalProducts = Object.keys(groupedMap || {}).length;
   const totalStockUnits = products.reduce((acc, p) => acc + (p.stock || 0), 0);
   const totalStockValue = products.reduce((acc, p) => acc + ((p.stock || 0) * (parseFloat(p.price) || 0)), 0);
   const totalStockCost = products.reduce((acc, p) => acc + ((p.stock || 0) * (parseFloat(p.cost_price || 35))), 0);
@@ -535,10 +535,12 @@ export function SupplyChainDashboard() {
 
   // Step 3: Compute real flavor lists & stock counts per model group
   Object.values(groupedMap).forEach(group => {
-    group.realFlavors = group.flavors.filter((f: any) => {
+    const specificFlavors = group.flavors.filter((f: any) => {
       const fName = (f.flavor || '').trim().toLowerCase();
       return fName !== 'padrão' && fName !== 'padrao' && fName !== '';
     });
+
+    group.realFlavors = specificFlavors.length > 0 ? specificFlavors : group.flavors;
 
     group.totalStock = group.realFlavors.reduce((sum, f) => sum + (f.stock || 0), 0);
     group.outOfStockFlavors = group.realFlavors.filter(f => (f.stock || 0) === 0);
