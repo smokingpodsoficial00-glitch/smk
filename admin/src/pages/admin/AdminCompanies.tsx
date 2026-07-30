@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Company } from '../../contexts/AuthContext';
+import type { Company } from '../../contexts/AuthContext';
 import { Building2, Search, CheckCircle2, XCircle, Calendar, Phone, Mail } from 'lucide-react';
 
 export function AdminCompanies() {
