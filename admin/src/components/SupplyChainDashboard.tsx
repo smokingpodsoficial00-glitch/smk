@@ -73,6 +73,9 @@ export function SupplyChainDashboard() {
   // Estado para Gaveta Lateral (Drawer) de Detalhes do SKU
   const [selectedDrawerSKU, setSelectedDrawerSKU] = useState<any | null>(null);
 
+  // Estado para Modal Card dedicado de Gestão de Sabores por Modelo
+  const [viewingFlavorsGroup, setViewingFlavorsGroup] = useState<any | null>(null);
+
   // Estado para modelo expandido no Ranking de Vendas por Modelo
   const [expandedRankingModelKey, setExpandedRankingModelKey] = useState<string | null>(null);
 
@@ -605,7 +608,7 @@ export function SupplyChainDashboard() {
       if (filterTab === 'EM_ESTOQUE') return group.inStockFlavors.length > 0;
       return true; // TODOS
     })
-    .sort((a, b) => b.totalStock - a.totalStock);
+    .sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name));
 
   // Step 5: Ranking de Vendas por Modelo de Pod com Expansão por Sabores
   const modelRankingMap: Record<string, {
@@ -1102,12 +1105,21 @@ export function SupplyChainDashboard() {
                         </div>
                       </div>
 
-                      {/* Ações do Grupo (Status, Olho, 3 Pontos, Chevron) */}
+                      {/* Ações do Grupo (Status, Ver Sabores, Olho, 3 Pontos) */}
                       <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${stockBadgeClass}`}>
                           <div className={`size-1.5 rounded-full ${stockBarColor}`} />
                           {stockLabel}
                         </span>
+
+                        <button
+                          type="button"
+                          onClick={() => setViewingFlavorsGroup(group)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95"
+                        >
+                          <Eye className="size-3.5" />
+                          Ver Sabores ({realFlavors.length})
+                        </button>
 
                         <button
                           type="button"
@@ -1297,6 +1309,133 @@ export function SupplyChainDashboard() {
           )}
         </div>
       </div>
+
+      {/* ━━━ MODAL CARD DEDICADO DE GESTÃO DE SABORES POR MODELO ━━━━━━━━━━━━━━ */}
+      {viewingFlavorsGroup && (() => {
+        const currentGroup = skuGroups.find(g => g.groupKey === viewingFlavorsGroup.groupKey) || viewingFlavorsGroup;
+        const displayName = getGroupDisplayName(currentGroup.brand, currentGroup.name);
+        const realFlavors = currentGroup.realFlavors || [];
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-[#121212] border border-border rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+              
+              {/* Modal Header */}
+              <div className="p-5 border-b border-border flex items-center justify-between bg-black/40">
+                <div className="flex items-center gap-3.5">
+                  {currentGroup.image_url ? (
+                    <img src={currentGroup.image_url} alt={displayName} className="size-12 object-cover rounded-xl border border-white/10" />
+                  ) : (
+                    <div className="size-12 rounded-xl bg-elevated border border-border flex items-center justify-center">
+                      <Box className="size-6 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      {displayName}
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">
+                        {currentGroup.totalStock} un em estoque
+                      </span>
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {realFlavors.length} {realFlavors.length === 1 ? 'sabor cadastrado' : 'sabores cadastrados'} • Venda {formatBRL(currentGroup.price)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setAddingFlavorGroup(currentGroup);
+                      setNewFlavorName("");
+                      setNewFlavorStock("");
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95"
+                  >
+                    <Plus className="size-4" />
+                    Adicionar Sabor
+                  </button>
+                  <button
+                    onClick={() => setViewingFlavorsGroup(null)}
+                    className="p-2 text-muted-foreground hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                  >
+                    <X className="size-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body - Lista Limpa de Sabores */}
+              <div className="p-5 overflow-y-auto space-y-3 custom-scrollbar flex-1">
+                {realFlavors.map((f: any) => {
+                  let stockBadgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+                  let stockLabel = "Em estoque";
+                  if (f.stock === 0) {
+                    stockBadgeClass = "bg-red-500/10 text-red-400 border-red-500/20";
+                    stockLabel = "Sem estoque";
+                  } else if (f.stock < 5) {
+                    stockBadgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                    stockLabel = "Baixo estoque";
+                  }
+
+                  return (
+                    <div key={f.id} className="p-4 rounded-2xl border border-white/10 bg-black/30 flex items-center justify-between gap-4 hover:border-white/20 transition-all">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="size-2.5 rounded-full bg-emerald-400 shrink-0" />
+                        <div>
+                          <div className="text-sm font-bold text-white truncate">{f.flavor || 'Padrão'}</div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${stockBadgeClass}`}>
+                              {stockLabel}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Controles de Estoque Estáveis */}
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <button
+                          onClick={() => handleUpdateStock(f.id, Math.max(0, (f.stock || 0) - 1))}
+                          className="size-9 rounded-xl bg-elevated border border-white/10 flex items-center justify-center text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer"
+                        >
+                          <Minus className="size-4" />
+                        </button>
+                        <span 
+                          onClick={() => { setEditingStockSku(f); setNewStockValue(String(f.stock || 0)); }}
+                          className="w-12 text-center font-mono text-sm font-bold text-white hover:text-emerald-400 cursor-pointer"
+                          title="Clique para editar valor exato"
+                        >
+                          {f.stock || 0} un
+                        </span>
+                        <button
+                          onClick={() => handleUpdateStock(f.id, (f.stock || 0) + 1)}
+                          className="size-9 rounded-xl bg-elevated border border-white/10 flex items-center justify-center text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer"
+                        >
+                          <Plus className="size-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {realFlavors.length === 0 && (
+                  <p className="text-xs text-muted-foreground py-6 text-center italic">Nenhum sabor cadastrado para este modelo ainda.</p>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-border bg-black/40 flex justify-end">
+                <button
+                  onClick={() => setViewingFlavorsGroup(null)}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer"
+                >
+                  Concluir
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ━━━ MODAL FLUTUANTE CENTRALIZADO ("BOLHA"): NOVO PRODUTO ━━━━━━━━ */}
       {showNewProductModal && (
