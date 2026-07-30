@@ -113,6 +113,7 @@ export function ChatbotPage() {
   const [aiEnabled, setAiEnabled] = useState(true);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [orderCreatedThisSession, setOrderCreatedThisSession] = useState(false);
+  const orderCreatedRef = useRef(false); // Ref atômico para evitar duplicação de pedido
 
   // Notification for Order Created
   const [newOrderCreatedToast, setNewOrderCreatedToast] = useState<{ id: string; clientName: string; total: number; productName: string } | null>(null);
@@ -781,7 +782,9 @@ ${isOngoingConversation
           `\n   assim que mandar o comprovante já coloco seu pedido em separação!`;
 
         // Se o endereço está 100% preenchido e o nome do cliente foi fornecido, dispara a criação do pedido no Kanban:
-        if (!orderCreatedThisSession && userProvidedName) {
+        // Usa ref atômico para garantir que NUNCA cria pedido duplicado (mesmo se o cliente pedir desconto depois)
+        if (!orderCreatedRef.current && !orderCreatedThisSession && userProvidedName) {
+          orderCreatedRef.current = true;
           setOrderCreatedThisSession(true);
           const finalAddress = detectedStreetAndBairro 
             ? `${detectedStreetAndBairro}, nº ${userNumberText || 'S/N'}`
@@ -1142,6 +1145,7 @@ ${isOngoingConversation
                   onClick={() => {
                     setMessages([]);
                     setOrderCreatedThisSession(false);
+                    orderCreatedRef.current = false;
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95"
                   title="Limpar e reiniciar conversa do zero"

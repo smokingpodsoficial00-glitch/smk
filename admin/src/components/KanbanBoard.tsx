@@ -195,12 +195,14 @@ export function KanbanBoard() {
     }
   };
 
-  const handleGrantDiscount = async (realId: string, amount: number) => {
+  const handleGrantDiscount = async (realId: string) => {
     const targetOrder = orders.find(o => o.realId === realId);
     if (!targetOrder) return;
 
+    // Aplica 10% de desconto sobre o valor dos produtos (sem considerar frete)
     const currentProductsOnly = Math.max(0, targetOrder.totalAmount - targetOrder.shippingFee);
-    const newProductsOnly = Math.max(0, currentProductsOnly - amount);
+    const discountAmount = Math.round(currentProductsOnly * 0.10 * 100) / 100;
+    const newProductsOnly = Math.max(0, currentProductsOnly - discountAmount);
     
     setOrders(prev => prev.map(o => o.realId === realId ? {
       ...o,
@@ -210,25 +212,29 @@ export function KanbanBoard() {
 
     await supabase
       .from('smoking_orders')
-      .update({ total_amount: newProductsOnly, receipt_url: null })
+      .update({ total_amount: newProductsOnly + targetOrder.shippingFee, receipt_url: null })
       .eq('id', realId);
   };
 
-  const handleGrantFreeShipping = async (realId: string) => {
+  const handleOpenWhatsAppDiscount = (realId: string) => {
     const targetOrder = orders.find(o => o.realId === realId);
     if (!targetOrder) return;
 
-    const productsOnly = targetOrder.totalAmount - targetOrder.shippingFee;
+    // Abre o WhatsApp Web diretamente no chat com o cliente para o dono negociar o desconto
+    const phoneClean = targetOrder.phone.replace(/\D/g, '');
+    const phoneFormatted = phoneClean.startsWith('55') ? phoneClean : `55${phoneClean}`;
+    const whatsappUrl = `https://wa.me/${phoneFormatted}`;
+    window.open(whatsappUrl, '_blank');
+
+    // Remove o badge de desconto após abrir o WhatsApp (o dono vai resolver direto no chat)
     setOrders(prev => prev.map(o => o.realId === realId ? {
       ...o,
-      shippingFee: 0,
-      totalAmount: productsOnly,
       requestedDiscount: false
     } : o));
 
-    await supabase
+    supabase
       .from('smoking_orders')
-      .update({ shipping_fee: 0, receipt_url: null })
+      .update({ receipt_url: null })
       .eq('id', realId);
   };
 
@@ -364,7 +370,7 @@ export function KanbanBoard() {
                         onDispatchClick={() => setSelectedOrderForDispatch(order.realId)}
                         onDelete={handleDeleteOrder}
                         onGrantDiscount={handleGrantDiscount}
-                        onGrantFreeShipping={handleGrantFreeShipping}
+                        onOpenWhatsAppDiscount={handleOpenWhatsAppDiscount}
                       />
                     ))}
                     {colOrders.length === 0 && (
@@ -770,14 +776,14 @@ function OrderCard({
   onDispatchClick,
   onDelete,
   onGrantDiscount,
-  onGrantFreeShipping
+  onOpenWhatsAppDiscount
 }: { 
   order: AdminOrder; 
   onUpdate: (realId: string, s: AdminOrder['status']) => void;
   onDispatchClick: () => void;
   onDelete: (realId: string) => void;
-  onGrantDiscount: (realId: string, amount: number) => void;
-  onGrantFreeShipping: (realId: string) => void;
+  onGrantDiscount: (realId: string) => void;
+  onOpenWhatsAppDiscount: (realId: string) => void;
 }) {
   const getProgressColor = (status: AdminOrder['status']) => {
     if (status === 'AGUARDANDO_PAGAMENTO') return 'bg-white/30 w-1/4';
@@ -817,16 +823,16 @@ function OrderCard({
 
           <div className="grid grid-cols-2 gap-1.5 pt-0.5">
             <button
-              onClick={() => onGrantDiscount(order.realId, 10)}
+              onClick={() => onGrantDiscount(order.realId)}
               className="bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-bold py-2 px-2 rounded-lg transition-all text-center cursor-pointer shadow-sm active:scale-95"
             >
-              🟢 R$ 10 OFF
+              🟢 10% Desconto
             </button>
             <button
-              onClick={() => onGrantFreeShipping(order.realId)}
-              className="bg-blue-500 hover:bg-blue-400 text-black text-[10px] font-bold py-2 px-2 rounded-lg transition-all text-center cursor-pointer shadow-sm active:scale-95"
+              onClick={() => onOpenWhatsAppDiscount(order.realId)}
+              className="bg-[#25D366] hover:bg-[#20bd5a] text-black text-[10px] font-bold py-2 px-2 rounded-lg transition-all text-center cursor-pointer shadow-sm active:scale-95"
             >
-              🚚 Frete Grátis
+              💬 Negociar via WhatsApp
             </button>
           </div>
         </div>
