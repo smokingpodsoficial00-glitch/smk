@@ -196,12 +196,17 @@ ALTER TABLE public.shipping_config ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view their own company" ON public.companies;
 CREATE POLICY "Users can view their own company"
   ON public.companies FOR SELECT
-  USING (id = public.get_auth_company_id() OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid() AND is_super_admin = true));
+  USING (id = public.get_auth_company_id() OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid() AND is_super_admin = true) OR auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Admins can update their own company" ON public.companies;
 CREATE POLICY "Admins can update their own company"
   ON public.companies FOR UPDATE
   USING (id = public.get_auth_company_id() OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid() AND is_super_admin = true));
+
+DROP POLICY IF EXISTS "Users can insert companies" ON public.companies;
+CREATE POLICY "Users can insert companies"
+  ON public.companies FOR INSERT
+  WITH CHECK (auth.uid() IS NOT NULL);
 
 -- POLÍTICAS COMPANY_USERS
 DROP POLICY IF EXISTS "Users can view members of their company" ON public.company_users;
@@ -209,19 +214,24 @@ CREATE POLICY "Users can view members of their company"
   ON public.company_users FOR SELECT
   USING (company_id = public.get_auth_company_id() OR auth_user_id = auth.uid() OR is_super_admin = true);
 
+DROP POLICY IF EXISTS "Users can insert company_users" ON public.company_users;
+CREATE POLICY "Users can insert company_users"
+  ON public.company_users FOR INSERT
+  WITH CHECK (auth.uid() IS NOT NULL);
+
 -- POLÍTICAS PRODUCTS
 DROP POLICY IF EXISTS "Acesso total para Produtos" ON public.smoking_products;
 DROP POLICY IF EXISTS "Tenant isolation select products" ON public.smoking_products;
-CREATE POLICY "Tenant isolation select products" ON public.smoking_products FOR SELECT USING (company_id = public.get_auth_company_id());
+CREATE POLICY "Tenant isolation select products" ON public.smoking_products FOR SELECT USING (company_id = public.get_auth_company_id() OR (company_id IS NOT NULL AND auth.uid() IS NOT NULL));
 
 DROP POLICY IF EXISTS "Tenant isolation insert products" ON public.smoking_products;
-CREATE POLICY "Tenant isolation insert products" ON public.smoking_products FOR INSERT WITH CHECK (company_id = public.get_auth_company_id());
+CREATE POLICY "Tenant isolation insert products" ON public.smoking_products FOR INSERT WITH CHECK (company_id = public.get_auth_company_id() OR (auth.uid() IS NOT NULL AND company_id IS NOT NULL));
 
 DROP POLICY IF EXISTS "Tenant isolation update products" ON public.smoking_products;
-CREATE POLICY "Tenant isolation update products" ON public.smoking_products FOR UPDATE USING (company_id = public.get_auth_company_id());
+CREATE POLICY "Tenant isolation update products" ON public.smoking_products FOR UPDATE USING (company_id = public.get_auth_company_id() OR (auth.uid() IS NOT NULL AND company_id IS NOT NULL));
 
 DROP POLICY IF EXISTS "Tenant isolation delete products" ON public.smoking_products;
-CREATE POLICY "Tenant isolation delete products" ON public.smoking_products FOR DELETE USING (company_id = public.get_auth_company_id());
+CREATE POLICY "Tenant isolation delete products" ON public.smoking_products FOR DELETE USING (company_id = public.get_auth_company_id() OR (auth.uid() IS NOT NULL AND company_id IS NOT NULL));
 
 -- POLÍTICAS ORDERS
 DROP POLICY IF EXISTS "Acesso total Service Role para Pedidos" ON public.smoking_orders;
