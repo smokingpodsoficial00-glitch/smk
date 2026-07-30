@@ -141,6 +141,7 @@ export function SupplyChainDashboard() {
     const file = e.target.files?.[0];
     if (file) processSelectedFile(file);
   };
+  const handleImageChange = handleFileChange;
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
