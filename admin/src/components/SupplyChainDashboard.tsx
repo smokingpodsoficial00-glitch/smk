@@ -186,12 +186,33 @@ export function SupplyChainDashboard() {
         .order("created_at", { ascending: false })
         .order("id", { ascending: true });
 
-      const { data: topData } = await supabase
-        .from("vw_top_selling_flavors")
-        .select("*")
-        .limit(10);
+      const { data: realOrders } = await supabase
+        .from("smoking_orders")
+        .select("items, status")
+        .eq("company_id", targetCompanyId);
+
+      let realSalesList: any[] = [];
+      if (realOrders && realOrders.length > 0) {
+        const flavorSalesMap: Record<string, { product_name: string; flavor: string; total_sold: number }> = {};
+        realOrders.forEach((ord: any) => {
+          if (ord.items && Array.isArray(ord.items)) {
+            ord.items.forEach((it: any) => {
+              const pName = it.name || it.product_name || 'Pod';
+              const fName = it.flavor || '';
+              const qty = parseInt(it.quantity) || 1;
+              const key = `${pName.toLowerCase()}__${fName.toLowerCase()}`;
+              if (!flavorSalesMap[key]) {
+                flavorSalesMap[key] = { product_name: pName, flavor: fName, total_sold: 0 };
+              }
+              flavorSalesMap[key].total_sold += qty;
+            });
+          }
+        });
+        realSalesList = Object.values(flavorSalesMap);
+      }
+
       if (prodData) setProducts(prodData);
-      if (topData) setTopSelling(topData);
+      setTopSelling(realSalesList);
     } catch (err) {
       console.error("Erro ao carregar dados do Supabase:", err);
     } finally {
