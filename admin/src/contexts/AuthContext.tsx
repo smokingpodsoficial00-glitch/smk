@@ -99,28 +99,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (companyData) {
           setCompany(companyData as Company);
           saveLocalSession(authUser, companyData as Company, compUserData as CompanyUser);
+          setLoading(false);
+          return;
         }
-      } else {
-        // Tenta buscar empresa pelo e-mail
-        const { data: companyByEmail } = await supabase
-          .from('companies')
-          .select('*')
-          .eq('email', authUser.email || '')
-          .maybeSingle();
+      }
 
-        if (companyByEmail) {
-          const mockUserComp: CompanyUser = {
-            id: 'cuser-auto',
-            company_id: companyByEmail.id,
+      // 2. Se o usuário não possui empresa vinculada, cria uma NOVA empresa zerada e isolada
+      const { data: newComp } = await supabase
+        .from('companies')
+        .insert({
+          name: authUser.user_metadata?.company_name || 'Minha Loja Smoking Pods',
+          email: authUser.email || '',
+          onboarding_done: false,
+        })
+        .select()
+        .single();
+
+      if (newComp) {
+        const { data: newCompUser } = await supabase
+          .from('company_users')
+          .insert({
+            company_id: newComp.id,
             auth_user_id: authUser.id,
             name: authUser.user_metadata?.full_name || 'Administrador',
             email: authUser.email || '',
             role: 'admin',
-          };
-          setCompany(companyByEmail as Company);
-          setCompanyUser(mockUserComp);
-          saveLocalSession(authUser, companyByEmail as Company, mockUserComp);
-        }
+          })
+          .select()
+          .single();
+
+        const activeCompUser: CompanyUser = (newCompUser as CompanyUser) || {
+          id: `cuser-${Date.now()}`,
+          company_id: newComp.id,
+          auth_user_id: authUser.id,
+          name: authUser.user_metadata?.full_name || 'Administrador',
+          email: authUser.email || '',
+          role: 'admin',
+        };
+
+        setCompany(newComp as Company);
+        setCompanyUser(activeCompUser);
+        saveLocalSession(authUser, newComp as Company, activeCompUser);
       }
     } catch (err) {
       console.error('Erro ao carregar dados do usuário:', err);
