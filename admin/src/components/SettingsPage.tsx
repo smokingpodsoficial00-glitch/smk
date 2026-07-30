@@ -30,10 +30,10 @@ export function SettingsPage() {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Dynamic Catalog Link
+  // Dynamic Catalog Link (Front-End do Cliente na Porta 5175)
   const catalogUrl = typeof window !== 'undefined'
-    ? window.location.origin.replace(":5174", ":5173")
-    : "http://localhost:5173";
+    ? window.location.origin.replace(":5174", ":5175")
+    : "http://localhost:5175";
 
   // Sync form state when config loads
   useEffect(() => {
