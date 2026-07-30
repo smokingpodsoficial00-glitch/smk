@@ -91,10 +91,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCompany(companyData as Company);
         }
       } else {
-        // Se for um usuário legado ou sem registro em company_users, tenta pegar empresa padrão
+        // Se o usuário não tiver empresa associada ainda, vincula ou cria a empresa
         const { data: defaultComp } = await supabase.from('companies').select('*').limit(1).maybeSingle();
         if (defaultComp) {
           setCompany(defaultComp as Company);
+          // Cria vinculo de company_user para este usuário
+          await supabase.from('company_users').insert({
+            company_id: defaultComp.id,
+            auth_user_id: authUser.id,
+            name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Admin',
+            email: authUser.email || '',
+            role: 'admin',
+          });
         }
       }
     } catch (err) {
@@ -144,7 +152,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (data: RegisterData) => {
     try {
-      // 1. Cria a conta no Supabase Auth
+      let activeAuthUser: User | null = null;
+
+      // 1. Tenta criar a conta no Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -156,10 +166,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Não foi possível criar a conta do usuário.');
+      if (authError) {
+        // Se a conta já existir ou houver bloqueio de rate-limit no signUp, tenta fazer o login diretamente com as credenciais informadas!
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
 
-      // 2. Insere a nova Empresa
+        if (!loginError && loginData?.user) {
+          activeAuthUser = loginData.user;
+        } else {
+          // Trata erros amigáveis
+          if (authError.message.includes('rate limit') || authError.message.includes('solicitação após')) {
+            throw new Error('Essa conta já foi cadastrada ou houve um limite de tentativas. Faça login diretamente com seu e-mail e senha.');
+          }
+          throw authError;
+        }
+      } else {
+        activeAuthUser = authData?.user || null;
+      }
+
+      if (!activeAuthUser) {
+        throw new Error('Não foi possível registrar o usuário no sistema.');
+      }
+
+      // 2. Verifica se a empresa já existe para este usuário
+      const { data: existingCompUser } = await supabase
+        .from('company_users')
+        .select('*, companies(*)')
+        .eq('auth_user_id', activeAuthUser.id)
+        .maybeSingle();
+
+      if (existingCompUser && existingCompUser.companies) {
+        setUser(activeAuthUser);
+        setCompany(existingCompUser.companies as Company);
+        setCompanyUser(existingCompUser as CompanyUser);
+        return { error: null };
+      }
+
+      // 3. Insere a nova Empresa se não existir
       const { data: newCompany, error: compError } = await supabase
         .from('companies')
         .insert({
@@ -173,27 +218,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (compError) throw compError;
 
-      // 3. Associa o usuário à nova empresa como Admin
+      // 4. Associa o usuário à nova empresa como Admin
       const { error: userLinkError } = await supabase
         .from('company_users')
         .insert({
           company_id: newCompany.id,
-          auth_user_id: authData.user.id,
+          auth_user_id: activeAuthUser.id,
           name: data.managerName,
           email: data.email,
           role: 'admin',
           is_super_admin: false,
         });
 
-      if (userLinkError) throw userLinkError;
+      if (userLinkError && !userLinkError.message.includes('duplicate')) {
+        console.warn('Aviso ao vincular usuário:', userLinkError);
+      }
 
-      // Atualiza o estado local imediatamente
-      setUser(authData.user);
+      // Atualiza o estado local
+      setUser(activeAuthUser);
       setCompany(newCompany as Company);
       setCompanyUser({
         id: 'new',
         company_id: newCompany.id,
-        auth_user_id: authData.user.id,
+        auth_user_id: activeAuthUser.id,
         name: data.managerName,
         email: data.email,
         role: 'admin',
@@ -202,7 +249,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: null };
     } catch (err: any) {
       console.error('Erro no registro:', err);
-      return { error: err instanceof Error ? err : new Error(err?.message || 'Erro no cadastro') };
+      let msg = err instanceof Error ? err.message : 'Erro ao cadastrar';
+      if (msg.includes('rate limit') || msg.includes('solicitação após')) {
+        msg = 'O e-mail informado já possui cadastro. Clique em "Fazer login" abaixo para entrar na sua conta com essa mesma senha!';
+      }
+      return { error: new Error(msg) };
     }
   };
 
