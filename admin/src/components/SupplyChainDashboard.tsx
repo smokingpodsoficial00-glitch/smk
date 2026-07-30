@@ -81,7 +81,12 @@ export function SupplyChainDashboard() {
 
   // Estado para Alterações Pendentes de Estoque (Botão Salvar no Canto Inferior Direito)
   const [pendingStockChanges, setPendingStockChanges] = useState<Record<string, number>>({});
+  const pendingStockChangesRef = useRef<Record<string, number>>({});
   const [isSavingStock, setIsSavingStock] = useState(false);
+
+  useEffect(() => {
+    pendingStockChangesRef.current = pendingStockChanges;
+  }, [pendingStockChanges]);
 
   // Estado para Modal de Ranking Completo de Vendas
   const [showFullRankingModal, setShowFullRankingModal] = useState(false);
@@ -222,7 +227,16 @@ export function SupplyChainDashboard() {
         realSalesList = Object.values(flavorSalesMap);
       }
 
-      if (prodData) setProducts(prodData);
+      if (prodData) {
+        const mergedProducts = prodData.map((p: any) => {
+          const stagedStock = pendingStockChangesRef.current[p.id];
+          if (stagedStock !== undefined) {
+            return { ...p, stock: stagedStock };
+          }
+          return p;
+        });
+        setProducts(mergedProducts);
+      }
       setTopSelling(realSalesList);
     } catch (err) {
       console.error("Erro ao carregar dados do Supabase:", err);
@@ -389,7 +403,9 @@ export function SupplyChainDashboard() {
 
   const handleUpdateStock = (id: string, newStock: number) => {
     if (newStock < 0) return;
-    setPendingStockChanges(prev => ({ ...prev, [id]: newStock }));
+    const updated = { ...pendingStockChangesRef.current, [id]: newStock };
+    pendingStockChangesRef.current = updated;
+    setPendingStockChanges(updated);
     setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: newStock } : p));
     if (selectedDrawerSKU?.id === id) {
       setSelectedDrawerSKU((prev: any) => prev ? { ...prev, stock: newStock } : null);
@@ -397,11 +413,10 @@ export function SupplyChainDashboard() {
   };
 
   const handleSaveAllStockChanges = async () => {
-    const entries = Object.entries(pendingStockChanges);
+    const entries = Object.entries(pendingStockChangesRef.current);
     if (entries.length === 0) return;
     setIsSavingStock(true);
     try {
-      const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
       for (const [id, stock] of entries) {
         let query = supabase.from("smoking_products").update({ stock }).eq("id", id);
         if (company?.id) query = query.eq("company_id", company.id);
@@ -410,6 +425,7 @@ export function SupplyChainDashboard() {
           await supabase.from("smoking_products").update({ stock }).eq("id", id);
         }
       }
+      pendingStockChangesRef.current = {};
       setPendingStockChanges({});
       alert("Alterações de estoque salvas com sucesso no Supabase e sincronizadas com o cardápio!");
       await fetchData();
@@ -422,6 +438,7 @@ export function SupplyChainDashboard() {
   };
 
   const handleDiscardStockChanges = async () => {
+    pendingStockChangesRef.current = {};
     setPendingStockChanges({});
     await fetchData();
   };
