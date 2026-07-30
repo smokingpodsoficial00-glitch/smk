@@ -4,7 +4,7 @@ import {
   Trash2, Search, Filter, ArrowUpDown, MoreVertical, Copy, Edit3, DollarSign, 
   CheckCircle2, X, TrendingUp, PieChart, ChevronRight, ChevronDown, ChevronUp, 
   Tag, Box, Camera, Download, FileText, BarChart3, Check, Share2, Smartphone, 
-  Monitor, Store, ExternalLink
+  Monitor, Store, ExternalLink, ListOrdered, Save
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatBRL } from "@/lib/cart";
