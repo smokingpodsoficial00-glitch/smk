@@ -107,6 +107,20 @@ async function fetchConfig(): Promise<StoreConfig> {
     console.warn("Fallback smoking_products não acessível no frontend:", e);
   }
 
+  // 3. Tentar ler da tabela `companies`
+  try {
+    const { data: compData } = await supabase
+      .from("companies")
+      .select("name, logo_url")
+      .limit(1)
+      .maybeSingle();
+
+    if (compData && compData.name) {
+      if (mainConfig) mainConfig.store_name = compData.name;
+      if (fallbackConfig) fallbackConfig.store_name = compData.name;
+    }
+  } catch (e) {}
+
   // Combina as fontes
   let local = getLocalFallback();
   let finalConfig: StoreConfig = mainConfig || fallbackConfig || local;
