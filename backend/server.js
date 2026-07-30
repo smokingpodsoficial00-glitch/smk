@@ -339,10 +339,14 @@ async function parseAndSaveOrder(senderNumber, contactName, messageText) {
             }
         }
 
+        // Buscar ID da empresa principal
+        const companyId = await getPrimaryCompanyId();
+
         // Criar pedido no Supabase
         const { data: newOrder, error: orderError } = await supabase
             .from('smoking_orders')
             .insert({
+                company_id: companyId,
                 client_phone: senderNumber,
                 client_name: contactName,
                 items: orderItems,
@@ -367,6 +371,17 @@ async function parseAndSaveOrder(senderNumber, contactName, messageText) {
         console.error('❌ Erro no processamento e gravação de pedido:', err);
         return null;
     }
+}
+
+// =============================================
+// GET PRIMARY COMPANY ID FROM SUPABASE
+// =============================================
+async function getPrimaryCompanyId() {
+    try {
+        const { data } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+        if (data && data.id) return data.id;
+    } catch (e) {}
+    return null;
 }
 
 // =============================================
@@ -425,7 +440,7 @@ async function handleReceiptReceived(senderNumber, contactName, messageText, has
                 .update({
                     payment_status: 'AGUARDANDO_CONFIRMACAO',
                     delivery_status: 'PREPARANDO',
-                    notes: 'Comprovante Pix enviado pelo cliente no WhatsApp - Aguardando validação do dono da loja'
+                    receipt_url: 'COMPROVANTE_PIX_ENVIADO'
                 })
                 .eq('id', existingOrder.id)
                 .select()
@@ -437,10 +452,13 @@ async function handleReceiptReceived(senderNumber, contactName, messageText, has
             }
         }
 
+        const companyId = await getPrimaryCompanyId();
+
         // 3. Se não existia pedido gravado ainda, cria o pedido direto no Kanban!
         const { data: newOrder, error: insertErr } = await supabase
             .from('smoking_orders')
             .insert({
+                company_id: companyId,
                 client_phone: senderNumber,
                 client_name: contactName,
                 items: [{ name: 'Pod (WhatsApp)', flavor: 'Pedido por Chat', quantity: 1, price: 89.90 }],
@@ -450,7 +468,7 @@ async function handleReceiptReceived(senderNumber, contactName, messageText, has
                 payment_status: 'AGUARDANDO_CONFIRMACAO',
                 delivery_status: 'PREPARANDO',
                 payment_method: 'PIX',
-                notes: 'Comprovante Pix enviado no WhatsApp - Aguardando confirmação do dono da loja'
+                receipt_url: 'COMPROVANTE_PIX_ENVIADO'
             })
             .select()
             .single();

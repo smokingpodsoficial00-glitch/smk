@@ -56,17 +56,20 @@ export function KanbanBoard() {
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
 
   const fetchOrders = async () => {
-    if (!company?.id) {
-      setOrders([]);
-      setLoading(false);
-      return;
-    }
     try {
-      const { data } = await supabase
+      let query = supabase
         .from('smoking_orders')
         .select('*')
-        .eq('company_id', company.id)
         .order('created_at', { ascending: false });
+
+      if (company?.id) {
+        query = query.or(`company_id.eq.${company.id},company_id.is.null`);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.error("Erro na busca do Kanban:", error);
+      }
 
       if (data) {
         const completedIds = getCompletedIds();
