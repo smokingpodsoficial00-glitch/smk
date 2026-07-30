@@ -193,38 +193,32 @@ async function calculateShippingQuote(rawAddressOrCep) {
     }
 
     let simulatedFee = 0;
-    let multiplier = 1.0;
-    
-    // Regra 1: Curtas distâncias (até X km inclusos - ex: 3km) => Taxa Mínima Fixa R$ 8,50 sem tarifa de pico
     if (distanceKm <= config.included_km) {
         simulatedFee = config.base_fare;
     } else {
-        // Regra 2: Distâncias que extrapolam o KM base + multiplicadores dinâmicos de trânsito
         const extraKm = distanceKm - config.included_km;
         simulatedFee = config.base_fare + (extraKm * config.extra_km_fee);
-
-        // Multiplicador Dinâmico baseado no horário (Fuso de São Paulo)
-        const spTimeStr = new Intl.DateTimeFormat('pt-BR', { 
-            timeZone: 'America/Sao_Paulo', 
-            hour: 'numeric', 
-            minute: 'numeric',
-            hour12: false
-        }).format(new Date());
-        
-        const [hour, min] = spTimeStr.split(':').map(Number);
-        const timeInMinutes = (hour * 60) + min;
-
-        // Almoço (11:30 às 13:30)
-        if (timeInMinutes >= (11 * 60 + 30) && timeInMinutes <= (13 * 60 + 30)) {
-            multiplier = 1.15; // +15%
-        }
-        // Pico da Tarde/Noite (17:00 às 19:30)
-        else if (timeInMinutes >= (17 * 60) && timeInMinutes <= (19 * 60 + 30)) {
-            multiplier = 1.25; // +25%
-        }
-        
-        simulatedFee = simulatedFee * multiplier;
     }
+
+    // Multiplicador Dinâmico baseado no horário (Fuso de São Paulo)
+    const spTimeStr = new Intl.DateTimeFormat('pt-BR', { 
+        timeZone: 'America/Sao_Paulo', 
+        hour: 'numeric', 
+        minute: 'numeric',
+        hour12: false
+    }).format(new Date());
+    
+    const [hour, min] = spTimeStr.split(':').map(Number);
+    const timeInMinutes = (hour * 60) + min;
+
+    let multiplier = 1.0;
+    if (timeInMinutes >= (11 * 60 + 30) && timeInMinutes <= (13 * 60 + 30)) {
+        multiplier = 1.15; // +15%
+    } else if (timeInMinutes >= (17 * 60) && timeInMinutes <= (19 * 60 + 30)) {
+        multiplier = 1.25; // +25%
+    }
+    
+    simulatedFee = simulatedFee * multiplier;
 
     // Garante um valor mínimo de frete (Segurança)
     if (simulatedFee < config.base_fare) simulatedFee = config.base_fare;

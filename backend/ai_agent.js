@@ -507,13 +507,15 @@ function initConversation(phone) {
 async function getAiResponse(phone, message) {
     initConversation(phone);
 
-    // Conectar ao Supabase para puxar estoque em tempo real
+    // Conectar ao Supabase para puxar estoque e configurações de frete/loja em tempo real
     let stockInfo = "\n=== ESTOQUE ATUAL ===\n";
+    let storeShippingInfo = "\n=== PARÂMETROS DE FRETE DA LOJA ===\n";
     try {
         const { supabase } = require('./supabase');
-        const { data: products, error } = await supabase
+        const { data: products } = await supabase
             .from('smoking_products')
-            .select('name, flavor, price, stock');
+            .select('name, flavor, price, stock')
+            .neq('brand', '__STORE_CONFIG__');
         
         if (products && products.length > 0) {
             products.forEach(p => {
@@ -522,16 +524,28 @@ async function getAiResponse(phone, message) {
         } else {
             stockInfo += "Estoque não encontrado ou vazio.\n";
         }
+
+        const { data: scData } = await supabase.from('store_config').select('*').limit(1).maybeSingle();
+        if (scData) {
+            const baseFare = scData.base_fare ? parseFloat(scData.base_fare) : 8.50;
+            const includedKm = scData.included_km ? parseFloat(scData.included_km) : 3.0;
+            const extraKmFee = scData.extra_km_fee ? parseFloat(scData.extra_km_fee) : 1.40;
+            storeShippingInfo += `- Valor mínimo de frete (até ${includedKm} km): R$ ${baseFare.toFixed(2)}\n`;
+            storeShippingInfo += `- Taxa por KM adicional excedente: R$ ${extraKmFee.toFixed(2)} por km\n`;
+            if (scData.pix_key) {
+                storeShippingInfo += `- Chave Pix cadastrada da loja: ${scData.pix_key}\n`;
+            }
+        }
     } catch (e) {
         stockInfo += "Erro ao carregar estoque.\n";
     }
 
     conversationHistory[phone].push({ role: 'user', content: message });
     
-    // Injeta temporariamente o estoque na system message com Lembretes Críticos
+    // Injeta temporariamente o estoque e parâmetros da loja na system message com Lembretes Críticos
     const originalSystemPrompt = conversationHistory[phone][0].content;
     const strictReminders = "\n\n[LEMBRETE OBRIGATÓRIO DO SISTEMA PARA ESTA RESPOSTA:\n1. NÃO USE EMOJIS. Nunca.\n2. Tudo em minúsculo.\n3. NUNCA ofereça a tabela se já ofereceu no passado.\n4. NUNCA pergunte 'algo mais?' ou 'alguma dúvida?'.\n5. REGRA DE QUANTIDADES EM ESTOQUE: Se o cliente pedir uma quantidade MAIOR do que o estoque em unidades disponível (ex: pediu 19 unidades mas só tem 7 ou 14 em estoque), NUNCA DIGA QUE ESTÁ ESGOTADO! Diga em tom amigável e minúsculo que só possui X unidades em estoque e pergunte se ele quer levar as X disponíveis ou prefere outro sabor.\n6. Se o cliente falar 'quero o [produto]' ou 'pode me ver [produto]', não diga 'temos disponível', pule direto para pedir o endereço (P30).]";
-    conversationHistory[phone][0].content = originalSystemPrompt + stockInfo + strictReminders;
+    conversationHistory[phone][0].content = originalSystemPrompt + stockInfo + storeShippingInfo + strictReminders;
 
     try {
         const completion = await openai.chat.completions.create({

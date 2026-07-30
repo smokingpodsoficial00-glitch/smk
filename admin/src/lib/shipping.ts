@@ -148,37 +148,38 @@ export async function calculateShippingQuote(rawCep: string): Promise<ShippingQu
     }
   }
 
-  // 4. Calcula a tarifa
+  // 4. Calcula a tarifa base (usando os valores dinâmicos configurados pela loja no Supabase)
   let fee = 0;
-  let multiplier = 1.0;
-
   if (distanceKm <= config.included_km) {
-    // Até o limite de KM incluso (3km), a taxa é SEMPRE o valor base fixo (ex: R$ 8,50)
     fee = config.base_fare;
   } else {
-    // Acima do KM incluso, aplica taxa extra por KM e multiplicadores dinâmicos de trânsito
     const extraKm = distanceKm - config.included_km;
     fee = config.base_fare + (extraKm * config.extra_km_fee);
-
-    const now = new Date();
-    const spTimeStr = new Intl.DateTimeFormat('pt-BR', {
-      timeZone: 'America/Sao_Paulo',
-      hour: 'numeric',
-      minute: 'numeric',
-      hour12: false,
-    }).format(now);
-
-    const [hour, min] = spTimeStr.split(':').map(Number);
-    const timeInMinutes = (hour * 60) + min;
-
-    if (timeInMinutes >= (11 * 60 + 30) && timeInMinutes <= (13 * 60 + 30)) {
-      multiplier = 1.15;
-    } else if (timeInMinutes >= (17 * 60) && timeInMinutes <= (19 * 60 + 30)) {
-      multiplier = 1.25;
-    }
-
-    fee = fee * multiplier;
   }
+
+  // 5. Multiplicador dinâmico de horário de pico (Proteção contra trânsito e alta demanda)
+  const now = new Date();
+  const spTimeStr = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  }).format(now);
+
+  const [hour, min] = spTimeStr.split(':').map(Number);
+  const timeInMinutes = (hour * 60) + min;
+
+  let multiplier = 1.0;
+  // Almoço (11:30 às 13:30): +15%
+  if (timeInMinutes >= (11 * 60 + 30) && timeInMinutes <= (13 * 60 + 30)) {
+    multiplier = 1.15;
+  }
+  // Pico da Tarde/Noite (17:00 às 19:30): +25%
+  else if (timeInMinutes >= (17 * 60) && timeInMinutes <= (19 * 60 + 30)) {
+    multiplier = 1.25;
+  }
+
+  fee = fee * multiplier;
 
   // Garante um valor mínimo de frete
   if (fee < config.base_fare) fee = config.base_fare;
