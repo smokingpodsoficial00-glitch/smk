@@ -176,16 +176,12 @@ export function SupplyChainDashboard() {
 
   // ─── Data Fetching ──────────────────────────────────────
   const fetchData = async () => {
-    if (!company?.id) {
-      setProducts([]);
-      setLoading(false);
-      return;
-    }
+    const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
     try {
       const { data: prodData } = await supabase
         .from("smoking_products")
         .select("*")
-        .eq("company_id", company.id)
+        .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
         .neq("brand", "__STORE_CONFIG__")
         .order("created_at", { ascending: false })
         .order("id", { ascending: true });
@@ -231,7 +227,7 @@ export function SupplyChainDashboard() {
         name: newModelName, brand: newBrandName, flavor: "Padrão",
         price: newPriceVal, cost_price: newCostVal, stock: 0,
         puffs: newPuffsVal, image_url: imageUrl, is_active: true,
-        company_id: company?.id || null,
+        company_id: company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5',
       };
 
       // Garante que o vínculo company_users existe no Supabase antes de inserir
