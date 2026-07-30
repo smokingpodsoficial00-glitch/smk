@@ -104,13 +104,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // 2. Se o usuário não possui empresa vinculada, cria uma NOVA empresa zerada e isolada
+      // 2. Se o usuário não possui empresa vinculada, cria uma NOVA empresa e marca onboarding como concluído
       const { data: newComp } = await supabase
         .from('companies')
         .insert({
           name: authUser.user_metadata?.company_name || 'Minha Loja Smoking Pods',
           email: authUser.email || '',
-          onboarding_done: false,
+          onboarding_done: true,
         })
         .select()
         .single();
