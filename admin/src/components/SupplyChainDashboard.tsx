@@ -76,8 +76,13 @@ export function SupplyChainDashboard() {
   // Estado para Modal Card dedicado de Gestão de Sabores por Modelo
   const [viewingFlavorsGroup, setViewingFlavorsGroup] = useState<any | null>(null);
 
-  // Estado para modelo expandido no Ranking de Vendas por Modelo
-  const [expandedRankingModelKey, setExpandedRankingModelKey] = useState<string | null>(null);
+  // Estado para Alterações Pendentes de Estoque (Botão Salvar no Canto Inferior Direito)
+  const [pendingStockChanges, setPendingStockChanges] = useState<Record<string, number>>({});
+  const [isSavingStock, setIsSavingStock] = useState(false);
+
+  // Estado para Modal de Ranking Completo de Vendas
+  const [showFullRankingModal, setShowFullRankingModal] = useState(false);
+  const [rankingSearchQuery, setRankingSearchQuery] = useState("");
 
   // Estado para Modal de Pré-visualização do Catálogo Público (Front do Cliente)
   const [showCatalogPreviewModal, setShowCatalogPreviewModal] = useState(false);
@@ -379,35 +384,49 @@ export function SupplyChainDashboard() {
     }
   };
 
-  const handleUpdateStock = async (id: string, newStock: number) => {
+  const handleUpdateStock = (id: string, newStock: number) => {
     if (newStock < 0) return;
-    try {
-      // 1. Atualização otimista imediata na interface
-      setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: newStock } : p));
-      if (selectedDrawerSKU?.id === id) {
-        setSelectedDrawerSKU((prev: any) => prev ? { ...prev, stock: newStock } : null);
-      }
-
-      // 2. Gravação definitiva no Supabase com fallback seguro
-      let query = supabase.from("smoking_products").update({ stock: newStock }).eq("id", id);
-      if (company?.id) {
-        query = query.eq("company_id", company.id);
-      }
-      const { data, error } = await query.select();
-
-      if (error || !data || data.length === 0) {
-        // Fallback: se por algum motivo a trava de company_id não deu match, tenta pelo ID direto
-        await supabase.from("smoking_products").update({ stock: newStock }).eq("id", id);
-      }
-    } catch (err) {
-      console.error("Erro ao salvar estoque no Supabase:", err);
+    setPendingStockChanges(prev => ({ ...prev, [id]: newStock }));
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: newStock } : p));
+    if (selectedDrawerSKU?.id === id) {
+      setSelectedDrawerSKU((prev: any) => prev ? { ...prev, stock: newStock } : null);
     }
+  };
+
+  const handleSaveAllStockChanges = async () => {
+    const entries = Object.entries(pendingStockChanges);
+    if (entries.length === 0) return;
+    setIsSavingStock(true);
+    try {
+      const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+      for (const [id, stock] of entries) {
+        let query = supabase.from("smoking_products").update({ stock }).eq("id", id);
+        if (company?.id) query = query.eq("company_id", company.id);
+        const { data, error } = await query.select();
+        if (error || !data || data.length === 0) {
+          await supabase.from("smoking_products").update({ stock }).eq("id", id);
+        }
+      }
+      setPendingStockChanges({});
+      alert("Alterações de estoque salvas com sucesso no Supabase e sincronizadas com o cardápio!");
+      await fetchData();
+    } catch (err) {
+      console.error("Erro ao salvar alterações de estoque:", err);
+      alert("Ocorreu um erro ao salvar as alterações de estoque.");
+    } finally {
+      setIsSavingStock(false);
+    }
+  };
+
+  const handleDiscardStockChanges = async () => {
+    setPendingStockChanges({});
+    await fetchData();
   };
 
   const handleSaveModalStock = async () => {
     if (!editingStockSku) return;
     const parsed = parseInt(newStockValue);
-    if (!isNaN(parsed) && parsed >= 0) await handleUpdateStock(editingStockSku.id, parsed);
+    if (!isNaN(parsed) && parsed >= 0) handleUpdateStock(editingStockSku.id, parsed);
     setEditingStockSku(null);
   };
 
@@ -610,7 +629,35 @@ export function SupplyChainDashboard() {
     })
     .sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name));
 
-  // Step 5: Ranking de Vendas por Modelo de Pod com Expansão por Sabores
+  // Step 5: Ranking de Vendas Global por Modelo (Não altera ao filtrar marcas no estoque)
+  const globalGroupedMap: Record<string, SKUGroup> = {};
+  products.forEach(product => {
+    const brandName = (product.brand || "Genérico").trim();
+    const modelName = (product.name || "Pod").trim();
+    const groupKey = `${brandName.toLowerCase()}__${modelName.toLowerCase()}`;
+
+    if (!globalGroupedMap[groupKey]) {
+      globalGroupedMap[groupKey] = {
+        groupKey, brand: brandName, name: modelName, puffs: product.puffs || 5000,
+        price: parseFloat(product.price) || 0, cost_price: parseFloat(product.cost_price) || 35,
+        image_url: product.image_url || "", totalStock: 0, 
+        flavors: [], realFlavors: [], outOfStockFlavors: [], lowStockFlavors: [], inStockFlavors: []
+      };
+    }
+
+    globalGroupedMap[groupKey].flavors.push(product);
+    if (!globalGroupedMap[groupKey].image_url && product.image_url) globalGroupedMap[groupKey].image_url = product.image_url;
+  });
+
+  Object.values(globalGroupedMap).forEach(group => {
+    const specificFlavors = group.flavors.filter((f: any) => {
+      const fName = (f.flavor || '').trim().toLowerCase();
+      return fName !== 'padrão' && fName !== 'padrao' && fName !== '';
+    });
+    group.realFlavors = specificFlavors.length > 0 ? specificFlavors : group.flavors;
+    group.totalStock = group.realFlavors.reduce((sum, f) => sum + (f.stock || 0), 0);
+  });
+
   const modelRankingMap: Record<string, {
     groupKey: string;
     modelDisplayName: string;
@@ -627,7 +674,7 @@ export function SupplyChainDashboard() {
     }>;
   }> = {};
 
-  Object.values(groupedMap).forEach(group => {
+  Object.values(globalGroupedMap).forEach(group => {
     const displayName = getGroupDisplayName(group.brand, group.name);
     const flavorsList = group.realFlavors.map((f: any) => ({
       id: f.id,
@@ -798,7 +845,14 @@ export function SupplyChainDashboard() {
                 <TrendingUp className="size-4 text-emerald-400" />
                 <span className="text-xs uppercase font-semibold text-silver tracking-wider">Ranking de Vendas por Modelo</span>
               </div>
-              <span className="text-[10px] text-muted-foreground font-medium">Clique no modelo para ver os sabores</span>
+              <button
+                type="button"
+                onClick={() => setShowFullRankingModal(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-emerald-400 text-[11px] font-bold transition-all border border-emerald-500/20 cursor-pointer"
+              >
+                <ListOrdered className="size-3.5" />
+                Ver mais modelos
+              </button>
             </div>
 
             <div className="space-y-3">
@@ -1750,6 +1804,224 @@ export function SupplyChainDashboard() {
                 className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold py-2.5 rounded-xl border border-red-500/20 flex items-center justify-center gap-2 cursor-pointer transition-colors">
                 <Trash2 className="size-4" />
                 Excluir SKU
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ━━━ MODAL CARD DEDICADO: RANKING COMPLETO DE VENDAS ━━━━━━━━━━━━━━ */}
+      {showFullRankingModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 md:p-6 animate-in fade-in duration-200">
+          <div className="bg-[#121212] border border-border rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="p-6 border-b border-border flex items-center justify-between bg-black/40 gap-4">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 grid place-items-center shrink-0">
+                  <TrendingUp className="size-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    Ranking Completo de Vendas por Modelo
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Visualização detalhada do desempenho de todos os modelos do catálogo</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="relative w-64 hidden sm:block">
+                  <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={rankingSearchQuery}
+                    onChange={(e) => setRankingSearchQuery(e.target.value)}
+                    placeholder="Pesquisar no ranking..."
+                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50"
+                  />
+                </div>
+                <button
+                  onClick={() => setShowFullRankingModal(false)}
+                  className="p-2 text-muted-foreground hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body - Lista Completa com Expansão */}
+            <div className="p-6 overflow-y-auto space-y-3 custom-scrollbar flex-1">
+              {(() => {
+                const filteredRanking = modelRankingList.filter(m => {
+                  if (!rankingSearchQuery.trim()) return true;
+                  const q = rankingSearchQuery.toLowerCase().trim();
+                  return m.modelDisplayName.toLowerCase().includes(q) || m.brand.toLowerCase().includes(q);
+                });
+
+                if (filteredRanking.length === 0) {
+                  return (
+                    <div className="py-12 text-center text-xs text-muted-foreground italic">
+                      Nenhum modelo encontrado no ranking.
+                    </div>
+                  );
+                }
+
+                return filteredRanking.map((modelItem, idx) => {
+                  const maxSold = modelRankingList[0]?.totalSold || 1;
+                  const pct = maxSold > 0 ? Math.round((modelItem.totalSold / maxSold) * 100) : 0;
+                  const medal = MEDAL_STYLES[idx];
+                  const isExpanded = expandedRankingModelKey === modelItem.groupKey;
+                  const barColor = medal
+                    ? `bg-gradient-to-r ${medal.barFrom} ${medal.barTo}`
+                    : "bg-emerald-500/60";
+
+                  return (
+                    <div key={modelItem.groupKey} className="border border-white/10 rounded-2xl overflow-hidden bg-black/30 hover:border-white/20 transition-all">
+                      <div 
+                        onClick={() => setExpandedRankingModelKey(isExpanded ? null : modelItem.groupKey)}
+                        className="p-4 flex items-center gap-4 cursor-pointer hover:bg-white/5 transition-colors"
+                      >
+                        <span className="text-base font-bold w-8 text-center shrink-0">
+                          {medal ? medal.emoji : `#${idx + 1}`}
+                        </span>
+
+                        {modelItem.image_url ? (
+                          <img src={modelItem.image_url} alt={modelItem.modelDisplayName} className="size-10 object-cover rounded-xl border border-white/10 shrink-0" />
+                        ) : (
+                          <div className="size-10 rounded-xl bg-elevated border border-border flex items-center justify-center shrink-0">
+                            <Box className="size-5 text-muted-foreground" />
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className={`text-sm font-bold truncate ${medal ? medal.text : "text-white"}`}>
+                              {modelItem.modelDisplayName}
+                            </span>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
+                                {modelItem.totalSold} un vendidas
+                              </span>
+                              <span className="text-xs text-muted-foreground font-medium">
+                                {modelItem.totalStock} un em estoque
+                              </span>
+                            </div>
+                          </div>
+                          <div className="h-2 w-full bg-elevated rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full transition-all duration-700 ${barColor}`} style={{ width: `${pct || 3}%` }} />
+                          </div>
+                        </div>
+
+                        <div className="text-muted-foreground hover:text-white shrink-0 ml-1">
+                          {isExpanded ? <ChevronUp className="size-5 text-emerald-400" /> : <ChevronDown className="size-5" />}
+                        </div>
+                      </div>
+
+                      {/* Expansão de Sabores no Ranking Completo */}
+                      {isExpanded && (
+                        <div className="border-t border-white/10 bg-black/50 p-4 space-y-2 text-xs">
+                          <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
+                            <span>Desempenho de Sabores — {modelItem.modelDisplayName}</span>
+                            <span>Estoque Atual</span>
+                          </div>
+
+                          {modelItem.flavors.map((fItem: any) => {
+                            const flavorStock = fItem.stock;
+                            let stockBadgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+                            let stockLabel = `${flavorStock} un em estoque`;
+
+                            if (flavorStock === 0) {
+                              stockBadgeClass = "bg-red-500/10 text-red-400 border-red-500/20";
+                              stockLabel = "Sem estoque";
+                            } else if (flavorStock < 5) {
+                              stockBadgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                              stockLabel = `${flavorStock} un restando`;
+                            }
+
+                            return (
+                              <div key={fItem.id || fItem.flavor} className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+                                <div className="flex items-center gap-2.5">
+                                  <Tag className="size-3.5 text-emerald-400" />
+                                  <span className="font-semibold text-white">{fItem.flavor}</span>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                  <span className="text-muted-foreground font-mono text-xs">
+                                    {fItem.totalSold} vendidas
+                                  </span>
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${stockBadgeClass}`}>
+                                    {stockLabel}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-border bg-black/40 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground font-medium">
+                Total de {modelRankingList.length} modelos ranqueados
+              </span>
+              <button
+                onClick={() => setShowFullRankingModal(false)}
+                className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ━━━ BARRA FLUTUANTE FIXA NO CANTO INFERIOR DIREITO: SALVAR ALTERAÇÕES ━━━ */}
+      {Object.keys(pendingStockChanges).length > 0 && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 duration-200">
+          <div className="bg-[#121212] border border-emerald-500/40 rounded-2xl p-4 shadow-[0_0_30px_rgba(16,185,129,0.35)] flex items-center gap-4 border-l-4 border-l-emerald-500 backdrop-blur-xl">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="size-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-xs font-bold text-white uppercase tracking-wider">Alterações de Estoque</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5 font-medium">
+                {Object.keys(pendingStockChanges).length} {Object.keys(pendingStockChanges).length === 1 ? 'item alterado' : 'itens alterados'} no rascunho
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleDiscardStockChanges}
+                disabled={isSavingStock}
+                className="px-3.5 py-2 rounded-xl bg-elevated hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-semibold transition-all cursor-pointer"
+              >
+                Descartar
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveAllStockChanges}
+                disabled={isSavingStock}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.4)] cursor-pointer active:scale-95 disabled:opacity-50"
+              >
+                {isSavingStock ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin text-black" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="size-4" />
+                    Salvar Alterações
+                  </>
+                )}
               </button>
             </div>
           </div>
