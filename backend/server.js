@@ -370,6 +370,105 @@ async function parseAndSaveOrder(senderNumber, contactName, messageText) {
 }
 
 // =============================================
+// GET REAL STORE PIX KEY FROM SUPABASE / ENV
+// =============================================
+async function getStorePixKey() {
+    try {
+        const { data: scData } = await supabase.from('store_config').select('pix_key').limit(1).maybeSingle();
+        if (scData && scData.pix_key && String(scData.pix_key).trim()) {
+            return String(scData.pix_key).trim();
+        }
+
+        const { data: spData } = await supabase.from('smoking_products').select('flavor').eq('brand', '__STORE_CONFIG__').limit(1).maybeSingle();
+        if (spData && spData.flavor) {
+            try {
+                const parsed = JSON.parse(spData.flavor);
+                if (parsed && parsed.pix_key && String(parsed.pix_key).trim()) {
+                    return String(parsed.pix_key).trim();
+                }
+            } catch (e) {}
+        }
+    } catch (err) {
+        console.warn('⚠️ Erro ao carregar chave Pix do banco:', err);
+    }
+    return process.env.PIX_KEY || '11999999999 (Pix Loja)';
+}
+
+// =============================================
+// PROCESS COMPROVANTE & MOVE ORDER TO KANBAN (SEPARAÇÃO)
+// =============================================
+async function handleReceiptReceived(senderNumber, contactName, messageText, hasMedia) {
+    try {
+        const isReceiptText = /comprovante|paguei|fiz o pix|mandei o pix|transferi|depositei|pagamento feito|print/i.test(messageText || '');
+        if (!hasMedia && !isReceiptText) return null;
+
+        console.log(`🧾 [Comprovante] Recebido de ${senderNumber} (${contactName}). Atualizando/Gravando pedido para o Kanban...`);
+
+        // 1. Salva/Atualiza Cliente
+        await supabase
+            .from('smoking_clients')
+            .upsert({ phone: senderNumber, name: contactName }, { onConflict: 'phone' });
+
+        // 2. Buscar último pedido do cliente que ainda não foi concluído
+        const { data: existingOrders } = await supabase
+            .from('smoking_orders')
+            .select('*')
+            .eq('client_phone', senderNumber)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+        if (existingOrders && existingOrders.length > 0) {
+            const existingOrder = existingOrders[0];
+            // Se o pedido existia, atualiza para Aguardando Confirmação do Pix & Separação
+            const { data: updated, error: updateErr } = await supabase
+                .from('smoking_orders')
+                .update({
+                    payment_status: 'AGUARDANDO_CONFIRMACAO',
+                    delivery_status: 'PREPARANDO',
+                    notes: 'Comprovante Pix enviado pelo cliente no WhatsApp - Aguardando validação do dono da loja'
+                })
+                .eq('id', existingOrder.id)
+                .select()
+                .single();
+
+            if (!updateErr) {
+                console.log(`✅ Pedido #${existingOrder.id} atualizado para AGUARDANDO_CONFIRMACAO / PREPARANDO no Kanban!`);
+                return updated;
+            }
+        }
+
+        // 3. Se não existia pedido gravado ainda, cria o pedido direto no Kanban!
+        const { data: newOrder, error: insertErr } = await supabase
+            .from('smoking_orders')
+            .insert({
+                client_phone: senderNumber,
+                client_name: contactName,
+                items: [{ name: 'Pod (WhatsApp)', flavor: 'Pedido por Chat', quantity: 1, price: 89.90 }],
+                total_amount: 89.90,
+                shipping_fee: 10.00,
+                shipping_address: 'Endereço enviado pelo WhatsApp',
+                payment_status: 'AGUARDANDO_CONFIRMACAO',
+                delivery_status: 'PREPARANDO',
+                payment_method: 'PIX',
+                notes: 'Comprovante Pix enviado no WhatsApp - Aguardando confirmação do dono da loja'
+            })
+            .select()
+            .single();
+
+        if (insertErr) {
+            console.error('❌ Erro ao registrar pedido de comprovante no Supabase:', insertErr);
+            return null;
+        }
+
+        console.log(`✅ Novo Pedido #${newOrder.id} gravado no Supabase em Separação para ${senderNumber}!`);
+        return newOrder;
+    } catch (err) {
+        console.error('❌ Erro no handleReceiptReceived:', err);
+        return null;
+    }
+}
+
+// =============================================
 // DETECT FOLLOW-UP TRIGGERS IN AI RESPONSE
 // =============================================
 function detectFollowUpTriggers(chatId, aiResponse) {
@@ -590,8 +689,8 @@ async function processMessage(msg, senderNumber, chatId, messageText) {
         }
 
         // --- DETECÇÃO DE NOVO PEDIDO DO CARDÁPIO ---
+        const pushName = contact.pushname || 'Cliente';
         if (messageText.startsWith('[PEDIDO-SMOKING]')) {
-            const pushName = contact.pushname || 'Cliente';
             const orderId = await parseAndSaveOrder(senderNumber, pushName, messageText);
             if (orderId) {
                 initConversation(senderNumber);
@@ -601,6 +700,9 @@ async function processMessage(msg, senderNumber, chatId, messageText) {
                 });
             }
         }
+
+        // --- DETECÇÃO E GRAVAÇÃO DE COMPROVANTE NO KANBAN ---
+        await handleReceiptReceived(senderNumber, pushName, messageText, msg.hasMedia);
 
         // --- DETECÇÃO CONTEXTUAL DE CEP OU ENDEREÇO ---
         let needsShippingCalculation = false;
@@ -740,10 +842,13 @@ async function processMessage(msg, senderNumber, chatId, messageText) {
         // INTEGRAÇÃO DE PAGAMENTOS: Pix e Mercado Pago
         // =============================================
         if (aiResponse) {
-            if (aiResponse.includes('[chave_pix_real]')) {
-                const pixKey = process.env.PIX_KEY || 'Chave Pix não configurada';
-                aiResponse = aiResponse.replace('[chave_pix_real]', pixKey);
-            }
+            const realPixKey = await getStorePixKey();
+            aiResponse = aiResponse
+                .replaceAll('[chave_pix_real]', realPixKey)
+                .replaceAll('[CHAVE PIX CNPJ / ALEATÓRIA DA LOJA]', realPixKey)
+                .replaceAll('[CHAVE PIX CNPJ/ALEATÓRIA DA LOJA]', realPixKey)
+                .replaceAll('[CHAVE PIX]', realPixKey)
+                .replaceAll('[chave_pix]', realPixKey);
 
             if (aiResponse.includes('[link_do_checkout]')) {
                 // Tenta extrair o valor total da mensagem gerada pela IA (ex: total de R$ 110,50)
