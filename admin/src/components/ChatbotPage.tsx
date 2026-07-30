@@ -317,10 +317,10 @@ export function ChatbotPage() {
       }
     }
 
-    // 2. Se não foi "de cada" ou faltam sabores, analisa histórico para sabores explícitos
+    // 2. Se não foi "de cada" ou faltam sabores, analisa histórico para marcas (Ignite, Elfbar), modelos ou sabores
     if (orderItems.length === 0) {
-      const extractQty = (text: string, flavorLower: string): number => {
-        const escaped = flavorLower.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const extractQty = (text: string, targetStr: string): number => {
+        const escaped = targetStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
         const specificMatch = text.match(new RegExp(`(\\d+)\\s*(?:unidades?|un|x|pods?)?\\s*(?:de|da|do)?\\s*${escaped}`, 'i'));
         if (specificMatch) {
           const val = parseInt(specificMatch[1], 10);
@@ -332,7 +332,7 @@ export function ChatbotPage() {
           if (val > 0 && val < 500) return val;
         }
         for (const [word, num] of Object.entries(numberWords)) {
-          if (text.includes(word) && text.indexOf(word) < text.indexOf(flavorLower)) return num;
+          if (text.includes(word) && text.indexOf(word) < text.indexOf(targetStr)) return num;
         }
         return 1;
       };
@@ -343,10 +343,15 @@ export function ChatbotPage() {
 
         for (const p of inStockProducts) {
           const flavorLower = p.flavor.toLowerCase();
-          const flavorFound = text.includes(flavorLower) || fuzzy(text, flavorLower) ||
-            flavorLower.split(' ').some((w: string) => w.length > 3 && text.includes(w));
+          const brandLower = (p.brand || '').toLowerCase();
+          const nameLower = (p.name || '').toLowerCase();
 
-          if (flavorFound && !orderItems.some(item => item.product_id === p.id)) {
+          const flavorFound = (flavorLower !== 'padrão' && flavorLower !== 'padrao') && 
+            (text.includes(flavorLower) || fuzzy(text, flavorLower) || flavorLower.split(' ').some((w: string) => w.length > 3 && text.includes(w)));
+
+          const brandOrModelFound = (brandLower && text.includes(brandLower)) || (nameLower && text.includes(nameLower));
+
+          if ((flavorFound || brandOrModelFound) && !orderItems.some(item => item.product_id === p.id)) {
             const qty = extractQty(text, flavorLower);
             const itemBrand = p.brand ? p.brand : '';
             const itemModel = `${itemBrand} ${p.name}`.trim();
@@ -357,6 +362,7 @@ export function ChatbotPage() {
               quantity: qty,
               price: parseFloat(p.price)
             });
+            break;
           }
         }
       }
