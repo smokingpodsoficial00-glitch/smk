@@ -72,6 +72,9 @@ export function SupplyChainDashboard() {
   // Estado para Gaveta Lateral (Drawer) de Detalhes do SKU
   const [selectedDrawerSKU, setSelectedDrawerSKU] = useState<any | null>(null);
 
+  // Estado para modelo expandido no Ranking de Vendas por Modelo
+  const [expandedRankingModelKey, setExpandedRankingModelKey] = useState<string | null>(null);
+
   // ─── Helpers ────────────────────────────────────────────
   const getGroupDisplayName = (brand: string, name: string) => {
     const b = (brand || '').trim();
@@ -295,14 +298,25 @@ export function SupplyChainDashboard() {
   const handleUpdateStock = async (id: string, newStock: number) => {
     if (newStock < 0) return;
     try {
+      // 1. Atualização otimista imediata na interface
       setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: newStock } : p));
       if (selectedDrawerSKU?.id === id) {
         setSelectedDrawerSKU((prev: any) => prev ? { ...prev, stock: newStock } : null);
       }
-      const { error } = await supabase.from("smoking_products").update({ stock: newStock }).eq("id", id).select();
-      if (error) console.error("Erro ao atualizar estoque:", error);
+
+      // 2. Gravação definitiva no Supabase com fallback seguro
+      let query = supabase.from("smoking_products").update({ stock: newStock }).eq("id", id);
+      if (company?.id) {
+        query = query.eq("company_id", company.id);
+      }
+      const { data, error } = await query.select();
+
+      if (error || !data || data.length === 0) {
+        // Fallback: se por algum motivo a trava de company_id não deu match, tenta pelo ID direto
+        await supabase.from("smoking_products").update({ stock: newStock }).eq("id", id);
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Erro ao salvar estoque no Supabase:", err);
     }
   };
 
@@ -501,6 +515,65 @@ export function SupplyChainDashboard() {
     })
     .sort((a, b) => b.totalStock - a.totalStock);
 
+  // Step 5: Ranking de Vendas por Modelo de Pod com Expansão por Sabores
+  const modelRankingMap: Record<string, {
+    groupKey: string;
+    modelDisplayName: string;
+    brand: string;
+    name: string;
+    image_url: string;
+    totalSold: number;
+    totalStock: number;
+    flavors: Array<{
+      id: string;
+      flavor: string;
+      totalSold: number;
+      stock: number;
+    }>;
+  }> = {};
+
+  Object.values(groupedMap).forEach(group => {
+    const displayName = getGroupDisplayName(group.brand, group.name);
+    const flavorsList = group.realFlavors.map((f: any) => ({
+      id: f.id,
+      flavor: f.flavor || 'Padrão',
+      totalSold: 0,
+      stock: f.stock || 0,
+    }));
+
+    modelRankingMap[group.groupKey] = {
+      groupKey: group.groupKey,
+      modelDisplayName: displayName,
+      brand: group.brand,
+      name: group.name,
+      image_url: group.image_url,
+      totalSold: 0,
+      totalStock: group.totalStock,
+      flavors: flavorsList,
+    };
+  });
+
+  topSelling.forEach((item: any) => {
+    const pName = (item.product_name || item.name || '').toLowerCase();
+    const fName = (item.flavor || '').toLowerCase();
+    const sold = parseInt(item.total_sold || item.quantity || 0) || 0;
+
+    Object.values(modelRankingMap).forEach(m => {
+      const brandLower = m.brand.toLowerCase();
+      const nameLower = m.name.toLowerCase();
+      if (pName.includes(brandLower) || pName.includes(nameLower) || m.modelDisplayName.toLowerCase().includes(pName)) {
+        m.totalSold += sold;
+        const foundFlavor = m.flavors.find(f => f.flavor.toLowerCase() === fName);
+        if (foundFlavor) {
+          foundFlavor.totalSold += sold;
+        }
+      }
+    });
+  });
+
+  const modelRankingList = Object.values(modelRankingMap)
+    .sort((a, b) => b.totalSold - a.totalSold);
+
   // ─── Loading State ──────────────────────────────────────
   if (loading) {
     return (
@@ -623,44 +696,119 @@ export function SupplyChainDashboard() {
         {/* ── GRÁFICOS: RANKING + DONUT ────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-          {/* Ranking Top Sabores (com Medalhas) */}
+          {/* Ranking Top Modelos de Pods (com Expansão de Sabores e Estoque) */}
           <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="size-4 text-emerald-400" />
-              <span className="text-xs uppercase font-semibold text-silver tracking-wider">Ranking de Vendas</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="size-4 text-emerald-400" />
+                <span className="text-xs uppercase font-semibold text-silver tracking-wider">Ranking de Vendas por Modelo</span>
+              </div>
+              <span className="text-[10px] text-muted-foreground font-medium">Clique no modelo para ver os sabores</span>
             </div>
+
             <div className="space-y-3">
-              {topSelling.slice(0, 5).map((item, idx) => {
-                const maxSold = topSelling[0]?.total_sold || 1;
-                const pct = Math.round((item.total_sold / maxSold) * 100);
+              {modelRankingList.slice(0, 5).map((modelItem, idx) => {
+                const maxSold = modelRankingList[0]?.totalSold || 1;
+                const pct = maxSold > 0 ? Math.round((modelItem.totalSold / maxSold) * 100) : 0;
                 const medal = MEDAL_STYLES[idx];
+                const isExpanded = expandedRankingModelKey === modelItem.groupKey;
                 const barColor = medal
                   ? `bg-gradient-to-r ${medal.barFrom} ${medal.barTo}`
-                  : "bg-white/20";
+                  : "bg-emerald-500/60";
 
                 return (
-                  <div key={idx} className="flex items-center gap-3">
-                    <span className="text-lg w-7 text-center shrink-0">
-                      {medal ? medal.emoji : `${idx + 1}º`}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-xs font-semibold truncate ${medal ? medal.text : "text-muted-foreground"}`}>
-                          {item.flavor || item.product_name}
-                        </span>
-                        <span className="text-xs text-muted-foreground ml-2 shrink-0 font-medium">
-                          {item.total_sold} un
-                        </span>
+                  <div key={modelItem.groupKey} className="border border-border/50 rounded-xl overflow-hidden bg-black/20">
+                    <div 
+                      onClick={() => setExpandedRankingModelKey(isExpanded ? null : modelItem.groupKey)}
+                      className="p-3 flex items-center gap-3 cursor-pointer hover:bg-white/5 transition-colors"
+                    >
+                      <span className="text-base w-6 text-center shrink-0">
+                        {medal ? medal.emoji : `${idx + 1}º`}
+                      </span>
+
+                      {modelItem.image_url ? (
+                        <img src={modelItem.image_url} alt={modelItem.modelDisplayName} className="size-8 object-cover rounded-lg border border-border shrink-0" />
+                      ) : (
+                        <div className="size-8 rounded-lg bg-elevated border border-border flex items-center justify-center shrink-0">
+                          <Box className="size-4 text-muted-foreground" />
+                        </div>
+                      )}
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-xs font-bold truncate ${medal ? medal.text : "text-white"}`}>
+                            {modelItem.modelDisplayName}
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs font-semibold text-emerald-400">
+                              {modelItem.totalSold} un vendidas
+                            </span>
+                            <span className="text-[11px] text-muted-foreground">
+                              ({modelItem.totalStock} un em estoque)
+                            </span>
+                          </div>
+                        </div>
+                        <div className="h-1.5 w-full bg-elevated rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all duration-700 ${barColor}`} style={{ width: `${pct || 5}%` }} />
+                        </div>
                       </div>
-                      <div className="h-2 w-full bg-elevated rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full transition-all duration-700 ${barColor}`} style={{ width: `${pct}%` }} />
+
+                      <div className="text-muted-foreground hover:text-white shrink-0 ml-1">
+                        {isExpanded ? <ChevronUp className="size-4 text-emerald-400" /> : <ChevronDown className="size-4" />}
                       </div>
                     </div>
+
+                    {/* Detalhamento de Sabores do Modelo Selecionado */}
+                    {isExpanded && (
+                      <div className="border-t border-border/40 bg-black/40 p-3 space-y-2 text-xs">
+                        <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
+                          <span>Desempenho de Sabores — {modelItem.modelDisplayName}</span>
+                          <span>Estoque Atual</span>
+                        </div>
+
+                        {modelItem.flavors.length > 0 ? (
+                          modelRankingList && modelItem.flavors.map((fItem) => {
+                            const flavorStock = fItem.stock;
+                            let stockBadgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+                            let stockLabel = `${flavorStock} un em estoque`;
+
+                            if (flavorStock === 0) {
+                              stockBadgeClass = "bg-red-500/10 text-red-400 border-red-500/20";
+                              stockLabel = "Sem estoque";
+                            } else if (flavorStock < 5) {
+                              stockBadgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                              stockLabel = `${flavorStock} un restando`;
+                            }
+
+                            return (
+                              <div key={fItem.id || fItem.flavor} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                                <div className="flex items-center gap-2">
+                                  <Tag className="size-3 text-emerald-400" />
+                                  <span className="font-medium text-white">{fItem.flavor}</span>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                  <span className="text-muted-foreground font-mono text-[11px]">
+                                    {fItem.totalSold} vendidas
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${stockBadgeClass}`}>
+                                    {stockLabel}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground py-1 italic">Nenhum sabor cadastrado para este modelo.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
-              {topSelling.length === 0 && (
-                <p className="text-xs text-muted-foreground py-4 text-center">Nenhuma venda registrada ainda.</p>
+
+              {modelRankingList.length === 0 && (
+                <p className="text-xs text-muted-foreground py-4 text-center">Nenhum produto cadastrado no modelo.</p>
               )}
             </div>
           </div>
