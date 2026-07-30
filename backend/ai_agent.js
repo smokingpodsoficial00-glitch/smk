@@ -476,7 +476,7 @@ async function getAiResponse(phone, message) {
     
     // Injeta temporariamente o estoque e parâmetros da loja na system message com Lembretes Críticos
     const originalSystemPrompt = conversationHistory[phone][0].content;
-    const strictReminders = "\n\n[LEMBRETE OBRIGATÓRIO DO SISTEMA PARA ESTA RESPOSTA:\n1. NÃO USE EMOJIS. Nunca.\n2. Tudo em minúsculo.\n3. NUNCA ofereça a tabela se já ofereceu no passado.\n4. NUNCA pergunte 'algo mais?' ou 'alguma dúvida?'.\n5. REGRA DE QUANTIDADES EM ESTOQUE: Se o cliente pedir uma quantidade MAIOR do que o estoque em unidades disponível (ex: pediu 19 unidades mas só tem 7 ou 14 em estoque), NUNCA DIGA QUE ESTÁ ESGOTADO! Diga em tom amigável e minúsculo que só possui X unidades em estoque e pergunte se ele quer levar as X disponíveis ou prefere outro sabor.\n6. Se o cliente falar 'quero o [produto]' ou 'pode me ver [produto]', não diga 'temos disponível', pule direto para pedir o endereço (P30).]";
+    const strictReminders = "\n\n[LEMBRETE OBRIGATÓRIO DO SISTEMA PARA ESTA RESPOSTA:\n1. NÃO USE EMOJIS. Nunca.\n2. Tudo em minúsculo.\n3. NUNCA ofereça a tabela se já ofereceu no passado.\n4. NUNCA pergunte 'algo mais?' ou 'alguma dúvida?'.\n5. REGRA DE QUANTIDADES EM ESTOQUE: Se o cliente pedir uma quantidade MAIOR do que o estoque em unidades disponível (ex: pediu 19 unidades mas só tem 7 ou 14 em estoque), NUNCA DIGA QUE ESTÁ ESGOTADO! Diga em tom amigável e minúsculo que só possui X unidades em estoque e pergunte se ele quer levar as X disponíveis ou prefere outro sabor.]";
     conversationHistory[phone][0].content = originalSystemPrompt + stockInfo + storeShippingInfo + strictReminders;
 
     try {
