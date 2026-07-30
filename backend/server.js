@@ -830,29 +830,10 @@ async function processMessage(msg, senderNumber, chatId, messageText) {
         }
 
         // =============================================
-        // CODE-001 + CODE-002: Get AI response (single call, fixed greeting)
+        // Get AI response (processed dynamically by OpenAI using the prompt)
         // =============================================
-        let aiResponse = null;
+        let aiResponse = await getAiResponse(senderNumber, messageText);
         let isHardcodedResponse = false;
-
-        if (isFirstMessage) {
-            // First message from a new client: use exact script greeting
-            aiResponse = 'Olá tudo bem, como posso te ajudar?';
-            isHardcodedResponse = true;
-
-            // Initialize conversation history with this exchange
-            initConversation(senderNumber);
-            conversationHistory[senderNumber].push(
-                { role: 'user', content: messageText },
-                { role: 'assistant', content: aiResponse }
-            );
-
-            // Schedule "oi" follow-up (1 hour) in case client goes silent
-            scheduleOiFollowUp(chatId);
-        } else {
-            // Subsequent messages: call AI once
-            aiResponse = await getAiResponse(senderNumber, messageText, senderNumber);
-        }
 
         // =============================================
         // CODE-003: Emoji removal — ONLY on AI-generated responses
