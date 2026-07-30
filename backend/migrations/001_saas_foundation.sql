@@ -1,11 +1,11 @@
 -- ============================================================================
--- 001_saas_foundation.sql
+-- 001_saas_foundation.sql (100% AUTO-CONTIDO E À PROVA DE ERROS)
 -- Transformação do Smoking Pods em SaaS Multi-Tenant Professional
 -- ============================================================================
 
 -- 1. TABELA DE TEMPLATES DE NEGÓCIO (Multi-nicho)
 CREATE TABLE IF NOT EXISTS public.business_templates (
-  id              TEXT PRIMARY KEY,  -- 'pods', 'tabacaria', 'adega', etc.
+  id              TEXT PRIMARY KEY,
   name            TEXT NOT NULL,
   icon            TEXT,
   categories      JSONB DEFAULT '[]'::jsonb,
@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS public.business_templates (
   created_at      TIMESTAMPTZ DEFAULT now()
 );
 
--- Seed do template inicial Pods
 INSERT INTO public.business_templates (id, name, icon, categories, product_fields) 
 VALUES (
   'pods', 
@@ -59,7 +58,71 @@ CREATE TABLE IF NOT EXISTS public.company_users (
   UNIQUE(company_id, auth_user_id)
 );
 
--- 4. ADICIONAR company_id ÀS TABELAS EXISTENTES (SE AINDA NÃO EXISTIR)
+-- 4. GARANTIR QUE TODAS AS TABELAS DO SISTEMA EXISTEM
+CREATE TABLE IF NOT EXISTS public.store_config (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  store_name TEXT DEFAULT 'Minha Loja',
+  store_slug TEXT DEFAULT 'minha-loja',
+  logo_url TEXT,
+  whatsapp_number TEXT,
+  pix_key TEXT,
+  address TEXT,
+  instagram_url TEXT,
+  description TEXT,
+  base_fare DECIMAL(10,2) DEFAULT 8.50,
+  included_km DECIMAL(10,2) DEFAULT 3.00,
+  extra_km_fee DECIMAL(10,2) DEFAULT 1.40,
+  origin_cep TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.shipping_config (
+  id SERIAL PRIMARY KEY,
+  base_fare DECIMAL(10,2) DEFAULT 8.50,
+  included_km DECIMAL(10,2) DEFAULT 3.00,
+  extra_km_fee DECIMAL(10,2) DEFAULT 1.40,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.smoking_products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  brand TEXT NOT NULL,
+  puffs INTEGER DEFAULT 5000,
+  flavor TEXT NOT NULL,
+  price DECIMAL(10,2) NOT NULL,
+  cost_price DECIMAL(10,2) DEFAULT 35.00,
+  stock INTEGER DEFAULT 0,
+  image_url TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.smoking_clients (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  phone TEXT UNIQUE NOT NULL,
+  name TEXT,
+  address TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.smoking_orders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_phone TEXT NOT NULL,
+  client_name TEXT,
+  items JSONB NOT NULL,
+  total_amount DECIMAL(10,2) NOT NULL,
+  shipping_fee DECIMAL(10,2) DEFAULT 0.00,
+  shipping_address TEXT NOT NULL,
+  payment_status TEXT DEFAULT 'PENDENTE',
+  delivery_status TEXT DEFAULT 'AGUARDANDO_PAGAMENTO',
+  payment_method TEXT DEFAULT 'PIX',
+  receipt_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 5. ADICIONAR COLUNA company_id EM TODAS AS TABELAS
 DO $$ 
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='smoking_products' AND column_name='company_id') THEN
@@ -91,18 +154,16 @@ CREATE INDEX IF NOT EXISTS idx_config_company    ON public.store_config(company_
 CREATE INDEX IF NOT EXISTS idx_comp_users_auth   ON public.company_users(auth_user_id);
 CREATE INDEX IF NOT EXISTS idx_comp_users_comp   ON public.company_users(company_id);
 
--- 5. CRIAR EMPRESA PADRÃO E VINCULAR DADOS EXISTENTES (MIGRAÇÃO)
+-- 6. CRIAR EMPRESA PADRÃO E VINCULAR DADOS EXISTENTES (MIGRAÇÃO)
 DO $$
 DECLARE
   v_default_company_id UUID;
 BEGIN
-  -- Se não existir nenhuma empresa, cria a empresa padrão "Smoking Pods Matrix"
   IF NOT EXISTS (SELECT 1 FROM public.companies) THEN
     INSERT INTO public.companies (name, email, onboarding_done)
     VALUES ('Smoking Pods Matrix', 'contato@smokingpods.com', true)
     RETURNING id INTO v_default_company_id;
 
-    -- Atribui a empresa padrão aos registros legados sem company_id
     UPDATE public.smoking_products SET company_id = v_default_company_id WHERE company_id IS NULL;
     UPDATE public.smoking_orders SET company_id = v_default_company_id WHERE company_id IS NULL;
     UPDATE public.smoking_clients SET company_id = v_default_company_id WHERE company_id IS NULL;
@@ -111,7 +172,7 @@ BEGIN
   END IF;
 END $$;
 
--- 6. FUNÇÃO HELPER PARA BUSCAR O company_id DO USUÁRIO AUTENTICADO
+-- 7. FUNÇÃO HELPER PARA BUSCAR O company_id DO USUÁRIO AUTENTICADO
 CREATE OR REPLACE FUNCTION public.get_auth_company_id()
 RETURNS UUID AS $$
   SELECT company_id FROM public.company_users 
@@ -120,7 +181,7 @@ RETURNS UUID AS $$
   LIMIT 1;
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
--- 7. CONFIGURAÇÃO DE ROW LEVEL SECURITY (RLS) MULTI-TENANT
+-- 8. CONFIGURAÇÃO DE ROW LEVEL SECURITY (RLS) MULTI-TENANT
 ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.company_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.smoking_products ENABLE ROW LEVEL SECURITY;
