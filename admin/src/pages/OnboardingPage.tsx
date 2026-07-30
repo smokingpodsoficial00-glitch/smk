@@ -125,22 +125,22 @@ export function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden selection:bg-white/20 selection:text-white">
       {/* Glow Effects */}
-      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-emerald-500/10 blur-[150px] rounded-full pointer-events-none" />
+      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-white/10 blur-[180px] rounded-full pointer-events-none" />
 
       <div className="w-full max-w-2xl bg-[#0b0b0b] border border-[#1f1f1f] rounded-3xl p-8 shadow-2xl relative z-10 backdrop-blur-xl">
         
         {/* Onboarding Header */}
         <div className="flex items-center justify-between mb-8 pb-6 border-b border-[#1a1a1a]">
           <div>
-            <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-widest mb-1">
-              <Sparkles className="size-3.5" />
+            <div className="flex items-center gap-2 text-white font-bold text-xs uppercase tracking-widest mb-1">
+              <Sparkles className="size-3.5 text-white" />
               Configuração Inicial da Empresa
             </div>
             <h1 className="text-xl font-bold text-white">Assistente de Onboarding</h1>
           </div>
-          <div className="text-xs font-mono text-white/40 bg-[#141414] border border-[#222] px-3 py-1.5 rounded-xl font-semibold">
+          <div className="text-xs font-mono text-white/50 bg-[#141414] border border-[#222] px-3 py-1.5 rounded-xl font-semibold">
             Passo {step} de {totalSteps}
           </div>
         </div>
@@ -148,7 +148,7 @@ export function OnboardingPage() {
         {/* Stepper Progress Bar */}
         <div className="w-full bg-[#141414] h-1.5 rounded-full overflow-hidden mb-8">
           <div 
-            className="bg-emerald-500 h-full transition-all duration-500 ease-out" 
+            className="bg-white h-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(255,255,255,0.5)]" 
             style={{ width: `${(step / totalSteps) * 100}%` }} 
           />
         </div>
@@ -160,35 +160,35 @@ export function OnboardingPage() {
           {step === 1 && (
             <div className="space-y-4 animate-fadeIn">
               <div className="flex items-center gap-3 mb-2">
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <div className="p-2.5 rounded-xl bg-white/10 border border-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.15)]">
                   <Building2 className="size-5" />
                 </div>
                 <div>
                   <h2 className="font-bold text-base text-white">Identidade da Empresa</h2>
-                  <p className="text-xs text-white/40">Defina o nome da sua marca e sua logo oficial</p>
+                  <p className="text-xs text-white/50">Defina o nome da sua marca e sua logo oficial</p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">Nome Comercial</label>
+                <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Nome Comercial</label>
                 <input
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Ex: Smoking Pods Express"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
+                  placeholder="Ex: Vape King Lounge"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">URL da Logo (ou Upload)</label>
+                <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">URL da Logo (ou Upload)</label>
                 <div className="flex gap-3">
                   <input
                     type="url"
                     value={logoUrl}
                     onChange={(e) => setLogoUrl(e.target.value)}
                     placeholder="https://exemplo.com/logo.png"
-                    className="flex-1 bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
+                    className="flex-1 bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
                   />
                   <div className="size-11 rounded-xl bg-[#141414] border border-[#262626] flex items-center justify-center shrink-0">
                     {logoUrl ? (
@@ -206,34 +206,34 @@ export function OnboardingPage() {
           {step === 2 && (
             <div className="space-y-4 animate-fadeIn">
               <div className="flex items-center gap-3 mb-2">
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <div className="p-2.5 rounded-xl bg-white/10 border border-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.15)]">
                   <MapPin className="size-5" />
                 </div>
                 <div>
                   <h2 className="font-bold text-base text-white">Endereço da Operação</h2>
-                  <p className="text-xs text-white/40">Endereço de partida dos entregadores para cálculo de frete</p>
+                  <p className="text-xs text-white/50">Endereço de partida dos entregadores para cálculo de frete</p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">Endereço Completo</label>
+                <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Endereço Completo</label>
                 <input
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="Rua, Número, Bairro - Cidade, Estado"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">CEP de Origem</label>
+                <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">CEP de Origem</label>
                 <input
                   type="text"
                   value={originCep}
                   onChange={(e) => setOriginCep(e.target.value)}
                   placeholder="00000-000"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
                 />
               </div>
             </div>
@@ -243,34 +243,34 @@ export function OnboardingPage() {
           {step === 3 && (
             <div className="space-y-4 animate-fadeIn">
               <div className="flex items-center gap-3 mb-2">
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <div className="p-2.5 rounded-xl bg-white/10 border border-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.15)]">
                   <Phone className="size-5" />
                 </div>
                 <div>
                   <h2 className="font-bold text-base text-white">Canais de Atendimento</h2>
-                  <p className="text-xs text-white/40">Dados para o bot de IA e botões de contato</p>
+                  <p className="text-xs text-white/50">Dados para o bot de IA e botões de contato</p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">WhatsApp Oficial da Loja</label>
+                <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">WhatsApp Oficial da Loja</label>
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="(11) 99999-9999"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">Instagram (@usuario)</label>
+                <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Instagram (@usuario)</label>
                 <input
                   type="text"
                   value={instagram}
                   onChange={(e) => setInstagram(e.target.value)}
                   placeholder="@minhalojaoficial"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
                 />
               </div>
             </div>
@@ -280,23 +280,23 @@ export function OnboardingPage() {
           {step === 4 && (
             <div className="space-y-4 animate-fadeIn">
               <div className="flex items-center gap-3 mb-2">
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <div className="p-2.5 rounded-xl bg-white/10 border border-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.15)]">
                   <Clock className="size-5" />
                 </div>
                 <div>
                   <h2 className="font-bold text-base text-white">Horário de Funcionamento</h2>
-                  <p className="text-xs text-white/40">A IA avisará os clientes se estiver fora do horário de atendimento</p>
+                  <p className="text-xs text-white/50">A IA avisará os clientes se estiver fora do horário de atendimento</p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">Horário Padrão</label>
+                <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Horário Padrão</label>
                 <input
                   type="text"
                   value={businessHours}
                   onChange={(e) => setBusinessHours(e.target.value)}
                   placeholder="Ex: 11:00 às 23:00 (Segunda a Sábado)"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none"
                 />
               </div>
             </div>
@@ -306,56 +306,56 @@ export function OnboardingPage() {
           {step === 5 && (
             <div className="space-y-4 animate-fadeIn">
               <div className="flex items-center gap-3 mb-2">
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <div className="p-2.5 rounded-xl bg-white/10 border border-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.15)]">
                   <Truck className="size-5" />
                 </div>
                 <div>
                   <h2 className="font-bold text-base text-white">Taxa e Raio de Entrega</h2>
-                  <p className="text-xs text-white/40">Parâmetros para cálculo automático de frete no WhatsApp</p>
+                  <p className="text-xs text-white/50">Parâmetros para cálculo automático de frete no WhatsApp</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">Taxa Base (R$)</label>
+                  <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Taxa Base (R$)</label>
                   <input
                     type="number"
                     step="0.50"
                     value={deliveryFee}
                     onChange={(e) => setDeliveryFee(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-mono"
+                    className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">KM Incluso na Base</label>
+                  <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">KM Incluso na Base</label>
                   <input
                     type="number"
                     step="0.5"
                     value={includedKm}
                     onChange={(e) => setIncludedKm(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-mono"
+                    className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">Valor KM Excedente (R$)</label>
+                  <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Valor KM Excedente (R$)</label>
                   <input
                     type="number"
                     step="0.10"
                     value={extraKmFee}
                     onChange={(e) => setExtraKmFee(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-mono"
+                    className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">Raio Máximo (KM)</label>
+                  <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Raio Máximo (KM)</label>
                   <input
                     type="number"
                     value={deliveryRadius}
                     onChange={(e) => setDeliveryRadius(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-mono"
+                    className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-mono"
                   />
                 </div>
               </div>
@@ -366,28 +366,28 @@ export function OnboardingPage() {
           {step === 6 && (
             <div className="space-y-4 animate-fadeIn">
               <div className="flex items-center gap-3 mb-2">
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <div className="p-2.5 rounded-xl bg-white/10 border border-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.15)]">
                   <QrCode className="size-5" />
                 </div>
                 <div>
                   <h2 className="font-bold text-base text-white">Chave PIX da Empresa</h2>
-                  <p className="text-xs text-white/40">Chave PIX que a atendente virtual enviará aos clientes</p>
+                  <p className="text-xs text-white/50">Chave PIX que a atendente virtual enviará aos clientes</p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">Chave PIX (CNPJ / Telefone / E-mail)</label>
+                <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Chave PIX (CNPJ / Telefone / E-mail)</label>
                 <input
                   type="text"
                   value={pixKey}
                   onChange={(e) => setPixKey(e.target.value)}
                   placeholder="Ex: 00.000.000/0001-00 ou contato@loja.com"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-mono"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-mono"
                 />
               </div>
 
-              <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-xs text-emerald-300 flex items-start gap-3">
-                <Check className="size-5 shrink-0 text-emerald-400 mt-0.5" />
+              <div className="p-4 bg-white/10 border border-white/20 rounded-2xl text-xs text-white flex items-start gap-3">
+                <Check className="size-5 shrink-0 text-white mt-0.5" />
                 <p>Tudo pronto! Sua empresa está configurada com suporte a múltiplos atendentes e isolamento completo de dados.</p>
               </div>
             </div>
@@ -410,26 +410,26 @@ export function OnboardingPage() {
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                className="px-6 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-extrabold transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)]"
               >
                 <span>Próximo Passo</span>
-                <ArrowRight className="size-4" />
+                <ArrowRight className="size-4 text-black" />
               </button>
             ) : (
               <button
                 type="button"
                 disabled={loading}
                 onClick={handleFinish}
-                className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50"
+                className="px-6 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-extrabold transition-all flex items-center gap-2 shadow-[0_0_25px_rgba(255,255,255,0.3)] hover:shadow-[0_0_35px_rgba(255,255,255,0.5)] disabled:opacity-50"
               >
                 {loading ? (
                   <>
-                    <Loader2 className="size-4 animate-spin" />
+                    <Loader2 className="size-4 animate-spin text-black" />
                     <span>Concluindo...</span>
                   </>
                 ) : (
                   <>
-                    <Check className="size-4" />
+                    <Check className="size-4 text-black" />
                     <span>Finalizar e Ir ao Painel</span>
                   </>
                 )}

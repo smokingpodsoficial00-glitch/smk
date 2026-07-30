@@ -50,18 +50,20 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4 py-12 relative overflow-hidden font-sans">
-      {/* Background glow effects */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-emerald-500/10 blur-[140px] rounded-full pointer-events-none" />
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 py-12 relative overflow-hidden font-sans selection:bg-white/20 selection:text-white">
+      
+      {/* Background glow effects (Bright White Ambient Glow) */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-white/10 blur-[180px] rounded-full pointer-events-none" />
 
       <div className="w-full max-w-lg bg-[#0b0b0b] border border-[#1f1f1f] rounded-3xl p-8 shadow-2xl relative z-10 backdrop-blur-xl">
+        
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="size-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-4 shadow-[0_0_25px_rgba(16,185,129,0.15)]">
-            <Bot className="size-7 text-emerald-400" />
+          <div className="size-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mb-4 shadow-[0_0_25px_rgba(255,255,255,0.2)]">
+            <Bot className="size-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Criar Nova Conta SaaS</h1>
-          <p className="text-xs text-white/40 mt-1">Cadastre sua empresa e comece a escalar suas vendas com IA</p>
+          <p className="text-xs text-white/50 mt-1">Cadastre sua empresa e comece a escalar suas vendas com IA</p>
         </div>
 
         {/* Error Alert */}
@@ -74,16 +76,16 @@ export function RegisterPage() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {/* Nome da Empresa */}
           <div>
-            <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">Nome da Empresa / Loja</label>
+            <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Nome da Empresa / Loja</label>
             <div className="relative">
-              <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/30" />
+              <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/40" />
               <input
                 type="text"
                 required
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="Ex: Vape King Lounge"
-                className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/60 transition-all font-medium"
+                className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-white/60 transition-all font-medium"
               />
             </div>
           </div>
@@ -91,31 +93,31 @@ export function RegisterPage() {
           {/* Nome do Responsável + WhatsApp (Grid) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">Seu Nome</label>
+              <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Seu Nome</label>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/30" />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/40" />
                 <input
                   type="text"
                   required
                   value={managerName}
                   onChange={(e) => setManagerName(e.target.value)}
                   placeholder="Nome completo"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/60 transition-all font-medium"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-white/60 transition-all font-medium"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">WhatsApp</label>
+              <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">WhatsApp</label>
               <div className="relative">
-                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/30" />
+                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/40" />
                 <input
                   type="tel"
                   required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="(11) 99999-9999"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/60 transition-all font-medium"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-white/60 transition-all font-medium"
                 />
               </div>
             </div>
@@ -123,16 +125,16 @@ export function RegisterPage() {
 
           {/* Email */}
           <div>
-            <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">E-mail Corporativo</label>
+            <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">E-mail Corporativo</label>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/30" />
+              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/40" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="seu@empresa.com"
-                className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/60 transition-all font-medium"
+                className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-white/60 transition-all font-medium"
               />
             </div>
           </div>
@@ -140,59 +142,59 @@ export function RegisterPage() {
           {/* Senha e Confirmar Senha (Grid) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">Senha</label>
+              <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Senha</label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/30" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/40" />
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Mínimo 6 dígitos"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/60 transition-all font-medium"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-white/60 transition-all font-medium"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-white/60 mb-1.5 uppercase tracking-wider">Confirmar Senha</label>
+              <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Confirmar Senha</label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/30" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/40" />
                 <input
                   type="password"
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Repita a senha"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/60 transition-all font-medium"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-white/60 transition-all font-medium"
                 />
               </div>
             </div>
           </div>
 
-          {/* Submit Button */}
+          {/* Submit Button (Bright White) */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer mt-3 shadow-[0_0_20px_rgba(16,185,129,0.2)] active:scale-[0.99]"
+            className="w-full bg-white hover:bg-slate-100 disabled:opacity-50 text-black font-extrabold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer mt-3 shadow-[0_0_25px_rgba(255,255,255,0.3)] hover:shadow-[0_0_35px_rgba(255,255,255,0.5)] active:scale-[0.99]"
           >
             {loading ? (
               <>
-                <Loader2 className="size-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin text-black" />
                 <span>Criando sua empresa...</span>
               </>
             ) : (
               <>
-                <CheckCircle2 className="size-4" />
+                <CheckCircle2 className="size-4 text-black" />
                 <span>Finalizar Cadastro e Iniciar</span>
               </>
             )}
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-[#1a1a1a] text-center text-xs text-white/40">
+        <div className="mt-8 pt-6 border-t border-[#1a1a1a] text-center text-xs text-white/50">
           Já possui uma empresa cadastrada?{' '}
-          <Link to="/login" className="font-bold text-white hover:text-emerald-400 transition-colors">
+          <Link to="/login" className="font-bold text-white hover:underline underline-offset-4 ml-1">
             Fazer login
           </Link>
         </div>

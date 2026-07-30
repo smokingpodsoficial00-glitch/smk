@@ -29,16 +29,18 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-500/10 blur-[120px] rounded-full pointer-events-none" />
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans selection:bg-white/20 selection:text-white">
+      
+      {/* Background glow effects */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-white/10 blur-[180px] rounded-full pointer-events-none" />
 
       <div className="w-full max-w-md bg-[#0b0b0b] border border-[#1f1f1f] rounded-3xl p-8 shadow-2xl relative z-10 backdrop-blur-xl">
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="size-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-4 shadow-[0_0_25px_rgba(16,185,129,0.15)]">
-            <Bot className="size-7 text-emerald-400" />
+          <div className="size-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mb-4 shadow-[0_0_25px_rgba(255,255,255,0.2)]">
+            <Bot className="size-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Recuperar Senha</h1>
-          <p className="text-xs text-white/40 mt-1">Informe seu e-mail cadastrado para receber as instruções</p>
+          <p className="text-xs text-white/50 mt-1">Informe seu e-mail cadastrado para receber as instruções</p>
         </div>
 
         {errorMsg && (
@@ -48,15 +50,15 @@ export function ForgotPasswordPage() {
         )}
 
         {success ? (
-          <div className="p-6 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-center flex flex-col items-center gap-3">
-            <CheckCircle2 className="size-10 text-emerald-400" />
+          <div className="p-6 bg-white/10 border border-white/20 rounded-2xl text-center flex flex-col items-center gap-3">
+            <CheckCircle2 className="size-10 text-white" />
             <h3 className="text-sm font-bold text-white">E-mail enviado com sucesso!</h3>
             <p className="text-xs text-white/60 leading-relaxed">
               Verifique sua caixa de entrada ou spam no e-mail <strong className="text-white">{email}</strong> para redefinir sua senha.
             </p>
             <Link
               to="/login"
-              className="mt-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
+              className="mt-2 text-xs font-bold text-white hover:underline flex items-center gap-1 transition-colors"
             >
               <ArrowLeft className="size-3.5" />
               <span>Voltar ao login</span>
@@ -65,16 +67,16 @@ export function ForgotPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
-              <label className="block text-xs font-bold text-white/60 mb-2 uppercase tracking-wider">E-mail Cadastrado</label>
+              <label className="block text-xs font-bold text-white/70 mb-2 uppercase tracking-wider">E-mail Cadastrado</label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/30" />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/40" />
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="seu@email.com"
-                  className="w-full bg-[#141414] border border-[#262626] focus:border-emerald-500/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/60 transition-all font-medium"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-white/60 transition-all font-medium"
                 />
               </div>
             </div>
@@ -82,11 +84,11 @@ export function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 shadow-[0_0_20px_rgba(16,185,129,0.2)] active:scale-[0.99]"
+              className="w-full bg-white hover:bg-slate-100 disabled:opacity-50 text-black font-extrabold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 shadow-[0_0_25px_rgba(255,255,255,0.3)] hover:shadow-[0_0_35px_rgba(255,255,255,0.5)] active:scale-[0.99]"
             >
               {loading ? (
                 <>
-                  <Loader2 className="size-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin text-black" />
                   <span>Enviando link...</span>
                 </>
               ) : (
@@ -96,9 +98,9 @@ export function ForgotPasswordPage() {
           </form>
         )}
 
-        <div className="mt-8 pt-6 border-t border-[#1a1a1a] text-center text-xs text-white/40">
+        <div className="mt-8 pt-6 border-t border-[#1a1a1a] text-center text-xs text-white/50">
           Lembrou a senha?{' '}
-          <Link to="/login" className="font-bold text-white hover:text-emerald-400 transition-colors">
+          <Link to="/login" className="font-bold text-white hover:underline underline-offset-4 ml-1">
             Voltar para o login
           </Link>
         </div>
