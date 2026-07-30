@@ -21,13 +21,13 @@ export type RealClient = {
 export const RealClient = {};
 
 export async function fetchLiveClients(companyId?: string): Promise<RealClient[]> {
+  if (!companyId) return [];
   try {
-    // 1. Buscar todos os pedidos do Supabase da empresa
-    let query = supabase.from('smoking_orders').select('*');
-    if (companyId) {
-      query = query.eq('company_id', companyId);
-    }
-    const { data: orders, error: ordersErr } = await query.order('created_at', { ascending: false });
+    const { data: orders, error: ordersErr } = await supabase
+      .from('smoking_orders')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false });
 
     if (ordersErr) {
       console.error("Erro ao buscar smoking_orders:", ordersErr);

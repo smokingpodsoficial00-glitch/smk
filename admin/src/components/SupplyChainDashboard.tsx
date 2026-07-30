@@ -149,17 +149,17 @@ export function SupplyChainDashboard() {
 
   // ─── Data Fetching ──────────────────────────────────────
   const fetchData = async () => {
+    if (!company?.id) {
+      setProducts([]);
+      setLoading(false);
+      return;
+    }
     try {
-      let query = supabase
+      const { data: prodData } = await supabase
         .from("smoking_products")
         .select("*")
-        .neq("brand", "__STORE_CONFIG__");
-
-      if (company?.id) {
-        query = query.eq("company_id", company.id);
-      }
-
-      const { data: prodData } = await query
+        .eq("company_id", company.id)
+        .neq("brand", "__STORE_CONFIG__")
         .order("created_at", { ascending: false })
         .order("id", { ascending: true });
 

@@ -30,17 +30,23 @@ export function FinanceDashboard() {
   const [stockAssetRetail, setStockAssetRetail] = useState(0);
 
   const fetchFinanceData = async () => {
+    if (!company?.id) {
+      setGrossRevenue(0); setCmv(0); setLogisticsSubsidy(0);
+      setNetProfit(0); setProfitMargin(0); setTotalOrders(0); setTotalPodsSold(0);
+      setStockAssetCost(0); setStockAssetRetail(0);
+      setLoading(false);
+      return;
+    }
     try {
-      // 1. Fetch Orders from Supabase for active company
-      let ordersQuery = supabase.from('smoking_orders').select('*');
-      let productsQuery = supabase.from('smoking_products').select('*');
-      if (company?.id) {
-        ordersQuery = ordersQuery.eq('company_id', company.id);
-        productsQuery = productsQuery.eq('company_id', company.id);
-      }
+      const { data: ordersData } = await supabase
+        .from('smoking_orders')
+        .select('*')
+        .eq('company_id', company.id);
 
-      const { data: ordersData } = await ordersQuery;
-      const { data: productsData } = await productsQuery;
+      const { data: productsData } = await supabase
+        .from('smoking_products')
+        .select('*')
+        .eq('company_id', company.id);
 
       // Create product cost map by id and by name/brand
       const costMap = new Map<string, number>();

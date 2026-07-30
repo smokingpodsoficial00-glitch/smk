@@ -56,12 +56,17 @@ export function KanbanBoard() {
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
 
   const fetchOrders = async () => {
+    if (!company?.id) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
     try {
-      let query = supabase.from('smoking_orders').select('*');
-      if (company?.id) {
-        query = query.eq('company_id', company.id);
-      }
-      const { data } = await query.order('created_at', { ascending: false });
+      const { data } = await supabase
+        .from('smoking_orders')
+        .select('*')
+        .eq('company_id', company.id)
+        .order('created_at', { ascending: false });
 
       if (data) {
         const completedIds = getCompletedIds();
