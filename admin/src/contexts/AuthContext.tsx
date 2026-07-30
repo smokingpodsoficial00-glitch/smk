@@ -104,42 +104,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // 2. Se o usuário não possui empresa vinculada, cria uma NOVA empresa e marca onboarding como concluído
-      const { data: newComp } = await supabase
+      // 2. Se o usuário não possui vínculo direto, conecta à empresa principal existente da loja
+      const { data: mainComp } = await supabase
         .from('companies')
-        .insert({
-          name: authUser.user_metadata?.company_name || 'Minha Loja Smoking Pods',
-          email: authUser.email || '',
-          onboarding_done: true,
-        })
-        .select()
-        .single();
+        .select('*')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
 
-      if (newComp) {
-        const { data: newCompUser } = await supabase
-          .from('company_users')
-          .insert({
-            company_id: newComp.id,
-            auth_user_id: authUser.id,
-            name: authUser.user_metadata?.full_name || 'Administrador',
-            email: authUser.email || '',
-            role: 'admin',
-          })
-          .select()
-          .single();
-
-        const activeCompUser: CompanyUser = (newCompUser as CompanyUser) || {
-          id: `cuser-${Date.now()}`,
-          company_id: newComp.id,
+      if (mainComp) {
+        const activeCompUser: CompanyUser = {
+          id: `cuser-${authUser.id}`,
+          company_id: mainComp.id,
           auth_user_id: authUser.id,
           name: authUser.user_metadata?.full_name || 'Administrador',
           email: authUser.email || '',
           role: 'admin',
         };
 
-        setCompany(newComp as Company);
+        // Garante vínculo no banco de dados
+        await supabase.from('company_users').upsert({
+          company_id: mainComp.id,
+          auth_user_id: authUser.id,
+          name: activeCompUser.name,
+          email: activeCompUser.email,
+          role: 'admin',
+          is_active: true
+        }, { onConflict: 'auth_user_id' });
+
+        setCompany(mainComp as Company);
         setCompanyUser(activeCompUser);
-        saveLocalSession(authUser, newComp as Company, activeCompUser);
+        saveLocalSession(authUser, mainComp as Company, activeCompUser);
+        setLoading(false);
+        return;
       }
     } catch (err) {
       console.error('Erro ao carregar dados do usuário:', err);
