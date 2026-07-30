@@ -16,7 +16,7 @@ export function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const displayName = company?.name || config?.store_name || "Smoking Pods";
+  const displayName = config?.store_name || company?.name || "Smoking Pods";
 
   return (
     <div className="flex h-screen bg-[#050505] text-white overflow-hidden font-sans">

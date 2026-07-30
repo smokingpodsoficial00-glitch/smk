@@ -89,9 +89,11 @@ export function SettingsPage() {
       logoUrl = null;
     }
 
+    const finalStoreName = storeName.trim() || "Minha Loja";
+
     await updateConfig({
-      store_name: storeName.trim() || "Minha Loja",
-      store_slug: (storeName.trim() || "minha-loja").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
+      store_name: finalStoreName,
+      store_slug: finalStoreName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
       description: "",
       primary_color: primaryColor,
       whatsapp_number: whatsappNumber.replace(/\D/g, ""),
@@ -103,6 +105,40 @@ export function SettingsPage() {
       included_km: parseFloat(includedKm) || 3.0,
       extra_km_fee: parseFloat(extraKmFee) || 1.40,
     });
+
+    // Sincroniza tabela companies e refreshCompany() no AuthContext
+    if (company?.id) {
+      try {
+        await supabase.from('companies').update({
+          name: finalStoreName,
+          logo_url: logoUrl,
+          address: address.trim(),
+          pix_key: pixKey,
+          phone: whatsappNumber.replace(/\D/g, "")
+        }).eq('id', company.id);
+        await refreshCompany();
+      } catch (e) {}
+    }
+
+    // Sincroniza fallback smoking_products (__STORE_CONFIG__) para o catálogo do cliente
+    try {
+      const configJson = JSON.stringify({
+        store_name: finalStoreName,
+        logo_url: logoUrl,
+        pix_key: pixKey,
+        whatsapp_number: whatsappNumber.replace(/\D/g, ""),
+        address: address.trim(),
+      });
+      await supabase
+        .from('smoking_products')
+        .upsert({
+          brand: '__STORE_CONFIG__',
+          name: finalStoreName,
+          image_url: logoUrl,
+          flavor: configJson,
+          company_id: company?.id || null
+        }, { onConflict: 'brand' });
+    } catch (e) {}
   };
 
   const hasChanges = () => {

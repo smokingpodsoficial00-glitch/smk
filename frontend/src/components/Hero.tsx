@@ -20,6 +20,12 @@ export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartC
   const storeName = config?.store_name || "Smoking Pods";
   const logoUrl = config?.logo_url;
 
+  useEffect(() => {
+    if (storeName) {
+      document.title = storeName;
+    }
+  }, [storeName]);
+
   return (
     <section className="px-5 pt-8 pb-6 sm:pt-14 sm:pb-10 max-w-6xl mx-auto relative">
       
