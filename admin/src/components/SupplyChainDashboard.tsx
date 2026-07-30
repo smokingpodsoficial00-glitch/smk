@@ -447,7 +447,16 @@ export function SupplyChainDashboard() {
   };
 
   // ─── Computed Metrics ───────────────────────────────────
-  const totalProducts = Object.keys(groupedMap || {}).length;
+  const uniqueModelsCount = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach(p => {
+      const key = `${(p.brand || '').toLowerCase().trim()}__${(p.name || '').toLowerCase().trim()}`;
+      set.add(key);
+    });
+    return set.size;
+  }, [products]);
+
+  const totalProducts = uniqueModelsCount;
   const totalStockUnits = products.reduce((acc, p) => acc + (p.stock || 0), 0);
   const totalStockValue = products.reduce((acc, p) => acc + ((p.stock || 0) * (parseFloat(p.price) || 0)), 0);
   const totalStockCost = products.reduce((acc, p) => acc + ((p.stock || 0) * (parseFloat(p.cost_price || 35))), 0);
