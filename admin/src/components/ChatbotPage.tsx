@@ -781,7 +781,7 @@ ${isOngoingConversation
           `\n   ficou R$ ${valorProdutos.toFixed(2)} (${itemsSummary}) + ${freteStr} de entrega` +
           `\n   total: R$ ${totalFinal.toFixed(2)}` +
           `\n   pode mandar o pix nessa chave:` +
-          `\n   [CHAVE PIX CNPJ / ALEATÓRIA DA LOJA]` +
+          `\n   ${config?.pix_key || '11999999999 (Chave Pix)'}` +
           `\n   assim que mandar o comprovante já coloco seu pedido em separação!`;
 
         // Se o endereço está 100% preenchido e o nome do cliente foi fornecido, dispara a criação do pedido no Kanban:
