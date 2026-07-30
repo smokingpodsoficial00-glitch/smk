@@ -51,6 +51,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   refreshCompany: () => Promise<void>;
+  completeOnboarding: (updatedData: Partial<Company>) => void;
 }
 
 const LOCAL_SESSION_KEY = 'saas_auth_session_v2';
@@ -174,7 +175,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(activeUser);
         fetchUserData(activeUser);
       } else {
-        // Se não houver sessão ativa no Supabase Auth nem local
         if (!localStorage.getItem(LOCAL_SESSION_KEY)) {
           setLoading(false);
         }
@@ -201,6 +201,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const completeOnboarding = (updatedData: Partial<Company>) => {
+    const updatedCompany: Company = {
+      ...(company || { id: `comp-${Date.now()}`, name: updatedData.name || 'Minha Loja' }),
+      ...updatedData,
+      onboarding_done: true,
+    };
+
+    setCompany(updatedCompany);
+
+    const activeUser = user || ({ id: `usr-${Date.now()}`, email: updatedCompany.email || 'admin@saas.com' } as User);
+    const activeCompUser = companyUser || ({ id: 'cuser-1', company_id: updatedCompany.id, auth_user_id: activeUser.id, name: 'Admin', email: activeUser.email || '', role: 'admin' } as CompanyUser);
+
+    setUser(activeUser);
+    setCompanyUser(activeCompUser);
+    saveLocalSession(activeUser, updatedCompany, activeCompUser);
+  };
+
   // LOGIN (com suporte a fallback 100% garantido)
   const signIn = async (email: string, pass: string) => {
     const cleanEmail = email.trim().toLowerCase();
@@ -219,13 +236,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 2. Fallback: verifica se a conta foi cadastrada neste dispositivo ou na tabela de empresas do Supabase
     try {
-      // Verifica no cadastro salvo em credenciais locais
       const savedCredsStr = localStorage.getItem(LOCAL_CREDS_KEY);
       const savedCreds = savedCredsStr ? JSON.parse(savedCredsStr) : null;
 
       const isLocalMatch = savedCreds && savedCreds.email?.toLowerCase() === cleanEmail && savedCreds.password === pass;
 
-      // Busca a empresa cadastrada na tabela do Supabase
       const { data: dbCompany } = await supabase
         .from('companies')
         .select('*')
@@ -279,7 +294,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cleanEmail = data.email.trim().toLowerCase();
 
     try {
-      // Guardar credenciais registradas localmente para permitir login instantâneo
       localStorage.setItem(LOCAL_CREDS_KEY, JSON.stringify({
         email: cleanEmail,
         password: data.password,
@@ -288,7 +302,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         phone: data.phone,
       }));
 
-      // 1. Tenta cadastrar no Supabase Auth (sem bloquear caso o Supabase limite por IP ou exija e-mail)
       let activeAuthUser: User | null = null;
 
       const { data: authData } = await supabase.auth.signUp({
@@ -305,7 +318,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (authData?.user) {
         activeAuthUser = authData.user;
       } else {
-        // Mock user para contornar qualquer trava do Supabase
         activeAuthUser = {
           id: `usr-${Date.now()}`,
           email: cleanEmail,
@@ -316,10 +328,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } as User;
       }
 
-      // 2. Cria a empresa no banco do Supabase
       let finalCompany: Company | null = null;
 
-      const { data: newComp, error: compErr } = await supabase
+      const { data: newComp } = await supabase
         .from('companies')
         .insert({
           name: data.companyName,
@@ -333,7 +344,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (newComp) {
         finalCompany = newComp as Company;
       } else {
-        // Se a empresa já existia, busca ela
         const { data: existingComp } = await supabase.from('companies').select('*').eq('email', cleanEmail).maybeSingle();
         if (existingComp) finalCompany = existingComp as Company;
       }
@@ -348,7 +358,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       }
 
-      // 3. Cria a relação de usuário da empresa
       const finalCompUser: CompanyUser = {
         id: `cuser-${Date.now()}`,
         company_id: finalCompany.id,
@@ -366,7 +375,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: 'admin',
       }).catch(() => {});
 
-      // 4. Define o usuário ativo imediatamente no estado e na sessão local
       setUser(activeAuthUser);
       setCompany(finalCompany);
       setCompanyUser(finalCompUser);
@@ -375,7 +383,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: null };
     } catch (err: any) {
       console.error('Erro no signUp:', err);
-      // Mesmo se qualquer API externa falhar, garante o acesso liberado
       const mockUsr = { id: `usr-${Date.now()}`, email: cleanEmail } as User;
       const mockComp = { id: `comp-${Date.now()}`, name: data.companyName, email: cleanEmail, onboarding_done: false };
       const mockCompUser = { id: 'cuser-mock', company_id: mockComp.id, auth_user_id: mockUsr.id, name: data.managerName, email: cleanEmail, role: 'admin' as UserRole };
@@ -420,6 +427,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signOut,
         resetPassword,
         refreshCompany,
+        completeOnboarding,
       }}
     >
       {children}

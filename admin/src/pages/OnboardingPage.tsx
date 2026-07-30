@@ -18,18 +18,38 @@ import {
 } from 'lucide-react';
 
 export function OnboardingPage() {
-  const { company, refreshCompany } = useAuth();
+  const { company, completeOnboarding } = useAuth();
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
   // Form State
-  const [companyName, setCompanyName] = useState(company?.name || '');
+  const [companyName, setCompanyName] = useState(() => {
+    if (company?.name && company.name !== 'Minha Empresa') return company.name;
+    try {
+      const savedCredsStr = localStorage.getItem('saas_registered_creds_v2');
+      if (savedCredsStr) {
+        const parsed = JSON.parse(savedCredsStr);
+        if (parsed.companyName) return parsed.companyName;
+      }
+    } catch (e) {}
+    return company?.name || '';
+  });
   const [logoUrl, setLogoUrl] = useState(company?.logo_url || '');
   const [address, setAddress] = useState(company?.address || '');
   const [originCep, setOriginCep] = useState('');
-  const [phone, setPhone] = useState(company?.phone || '');
+  const [phone, setPhone] = useState(() => {
+    if (company?.phone) return company.phone;
+    try {
+      const savedCredsStr = localStorage.getItem('saas_registered_creds_v2');
+      if (savedCredsStr) {
+        const parsed = JSON.parse(savedCredsStr);
+        if (parsed.phone) return parsed.phone;
+      }
+    } catch (e) {}
+    return '';
+  });
   const [instagram, setInstagram] = useState(company?.instagram || '');
   const [businessHours, setBusinessHours] = useState('11:00 às 23:00 (Segunda a Sábado)');
   
@@ -53,74 +73,73 @@ export function OnboardingPage() {
   };
 
   const handleFinish = async () => {
-    if (!company?.id) return;
     setLoading(true);
 
+    const onboardingData = {
+      name: companyName,
+      address,
+      phone,
+      instagram,
+      business_hours: businessHours,
+      delivery_fee: deliveryFee,
+      delivery_radius: deliveryRadius,
+      pix_key: pixKey,
+      logo_url: logoUrl,
+      onboarding_done: true,
+    };
+
+    // 1. Atualiza a sessão e estado de onboarding no AuthContext sincronizadamente
+    completeOnboarding(onboardingData);
+
+    // 2. Atualiza o cache local do store_config (para useStoreConfig, header e SettingsPage)
+    const storeConfigObj = {
+      store_name: companyName,
+      whatsapp_number: phone,
+      pix_key: pixKey,
+      address: address,
+      instagram_url: instagram,
+      logo_url: logoUrl,
+      base_fare: deliveryFee,
+      included_km: includedKm,
+      extra_km_fee: extraKmFee,
+      origin_cep: originCep,
+    };
+    localStorage.setItem('store_config_fallback_v4', JSON.stringify(storeConfigObj));
+
     try {
-      // 1. Atualiza a tabela Companies
-      const { error: compErr } = await supabase
-        .from('companies')
-        .update({
-          name: companyName,
-          address,
-          phone,
-          instagram,
-          business_hours: businessHours,
-          delivery_fee: deliveryFee,
-          delivery_radius: deliveryRadius,
-          pix_key: pixKey,
-          logo_url: logoUrl,
-          onboarding_done: true,
-        })
-        .eq('id', company.id);
+      const bc = new BroadcastChannel('store_config_channel_v4');
+      bc.postMessage(storeConfigObj);
+      bc.close();
+    } catch (e) {}
 
-      if (compErr) console.warn('Erro ao atualizar empresa:', compErr);
+    // 3. Salva no banco de dados do Supabase
+    try {
+      if (company?.id) {
+        await supabase.from('companies').update(onboardingData).eq('id', company.id);
 
-      // 2. Insere ou atualiza o store_config
-      const { data: existingConfig } = await supabase
-        .from('store_config')
-        .select('id')
-        .eq('company_id', company.id)
-        .maybeSingle();
-
-      if (existingConfig) {
-        await supabase
+        const { data: existingConfig } = await supabase
           .from('store_config')
-          .update({
-            store_name: companyName,
-            whatsapp_number: phone,
-            pix_key: pixKey,
-            address,
-            instagram_url: instagram,
-            logo_url: logoUrl,
-            base_fare: deliveryFee,
-            included_km: includedKm,
-            extra_km_fee: extraKmFee,
-            origin_cep: originCep,
-          })
-          .eq('company_id', company.id);
-      } else {
-        await supabase.from('store_config').insert({
-          company_id: company.id,
-          store_name: companyName,
-          whatsapp_number: phone,
-          pix_key: pixKey,
-          address,
-          instagram_url: instagram,
-          logo_url: logoUrl,
-          base_fare: deliveryFee,
-          included_km: includedKm,
-          extra_km_fee: extraKmFee,
-          origin_cep: originCep,
-        });
-      }
+          .select('id')
+          .eq('company_id', company.id)
+          .maybeSingle();
 
-      await refreshCompany();
-      navigate('/', { replace: true });
+        if (existingConfig) {
+          await supabase.from('store_config').update({
+            company_id: company.id,
+            ...storeConfigObj
+          }).eq('company_id', company.id);
+        } else {
+          await supabase.from('store_config').insert({
+            company_id: company.id,
+            ...storeConfigObj
+          });
+        }
+      }
     } catch (err) {
-      console.error('Erro ao salvar onboarding:', err);
+      console.warn('Aviso ao sincronizar onboarding com Supabase:', err);
     } finally {
       setLoading(false);
+      navigate('/pedidos', { replace: true });
     }
   };
 
