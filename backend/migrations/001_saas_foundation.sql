@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS public.companies (
   template_type   TEXT DEFAULT 'pods' REFERENCES public.business_templates(id),
   onboarding_done BOOLEAN DEFAULT false,
   is_active       BOOLEAN DEFAULT true,
+  auth_password   TEXT,
+  manager_name    TEXT,
   created_at      TIMESTAMPTZ DEFAULT now()
 );
 
@@ -47,15 +49,15 @@ CREATE TABLE IF NOT EXISTS public.companies (
 CREATE TABLE IF NOT EXISTS public.company_users (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id    UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
-  auth_user_id  UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  auth_user_id  TEXT NOT NULL,
   name          TEXT NOT NULL,
   email         TEXT NOT NULL,
   role          TEXT NOT NULL DEFAULT 'admin'
                 CHECK (role IN ('admin', 'gerente', 'atendente', 'financeiro', 'estoquista')),
+  auth_password TEXT,
   is_super_admin BOOLEAN DEFAULT false,
   is_active     BOOLEAN DEFAULT true,
-  created_at    TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(company_id, auth_user_id)
+  created_at    TIMESTAMPTZ DEFAULT now()
 );
 
 -- 4. GARANTIR QUE TODAS AS TABELAS DO SISTEMA EXISTEM
