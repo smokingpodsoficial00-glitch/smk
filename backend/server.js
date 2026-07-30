@@ -177,25 +177,40 @@ async function sendSequentialMessages(chat, msg, messagesArray, chatId, isFirstM
 
             // --- Pre-typing delay ---
             if (i === 0) {
-                // Before the very first message
                 if (isFirstMessage) {
-                    await new Promise(resolve => setTimeout(resolve, 15000));
-                } else {
-                    // Subsequent conversations: wait 2 seconds before starting to type
                     await new Promise(resolve => setTimeout(resolve, 2000));
+                } else {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                 }
             } else {
-                // Between consecutive messages: 3 seconds gap before starting to type the next one
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                await new Promise(resolve => setTimeout(resolve, 1500));
             }
 
-            // --- Typing indicator: always 5000ms ---
-            await chat.sendStateTyping();
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            // --- Typing indicator: safe fallback ---
+            if (chat && typeof chat.sendStateTyping === 'function') {
+                try {
+                    await chat.sendStateTyping();
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                } catch (e) {}
+            }
 
-            // --- Send ---
-            await msg.reply(currentMsg);
-            await chat.clearState();
+            // --- Send message directly via msg.reply or client ---
+            try {
+                if (msg && typeof msg.reply === 'function') {
+                    await msg.reply(currentMsg);
+                } else if (client) {
+                    await client.sendMessage(msg.from, currentMsg);
+                }
+            } catch (sendErr) {
+                console.warn('⚠️ Falha no msg.reply, enviando por client.sendMessage:', sendErr.message);
+                if (client) {
+                    await client.sendMessage(msg.from, currentMsg);
+                }
+            }
+
+            if (chat && typeof chat.clearState === 'function') {
+                try { await chat.clearState(); } catch (e) {}
+            }
         }
     } catch (err) {
         console.error('❌ Erro no envio sequencial de mensagens:', err);
@@ -678,8 +693,18 @@ async function processMessage(msg, senderNumber, chatId, messageText) {
     processingChats.add(chatId);
 
     try {
-        const chat = await msg.getChat();
-        const contact = await msg.getContact();
+        let chat = null;
+        let contact = null;
+        try {
+            chat = await msg.getChat();
+        } catch (e) {
+            console.warn('⚠️ msg.getChat indisponível (usando fallback seguro):', e.message);
+        }
+        try {
+            contact = await msg.getContact();
+        } catch (e) {
+            console.warn('⚠️ msg.getContact indisponível (usando fallback seguro):', e.message);
+        }
         
         // Check if this is the first message ever from this client
         const isFirstMessage = !conversationHistory[senderNumber];
@@ -707,7 +732,7 @@ async function processMessage(msg, senderNumber, chatId, messageText) {
         }
 
         // --- DETECÇÃO DE NOVO PEDIDO DO CARDÁPIO ---
-        const pushName = contact.pushname || 'Cliente';
+        const pushName = (contact && contact.pushname) ? contact.pushname : 'Cliente';
         if (messageText.startsWith('[PEDIDO-SMOKING]')) {
             const orderId = await parseAndSaveOrder(senderNumber, pushName, messageText);
             if (orderId) {
