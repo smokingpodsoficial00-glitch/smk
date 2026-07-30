@@ -1110,17 +1110,13 @@ export function SupplyChainDashboard() {
                   key={group.groupKey} 
                   className={`bg-card border border-border rounded-2xl shadow-lg transition-all relative ${isGroupMenuActive ? 'z-40' : 'z-10'}`}
                 >
-                  {/* ── CARD HEADER MINIMALISTA E UNIFORME ────────── */}
-                  <div 
-                    onClick={() => toggleGroup(group.groupKey)}
-                    className="p-5 cursor-pointer hover:bg-white/[0.015] transition-colors select-none space-y-4"
-                  >
+                  {/* ── CARD HEADER MINIMALISTA E UNIFORME (SEM EXPANSÃO INLINE) ────────── */}
+                  <div className="p-5 space-y-4">
                     {/* Linha Superior: Foto, Nome, Puffs e Ações */}
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-4">
                         {/* Foto do Modelo */}
                         <div 
-                          onClick={(e) => e.stopPropagation()}
                           className="relative size-14 rounded-xl border border-white/10 bg-black/40 overflow-hidden shrink-0 group/img cursor-pointer"
                           title="Clique para alterar a foto deste modelo"
                         >
@@ -1163,7 +1159,7 @@ export function SupplyChainDashboard() {
                       </div>
 
                       {/* Ações do Grupo (Status, Ver Sabores, Olho, 3 Pontos) */}
-                      <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 shrink-0">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${stockBadgeClass}`}>
                           <div className={`size-1.5 rounded-full ${stockBarColor}`} />
                           {stockLabel}
@@ -1256,110 +1252,6 @@ export function SupplyChainDashboard() {
                       </div>
                     </div>
                   </div>
-
-                  {/* ── SUB-LISTA DE SABORES (EXPANDIDO) ── */}
-                  {isExpanded && (
-                    <div className="bg-[#0a0a0a] border-t border-border/80 p-4 space-y-3 animate-in fade-in duration-200 rounded-b-2xl">
-                      <div className="flex items-center justify-between pb-2 border-b border-white/5">
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                          Sabores — {displayName}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setAddingFlavorGroup(group);
-                            setNewFlavorName(""); setNewFlavorStock("");
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/20 transition-all cursor-pointer"
-                        >
-                          <Plus className="size-3.5" />
-                          Adicionar Sabor
-                        </button>
-                      </div>
-
-                      {realFlavors.length === 0 ? (
-                        <div className="py-6 text-center space-y-2">
-                          <p className="text-xs text-muted-foreground">Nenhum sabor cadastrado ainda.</p>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAddingFlavorGroup(group);
-                              setNewFlavorName(""); setNewFlavorStock("");
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/20 transition-all cursor-pointer"
-                          >
-                            <Plus className="size-3.5" />
-                            Cadastrar Primeiro Sabor
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="divide-y divide-white/5">
-                          {realFlavors.map((flavorSku: any) => {
-                            const flavorStock = flavorSku.stock || 0;
-                            let flavorBadge;
-                            if (flavorStock >= 5) flavorBadge = <span className="text-emerald-400 text-[10px] font-medium">🟢 Em estoque</span>;
-                            else if (flavorStock > 0) flavorBadge = <span className="text-amber-400 text-[10px] font-medium">🟡 Estoque Baixo</span>;
-                            else flavorBadge = <span className="text-red-400 text-[10px] font-medium">🔴 Esgotado</span>;
-
-                            const isFilteredMatch = 
-                              (filterTab === 'SEM_ESTOQUE' && flavorStock === 0) ||
-                              (filterTab === 'BAIXO_ESTOQUE' && flavorStock > 0 && flavorStock < 5) ||
-                              (filterTab === 'EM_ESTOQUE' && flavorStock >= 5);
-
-                            return (
-                              <div 
-                                key={flavorSku.id}
-                                onClick={() => setSelectedDrawerSKU(flavorSku)}
-                                className={`py-2.5 px-3 flex items-center justify-between gap-4 rounded-xl transition-colors cursor-pointer ${
-                                  isFilteredMatch && (filterTab as string) !== 'TODOS' ? 'bg-white/[0.04] border border-white/10' : 'hover:bg-white/[0.02]'
-                                }`}
-                              >
-                                <div>
-                                  <span className="font-semibold text-white text-xs block">{flavorSku.flavor}</span>
-                                  {flavorBadge}
-                                </div>
-                                <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
-                                  <div className="inline-flex items-center gap-1 bg-[#0f0f0f] border border-white/10 rounded-xl p-1">
-                                    <button 
-                                      type="button"
-                                      onClick={() => handleUpdateStock(flavorSku.id, flavorStock - 1)}
-                                      disabled={flavorStock === 0}
-                                      className="grid place-items-center size-6 rounded-lg hover:bg-white/10 active:scale-95 disabled:opacity-20 cursor-pointer text-muted-foreground hover:text-white"
-                                    >
-                                      <Minus className="size-3" />
-                                    </button>
-                                    <span 
-                                      onClick={() => { setEditingStockSku(flavorSku); setNewStockValue(flavorStock.toString()); }}
-                                      className="w-10 text-center text-xs font-bold text-silver cursor-pointer hover:text-emerald-400"
-                                      title="Clique para editar"
-                                    >
-                                      {flavorStock} un
-                                    </span>
-                                    <button 
-                                      type="button"
-                                      onClick={() => handleUpdateStock(flavorSku.id, flavorStock + 1)}
-                                      className="grid place-items-center size-6 rounded-lg hover:bg-white/10 active:scale-95 cursor-pointer text-muted-foreground hover:text-white"
-                                    >
-                                      <Plus className="size-3" />
-                                    </button>
-                                  </div>
-                                  <button
-                                    onClick={() => setSelectedDrawerSKU(flavorSku)}
-                                    className="p-1.5 rounded-lg bg-elevated hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
-                                    title="Ver detalhes"
-                                  >
-                                    <ChevronRight className="size-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               );
             })
