@@ -1,12 +1,10 @@
 import React, { Component, type ReactNode, useState } from "react";
-import { Users, Bot, Target, Zap, Activity, AlertTriangle, RefreshCw } from "lucide-react";
+import { Users, Target, Activity, AlertTriangle, RefreshCw } from "lucide-react";
 import type { RealClient } from "@/lib/crm";
 
 // Componentes do CRM
 import { RFMMatrix } from "./crm/RFMMatrix";
 import { PredictiveReplenishment } from "./crm/PredictiveReplenishment";
-import { LongTailMatch } from "./crm/LongTailMatch";
-import { BotAutomations } from "./crm/BotAutomations";
 import { ClientProfileModal } from "./crm/ClientProfileModal";
 
 interface ErrorBoundaryProps {
@@ -55,14 +53,12 @@ class CRMErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
 }
 
 export function CRMDashboard() {
-  const [activeSubTab, setActiveSubTab] = useState<'rfm' | 'replenishment' | 'match' | 'automations'>('rfm');
+  const [activeSubTab, setActiveSubTab] = useState<'rfm' | 'replenishment'>('rfm');
   const [selectedClient, setSelectedClient] = useState<RealClient | null>(null);
 
   const tabs = [
     { id: 'rfm', label: 'Matriz RFM', icon: <Target className="size-4" /> },
     { id: 'replenishment', label: 'Reposição Preditiva', icon: <Activity className="size-4" /> },
-    { id: 'match', label: 'Match de Cauda Longa', icon: <Zap className="size-4" /> },
-    { id: 'automations', label: 'Automações & Bot', icon: <Bot className="size-4" /> },
   ] as const;
 
   return (
@@ -94,8 +90,8 @@ export function CRMDashboard() {
             {tabs.map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveSubTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                   activeSubTab === tab.id 
                     ? 'bg-primary/10 text-primary border border-primary/20' 
                     : 'text-muted-foreground hover:bg-white/5 border border-transparent'
@@ -113,8 +109,6 @@ export function CRMDashboard() {
           <CRMErrorBoundary>
             {activeSubTab === 'rfm' && <RFMMatrix onSelectClient={setSelectedClient} />}
             {activeSubTab === 'replenishment' && <PredictiveReplenishment onSelectClient={setSelectedClient} />}
-            {activeSubTab === 'match' && <LongTailMatch onSelectClient={() => {}} />}
-            {activeSubTab === 'automations' && <BotAutomations />}
           </CRMErrorBoundary>
         </div>
 
