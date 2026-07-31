@@ -1,11 +1,10 @@
 const axios = require('axios');
-const { supabase } = require('./supabase'); // Import supabase for shipping config
+const { supabase } = require('./supabase');
 
-// Endereço de Origem do Estoque (Configurável via .env)
+// Endereço de Origem Padrão do Estoque
 const ORIGIN_ADDRESS = process.env.UBER_PICKUP_ADDRESS || 'Rua Alexandra Lunardi Fanani, 57 - Assunção, São Bernardo do Campo - SP, 09810-200';
-// Coordenadas exatas do estoque para o OSRM
-const ORIGIN_LAT = '-23.7168022';
-const ORIGIN_LON = '-46.5691653';
+const ORIGIN_LAT = -23.7168022;
+const ORIGIN_LON = -46.5691653;
 
 let cachedToken = null;
 let tokenExpiry = 0;
@@ -45,39 +44,95 @@ async function getUberToken() {
 }
 
 /**
- * Busca dados completos do CEP usando a API AwesomeAPI (Retorna Lat/Lon e Endereço)
+ * Geocodifica qualquer endereço ou CEP via AwesomeAPI e OpenStreetMap Nominatim
  */
-async function getAddressFromCep(cep) {
-    const cleanedCep = cep.replace(/\D/g, '');
-    try {
-        const response = await axios.get(`https://cep.awesomeapi.com.br/json/${cleanedCep}`);
-        if (response.data && response.data.lat && response.data.lng) {
-            return response.data;
-        }
-    } catch (e) {
-        console.error(`⚠️ Erro ao buscar CEP ${cleanedCep} na AwesomeAPI:`, e.message);
+async function geocodeAddress(rawInput) {
+    const cleanCep = rawInput.replace(/\D/g, '');
+
+    // 1. Se for CEP de 8 dígitos
+    if (cleanCep.length === 8) {
+        try {
+            const resp = await axios.get(`https://cep.awesomeapi.com.br/json/${cleanCep}`, { timeout: 3500 });
+            if (resp.data && resp.data.lat && resp.data.lng) {
+                return {
+                    lat: parseFloat(resp.data.lat),
+                    lon: parseFloat(resp.data.lng),
+                    address: `${resp.data.address}, ${resp.data.district}, ${resp.data.city} - ${resp.data.state}`
+                };
+            }
+        } catch (e) {}
+
+        // Fallback ViaCEP + Nominatim
+        try {
+            const viaCep = await axios.get(`https://viacep.com.br/ws/${cleanCep}/json/`, { timeout: 3500 });
+            if (viaCep.data && !viaCep.data.erro) {
+                const fullStr = `${viaCep.data.logradouro}, ${viaCep.data.bairro}, ${viaCep.data.localidade} - ${viaCep.data.uf}, Brasil`;
+                const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullStr)}&limit=1`;
+                const nomResp = await axios.get(nomUrl, { headers: { 'User-Agent': 'SmokingPodsApp/1.0' }, timeout: 3500 });
+                if (nomResp.data && nomResp.data.length > 0) {
+                    return {
+                        lat: parseFloat(nomResp.data[0].lat),
+                        lon: parseFloat(nomResp.data[0].lon),
+                        address: `${viaCep.data.logradouro}, ${viaCep.data.bairro}, ${viaCep.data.localidade} - ${viaCep.data.uf}`
+                    };
+                }
+                return {
+                    lat: null,
+                    lon: null,
+                    address: `${viaCep.data.logradouro}, ${viaCep.data.bairro}, ${viaCep.data.localidade} - ${viaCep.data.uf}`
+                };
+            }
+        } catch (e) {}
     }
-    return null;
+
+    // 2. Se for texto de endereço (ex: "Rua Alexandra Lunardi Fanani")
+    try {
+        const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(rawInput + ', São Paulo, Brasil')}&limit=1`;
+        const nomResp = await axios.get(nomUrl, { headers: { 'User-Agent': 'SmokingPodsApp/1.0' }, timeout: 3500 });
+        if (nomResp.data && nomResp.data.length > 0) {
+            return {
+                lat: parseFloat(nomResp.data[0].lat),
+                lon: parseFloat(nomResp.data[0].lon),
+                address: nomResp.data[0].display_name
+            };
+        }
+    } catch (e) {}
+
+    return { lat: null, lon: null, address: rawInput };
 }
 
 /**
- * Obtém a distância real em KM via OSRM (Open Source Routing Machine)
+ * Fórmula de Haversine para cálculo de distância em linha reta (fallback de segurança)
+ */
+function haversineDistanceKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+/**
+ * Obtém a distância real de condução em KM via OSRM
  */
 async function getDistanceOSRM(destLat, destLon, originLat = ORIGIN_LAT, originLon = ORIGIN_LON) {
     const url = `http://router.project-osrm.org/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=false`;
     try {
         const response = await axios.get(url, { timeout: 4000 });
         if (response.data.routes && response.data.routes.length > 0) {
-            return response.data.routes[0].distance / 1000; // Converte metros para KM
+            return response.data.routes[0].distance / 1000;
         }
     } catch (e) {
-        console.error("⚠️ OSRM Error:", e.message);
+        console.error("⚠️ Erro na rota OSRM:", e.message);
     }
-    return null; // Fallback se falhar
+    return null;
 }
 
 /**
- * Puxa configurações dinâmicas de preço e origem do estoque do Supabase (com fallback hardcoded)
+ * Puxa configurações dinâmicas de frete da loja no Supabase
  */
 async function getDynamicShippingConfig() {
     let config = {
@@ -92,12 +147,11 @@ async function getDynamicShippingConfig() {
     if (!supabase) return config;
 
     try {
-        // 1. Tenta ler da tabela store_config
         const { data: storeData } = await supabase
             .from('store_config')
             .select('*')
             .limit(1)
-            .single();
+            .maybeSingle();
 
         if (storeData) {
             if (storeData.base_fare) config.base_fare = parseFloat(storeData.base_fare);
@@ -107,58 +161,35 @@ async function getDynamicShippingConfig() {
 
             const originCep = storeData.origin_cep || (storeData.address ? storeData.address.match(/\b\d{5}-?\d{3}\b/)?.[0] : null);
             if (originCep) {
-                const geo = await getAddressFromCep(originCep);
-                if (geo && geo.lat && geo.lng) {
+                const geo = await geocodeAddress(originCep);
+                if (geo && geo.lat && geo.lon) {
                     config.originLat = geo.lat;
-                    config.originLon = geo.lng;
+                    config.originLon = geo.lon;
                 }
             }
         }
-
-        // 2. Tenta ler da tabela shipping_config
-        const { data: shipData } = await supabase
-            .from('shipping_config')
-            .select('*')
-            .limit(1)
-            .single();
-
-        if (shipData) {
-            if (shipData.base_fare) config.base_fare = parseFloat(shipData.base_fare);
-            if (shipData.included_km) config.included_km = parseFloat(shipData.included_km);
-            if (shipData.extra_km_fee) config.extra_km_fee = parseFloat(shipData.extra_km_fee);
-        }
     } catch (err) {
-        console.log("ℹ️ Erro ao tentar ler configurações de frete no Supabase. Usando padrões.");
+        console.log("ℹ️ Erro ao ler configurações de frete no Supabase. Usando padrões.");
     }
     return config;
 }
 
 /**
- * Calcula a taxa de entrega baseado em Uber Direct ou Simulador Dinâmico OSRM
+ * CÁLCULO DE FRETE REAL (Origem da loja -> Destino do cliente)
  */
 async function calculateShippingQuote(rawAddressOrCep) {
+    const config = await getDynamicShippingConfig();
     const token = await getUberToken();
-    const cleanCep = rawAddressOrCep.replace(/\D/g, '');
-    
-    let fullUberAddress = rawAddressOrCep;
-    let addressName = rawAddressOrCep;
-    let cepData = null;
 
-    // Se for um CEP, obtemos o endereço formatado e as coordenadas
-    if (cleanCep.length === 8) {
-        cepData = await getAddressFromCep(cleanCep);
-        if (cepData) {
-            addressName = `${cepData.address}, ${cepData.district}, ${cepData.city} - ${cepData.state}`;
-            fullUberAddress = `${addressName}, ${cepData.cep}`;
-        }
-    }
+    // 1. Geocodifica o endereço de destino do cliente
+    const geo = await geocodeAddress(rawAddressOrCep);
 
-    // --- PLANO A: UBER DIRECT API ---
+    // --- PLANO A: UBER DIRECT API (Se credenciais de API estiverem configuradas) ---
     if (token) {
         try {
             const response = await axios.post('https://api.uber.com/v1/deliveries/quote', {
-                pickup_address: ORIGIN_ADDRESS,
-                dropoff_address: fullUberAddress
+                pickup_address: config.originAddress,
+                dropoff_address: geo.address
             }, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -167,40 +198,45 @@ async function calculateShippingQuote(rawAddressOrCep) {
             });
 
             const fee = response.data.fee / 100;
-            console.log(`🚗 [Uber Direct API] Cotação real para "${fullUberAddress}": R$ ${fee.toFixed(2)}`);
+            console.log(`🚗 [Uber Direct API] Cotação real para "${geo.address}": R$ ${fee.toFixed(2)}`);
             return {
                 fee: parseFloat(fee.toFixed(2)),
                 distanceKm: response.data.distance || 0,
-                address: response.data.dropoff_address || addressName,
+                address: response.data.dropoff_address || geo.address,
                 isSimulated: false
             };
         } catch (error) {
-            console.warn('⚠️ Erro na cotação real do Uber Direct, caindo para o simulador dinâmico OSRM:', error.response?.data?.message || error.message);
+            console.warn('⚠️ Erro na cotação real do Uber Direct, usando cálculo de rota da loja:', error.response?.data?.message || error.message);
         }
     }
 
-    // --- PLANO B: SIMULADOR DINÂMICO OSRM (REALISTA DA IA) ---
-    // Obtém parâmetros do Supabase (ou fallback padrão) e coordenadas de origem da loja
-    const config = await getDynamicShippingConfig();
+    // --- PLANO B: CÁLCULO DE KM REAL BASEADO NAS CONFIGURAÇÕES DA LOJA ---
+    let distanceKm = null;
 
-    let distanceKm = 3.0; // Distância padrão segura caso tudo falhe
-
-    if (cepData && cepData.lat && cepData.lng) {
-        const osrmDist = await getDistanceOSRM(cepData.lat, cepData.lng, config.originLat, config.originLon);
-        if (osrmDist !== null) {
-            distanceKm = osrmDist;
-        }
+    if (geo.lat && geo.lon && config.originLat && config.originLon) {
+        distanceKm = await getDistanceOSRM(geo.lat, geo.lon, config.originLat, config.originLon);
     }
 
-    let simulatedFee = 0;
-    if (distanceKm <= config.included_km) {
-        simulatedFee = config.base_fare;
-    } else {
+    // Fallback via Haversine se OSRM falhar (Aplica fator de curva 1.3x)
+    if (distanceKm === null && geo.lat && geo.lon && config.originLat && config.originLon) {
+        distanceKm = haversineDistanceKm(config.originLat, config.originLon, geo.lat, geo.lon) * 1.3;
+    }
+
+    // Se o geocoding de lat/lon falhar totalmente, estima 4.5km para calcular acima da tarifa mínima
+    if (distanceKm === null || isNaN(distanceKm)) {
+        distanceKm = 4.5;
+    }
+
+    // CÁLCULO DA TARIFA:
+    // Até included_km (ex: 3km) = base_fare (ex: R$ 8.50)
+    // Além de included_km = base_fare + (KM_extra * extra_km_fee)
+    let calculatedFee = config.base_fare;
+    if (distanceKm > config.included_km) {
         const extraKm = distanceKm - config.included_km;
-        simulatedFee = config.base_fare + (extraKm * config.extra_km_fee);
+        calculatedFee = config.base_fare + (extraKm * config.extra_km_fee);
     }
 
-    // Multiplicador Dinâmico baseado no horário (Fuso de São Paulo)
+    // Multiplicador Dinâmico de Horário de Pico (Fuso SP)
     const spTimeStr = new Intl.DateTimeFormat('pt-BR', { 
         timeZone: 'America/Sao_Paulo', 
         hour: 'numeric', 
@@ -213,22 +249,20 @@ async function calculateShippingQuote(rawAddressOrCep) {
 
     let multiplier = 1.0;
     if (timeInMinutes >= (11 * 60 + 30) && timeInMinutes <= (13 * 60 + 30)) {
-        multiplier = 1.15; // +15%
+        multiplier = 1.15; // Pico Almoço (+15%)
     } else if (timeInMinutes >= (17 * 60) && timeInMinutes <= (19 * 60 + 30)) {
-        multiplier = 1.25; // +25%
+        multiplier = 1.25; // Pico Tarde (+25%)
     }
     
-    simulatedFee = simulatedFee * multiplier;
+    calculatedFee = calculatedFee * multiplier;
+    if (calculatedFee < config.base_fare) calculatedFee = config.base_fare;
 
-    // Garante um valor mínimo de frete (Segurança)
-    if (simulatedFee < config.base_fare) simulatedFee = config.base_fare;
-
-    console.log(`🤖 [Simulador Dinâmico OSRM] CEP/Endereço: "${addressName}" | Distância: ${distanceKm.toFixed(1)} km | Multiplicador: ${multiplier}x | Frete: R$ ${simulatedFee.toFixed(2)}`);
+    console.log(`🚗 [Cálculo de Frete da Loja] Destino: "${geo.address}" | Distância: ${distanceKm.toFixed(1)} km | Tarifa Base: R$ ${config.base_fare} | KM Extra: R$ ${config.extra_km_fee}/km | Frete Calculado: R$ ${calculatedFee.toFixed(2)}`);
 
     return {
-        fee: parseFloat(simulatedFee.toFixed(2)),
+        fee: parseFloat(calculatedFee.toFixed(2)),
         distanceKm: parseFloat(distanceKm.toFixed(1)),
-        address: addressName,
+        address: geo.address,
         isSimulated: true
     };
 }
