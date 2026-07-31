@@ -440,18 +440,34 @@ async function getAiResponse(phone, message) {
     initConversation(phone);
 
     // Conectar ao Supabase para puxar estoque e configurações de frete/loja em tempo real
-    let stockInfo = "\n=== ESTOQUE ATUAL ===\n";
+    let stockInfo = "\n=== ESTOQUE ATUAL EM TEMPO REAL (MARCAS, MODELOS E SABORES) ===\n";
     let storeShippingInfo = "\n=== PARÂMETROS DE FRETE DA LOJA ===\n";
     try {
         const { supabase } = require('./supabase');
         const { data: products } = await supabase
             .from('smoking_products')
-            .select('name, flavor, price, stock')
+            .select('brand, name, flavor, price, stock')
             .neq('brand', '__STORE_CONFIG__');
         
         if (products && products.length > 0) {
+            const groups = {};
             products.forEach(p => {
-                stockInfo += `- ${p.name} (${p.flavor}): R$ ${p.price} [Estoque: ${p.stock || 0} un]\n`;
+                const brandStr = (p.brand || 'Vape').trim();
+                const modelStr = (p.name || '').trim();
+                const key = `${brandStr} ${modelStr}`.trim();
+                if (!groups[key]) {
+                    groups[key] = { brand: brandStr, model: modelStr, price: p.price, flavors: [] };
+                }
+                const stockQty = typeof p.stock === 'number' ? p.stock : parseInt(p.stock || '0', 10);
+                groups[key].flavors.push({ flavor: p.flavor, stock: stockQty });
+            });
+
+            Object.values(groups).forEach(g => {
+                const flavorDetails = g.flavors
+                    .map(f => `${f.flavor} (${f.stock > 0 ? f.stock + ' un em estoque' : 'ESGOTADO'})`)
+                    .join(', ');
+                stockInfo += `• Marca: ${g.brand} | Modelo: ${g.model} | Preço: R$ ${parseFloat(g.price).toFixed(2)}\n`;
+                stockInfo += `  Sabores disponíveis do ${g.brand} ${g.model}: ${flavorDetails}\n\n`;
             });
         } else {
             stockInfo += "Estoque não encontrado ou vazio.\n";
@@ -476,7 +492,7 @@ async function getAiResponse(phone, message) {
     
     // Injeta temporariamente o estoque e parâmetros da loja na system message com Lembretes Críticos
     const originalSystemPrompt = conversationHistory[phone][0].content;
-    const strictReminders = "\n\n[LEMBRETE OBRIGATÓRIO DO SISTEMA PARA ESTA RESPOSTA:\n1. NÃO USE EMOJIS. Nunca.\n2. Tudo em minúsculo.\n3. NUNCA ofereça a tabela se já ofereceu no passado.\n4. NUNCA pergunte 'algo mais?' ou 'alguma dúvida?'.\n5. REGRA DE QUANTIDADES EM ESTOQUE: Se o cliente pedir uma quantidade MAIOR do que o estoque em unidades disponível (ex: pediu 19 unidades mas só tem 7 ou 14 em estoque), NUNCA DIGA QUE ESTÁ ESGOTADO! Diga em tom amigável e minúsculo que só possui X unidades em estoque e pergunte se ele quer levar as X disponíveis ou prefere outro sabor.]";
+    const strictReminders = "\n\n[LEMBRETE OBRIGATÓRIO DE MARCAS E SABORES PARA ESTA RESPOSTA:\n1. NUNCA MISTURE MARCAS! Elfbar fabrica o modelo BC15K. Ignite fabrica os modelos V50 e V80. Jamais invente 'Ignite BC15K'!\n2. Ao apresentar as opções ao cliente, diga a MARCA e MODELO e liste os SABORES disponíveis daquele pod específico.\n3. NÃO USE EMOJIS. Nunca.\n4. Tudo em minúsculo.\n5. NUNCA ofereça a tabela se já ofereceu no passado.\n6. NUNCA pergunte 'algo mais?' ou 'alguma dúvida?'.\n7. REGRA DE QUANTIDADES EM ESTOQUE: Se o cliente pedir uma quantidade MAIOR do que o estoque em unidades disponível, NUNCA DIGA QUE ESTÁ ESGOTADO! Diga amigavelmente que só possui X unidades em estoque e pergunte se ele quer levar as X disponíveis ou prefere outro sabor.]";
     conversationHistory[phone][0].content = originalSystemPrompt + stockInfo + storeShippingInfo + strictReminders;
 
     try {

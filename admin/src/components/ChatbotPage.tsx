@@ -464,16 +464,30 @@ export function ChatbotPage() {
 
       if (products && products.length > 0) {
         inStockProducts = products;
-        const stockLines = products.map(p => 
-          `${p.brand ? p.brand + ' ' : ''}${p.name} (sabor: ${p.flavor}) - R$ ${parseFloat(p.price).toFixed(2)} [Estoque disponível: ${p.stock} unidades]`
-        );
-        stockContext = `\n\nESTOQUE EM TEMPO REAL DISPONÍVEL NA SMOKING PODS (ATUALIZADO AGORA):\n` +
+        const groups: Record<string, { brand: string; name: string; price: number; flavors: { flavor: string; stock: number }[] }> = {};
+        
+        products.forEach(p => {
+          const brandStr = (p.brand || 'Vape').trim();
+          const nameStr = (p.name || '').trim();
+          const key = `${brandStr} ${nameStr}`.trim();
+          if (!groups[key]) {
+            groups[key] = { brand: brandStr, name: nameStr, price: parseFloat(p.price), flavors: [] };
+          }
+          groups[key].flavors.push({ flavor: p.flavor, stock: p.stock });
+        });
+
+        const stockLines = Object.values(groups).map(g => {
+          const flavorsList = g.flavors.map(f => `${f.flavor} (${f.stock} un)`).join(', ');
+          return `• Marca: ${g.brand} | Modelo: ${g.name} | Preço: R$ ${g.price.toFixed(2)} | Sabores em Estoque: ${flavorsList}`;
+        });
+
+        stockContext = `\n\nESTOQUE EM TEMPO REAL DISPONÍVEL NA LOJA (AGRUPADO POR MARCA E MODELO):\n` +
           stockLines.join("\n") +
-          `\n\nREGRAS CRÍTICAS DE ESTOQUE E QUANTIDADES:` +
-          `\n1. Escreva 100% em LETRAS MINÚSCULA! (sem maiúsculas no início, ex: "temos sim amg", nunca "Infelizmente" ou "Elfbar").` +
-          `\n2. NUNCA use marcadores de lista como traços (- ), asteriscos (* ) ou números (1. ). Escreva mensagens de texto normais de WhatsApp!` +
-          `\n3. NUNCA invente marcas, modelos ou sabores fora da lista de estoque acima.` +
-          `\n4. REGRA DE QUANTIDADES EM ESTOQUE: Se o cliente pedir uma quantidade MAIOR do que o estoque disponível (ex: pediu 19 unidades mas você só tem 7 ou 14 em estoque), NUNCA DIGA QUE ESTÁ ESGOTADO! Informe a quantidade exata que você possui em estoque e pergunte se ele deseja levar essa quantidade disponível ou escolher outro sabor. Exemplo: "olha amg, desse sabor eu só tenho 14 unidades em estoque no momento, vc quer levar as 14 ou prefere outro sabor?"`;
+          `\n\nREGRAS CRÍTICAS DE MARCAS E SABORES:` +
+          `\n1. Entenda que a MARCA é a fabricante (ex: Elfbar, Ignite) e o MODELO é a linha de pods (ex: BC15K da Elfbar, V50 e V80 da Ignite).` +
+          `\n2. NUNCA misture marcas! Jamais invente "Ignite BC15K" porque BC15K é da marca Elfbar!` +
+          `\n3. Quando o cliente pedir opções, informe primeiro a Marca e Modelo com o valor, e liste os Sabores disponíveis daquele modelo!` +
+          `\n4. Escreva 100% em LETRAS MINÚSCULAS no WhatsApp!`;
       } else {
         stockContext = `\n\nESTOQUE EM TEMPO REAL: Atualmente todos os produtos da loja estão sem estoque. Informe o cliente educadamente em minúsculo.`;
       }
