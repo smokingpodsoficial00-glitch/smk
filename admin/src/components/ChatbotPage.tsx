@@ -484,11 +484,12 @@ export function ChatbotPage() {
         stockContext = `\n\nESTOQUE EM TEMPO REAL DISPONÍVEL NA LOJA:\n` +
           stockLines.join("\n") +
           `\n\nREGRAS CRÍTICAS DE EXIBIÇÃO E ORDEM DE PEDIDO:` +
-          `\n1. QUANDO O CLIENTE CONFIRMAR O SABOR: Confirme o pedido e PEÇA APENAS O CEP ("me passa o seu cep pra eu calcular o frete certinho pra vc amg?"). É PROIBIDO PERGUNTAR NÚMERO DE ENDEREÇO OU COMPLEMENTO ANTES DE TER O CEP!` +
-          `\n2. QUANDO O CLIENTE MANDAR O CEP: Confirme o endereço localizado e pergunte o número ("qual o número do seu endereço amg? tem algum complemento?"). PROIBIDO FALAR FRETE AQUI!` +
-          `\n3. QUANDO O CLIENTE MANDAR O NÚMERO/COMPLEMENTO: Diga APENAS O FRETE: "tá bom amg, o valor do frete ficou [frete]. qual seria a forma de pagamento?" (PROIBIDO FALAR TOTAL AQUI!).` +
-          `\n4. QUANDO O CLIENTE RESPONDER "PIX": Envie o valor total e a chave Pix da loja.` +
-          `\n5. NUNCA COLOQUE "R$" OU "r$" ANTES DOS PREÇOS DOS PRODUTOS! Escreva apenas o número puro (ex: 80, 70, 89,90).`;
+          `\n1. PROIBIDO DIGITAR "msg1:", "msg2:", "msg3:" OU QUALQUER PREFIXO NA SUA RESPOSTA! Escreva apenas o texto puro!` +
+          `\n2. QUANDO O CLIENTE CONFIRMAR O SABOR: Confirme o pedido e PEÇA APENAS O CEP ("me passa o seu cep pra eu calcular o frete certinho pra vc amg?"). É PROIBIDO PERGUNTAR NÚMERO DE ENDEREÇO OU COMPLEMENTO ANTES DE TER O CEP!` +
+          `\n3. QUANDO O CLIENTE MANDAR O CEP: Confirme o endereço localizado e pergunte o número ("qual o número do seu endereço amg? tem algum complemento?"). PROIBIDO FALAR FRETE AQUI!` +
+          `\n4. QUANDO O CLIENTE MANDAR O NÚMERO/COMPLEMENTO: Diga APENAS O FRETE: "tá bom amg, o valor do frete ficou [frete]. qual seria a forma de pagamento?" (PROIBIDO FALAR TOTAL AQUI!).` +
+          `\n5. QUANDO O CLIENTE RESPONDER "PIX": Envie o valor total e a chave Pix da loja.` +
+          `\n6. NUNCA COLOQUE "R$" OU "r$" ANTES DOS PREÇOS DOS PRODUTOS! Escreva apenas o número puro (ex: 80, 70, 89,90).`;
       } else {
         stockContext = `\n\nESTOQUE EM TEMPO REAL: Atualmente todos os produtos da loja estão sem estoque. Informe o cliente educadamente em minúsculo.`;
       }

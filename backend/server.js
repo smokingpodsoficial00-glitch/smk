@@ -830,12 +830,12 @@ async function processMessage(msg, senderNumber, chatId, messageText) {
                         `   - Responda informando SOMENTE O FRETE e pergunte a forma de pagamento: "tá bom amg, o valor do frete ficou ${quote.fee.toFixed(2).replace('.', ',')}. qual seria a forma de pagamento?"` +
                         `   - É PROIBIDO INFORMAR O VALOR TOTAL DO PEDIDO NESTE MOMENTO! PERGUNTE APENAS A FORMA DE PAGAMENTO!` +
                         `\n3. QUANDO O CLIENTE RESPONDER A FORMA DE PAGAMENTO (ex: "pix", "no pix"):` +
-                        `   - Envie o valor total e a Chave Pix da loja em minúsculas (PROIBIDO CAIXA ALTA):` +
-                        `   msg1: perfeito amg, então o valor total ficou [total_com_frete]!` +
+                        `   - PROIBIDO DIGITAR "msg1:", "msg2:" OU "msg3:" NA SUA RESPOSTA!` +
+                        `   perfeito amg, então o valor total ficou [total_com_frete]!` +
                         `   [QUEBRA]` +
-                        `   msg2: nossa chave pix é: [CHAVE_PIX_DA_LOJA]` +
+                        `   nossa chave pix é: [CHAVE_PIX_DA_LOJA]` +
                         `   [QUEBRA]` +
-                        `   msg3: assim que fizer o pagamento me manda o comprovante aqui tá?`
+                        `   assim que fizer o pagamento me manda o comprovante aqui tá?`
                 });
                 console.log(`🚗 Cotação de frete injetada para ${senderNumber}: R$ ${quote.fee.toFixed(2)}`);
             } catch (err) {
