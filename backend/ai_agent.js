@@ -497,9 +497,9 @@ async function getAiResponse(phone, message) {
 
     try {
         const completion = await openai.chat.completions.create({
-            model: 'gpt-3.5-turbo',
+            model: 'gpt-4o-mini',
             messages: conversationHistory[phone],
-            temperature: 0.6,
+            temperature: 0.3,
             max_tokens: 350,
         });
 
