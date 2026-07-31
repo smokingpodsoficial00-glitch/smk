@@ -36,6 +36,7 @@ const fs = require('fs');
 
 let latestQr = null;
 let isWhatsAppReady = false;
+const aiSentMessages = new Set();
 
 client.on('qr', (qr) => {
     latestQr = qr;
@@ -201,6 +202,9 @@ async function sendSequentialMessages(chat, msg, messagesArray, chatId, isFirstM
 
             // --- Send message directly via msg.reply or client ---
             try {
+                if (currentMsg) {
+                    aiSentMessages.add(currentMsg.trim().toLowerCase());
+                }
                 if (msg && typeof msg.reply === 'function') {
                     await msg.reply(currentMsg);
                 } else if (client) {
@@ -526,32 +530,36 @@ function detectFollowUpTriggers(chatId, aiResponse) {
 // =============================================
 // MAIN MESSAGE HANDLER
 // =============================================
-client.on('message', async msg => {
-    // Avoid responding to self or status broadcasts
-    if (msg.from === 'status@broadcast' || msg.fromMe) return;
+client.on('message_create', async msg => {
+    // Avoid status broadcasts
+    if (msg.from === 'status@broadcast') return;
+
+    // Permite testes pelo próprio número no WhatsApp (ignora respostas automáticas enviadas pela Eloísa)
+    if (msg.fromMe) {
+        const bodyLower = (msg.body || '').trim().toLowerCase();
+        if (aiSentMessages.has(bodyLower)) {
+            aiSentMessages.delete(bodyLower);
+            return; // Resposta enviada pela própria Eloísa, ignora para evitar loop
+        }
+    }
 
     // Ignore groups completely
     if (msg.from.endsWith('@g.us')) {
-        console.log(`👥 Ignorando mensagem de grupo: ${msg.from}`);
         return;
     }
 
     // Ignore old messages (WhatsApp Web sync backlog)
     const now = Math.floor(Date.now() / 1000);
     if (now - msg.timestamp > 60) {
-        console.log(`⏳ Ignorando mensagem antiga de ${msg.from} (enviada há ${now - msg.timestamp}s)`);
         return;
     }
 
     // --- MESSAGE TYPE FILTERS ---
-    
-    // P53: Stickers — IGNORE completely
     if (msg.type === 'sticker' || msg.type === MessageTypes.STICKER) {
-        console.log(`🎭 Ignorando sticker de ${msg.from}`);
         return;
     }
 
-    const senderNumber = msg.from.split('@')[0];
+    const senderNumber = msg.fromMe ? (msg.to ? msg.to.split('@')[0] : msg.from.split('@')[0]) : msg.from.split('@')[0];
     let messageText = msg.body || '';
     const chatId = `${senderNumber}`;
 
