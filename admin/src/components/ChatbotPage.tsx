@@ -484,11 +484,12 @@ export function ChatbotPage() {
         stockContext = `\n\nESTOQUE EM TEMPO REAL DISPONÍVEL NA LOJA:\n` +
           stockLines.join("\n") +
           `\n\nREGRAS CRÍTICAS DE EXIBIÇÃO E ORDEM DE PEDIDO:` +
-          `\n1. NUNCA COLOQUE "R$" OU "r$" ANTES DOS PREÇOS DOS PRODUTOS! Escreva apenas o número puro (ex: 80, 70, 89,90). PROIBIDO ESCREVER "r$ 80" OU "R$ 80"!` +
-          `\n2. NUNCA PERGUNTE "qual vc prefere?" NEM "pode ser ele?". Apenas informe o valor puro e os sabores de forma objetiva!` +
-          `\n3. SE TIVER APENAS 1 SABOR: "perfeito amg, o [modelo] tá saindo por [preço]! em estoque somente temos o sabor de [sabor]"` +
-          `\n4. SE TIVER 2 OU MAIS SABORES: "perfeito amg, o [modelo] tá saindo por [preço]! em estoque temos os sabores [sabor1] e [sabor2]"` +
-          `\n5. NUNCA PEÇA O CEP ANTES DE TER AS 3 INFORMAÇÕES CONFIRMADAS: MARCA, MODELO E SABOR!`;
+          `\n1. É ESTREITAMENTE PROIBIDO PEDIR CEP OU ENDEREÇO NA MESMA MENSAGEM EM QUE VOCÊ INFORMA OS SABORES! Envie apenas a frase com valor e sabores, PARE A RESPOSTA E ESPERE o cliente responder escolhendo/confirmando o sabor!` +
+          `\n2. SOMENTE após o cliente responder confirmando o sabor, aí sim você pede o CEP!` +
+          `\n3. NUNCA COLOQUE "R$" OU "r$" ANTES DOS PREÇOS DOS PRODUTOS! Escreva apenas o número puro (ex: 80, 70, 89,90).` +
+          `\n4. NUNCA PERGUNTE "qual vc prefere?" NEM "pode ser ele?". Apenas informe o valor puro e os sabores de forma objetiva!` +
+          `\n5. SE TIVER APENAS 1 SABOR: "perfeito amg, o [modelo] tá saindo por [preço]! em estoque somente temos o sabor de [sabor]"` +
+          `\n6. SE TIVER 2 OU MAIS SABORES: "perfeito amg, o [modelo] tá saindo por [preço]! em estoque temos os sabores [sabor1] e [sabor2]"`;
       } else {
         stockContext = `\n\nESTOQUE EM TEMPO REAL: Atualmente todos os produtos da loja estão sem estoque. Informe o cliente educadamente em minúsculo.`;
       }
