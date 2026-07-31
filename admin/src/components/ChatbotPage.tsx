@@ -485,7 +485,7 @@ export function ChatbotPage() {
           stockLines.join("\n") +
           `\n\nREGRAS CRÍTICAS DE EXIBIÇÃO E ORDEM DE PEDIDO:` +
           `\n1. PROIBIDO DIGITAR "msg1:", "msg2:", "msg3:" OU QUALQUER PREFIXO NA SUA RESPOSTA! Escreva apenas o texto puro!` +
-          `\n2. QUANDO O CLIENTE CONFIRMAR O SABOR: Confirme o pedido e PEÇA APENAS O CEP ("me passa o seu cep pra eu calcular o frete certinho pra vc amg?"). É PROIBIDO PERGUNTAR NÚMERO DE ENDEREÇO OU COMPLEMENTO ANTES DE TER O CEP!` +
+          `\n2. QUANDO O CLIENTE CONSULTAR UM PRODUTO: Diga APENAS a frase de valor puro e sabores em 1 ÚNICO BALÃO. É ESTREITAMENTE PROIBIDO ADICIONAR QUEBRA OU PEDIR CEP/ENDEREÇO AQUI!` +
           `\n3. QUANDO O CLIENTE MANDAR O CEP: Confirme o endereço localizado e pergunte o número ("qual o número do seu endereço amg? tem algum complemento?"). PROIBIDO FALAR FRETE AQUI!` +
           `\n4. QUANDO O CLIENTE MANDAR O NÚMERO/COMPLEMENTO: Diga APENAS O FRETE: "tá bom amg, o valor do frete ficou [frete]. qual seria a forma de pagamento?" (PROIBIDO FALAR TOTAL AQUI!).` +
           `\n5. QUANDO O CLIENTE RESPONDER "PIX": Envie o valor total e a chave Pix da loja.` +
