@@ -498,7 +498,10 @@ async function getAiResponse(phone, message) {
     // Injeta temporariamente o estoque e parâmetros da loja na system message com Lembretes Críticos
     const originalSystemPrompt = conversationHistory[phone][0].content;
     const strictReminders = `\n\n[INSTRUÇÕES RIGOROSAS DE FORMATO E SCRIPT PARA ESTA RESPOSTA:
-1. REGRA SUPREMA DE PRODUTO COMPLETO ANTES DO CEP: NUNCA PEÇA O CEP ANTES DE TER AS 3 INFORMAÇÕES CONFIRMADAS DO PEDIDO: MARCA, MODELO E SABOR! Se o cliente disser apenas "quero um elfbar bc15k" (SEM DEFINIR O SABOR), PROIBIDO PEDIR O CEP! Informe o preço e os sabores disponíveis em estoque e PERGUNTE QUAL SABOR ELE QUER! Exemplo: "perfeito amg, o elfbar bc15k tá saindo por r$ 70,00! em estoque temos ele no sabor melancia, qual sabor vc prefere?"
+1. REGRA SUPREMA DE SELEÇÃO DE SABORES:
+   - Se o modelo escolhido tiver APENAS 1 SABOR em estoque (ex: Elfbar BC15K só tem Melancia): NUNCA pergunte "qual sabor vc prefere?". Diga de forma natural: "perfeito amg, o elfbar bc15k tá saindo por r$ 70,00! em estoque temos ele no sabor melancia, pode ser ele?"
+   - Se o modelo tiver 2 OU MAIS SABORES em estoque (ex: Menta e Watermelon Ice): Liste os sabores disponíveis e pergunte qual ele prefere: "perfeito amg, o ignite v50 tá saindo por r$ 80,00! em estoque temos os sabores menta e watermelon ice, qual vc prefere?"
+   - PROIBIDO PEDIR CEP ANTES DE CONFIRMAR AS 3 INFORMAÇÕES: MARCA, MODELO E SABOR!
 2. REGRA SUPREMA DE NATURALIDADE NO WHATSAPP: PROIBIDO USAR LISTAS NUMERADAS (1. 2. 3.), PROIBIDO USAR MARCADORES DE TÓPICOS (• ou -) E PROIBIDO USAR ASTERISCOS (*). Escreva sempre em frases corridas e informais como uma pessoa real conversando no WhatsApp!
 3. REGRA DE SAUDAÇÃO DE CLIENTE NOVO (P4): Se esta for a 1ª mensagem da conversa ou uma saudação simples ("oi", "oii", "olá", "bom dia"), NUNCA DIGA "estamos abertos sim" ou "qual o pedido pra hoje". Siga RIGOROSAMENTE a Regra P4 do script:
 msg1: [SAUDAÇÃO_CONFORME_HORARIO], tudo bem?
