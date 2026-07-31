@@ -484,11 +484,11 @@ export function ChatbotPage() {
         stockContext = `\n\nESTOQUE EM TEMPO REAL DISPONÍVEL NA LOJA:\n` +
           stockLines.join("\n") +
           `\n\nREGRAS CRÍTICAS DE EXIBIÇÃO E ORDEM DE PEDIDO:` +
-          `\n1. SE O PRODUTO TIVER APENAS 1 SABOR EM ESTOQUE: Diga exatamente: "perfeito, o [modelo] tá saindo por r$ [preço]! em estoque somente temos o sabor de [sabor], pode ser ele amg?" (Exemplo: "perfeito, o ignite v80 tá saindo por r$ 89,90! em estoque somente temos o sabor de watermelon ice, pode ser ele amg?")` +
-          `\n2. SE O PRODUTO TIVER 2 OU MAIS SABORES: Liste os sabores disponíveis e pergunte qual ele prefere.` +
-          `\n3. NUNCA PEÇA O CEP ANTES DE TER AS 3 INFORMAÇÕES CONFIRMADAS: MARCA, MODELO E SABOR!` +
-          `\n4. PROIBIDO USAR MARCADORES DE LISTA (como 1., 2., 3., • ou -) E PROIBIDO USAR ASTERISCOS (*). Escreva sempre em texto corrido e informal de WhatsApp!` +
-          `\n5. Escreva 100% em LETRAS MINÚSCULAS no WhatsApp!`;
+          `\n1. NUNCA COLOQUE "R$" OU "r$" ANTES DOS PREÇOS DOS PRODUTOS! Escreva apenas o número puro (ex: 80, 70, 89,90). PROIBIDO ESCREVER "r$ 80" OU "R$ 80"!` +
+          `\n2. NUNCA PERGUNTE "qual vc prefere?" NEM "pode ser ele?". Apenas informe o valor puro e os sabores de forma objetiva!` +
+          `\n3. SE TIVER APENAS 1 SABOR: "perfeito amg, o [modelo] tá saindo por [preço]! em estoque somente temos o sabor de [sabor]"` +
+          `\n4. SE TIVER 2 OU MAIS SABORES: "perfeito amg, o [modelo] tá saindo por [preço]! em estoque temos os sabores [sabor1] e [sabor2]"` +
+          `\n5. NUNCA PEÇA O CEP ANTES DE TER AS 3 INFORMAÇÕES CONFIRMADAS: MARCA, MODELO E SABOR!`;
       } else {
         stockContext = `\n\nESTOQUE EM TEMPO REAL: Atualmente todos os produtos da loja estão sem estoque. Informe o cliente educadamente em minúsculo.`;
       }

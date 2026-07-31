@@ -468,10 +468,11 @@ async function getAiResponse(phone, message) {
             Object.values(groups).forEach(g => {
                 const flavorDetails = g.flavors
                     .filter(f => f.stock > 0)
-                    .map(f => `${f.flavor} (${f.stock} un em estoque)`)
-                    .join(', ');
+                    .map(f => `${f.flavor}`)
+                    .join(' e ');
                 if (flavorDetails) {
-                    stockInfo += `O modelo ${g.brand} ${g.model} custa R$ ${parseFloat(g.price).toFixed(2)} e possui em estoque os sabores: ${flavorDetails}.\n`;
+                    const priceFormatted = parseFloat(g.price) % 1 === 0 ? parseInt(g.price, 10) : parseFloat(g.price).toFixed(2).replace('.', ',');
+                    stockInfo += `O modelo ${g.brand} ${g.model} sai por ${priceFormatted} e tem em estoque os sabores: ${flavorDetails}.\n`;
                 }
             });
         } else {
@@ -498,9 +499,11 @@ async function getAiResponse(phone, message) {
     // Injeta temporariamente o estoque e parâmetros da loja na system message com Lembretes Críticos
     const originalSystemPrompt = conversationHistory[phone][0].content;
     const strictReminders = `\n\n[INSTRUÇÕES RIGOROSAS DE FORMATO E SCRIPT PARA ESTA RESPOSTA:
-1. REGRA SUPREMA DE SELEÇÃO DE SABORES:
-   - Se o modelo escolhido tiver APENAS 1 SABOR em estoque: Diga exatamente: "perfeito, o [modelo] tá saindo por r$ [preço]! em estoque somente temos o sabor de [sabor], pode ser ele amg?" (Exemplo: "perfeito, o ignite v80 tá saindo por r$ 89,90! em estoque somente temos o sabor de watermelon ice, pode ser ele amg?")
-   - Se o modelo tiver 2 OU MAIS SABORES em estoque: Diga exatamente: "perfeito amg, o [modelo] tá saindo por r$ [preço]! em estoque temos os sabores [sabor1] e [sabor2], qual vc prefere?" (Exemplo: "perfeito amg, o ignite v50 tá saindo por r$ 80,00! em estoque temos os sabores menta e watermelon ice, qual vc prefere?")
+1. REGRA SUPREMA DE VALOR E SELEÇÃO DE SABORES:
+   - NUNCA COLOQUE "R$" OU "r$" ANTES DOS PREÇOS DOS PRODUTOS! Escreva apenas o número puro (ex: 80, 70, 89,90). PROIBIDO ESCREVER "r$ 80" OU "R$ 80"!
+   - NUNCA PERGUNTE "qual vc prefere?" NEM "pode ser ele?". Apenas informe o valor puro e os sabores de forma objetiva!
+   - Se tiver APENAS 1 SABOR em estoque: Diga exatamente: "perfeito amg, o [modelo] tá saindo por [preço]! em estoque somente temos o sabor de [sabor]" (Exemplo: "perfeito amg, o ignite v80 tá saindo por 89,90! em estoque somente temos o sabor de watermelon ice")
+   - Se tiver 2 OU MAIS SABORES em estoque: Diga exatamente: "perfeito amg, o [modelo] tá saindo por [preço]! em estoque temos os sabores [sabor1] e [sabor2]" (Exemplo: "perfeito amg, o ignite v50 tá saindo por 80! em estoque temos os sabores menta e watermelon ice")
    - PROIBIDO PEDIR CEP ANTES DE CONFIRMAR AS 3 INFORMAÇÕES: MARCA, MODELO E SABOR!
 2. REGRA SUPREMA DE NATURALIDADE NO WHATSAPP: PROIBIDO USAR LISTAS NUMERADAS (1. 2. 3.), PROIBIDO USAR MARCADORES DE TÓPICOS (• ou -) E PROIBIDO USAR ASTERISCOS (*). Escreva sempre em frases corridas e informais como uma pessoa real conversando no WhatsApp!
 3. REGRA DE SAUDAÇÃO DE CLIENTE NOVO (P4): Se esta for a 1ª mensagem da conversa ou uma saudação simples ("oi", "oii", "olá", "bom dia"), NUNCA DIGA "estamos abertos sim" ou "qual o pedido pra hoje". Siga RIGOROSAMENTE a Regra P4 do script:
