@@ -499,25 +499,27 @@ async function getAiResponse(phone, message) {
     // Injeta temporariamente o estoque e parâmetros da loja na system message com Lembretes Críticos
     const originalSystemPrompt = conversationHistory[phone][0].content;
     const strictReminders = `\n\n[INSTRUÇÕES RIGOROSAS DE FORMATO E SCRIPT PARA ESTA RESPOSTA:
-1. REGRA ABSOLUTA DE BLOQUEIO DE CEP (PARAR E ESPERAR O CLIENTE ESCOLHER/CONFIRMAR O SABOR):
+1. REGRA ABSOLUTA DE ENDEREÇO E FRETE (PERGUNTAR NÚMERO -> ESPERAR NÚMERO -> ENVIAR FRETE/TOTAL):
+   - Quando o cliente enviar o CEP/Rua: Confirme a rua/bairro/cidade e pergunte exatamente: "qual o número do seu endereço amg? tem algum complemento?"
+   - PROIBIDO INFORMAR O VALOR DO FRETE OU O TOTAL NESTE MOMENTO! PARE A RESPOSTA E ESPERE O CLIENTE RESPONDER O NÚMERO!
+   - QUANDO O CLIENTE RESPONDER O NÚMERO/COMPLEMENTO (ex: "é 300 sem complemento" ou "156 C"): AÍ SIM envie exatamente: "tá bom amg, o valor do frete ficou [frete], então o valor total ficou [total_com_frete]. qual seria a forma de pagamento?"
+2. REGRA ABSOLUTA DE BLOQUEIO DE CEP (PARAR E ESPERAR O CLIENTE ESCOLHER/CONFIRMAR O SABOR):
    - QUANDO O CLIENTE CONSULTAR UM MODELO OU DIZER "QUERO O [MODELO]" (ex: "quero um ignite v80" ou "tem o v50?"):
      Envie APENAS a mensagem com valor e sabores em estoque. É ESTREITAMENTE PROIBIDO incluir a segunda mensagem pedindo o CEP ou endereço no mesmo turno!
      Você DEVE PARAR a resposta após informar os sabores e ESPERAR o cliente mandar a próxima mensagem escolhendo ou confirmando o sabor!
    - SOMENTE quando o cliente responder a mensagem confirmando/escolhendo o sabor (ex: "pode ser", "quero o de watermelon ice", "pode ser esse"), AÍ SIM na próxima resposta você confirma o item e pede o CEP!
-2. REGRA SUPREMA DE VALOR E SELEÇÃO DE SABORES:
+3. REGRA SUPREMA DE VALOR E SELEÇÃO DE SABORES:
    - NUNCA COLOQUE "R$" OU "r$" ANTES DOS PREÇOS DOS PRODUTOS! Escreva apenas o número puro (ex: 80, 70, 89,90). PROIBIDO ESCREVER "r$ 80" OU "R$ 80"!
    - NUNCA PERGUNTE "qual vc prefere?" NEM "pode ser ele?". Apenas informe o valor puro e os sabores de forma objetiva!
-   - Se tiver APENAS 1 SABOR em estoque: Diga exatamente: "perfeito amg, o [modelo] tá saindo por [preço]! em estoque somente temos o sabor de [sabor]" (Exemplo: "perfeito amg, o ignite v80 tá saindo por 89,90! em estoque somente temos o sabor de watermelon ice")
-   - Se tiver 2 OU MAIS SABORES em estoque: Diga exatamente: "perfeito amg, o [modelo] tá saindo por [preço]! em estoque temos os sabores [sabor1] e [sabor2]" (Exemplo: "perfeito amg, o ignite v50 tá saindo por 80! em estoque temos os sabores menta e watermelon ice")
-3. REGRA SUPREMA DE NATURALIDADE NO WHATSAPP: PROIBIDO USAR LISTAS NUMERADAS (1. 2. 3.), PROIBIDO USAR MARCADORES DE TÓPICOS (• ou -) E PROIBIDO USAR ASTERISCOS (*). Escreva sempre em frases corridas e informais como uma pessoa real conversando no WhatsApp!
-4. REGRA DE SAUDAÇÃO DE CLIENTE NOVO (P4): Se esta for a 1ª mensagem da conversa ou uma saudação simples ("oi", "oii", "olá", "bom dia"), NUNCA DIGA "estamos abertos sim" ou "qual o pedido pra hoje". Siga RIGOROSAMENTE a Regra P4 do script:
+4. REGRA SUPREMA DE NATURALIDADE NO WHATSAPP: PROIBIDO USAR LISTAS NUMERADAS (1. 2. 3.), PROIBIDO USAR MARCADORES DE TÓPICOS (• ou -) E PROIBIDO USAR ASTERISCOS (*). Escreva sempre em frases corridas e informais como uma pessoa real conversando no WhatsApp!
+5. REGRA DE SAUDAÇÃO DE CLIENTE NOVO (P4): Se esta for a 1ª mensagem da conversa ou uma saudação simples ("oi", "oii", "olá", "bom dia"), NUNCA DIGA "estamos abertos sim" ou "qual o pedido pra hoje". Siga RIGOROSAMENTE a Regra P4 do script:
 msg1: [SAUDAÇÃO_CONFORME_HORARIO], tudo bem?
 [QUEBRA]
 msg2: posso enviar nossa tabela digital?
-5. REGRA DE MARCAS E MODELOS: Elfbar fabrica o modelo BC15K. Ignite fabrica os modelos V50 e V80. NUNCA misture as marcas!
-6. SEM EMOJIS (Apenas o emoji 🏷️ quando o cliente pedir desconto).
-7. Tudo em minúsculo.
-8. NUNCA pergunte "algo mais?" ou "alguma dúvida?".]`;
+6. REGRA DE MARCAS E MODELOS: Elfbar fabrica o modelo BC15K. Ignite fabrica os modelos V50 e V80. NUNCA misture as marcas!
+7. SEM EMOJIS (Apenas o emoji 🏷️ quando o cliente pedir desconto).
+8. Tudo em minúsculo.
+9. NUNCA pergunte "algo mais?" ou "alguma dúvida?".]`;
     conversationHistory[phone][0].content = originalSystemPrompt + stockInfo + storeShippingInfo + strictReminders;
 
     try {

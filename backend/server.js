@@ -821,11 +821,14 @@ async function processMessage(msg, senderNumber, chatId, messageText) {
                 initConversation(senderNumber);
                 conversationHistory[senderNumber].push({
                     role: "system",
-                    content: `[SISTEMA: O CEP/Endereço do cliente foi localizado como "${quote.address}". O frete via Uber Direct é de R$ ${quote.fee.toFixed(2)} (${quote.distanceKm} km).` +
-                        `\n\nINSTRUÇÕES OBRIGATÓRIAS DE RESPOSTA:` +
-                        `\n1. Primeiro, CONFIRME O ENDEREÇO LOCALIZADO com o cliente para evitar entregas no lugar errado! Exemplo: "ahh sim, localizei aqui amg! esse é o seu endereço né: ${quote.address}?"` +
-                        `\n2. Na mesma resposta, PEÇA O NÚMERO E COMPLEMENTO: "qual o número da sua casa/apto amg? tem algum complemento?"` +
-                        `\n3. Em seguida, informe o valor do frete (R$ ${quote.fee.toFixed(2)}) e o valor total do pedido.]`
+                    content: `[SISTEMA: O CEP/Endereço do cliente foi localizado como "${quote.address}". O frete via Uber Direct é de R$ ${quote.fee.toFixed(2).replace('.', ',')} (${quote.distanceKm} km).` +
+                        `\n\nINSTRUÇÕES OBRIGATÓRIAS DE ENDEREÇO E FRETE:` +
+                        `\n1. SE O CLIENTE ENVIOU O CEP/RUA AGORA:` +
+                        `   - Responda apenas confirmando a rua/bairro/cidade e peça o número: "ahh sim, localizei aqui amg! o seu endereço é esse né: ${quote.address}?" [QUEBRA] "qual o número do seu endereço amg? tem algum complemento?"` +
+                        `   - É PROIBIDO INFORMAR O FRETE OU O TOTAL NESTA MENSAGEM! PARE A RESPOSTA E ESPERE O CLIENTE MANDAR O NÚMERO!` +
+                        `\n2. QUANDO O CLIENTE RESPONDER O NÚMERO E COMPLEMENTO (ex: "é 300 sem complemento", "156 C"):` +
+                        `   - Envie exatamente a mensagem de fechamento: "tá bom amg, o valor do frete ficou ${quote.fee.toFixed(2).replace('.', ',')}, então o valor total ficou [total_com_frete]. qual seria a forma de pagamento?"` +
+                        `   - Se ele mandar o complemento (ex: 156 C), diga "complemento apto 156 C", NUNCA chame o complemento de "número 156 C"!]`
                 });
                 console.log(`🚗 Cotação de frete injetada para ${senderNumber}: R$ ${quote.fee.toFixed(2)}`);
             } catch (err) {
