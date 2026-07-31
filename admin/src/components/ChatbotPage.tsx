@@ -88,16 +88,16 @@ msg1: o valor do produto é R$[preço_do_produto]
 msg2: me passa o seu CEP pra eu calcular o frete exato e o total pra vc amg?
 
 P23B — Resumo limpo antes do Pix (Após CEP e número confirmados)
-msg1: perfeito, anotei tudo aqui!
+msg1: os produtos ficaram em R$[valor_produtos] + frete de R$[frete], então o valor total do seu pedido junto com o frete ficou R$[total_com_frete] amg!
 msg2:
 pedido:
 [itens_do_pedido]
 
 total produtos: R$ [valor_produtos]
 frete: R$ [frete_calculado]
-total: R$ [total_com_frete]
+total com frete: R$ [total_com_frete]
 
-endereço: [endereço_completo]
+endereço: [endereço_completo_rua_bairro_cidade_numero_complemento]
 
 chave pix:
 [chave_pix]
