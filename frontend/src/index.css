@@ -15,6 +15,18 @@
   ::selection { background: oklch(1 0 0 / 20%); color: oklch(1 0 0); }
 }
 
+/* Remover setas de aumentar/diminuir (spin buttons) de todos os inputs numéricos */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 @layer utilities {
   .glass {
     background: color-mix(in oklab, theme('colors.background') 60%, transparent);

@@ -91,6 +91,13 @@ export function SettingsPage() {
 
     const finalStoreName = storeName.trim() || "Minha Loja";
 
+    const parseDecimal = (val: string, fallback: number): number => {
+      if (!val) return fallback;
+      const normalized = val.toString().replace(',', '.').replace(/[^0-9.]/g, '');
+      const num = parseFloat(normalized);
+      return isNaN(num) ? fallback : num;
+    };
+
     await updateConfig({
       store_name: finalStoreName,
       store_slug: finalStoreName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
@@ -101,9 +108,9 @@ export function SettingsPage() {
       logo_url: logoUrl,
       address: address.trim(),
       origin_cep: originCep.trim(),
-      base_fare: parseFloat(baseFare) || 8.50,
-      included_km: parseFloat(includedKm) || 3.0,
-      extra_km_fee: parseFloat(extraKmFee) || 1.40,
+      base_fare: parseDecimal(baseFare, 8.50),
+      included_km: parseDecimal(includedKm, 3.0),
+      extra_km_fee: parseDecimal(extraKmFee, 1.40),
     });
 
     // Sincroniza tabela companies e refreshCompany() no AuthContext
@@ -460,11 +467,11 @@ export function SettingsPage() {
               <div className="relative">
                 <span className="absolute left-3.5 top-3 text-xs text-muted-foreground font-bold">R$</span>
                 <input
-                  type="number"
-                  step="0.50"
+                  type="text"
+                  inputMode="decimal"
                   value={baseFare}
                   onChange={(e) => setBaseFare(e.target.value)}
-                  placeholder="8.50"
+                  placeholder="8,50"
                   className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl pl-9 pr-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 font-semibold"
                 />
               </div>
@@ -478,11 +485,11 @@ export function SettingsPage() {
               </label>
               <div className="relative">
                 <input
-                  type="number"
-                  step="0.5"
+                  type="text"
+                  inputMode="decimal"
                   value={includedKm}
                   onChange={(e) => setIncludedKm(e.target.value)}
-                  placeholder="3.0"
+                  placeholder="3,0"
                   className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 font-semibold"
                 />
                 <span className="absolute right-3.5 top-3 text-xs text-muted-foreground font-bold">KM</span>
@@ -498,11 +505,11 @@ export function SettingsPage() {
               <div className="relative">
                 <span className="absolute left-3.5 top-3 text-xs text-muted-foreground font-bold">R$</span>
                 <input
-                  type="number"
-                  step="0.10"
+                  type="text"
+                  inputMode="decimal"
                   value={extraKmFee}
                   onChange={(e) => setExtraKmFee(e.target.value)}
-                  placeholder="1.40"
+                  placeholder="1,40"
                   className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl pl-9 pr-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 font-semibold"
                 />
               </div>
