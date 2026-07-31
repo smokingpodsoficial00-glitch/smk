@@ -96,11 +96,16 @@ app.post('/api/logout', async (req, res) => {
             }
         }
 
-        res.json({ success: true, message: 'WhatsApp desconectado com sucesso. O backend irá gerar um novo QR Code ao reiniciar.' });
+        res.json({ success: true, message: 'WhatsApp desconectado com sucesso. Gerando novo QR Code...' });
 
-        setTimeout(() => {
-            process.exit(0);
-        }, 1000);
+        setTimeout(async () => {
+            try {
+                console.log('🔄 Reinicializando cliente do WhatsApp para gerar novo QR Code...');
+                await client.initialize();
+            } catch (e) {
+                console.error('Erro ao re-inicializar cliente:', e);
+            }
+        }, 1500);
     } catch (err) {
         console.error('Erro no logout API:', err);
         res.status(500).json({ error: 'Falha ao desconectar.' });
