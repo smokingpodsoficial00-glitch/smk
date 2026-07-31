@@ -797,32 +797,19 @@ async function processMessage(msg, senderNumber, chatId, messageText) {
                 });
             }
         } else {
-            // Normal hours — detect address/CEP
+            // Normal hours — detect address/CEP strictly (prevent treating questions like 'qual o valor dele?' as addresses)
             const cepMatch = messageText.match(/\b\d{5}-?\d{3}\b/);
-            
+            const containsStreetKeywords = /\b(rua|r\.|av\.|avenida|alameda|pra[çc]a|travessa|estrada|rodovia|bairro)\b/i.test(messageText);
+            const isQuestionOrInquiry = /\b(qual|quanto|quantos|tem|quais|como|por quanto|desconto|pre[çc]o|valor)\b/i.test(messageText) || messageText.includes('?');
+
             if (cepMatch) {
                 needsShippingCalculation = true;
                 addressToCalculate = cepMatch[0];
+            } else if (containsStreetKeywords && !isQuestionOrInquiry) {
+                needsShippingCalculation = true;
+                addressToCalculate = messageText;
             } else {
-                const history = conversationHistory[senderNumber];
-                if (history && history.length > 0) {
-                    const lastAssistantMsg = history[history.length - 1];
-                    if (lastAssistantMsg.role === 'assistant') {
-                        const lastText = lastAssistantMsg.content.toLowerCase();
-                        const askedForAddress = lastText.includes('preciso do seu endereço') || 
-                                                lastText.includes('enviar o cep ao invés') || 
-                                                lastText.includes('me passa o endereço completo') || 
-                                                lastText.includes('qual seria o número') ||
-                                                lastText.includes('qual seria o bairro');
-                        
-                        const isCardapioOrder = messageText.includes('[PEDIDO-SMOKING]');
-                        const isTooShort = messageText.length < 5;
-
-                        if (askedForAddress && !isCardapioOrder && !isTooShort) {
-                            needsShippingCalculation = true;
-                        }
-                    }
-                }
+                needsShippingCalculation = false;
             }
         }
 
