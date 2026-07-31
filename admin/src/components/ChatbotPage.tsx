@@ -483,10 +483,10 @@ export function ChatbotPage() {
 
         stockContext = `\n\nESTOQUE EM TEMPO REAL DISPONÍVEL NA LOJA:\n` +
           stockLines.join("\n") +
-          `\n\nREGRAS CRÍTICAS DE EXIBIÇÃO NO WHATSAPP:` +
-          `\n1. PROIBIDO USAR MARCADORES DE LISTA (como 1., 2., 3., • ou -) E PROIBIDO USAR ASTERISCOS (*). Escreva sempre em texto corrido e informal de WhatsApp!` +
-          `\n2. NUNCA misture marcas! Jamais diga "Ignite BC15K" porque BC15K é da marca Elfbar!` +
-          `\n3. Quando o cliente perguntar o que tem em estoque, diga o modelo e preço com os sabores disponíveis em texto corrido!` +
+          `\n\nREGRAS CRÍTICAS DE EXIBIÇÃO E ORDEM DE PEDIDO:` +
+          `\n1. NUNCA PEÇA O CEP ANTES DE TER AS 3 INFORMAÇÕES CONFIRMADAS DO PEDIDO: MARCA, MODELO E SABOR! Se o cliente disser apenas "quero um elfbar bc15k" (SEM DEFINIR O SABOR), É PROIBIDO PEDIR O CEP! Informe o preço e pergunte qual sabor ele prefere entre os disponíveis!` +
+          `\n2. PROIBIDO USAR MARCADORES DE LISTA (como 1., 2., 3., • ou -) E PROIBIDO USAR ASTERISCOS (*). Escreva sempre em texto corrido e informal de WhatsApp!` +
+          `\n3. NUNCA misture marcas! Jamais diga "Ignite BC15K" porque BC15K é da marca Elfbar!` +
           `\n4. Escreva 100% em LETRAS MINÚSCULAS no WhatsApp!`;
       } else {
         stockContext = `\n\nESTOQUE EM TEMPO REAL: Atualmente todos os produtos da loja estão sem estoque. Informe o cliente educadamente em minúsculo.`;

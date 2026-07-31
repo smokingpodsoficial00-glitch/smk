@@ -498,15 +498,16 @@ async function getAiResponse(phone, message) {
     // Injeta temporariamente o estoque e parâmetros da loja na system message com Lembretes Críticos
     const originalSystemPrompt = conversationHistory[phone][0].content;
     const strictReminders = `\n\n[INSTRUÇÕES RIGOROSAS DE FORMATO E SCRIPT PARA ESTA RESPOSTA:
-1. REGRA SUPREMA DE NATURALIDADE NO WHATSAPP: PROIBIDO USAR LISTAS NUMERADAS (1. 2. 3.), PROIBIDO USAR MARCADORES DE TÓPICOS (• ou -) E PROIBIDO USAR ASTERISCOS (*). Escreva sempre em frases corridas e informais como uma pessoa real conversando no WhatsApp!
-2. REGRA DE SAUDAÇÃO DE CLIENTE NOVO (P4): Se esta for a 1ª mensagem da conversa ou uma saudação simples ("oi", "oii", "olá", "bom dia"), NUNCA DIGA "estamos abertos sim" ou "qual o pedido pra hoje". Siga RIGOROSAMENTE a Regra P4 do script:
+1. REGRA SUPREMA DE PRODUTO COMPLETO ANTES DO CEP: NUNCA PEÇA O CEP ANTES DE TER AS 3 INFORMAÇÕES CONFIRMADAS DO PEDIDO: MARCA, MODELO E SABOR! Se o cliente disser apenas "quero um elfbar bc15k" (SEM DEFINIR O SABOR), PROIBIDO PEDIR O CEP! Informe o preço e os sabores disponíveis em estoque e PERGUNTE QUAL SABOR ELE QUER! Exemplo: "perfeito amg, o elfbar bc15k tá saindo por r$ 70,00! em estoque temos ele no sabor melancia, qual sabor vc prefere?"
+2. REGRA SUPREMA DE NATURALIDADE NO WHATSAPP: PROIBIDO USAR LISTAS NUMERADAS (1. 2. 3.), PROIBIDO USAR MARCADORES DE TÓPICOS (• ou -) E PROIBIDO USAR ASTERISCOS (*). Escreva sempre em frases corridas e informais como uma pessoa real conversando no WhatsApp!
+3. REGRA DE SAUDAÇÃO DE CLIENTE NOVO (P4): Se esta for a 1ª mensagem da conversa ou uma saudação simples ("oi", "oii", "olá", "bom dia"), NUNCA DIGA "estamos abertos sim" ou "qual o pedido pra hoje". Siga RIGOROSAMENTE a Regra P4 do script:
 msg1: [SAUDAÇÃO_CONFORME_HORARIO], tudo bem?
 [QUEBRA]
 msg2: posso enviar nossa tabela digital?
-3. REGRA DE MARCAS E MODELOS: Elfbar fabrica o modelo BC15K. Ignite fabrica os modelos V50 e V80. NUNCA misture as marcas!
-4. SEM EMOJIS (Apenas o emoji 🏷️ quando o cliente pedir desconto).
-5. Tudo em minúsculo.
-6. NUNCA pergunte "algo mais?" ou "alguma dúvida?".]`;
+4. REGRA DE MARCAS E MODELOS: Elfbar fabrica o modelo BC15K. Ignite fabrica os modelos V50 e V80. NUNCA misture as marcas!
+5. SEM EMOJIS (Apenas o emoji 🏷️ quando o cliente pedir desconto).
+6. Tudo em minúsculo.
+7. NUNCA pergunte "algo mais?" ou "alguma dúvida?".]`;
     conversationHistory[phone][0].content = originalSystemPrompt + stockInfo + storeShippingInfo + strictReminders;
 
     try {
