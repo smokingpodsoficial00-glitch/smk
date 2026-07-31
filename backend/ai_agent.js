@@ -462,12 +462,15 @@ async function getAiResponse(phone, message) {
                 groups[key].flavors.push({ flavor: p.flavor, stock: stockQty });
             });
 
+            stockInfo = "\n=== ESTOQUE REAL DA LOJA (USAR APENAS ESTES PRODUTOS NAS RESPOSTAS DA ELOÍSA) ===\n";
             Object.values(groups).forEach(g => {
                 const flavorDetails = g.flavors
-                    .map(f => `${f.flavor} (${f.stock > 0 ? f.stock + ' un em estoque' : 'ESGOTADO'})`)
+                    .filter(f => f.stock > 0)
+                    .map(f => `${f.flavor} (${f.stock} un em estoque)`)
                     .join(', ');
-                stockInfo += `• Marca: ${g.brand} | Modelo: ${g.model} | Preço: R$ ${parseFloat(g.price).toFixed(2)}\n`;
-                stockInfo += `  Sabores disponíveis do ${g.brand} ${g.model}: ${flavorDetails}\n\n`;
+                if (flavorDetails) {
+                    stockInfo += `O modelo ${g.brand} ${g.model} custa R$ ${parseFloat(g.price).toFixed(2)} e possui em estoque os sabores: ${flavorDetails}.\n`;
+                }
             });
         } else {
             stockInfo += "Estoque não encontrado ou vazio.\n";
@@ -492,7 +495,16 @@ async function getAiResponse(phone, message) {
     
     // Injeta temporariamente o estoque e parâmetros da loja na system message com Lembretes Críticos
     const originalSystemPrompt = conversationHistory[phone][0].content;
-    const strictReminders = "\n\n[LEMBRETE OBRIGATÓRIO DE MARCAS E SABORES PARA ESTA RESPOSTA:\n1. NUNCA MISTURE MARCAS! Elfbar fabrica o modelo BC15K. Ignite fabrica os modelos V50 e V80. Jamais invente 'Ignite BC15K'!\n2. Ao apresentar as opções ao cliente, diga a MARCA e MODELO e liste os SABORES disponíveis daquele pod específico.\n3. NÃO USE EMOJIS. Nunca.\n4. Tudo em minúsculo.\n5. NUNCA ofereça a tabela se já ofereceu no passado.\n6. NUNCA pergunte 'algo mais?' ou 'alguma dúvida?'.\n7. REGRA DE QUANTIDADES EM ESTOQUE: Se o cliente pedir uma quantidade MAIOR do que o estoque em unidades disponível, NUNCA DIGA QUE ESTÁ ESGOTADO! Diga amigavelmente que só possui X unidades em estoque e pergunte se ele quer levar as X disponíveis ou prefere outro sabor.]";
+    const strictReminders = `\n\n[INSTRUÇÕES RIGOROSAS DE FORMATO E SCRIPT PARA ESTA RESPOSTA:
+1. REGRA SUPREMA DE NATURALIDADE NO WHATSAPP: PROIBIDO USAR LISTAS NUMERADAS (1. 2. 3.), PROIBIDO USAR MARCADORES DE TÓPICOS (• ou -) E PROIBIDO USAR ASTERISCOS (*). Escreva sempre em frases corridas e informais como uma pessoa real conversando no WhatsApp!
+2. REGRA DE SAUDAÇÃO DE CLIENTE NOVO (P4): Se esta for a 1ª mensagem da conversa ou uma saudação simples ("oi", "oii", "olá", "bom dia"), NUNCA DIGA "estamos abertos sim" ou "qual o pedido pra hoje". Siga RIGOROSAMENTE a Regra P4 do script:
+msg1: [SAUDAÇÃO_CONFORME_HORARIO], tudo bem?
+[QUEBRA]
+msg2: posso enviar nossa tabela digital?
+3. REGRA DE MARCAS E MODELOS: Elfbar fabrica o modelo BC15K. Ignite fabrica os modelos V50 e V80. NUNCA misture as marcas!
+4. SEM EMOJIS (Apenas o emoji 🏷️ quando o cliente pedir desconto).
+5. Tudo em minúsculo.
+6. NUNCA pergunte "algo mais?" ou "alguma dúvida?".]`;
     conversationHistory[phone][0].content = originalSystemPrompt + stockInfo + storeShippingInfo + strictReminders;
 
     try {

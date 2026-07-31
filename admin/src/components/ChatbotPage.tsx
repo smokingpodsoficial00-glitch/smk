@@ -477,16 +477,16 @@ export function ChatbotPage() {
         });
 
         const stockLines = Object.values(groups).map(g => {
-          const flavorsList = g.flavors.map(f => `${f.flavor} (${f.stock} un)`).join(', ');
-          return `• Marca: ${g.brand} | Modelo: ${g.name} | Preço: R$ ${g.price.toFixed(2)} | Sabores em Estoque: ${flavorsList}`;
+          const flavorsList = g.flavors.filter(f => f.stock > 0).map(f => `${f.flavor} (${f.stock} un)`).join(', ');
+          return `O modelo ${g.brand} ${g.name} custa R$ ${g.price.toFixed(2)} e possui em estoque os sabores: ${flavorsList}.`;
         });
 
-        stockContext = `\n\nESTOQUE EM TEMPO REAL DISPONÍVEL NA LOJA (AGRUPADO POR MARCA E MODELO):\n` +
+        stockContext = `\n\nESTOQUE EM TEMPO REAL DISPONÍVEL NA LOJA:\n` +
           stockLines.join("\n") +
-          `\n\nREGRAS CRÍTICAS DE MARCAS E SABORES:` +
-          `\n1. Entenda que a MARCA é a fabricante (ex: Elfbar, Ignite) e o MODELO é a linha de pods (ex: BC15K da Elfbar, V50 e V80 da Ignite).` +
-          `\n2. NUNCA misture marcas! Jamais invente "Ignite BC15K" porque BC15K é da marca Elfbar!` +
-          `\n3. Quando o cliente pedir opções, informe primeiro a Marca e Modelo com o valor, e liste os Sabores disponíveis daquele modelo!` +
+          `\n\nREGRAS CRÍTICAS DE EXIBIÇÃO NO WHATSAPP:` +
+          `\n1. PROIBIDO USAR MARCADORES DE LISTA (como 1., 2., 3., • ou -) E PROIBIDO USAR ASTERISCOS (*). Escreva sempre em texto corrido e informal de WhatsApp!` +
+          `\n2. NUNCA misture marcas! Jamais diga "Ignite BC15K" porque BC15K é da marca Elfbar!` +
+          `\n3. Quando o cliente perguntar o que tem em estoque, diga o modelo e preço com os sabores disponíveis em texto corrido!` +
           `\n4. Escreva 100% em LETRAS MINÚSCULAS no WhatsApp!`;
       } else {
         stockContext = `\n\nESTOQUE EM TEMPO REAL: Atualmente todos os produtos da loja estão sem estoque. Informe o cliente educadamente em minúsculo.`;
