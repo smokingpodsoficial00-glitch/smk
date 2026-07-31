@@ -834,7 +834,11 @@ async function processMessage(msg, senderNumber, chatId, messageText) {
                 initConversation(senderNumber);
                 conversationHistory[senderNumber].push({
                     role: "system",
-                    content: `[SISTEMA: O frete via Uber Direct para o endereço "${quote.address}" foi calculado com sucesso. Valor do frete: R$ ${quote.fee.toFixed(2)}. Distância: ${quote.distanceKm} km. Informe o valor do frete ao cliente e pergunte se deseja prosseguir. Ofereça a chave Pix aleatória para concluir.]`
+                    content: `[SISTEMA: O CEP/Endereço do cliente foi localizado como "${quote.address}". O frete via Uber Direct é de R$ ${quote.fee.toFixed(2)} (${quote.distanceKm} km).` +
+                        `\n\nINSTRUÇÕES OBRIGATÓRIAS DE RESPOSTA:` +
+                        `\n1. Primeiro, CONFIRME O ENDEREÇO LOCALIZADO com o cliente para evitar entregas no lugar errado! Exemplo: "ahh sim, localizei aqui amg! esse é o seu endereço né: ${quote.address}?"` +
+                        `\n2. Na mesma resposta, PEÇA O NÚMERO E COMPLEMENTO: "qual o número da sua casa/apto amg? tem algum complemento?"` +
+                        `\n3. Em seguida, informe o valor do frete (R$ ${quote.fee.toFixed(2)}) e o valor total do pedido.]`
                 });
                 console.log(`🚗 Cotação de frete injetada para ${senderNumber}: R$ ${quote.fee.toFixed(2)}`);
             } catch (err) {
