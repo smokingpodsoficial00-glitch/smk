@@ -502,10 +502,15 @@ async function getAiResponse(phone, message) {
     // Injeta temporariamente o estoque e parâmetros da loja na system message com Lembretes Críticos
     const originalSystemPrompt = conversationHistory[phone][0].content;
     const strictReminders = `\n\n[INSTRUÇÕES RIGOROSAS DE FORMATO E SCRIPT PARA ESTA RESPOSTA:
-1. REGRA ABSOLUTA DE ENDEREÇO E FRETE (PERGUNTAR NÚMERO -> ESPERAR NÚMERO -> ENVIAR FRETE/TOTAL):
-   - Quando o cliente enviar o CEP/Rua: Confirme a rua/bairro/cidade e pergunte exatamente: "qual o número do seu endereço amg? tem algum complemento?"
-   - PROIBIDO INFORMAR O VALOR DO FRETE OU O TOTAL NESTE MOMENTO! PARE A RESPOSTA E ESPERE O CLIENTE RESPONDER O NÚMERO!
-   - QUANDO O CLIENTE RESPONDER O NÚMERO/COMPLEMENTO (ex: "é 300 sem complemento" ou "156 C"): AÍ SIM envie exatamente: "tá bom amg, o valor do frete ficou [frete], então o valor total ficou [total_com_frete]. qual seria a forma de pagamento?"
+1. REGRA ABSOLUTA DE FECHAMENTO DE ENDEREÇO, FRETE E PIX:
+   - PASSO 1 (Quando o cliente manda CEP): Confirme a rua/bairro/cidade e pergunte exatamente: "qual o número do seu endereço amg? tem algum complemento?" (PROIBIDO FALAR FRETE OU TOTAL AQUI!).
+   - PASSO 2 (Quando o cliente manda o número/complemento): Responda informando APENAS O FRETE e pergunte o pagamento: "tá bom amg, o valor do frete ficou [frete]. qual seria a forma de pagamento?" (PROIBIDO FALAR O TOTAL AQUI!).
+   - PASSO 3 (Quando o cliente responde "pix" ou "no pix"): Informe o valor total e envie a Chave Pix da loja de forma limpa e informal em minúsculas (PROIBIDO CAIXA ALTA E PROIBIDO DIGITAR "SMOKING PODS AGRADECE"):
+     msg1: perfeito amg, então o valor total ficou [total_com_frete]!
+     [QUEBRA]
+     msg2: nossa chave pix é: [CHAVE_PIX_DA_LOJA]
+     [QUEBRA]
+     msg3: assim que fizer o pagamento me manda o comprovante aqui tá?
 2. REGRA ABSOLUTA DE BLOQUEIO DE CEP (PARAR E ESPERAR O CLIENTE ESCOLHER/CONFIRMAR O SABOR):
    - QUANDO O CLIENTE CONSULTAR UM MODELO OU DIZER "QUERO O [MODELO]" (ex: "quero um ignite v80" ou "tem o v50?"):
      Envie APENAS a mensagem com valor e sabores em estoque. É ESTREITAMENTE PROIBIDO incluir a segunda mensagem pedindo o CEP ou endereço no mesmo turno!

@@ -484,9 +484,12 @@ export function ChatbotPage() {
         stockContext = `\n\nESTOQUE EM TEMPO REAL DISPONÍVEL NA LOJA:\n` +
           stockLines.join("\n") +
           `\n\nREGRAS CRÍTICAS DE EXIBIÇÃO E ORDEM DE PEDIDO:` +
-          `\n1. QUANDO O CLIENTE MANDAR O CEP: Confirme o endereço localizado e pergunte exatamente: "qual o número do seu endereço amg? tem algum complemento?"` +
-          `\n2. PROIBIDO ENVIAR O VALOR DO FRETE OU TOTAL NESTA MENSAGEM! PARE E ESPERE O CLIENTE MANDAR O NÚMERO!` +
-          `\n3. QUANDO O CLIENTE MANDAR O NÚMERO E COMPLEMENTO: Envie exatamente: "tá bom amg, o valor do frete ficou [frete], então o valor total ficou [total_com_frete]. qual seria a forma de pagamento?"` +
+          `\n1. QUANDO O CLIENTE MANDAR O CEP: Confirme o endereço localizado e pergunte exatamente: "qual o número do seu endereço amg? tem algum complemento?" (PROIBIDO ENVIAR FRETE OU TOTAL AQUI!).` +
+          `\n2. QUANDO O CLIENTE MANDAR O NÚMERO/COMPLEMENTO: Diga APENAS O FRETE: "tá bom amg, o valor do frete ficou [frete]. qual seria a forma de pagamento?" (PROIBIDO FALAR TOTAL AQUI!).` +
+          `\n3. QUANDO O CLIENTE MANDAR A FORMA DE PAGAMENTO (ex: "pix"): Envie o total e a chave Pix da loja em minúsculas (PROIBIDO CAIXA ALTA):` +
+          `\n   msg1: perfeito amg, então o valor total ficou [total_com_frete]!` +
+          `\n   msg2: nossa chave pix é: [CHAVE_PIX_DA_LOJA]` +
+          `\n   msg3: assim que fizer o pagamento me manda o comprovante aqui tá?` +
           `\n4. NUNCA COLOQUE "R$" OU "r$" ANTES DOS PREÇOS DOS PRODUTOS! Escreva apenas o número puro (ex: 80, 70, 89,90).` +
           `\n5. NUNCA PERGUNTE "qual vc prefere?" NEM "pode ser ele?". Apenas informe o valor puro e os sabores de forma objetiva!`;
       } else {

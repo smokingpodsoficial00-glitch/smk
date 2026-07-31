@@ -827,8 +827,15 @@ async function processMessage(msg, senderNumber, chatId, messageText) {
                         `   - Responda apenas confirmando a rua/bairro/cidade e peça o número: "ahh sim, localizei aqui amg! o seu endereço é esse né: ${quote.address}?" [QUEBRA] "qual o número do seu endereço amg? tem algum complemento?"` +
                         `   - É PROIBIDO INFORMAR O FRETE OU O TOTAL NESTA MENSAGEM! PARE A RESPOSTA E ESPERE O CLIENTE MANDAR O NÚMERO!` +
                         `\n2. QUANDO O CLIENTE RESPONDER O NÚMERO E COMPLEMENTO (ex: "é 300 sem complemento", "156 C"):` +
-                        `   - Envie exatamente a mensagem de fechamento: "tá bom amg, o valor do frete ficou ${quote.fee.toFixed(2).replace('.', ',')}, então o valor total ficou [total_com_frete]. qual seria a forma de pagamento?"` +
-                        `   - Se ele mandar o complemento (ex: 156 C), diga "complemento apto 156 C", NUNCA chame o complemento de "número 156 C"!]`
+                        `   - Responda informando SOMENTE O FRETE e pergunte a forma de pagamento: "tá bom amg, o valor do frete ficou ${quote.fee.toFixed(2).replace('.', ',')}. qual seria a forma de pagamento?"` +
+                        `   - É PROIBIDO INFORMAR O VALOR TOTAL DO PEDIDO NESTE MOMENTO! PERGUNTE APENAS A FORMA DE PAGAMENTO!` +
+                        `\n3. QUANDO O CLIENTE RESPONDER A FORMA DE PAGAMENTO (ex: "pix", "no pix"):` +
+                        `   - Envie o valor total e a Chave Pix da loja em minúsculas (PROIBIDO CAIXA ALTA):` +
+                        `   msg1: perfeito amg, então o valor total ficou [total_com_frete]!` +
+                        `   [QUEBRA]` +
+                        `   msg2: nossa chave pix é: [CHAVE_PIX_DA_LOJA]` +
+                        `   [QUEBRA]` +
+                        `   msg3: assim que fizer o pagamento me manda o comprovante aqui tá?`
                 });
                 console.log(`🚗 Cotação de frete injetada para ${senderNumber}: R$ ${quote.fee.toFixed(2)}`);
             } catch (err) {
