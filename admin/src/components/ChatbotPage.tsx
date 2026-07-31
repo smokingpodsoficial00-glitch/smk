@@ -484,7 +484,7 @@ export function ChatbotPage() {
         stockContext = `\n\nESTOQUE EM TEMPO REAL DISPONÍVEL NA LOJA:\n` +
           stockLines.join("\n") +
           `\n\nREGRAS CRÍTICAS DE EXIBIÇÃO E ORDEM DE PEDIDO:` +
-          `\n1. SE O PRODUTO TIVER APENAS 1 SABOR EM ESTOQUE (ex: Elfbar BC15K só tem Melancia): NUNCA pergunte "qual sabor vc prefere?". Diga: "em estoque temos ele no sabor melancia, pode ser ele?"` +
+          `\n1. SE O PRODUTO TIVER APENAS 1 SABOR EM ESTOQUE: Diga exatamente: "perfeito, o [modelo] tá saindo por r$ [preço]! em estoque somente temos o sabor de [sabor], pode ser ele amg?" (Exemplo: "perfeito, o ignite v80 tá saindo por r$ 89,90! em estoque somente temos o sabor de watermelon ice, pode ser ele amg?")` +
           `\n2. SE O PRODUTO TIVER 2 OU MAIS SABORES: Liste os sabores disponíveis e pergunte qual ele prefere.` +
           `\n3. NUNCA PEÇA O CEP ANTES DE TER AS 3 INFORMAÇÕES CONFIRMADAS: MARCA, MODELO E SABOR!` +
           `\n4. PROIBIDO USAR MARCADORES DE LISTA (como 1., 2., 3., • ou -) E PROIBIDO USAR ASTERISCOS (*). Escreva sempre em texto corrido e informal de WhatsApp!` +
