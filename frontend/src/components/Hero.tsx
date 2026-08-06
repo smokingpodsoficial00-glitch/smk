@@ -46,16 +46,8 @@ export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartC
         </div>
       </button>
 
-      {/* Destaque Central: Badge de Logo do Negócio + Nome da Loja */}
-      <div className="flex flex-col items-center text-center gap-3 sm:gap-4">
-        <div className="relative size-24 sm:size-28 rounded-2xl bg-black border border-white/20 p-2 flex items-center justify-center overflow-hidden shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all hover:scale-105">
-          <img 
-            src={logoUrl} 
-            alt={storeName} 
-            className="size-full object-cover rounded-xl"
-          />
-        </div>
-
+      {/* Destaque Central: Nome da Loja */}
+      <div className="flex flex-col items-center text-center gap-3 sm:gap-4 pt-4">
         <h1 className="text-white text-3xl sm:text-6xl font-bold tracking-tight leading-none">
           {storeName}
         </h1>
