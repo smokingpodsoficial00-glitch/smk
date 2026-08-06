@@ -359,13 +359,29 @@ export function SupplyChainDashboard() {
       alert("Por favor, informe o nome do sabor.");
       return;
     }
+
+    const addedName = newFlavorName.trim();
+    const modelName = getGroupDisplayName(addingFlavorGroup.brand, addingFlavorGroup.name);
+    const initialStock = parseInt(newFlavorStock) || 0;
+
+    const confirmSave = window.confirm(
+      `Deseja salvar o sabor "${addedName}" (${initialStock} un. em estoque) no modelo ${modelName} e atualizar o cardápio digital agora?\n\nClique em [OK] para salvar ou [Cancelar] para descartar.`
+    );
+
+    if (!confirmSave) {
+      setAddingFlavorGroup(null);
+      setNewFlavorName("");
+      setNewFlavorStock("");
+      return;
+    }
+
     setSubmittingFlavor(true);
     try {
       let insertPayload: any = {
         name: addingFlavorGroup.name, brand: addingFlavorGroup.brand,
-        flavor: newFlavorName.trim(), price: addingFlavorGroup.price,
+        flavor: addedName, price: addingFlavorGroup.price,
         cost_price: addingFlavorGroup.cost_price || 35.00,
-        stock: parseInt(newFlavorStock) || 0, puffs: addingFlavorGroup.puffs || 5000,
+        stock: initialStock, puffs: addingFlavorGroup.puffs || 5000,
         image_url: addingFlavorGroup.image_url || "", is_active: true,
         company_id: company?.id || null,
       };
@@ -380,10 +396,10 @@ export function SupplyChainDashboard() {
         id: `flavor-${Date.now()}`,
         name: addingFlavorGroup.name,
         brand: addingFlavorGroup.brand,
-        flavor: newFlavorName.trim(),
+        flavor: addedName,
         price: addingFlavorGroup.price,
         cost_price: addingFlavorGroup.cost_price || 35.00,
-        stock: parseInt(newFlavorStock) || 0,
+        stock: initialStock,
         puffs: addingFlavorGroup.puffs || 5000,
         image_url: addingFlavorGroup.image_url || "",
         is_active: true,
@@ -392,11 +408,11 @@ export function SupplyChainDashboard() {
       };
 
       setProducts(prev => [createdFlavor, ...prev]);
-
-      const addedName = newFlavorName.trim();
-      const modelName = getGroupDisplayName(addingFlavorGroup.brand, addingFlavorGroup.name);
-      setAddingFlavorGroup(null); setNewFlavorName(""); setNewFlavorStock("");
-      alert(`Sabor "${addedName}" adicionado ao modelo ${modelName}!`);
+      setAddingFlavorGroup(null); 
+      setNewFlavorName(""); 
+      setNewFlavorStock("");
+      alert(`Sabor "${addedName}" salvo com sucesso e atualizado no cardápio digital!`);
+      await fetchData();
     } catch (err: any) {
       console.error(err);
       alert("Erro ao adicionar sabor: " + err.message);
@@ -1285,6 +1301,18 @@ export function SupplyChainDashboard() {
         const currentGroup = skuGroups.find(g => g.groupKey === viewingFlavorsGroup.groupKey) || viewingFlavorsGroup;
         const displayName = getGroupDisplayName(currentGroup.brand, currentGroup.name);
         const realFlavors = currentGroup.realFlavors || [];
+        const hasModalPendingChanges = realFlavors.some((f: any) => pendingStockChanges[f.id] !== undefined);
+
+        const handleCloseViewingFlavors = () => {
+          if (hasModalPendingChanges) {
+            if (window.confirm("Você possui alterações de estoque pendentes para este modelo. Deseja salvar no cardápio antes de fechar?")) {
+              handleSaveAllStockChanges();
+            } else {
+              handleDiscardStockChanges();
+            }
+          }
+          setViewingFlavorsGroup(null);
+        };
 
         return (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -1314,6 +1342,16 @@ export function SupplyChainDashboard() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {hasModalPendingChanges && (
+                    <button
+                      onClick={handleSaveAllStockChanges}
+                      disabled={isSavingStock}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.35)] animate-pulse cursor-pointer active:scale-95 disabled:opacity-50"
+                    >
+                      {isSavingStock ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                      <span>Salvar no Cardápio</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setAddingFlavorGroup(currentGroup);
@@ -1326,7 +1364,7 @@ export function SupplyChainDashboard() {
                     Adicionar Sabor
                   </button>
                   <button
-                    onClick={() => setViewingFlavorsGroup(null)}
+                    onClick={handleCloseViewingFlavors}
                     className="p-2 text-muted-foreground hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
                   >
                     <X className="size-5" />
