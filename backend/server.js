@@ -470,11 +470,11 @@ async function handleReceiptReceived(senderNumber, contactName, messageText, has
 
         if (existingOrders && existingOrders.length > 0) {
             const existingOrder = existingOrders[0];
-            // Se o pedido existia, atualiza para Aguardando Confirmação do Pix & Separação
+            // Se o pedido existia, atualiza para PENDENTE & Separação (PREPARANDO)
             const { data: updated, error: updateErr } = await supabase
                 .from('smoking_orders')
                 .update({
-                    payment_status: 'AGUARDANDO_CONFIRMACAO',
+                    payment_status: 'PENDENTE',
                     delivery_status: 'PREPARANDO',
                     receipt_url: 'COMPROVANTE_PIX_ENVIADO'
                 })
@@ -483,7 +483,7 @@ async function handleReceiptReceived(senderNumber, contactName, messageText, has
                 .single();
 
             if (!updateErr) {
-                console.log(`✅ Pedido #${existingOrder.id} atualizado para AGUARDANDO_CONFIRMACAO / PREPARANDO no Kanban!`);
+                console.log(`✅ Pedido #${existingOrder.id} atualizado para PENDENTE / PREPARANDO no Kanban!`);
                 return updated;
             }
         }
@@ -501,7 +501,7 @@ async function handleReceiptReceived(senderNumber, contactName, messageText, has
                 total_amount: 89.90,
                 shipping_fee: 10.00,
                 shipping_address: 'Endereço enviado pelo WhatsApp',
-                payment_status: 'AGUARDANDO_CONFIRMACAO',
+                payment_status: 'PENDENTE',
                 delivery_status: 'PREPARANDO',
                 payment_method: 'PIX',
                 receipt_url: 'COMPROVANTE_PIX_ENVIADO'
