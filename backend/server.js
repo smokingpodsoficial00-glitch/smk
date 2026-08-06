@@ -142,6 +142,10 @@ const pendingFollowUps = new Map(); // chatId -> { timers: [timeoutId, ...], sta
 // CODE-009: Reservation mode (out of hours — don't calculate freight)
 const reservationMode = new Set();  // chatId
 
+// Silêncio pós-comprovante (bloqueia respostas da IA após pedido finalizado)
+const silentChats = new Set();       // senderNumber
+const autoResetTimers = new Map();   // senderNumber -> timeoutId (4h auto-reset)
+
 // =============================================
 // EMOJI REGEX (reused in multiple places)
 // =============================================
@@ -731,6 +735,13 @@ async function processMessage(msg, senderNumber, chatId, messageText) {
             console.warn('⚠️ msg.getContact indisponível (usando fallback seguro):', e.message);
         }
         
+        // --- SILÊNCIO PÓS-COMPROVANTE ---
+        // Se o cliente já enviou o comprovante e o pedido foi finalizado, a IA silencia para que a equipe atenda se necessário
+        if (silentChats.has(senderNumber)) {
+            console.log(`🔕 [Silêncio Pós-Comprovante] Mensagem de ${senderNumber} ignorada pela IA pois o pedido já foi concluído.`);
+            return;
+        }
+
         // Check if this is the first message ever from this client
         const isFirstMessage = !conversationHistory[senderNumber];
 
@@ -770,7 +781,38 @@ async function processMessage(msg, senderNumber, chatId, messageText) {
         }
 
         // --- DETECÇÃO E GRAVAÇÃO DE COMPROVANTE NO KANBAN ---
-        await handleReceiptReceived(senderNumber, pushName, messageText, msg.hasMedia);
+        const receiptOrder = await handleReceiptReceived(senderNumber, pushName, messageText, msg.hasMedia);
+        if (receiptOrder) {
+            const receiptReplyMessages = [
+                'perfeito, recebi seu comprovante!',
+                'seu pedido já foi enviado pro nosso painel de separação, o gerente vai conferir o pix e já liberamos o envio amg'
+            ];
+
+            initConversation(senderNumber);
+            conversationHistory[senderNumber].push(
+                { role: 'user', content: messageText },
+                { role: 'assistant', content: receiptReplyMessages.join('\n') }
+            );
+
+            await sendSequentialMessages(chat, msg, receiptReplyMessages, chatId, true);
+
+            // Marca para a IA ficar em silêncio com este cliente após a mensagem de confirmação
+            silentChats.add(senderNumber);
+
+            // Agenda o reset automático de 4 horas para esta conversa
+            if (autoResetTimers.has(senderNumber)) {
+                clearTimeout(autoResetTimers.get(senderNumber));
+            }
+            const timerId = setTimeout(() => {
+                delete conversationHistory[senderNumber];
+                silentChats.delete(senderNumber);
+                autoResetTimers.delete(senderNumber);
+                console.log(`⏱️ [Auto-Reset 4h] Histórico da conversa de ${senderNumber} resetado automaticamente após 4 horas.`);
+            }, 4 * 60 * 60 * 1000); // 4 horas em ms
+            autoResetTimers.set(senderNumber, timerId);
+
+            return; // Encerra atendimento da IA para esta conversa
+        }
 
         // --- DETECÇÃO CONTEXTUAL DE CEP OU ENDEREÇO ---
         let needsShippingCalculation = false;
@@ -1014,6 +1056,9 @@ app.post('/api/chat/reset-history', (req, res) => {
         pendingFollowUps.clear();
         reservationMode.clear();
         aiSentMessages.clear();
+        silentChats.clear();
+        autoResetTimers.forEach(t => clearTimeout(t));
+        autoResetTimers.clear();
 
         console.log('✅ Histórico de conversas do WhatsApp e memórias ativas zerados com sucesso!');
         res.json({ success: true, message: 'Histórico de conversas da IA zerado com sucesso!' });
