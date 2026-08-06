@@ -680,11 +680,15 @@ client.on('message_create', async msg => {
 
     // Store/accumulate message data
     if (!pendingMessages.has(chatId)) {
-        pendingMessages.set(chatId, { messages: [], msg: msg });
+        pendingMessages.set(chatId, { messages: [], msg: msg, hasMedia: false });
     }
     const pending = pendingMessages.get(chatId);
     if (messageText) {
         pending.messages.push(messageText);
+    }
+    // Track if ANY message in this batch had media (photo, pdf, document)
+    if (msg.hasMedia) {
+        pending.hasMedia = true;
     }
     // Always keep the latest msg reference (for reply)
     pending.msg = msg;
@@ -697,14 +701,14 @@ client.on('message_create', async msg => {
         const data = pendingMessages.get(chatId);
         pendingMessages.delete(chatId);
         
-        if (!data || data.messages.length === 0) return;
+        if (!data || (data.messages.length === 0 && !data.hasMedia)) return;
 
         // Combine all accumulated messages into one
         const combinedMessage = data.messages.join('\n');
         const latestMsg = data.msg;
 
-        // Process the combined message
-        await processMessage(latestMsg, senderNumber, chatId, combinedMessage);
+        // Process the combined message, passing the accumulated hasMedia flag
+        await processMessage(latestMsg, senderNumber, chatId, combinedMessage, data.hasMedia);
     }, 8000);
 
     debounceTimers.set(chatId, timerId);
@@ -713,7 +717,7 @@ client.on('message_create', async msg => {
 // =============================================
 // CORE MESSAGE PROCESSING (after debounce)
 // =============================================
-async function processMessage(msg, senderNumber, chatId, messageText) {
+async function processMessage(msg, senderNumber, chatId, messageText, accumulatedHasMedia) {
     // Guard: prevent concurrent processing for same chat
     if (processingChats.has(chatId)) {
         console.log(`⚡️ Ignorando mensagem concorrente de ${senderNumber}`);
@@ -781,7 +785,7 @@ async function processMessage(msg, senderNumber, chatId, messageText) {
         }
 
         // --- DETECÇÃO E GRAVAÇÃO DE COMPROVANTE NO KANBAN ---
-        const receiptOrder = await handleReceiptReceived(senderNumber, pushName, messageText, msg.hasMedia);
+        const receiptOrder = await handleReceiptReceived(senderNumber, pushName, messageText, accumulatedHasMedia || msg.hasMedia);
         if (receiptOrder) {
             const receiptReplyMessages = [
                 'perfeito, recebi seu comprovante!',
