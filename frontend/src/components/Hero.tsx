@@ -19,7 +19,7 @@ export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartC
   const brandList = brands && brands.length > 0 ? brands : (BRANDS as unknown as string[]);
 
   const storeName = config?.store_name || "Smoking Pods";
-  const logoUrl = config?.logo_url;
+  const logoUrl = config?.logo_url || "/logo.jpg";
 
   useEffect(() => {
     if (storeName) {
@@ -48,16 +48,12 @@ export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartC
 
       {/* Destaque Central: Badge de Logo do Negócio + Nome da Loja */}
       <div className="flex flex-col items-center text-center gap-3 sm:gap-4">
-        <div className="relative size-20 sm:size-24 rounded-2xl bg-white/10 border border-white/30 p-2.5 flex items-center justify-center overflow-hidden shadow-[0_0_30px_rgba(255,255,255,0.25)] transition-all hover:scale-105">
-          {logoUrl ? (
-            <img 
-              src={logoUrl} 
-              alt={storeName} 
-              className="size-full object-contain rounded-xl"
-            />
-          ) : (
-            <Store className="size-9 sm:size-11 text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]" />
-          )}
+        <div className="relative size-24 sm:size-28 rounded-2xl bg-black border border-white/20 p-2 flex items-center justify-center overflow-hidden shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all hover:scale-105">
+          <img 
+            src={logoUrl} 
+            alt={storeName} 
+            className="size-full object-cover rounded-xl"
+          />
         </div>
 
         <h1 className="text-white text-3xl sm:text-6xl font-bold tracking-tight leading-none">
