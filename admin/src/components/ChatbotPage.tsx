@@ -993,6 +993,38 @@ ${isOngoingConversation
     }
   };
 
+  const [isResettingHistory, setIsResettingHistory] = useState(false);
+
+  const handleResetHistory = async () => {
+    if (!window.confirm("Deseja zerar todo o histórico de conversas da IA com os clientes para iniciar novos testes do zero?\n\n(Atenção: Apenas as mensagens trocadas serão apagadas. Nenhum produto, estoque ou pedido será modificado).")) {
+      return;
+    }
+    setIsResettingHistory(true);
+    try {
+      // 1. Zerar histórico local do simulador
+      setMessages([]);
+      setClientName("");
+      setUserProvidedName("");
+      setCepDetected(false);
+      setDetectedStreetAndBairro("");
+      setOrderCreatedThisSession(false);
+      orderCreatedRef.current = false;
+
+      // 2. Chamar o backend para zerar todo o histórico em memória da IA no WhatsApp (porta 3006)
+      const res = await fetch("http://localhost:3006/api/chat/reset-history", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        alert("🧹 Histórico de conversas da IA zerado com sucesso! Pronta para novos testes do zero.");
+      } else {
+        alert("Histórico local do simulador zerado. Aviso do servidor: " + (data?.error || "Servidor offline"));
+      }
+    } catch (e: any) {
+      alert("Histórico do simulador zerado! (Servidor backend não respondeu na porta 3006).");
+    } finally {
+      setIsResettingHistory(false);
+    }
+  };
+
   const handleCopyPrompt = () => {
     navigator.clipboard.writeText(systemPrompt);
     setCopiedPrompt(true);
@@ -1050,6 +1082,15 @@ ${isOngoingConversation
               {isConnected ? "Sessão Ativa no WhatsApp" : "Escaneie o código para conectar"}
             </p>
           </div>
+          <button
+            onClick={handleResetHistory}
+            disabled={isResettingHistory}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+            title="Zera todas as mensagens e histórico da IA para iniciar novos testes do zero"
+          >
+            {isResettingHistory ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
+            <span>Zerar Histórico da IA</span>
+          </button>
           <button
             onClick={handleToggleConnection}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
@@ -1167,16 +1208,13 @@ ${isOngoingConversation
               <div className="flex items-center gap-3 text-[#aebac1]">
                 <button
                   type="button"
-                  onClick={() => {
-                    setMessages([]);
-                    setOrderCreatedThisSession(false);
-                    orderCreatedRef.current = false;
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95"
-                  title="Limpar e reiniciar conversa do zero"
+                  onClick={handleResetHistory}
+                  disabled={isResettingHistory}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
+                  title="Zera todas as mensagens e histórico da IA para iniciar novos testes do zero"
                 >
-                  <RotateCcw className="size-3.5" />
-                  Resetar Chat
+                  {isResettingHistory ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
+                  Zerar Histórico da IA
                 </button>
                 <div className="h-4 w-px bg-white/10" />
                 <MoreVertical className="size-4 cursor-pointer hover:text-white" />

@@ -988,6 +988,41 @@ app.post('/api/webhook/dispatch', async (req, res) => {
     }
 });
 
+// ============================================================
+// ENDPOINT: ZERAR HISTÓRICO DE CONVERSAS DA IA / WHATSAPP
+// ============================================================
+app.post('/api/chat/reset-history', (req, res) => {
+    try {
+        console.log('🧹 [API] Comando recebido: Zerar histórico de conversas da IA...');
+        
+        // 1. Limpa todas as conversas gravadas em memória no ai_agent
+        Object.keys(conversationHistory).forEach(phone => {
+            delete conversationHistory[phone];
+        });
+
+        // 2. Cancela e limpa todos os timers e pendências ativas no servidor
+        processingChats.clear();
+        debounceTimers.forEach(timer => clearTimeout(timer));
+        debounceTimers.clear();
+        pendingMessages.clear();
+        
+        pendingFollowUps.forEach(followUp => {
+            if (followUp && followUp.timers) {
+                followUp.timers.forEach(t => clearTimeout(t));
+            }
+        });
+        pendingFollowUps.clear();
+        reservationMode.clear();
+        aiSentMessages.clear();
+
+        console.log('✅ Histórico de conversas do WhatsApp e memórias ativas zerados com sucesso!');
+        res.json({ success: true, message: 'Histórico de conversas da IA zerado com sucesso!' });
+    } catch (err) {
+        console.error('❌ Erro ao zerar histórico da IA:', err);
+        res.status(500).json({ error: 'Falha ao zerar histórico da IA.' });
+    }
+});
+
 app.listen(port, () => {
     console.log(`🚀 Servidor backend rodando na porta ${port}`);
     console.log(`⏳ Iniciando o motor do WhatsApp... aguarde o QR Code.`);
