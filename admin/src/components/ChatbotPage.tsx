@@ -604,23 +604,15 @@ export function ChatbotPage() {
       }
     }
 
-    // 3. Calcula a saudação do horário real do dia
-    const currentHour = new Date().getHours();
-    let timeGreeting = "boa noite";
-    if (currentHour >= 6 && currentHour < 12) {
-      timeGreeting = "bom dia";
-    } else if (currentHour >= 12 && currentHour < 18) {
-      timeGreeting = "boa tarde";
-    }
-
     const isOngoingConversation = conversationHistory.length > 1;
 
-    const timeContext = `\n\nHORÁRIO ATUAL DO SISTEMA: ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.
-SAUDAÇÃO CORRETA DO HORÁRIO: "${timeGreeting}".
-REGRA IMPERATIVA DE SAUDAÇÃO:
+    const timeContext = `\n\nREGRA HIERÁRQUICA SUPREMA DE SAUDAÇÃO E PRIMEIRO CONTATO:
 ${isOngoingConversation 
-  ? `ATENÇÃO SUPREMA: ESTA CONVERSA JÁ ESTÁ EM ANDAMENTO (MENSAGEM Nº ${conversationHistory.length})! NUNCA COMECE SUA RESPOSTA COM "bom dia", "boa tarde", "boa noite", "olá tudo bem" OU QUALQUER OUTRA SAUDAÇÃO! É PROIBIDO CUMPRIMENTAR NOVAMENTE. RESPONDA DIRETO À PERGUNTA DO CLIENTE COM LETRA MINÚSCULA!` 
-  : `Esta é a 1ª mensagem da conversa. Comece com a primeira letra maiúscula: "${timeGreeting.charAt(0).toUpperCase() + timeGreeting.slice(1)}, tudo bem? como posso te ajudar?"`}`;
+  ? `ATENÇÃO SUPREMA: ESTA CONVERSA JÁ ESTÁ EM ANDAMENTO (MENSAGEM Nº ${conversationHistory.length})! NUNCA COMECE SUA RESPOSTA COM "bom dia", "boa tarde", "boa noite", "olá" OU QUALQUER OUTRA SAUDAÇÃO! É PROIBIDO CUMPRIMENTAR NOVAMENTE. RESPONDA DIRETO À DÚVIDA/PEDIDO DO CLIENTE COM LETRA MINÚSCULA!` 
+  : `Esta é a 1ª mensagem da conversa. Se o cliente enviou apenas um cumprimento ("oi", "oii", "olá", "tudo bem", "bom dia", "boa tarde", "boa noite"):
+- Responda APENAS: "olá, como posso te ajudar?" em 1 único balão.
+- PROIBIDO usar "bom dia", "boa tarde" ou "boa noite" em qualquer circunstância!
+- PROIBIDO enviar "posso enviar nossa tabela digital?" nesta mensagem de saudação! Aguarde o cliente responder o que procura!`}`;
 
     // 3. Detecção Inteligente do Nome do Cliente
     let clientName = "Cliente WhatsApp";
