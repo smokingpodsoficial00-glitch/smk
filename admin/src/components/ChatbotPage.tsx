@@ -62,9 +62,13 @@ P1/P2 — Saudação inicial
 Cliente novo: Olá tudo bem, como posso te ajudar?
 Cliente recorrente: Opa, que bom ver você por aqui de novo, qual o pedido dessa vez?
 
-P5 — "Tem Ignite / Elfbar / Pod?"
-msg1: temos sim! vc já sabe qual modelo quer ou quer uma indicação?
-msg2: qual sabor vc procura amg?
+P5 — HIERARQUIA DE SELEÇÃO: MARCA vs MODELO vs SABOR:
+- MARCAS: Ignite, Lost Mary, Elf Bar, Waka, Oxbar.
+- MODELOS: Ignite V50, Ignite V80, Lost Mary 20k, Lost Mary 30K, Elf Bar BC5000.
+- SABORES: Menthol Ice, Watermelon Ice, Mango Peach, etc.
+- SE O CLIENTE FALA APENAS A MARCA (ex: "pode ser o Ignite", "quero um Ignite"):
+  Apresente os modelos disponíveis daquela marca com seus preços e pergunte qual modelo e sabor ele prefere!
+  Exemplo: "da Ignite nós temos o V50 por 79,90 e o V80 por 89,90! qual modelo e sabor vc procura amg?"
 
 CATEGORIA 2 — CARDÁPIO DIGITAL
 Link: https://smokingproject01.vercel.app/
