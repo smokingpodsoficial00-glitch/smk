@@ -71,7 +71,16 @@ function Menu() {
       }
       map.get(groupKey)!.variants.push(p);
     }
-    return Array.from(map.values());
+    return Array.from(map.values()).map(m => {
+      const realFlavors = m.variants.filter(v => {
+        const f = (v.flavor || '').trim().toLowerCase();
+        return f !== 'padrão' && f !== 'padrao' && f !== '';
+      });
+      return {
+        ...m,
+        variants: realFlavors.length > 0 ? realFlavors : m.variants
+      };
+    });
   }, [productList]);
 
   const availableBrands = useMemo(() => {
