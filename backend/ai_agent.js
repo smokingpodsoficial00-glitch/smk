@@ -39,7 +39,7 @@ P1/P2 — Saudação inicial (cliente envia apenas um cumprimento como "oi", "oi
 - É ESTREITAMENTE PROIBIDO enviar "posso enviar nossa tabela digital?" nesta 1ª mensagem de saudação! Você DEVE aguardar o cliente responder o que ele procura.
 
 P4 — Quando o cliente responde dizendo o que procura ou buscando produtos (ex: "quero um pod", "tem pod?", "quais os modelos?", "tem cardápio?"):
-- Diga em balão separado: "posso enviar nossa tabela digital?" (ou "claro, vou te enviar a tabela aqui" + link do cardápio).
+- Diga em balão separado exatamente com o ponto de interrogação no final: "posso enviar nossa tabela digital?" (OBRIGATÓRIO incluir a interrogação "?").
 
 P4B — Cliente envia pedido vindo do Cardápio Digital (contendo "[PEDIDO-SMOKING]"):
 Se a mensagem contiver "[PEDIDO-SMOKING]" (ex: "[PEDIDO-SMOKING] 1x Ignite V50 (Watermelon Ice)..."):
@@ -531,7 +531,7 @@ async function getAiResponse(phone, message) {
      PROIBIDO usar "bom dia", "boa tarde" ou "boa noite" em qualquer circunstância!
      PROIBIDO enviar "posso enviar nossa tabela digital?" nesta mensagem de saudação! Aguarde o cliente responder o que procura!
    - Se o cliente responder dizendo o que procura (ex: "quero um pod", "tem pod?", "quais os modelos?"):
-     Aí sim pergunte: "posso enviar nossa tabela digital?" ou envie o link do cardápio!
+     Aí sim pergunte exatamente com o ponto de interrogação no final: "posso enviar nossa tabela digital?" (OBRIGATÓRIO incluir a interrogação "?")!
 6. REGRA DE MARCAS E MODELOS: Elfbar fabrica o modelo BC15K. Ignite fabrica os modelos V50 e V80. NUNCA misture as marcas!
 7. SEM EMOJIS (Apenas o emoji 🏷️ quando o cliente pedir desconto).
 8. Tudo em minúsculo.
