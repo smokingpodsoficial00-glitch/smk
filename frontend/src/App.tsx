@@ -9,6 +9,7 @@ import { fetchProductsFromSupabase, type Product, type PodModel } from "@/lib/pr
 import { supabase } from "@/lib/supabase";
 import { Loader2 } from "lucide-react";
 
+// Trigger Vercel auto-deploy from Git
 export default function App() {
   return (
     <CartProvider>
