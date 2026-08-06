@@ -280,13 +280,17 @@ export function SupplyChainDashboard() {
       if (company?.id) {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          await supabase.from("companies").upsert({
-            id: company.id, name: company.name || 'Minha Loja', email: session.user.email || '', onboarding_done: true
-          }, { onConflict: 'id' }).catch(() => {});
+          try {
+            await supabase.from("companies").upsert({
+              id: company.id, name: company.name || 'Minha Loja', email: session.user.email || '', onboarding_done: true
+            }, { onConflict: 'id' });
+          } catch (e) {}
 
-          await supabase.from("company_users").upsert({
-            company_id: company.id, auth_user_id: session.user.id, name: 'Administrador', email: session.user.email || '', role: 'admin'
-          }, { onConflict: 'company_id,auth_user_id' }).catch(() => {});
+          try {
+            await supabase.from("company_users").upsert({
+              company_id: company.id, auth_user_id: session.user.id, name: 'Administrador', email: session.user.email || '', role: 'admin'
+            }, { onConflict: 'company_id,auth_user_id' });
+          } catch (e) {}
         }
       }
 

@@ -1,4 +1,6 @@
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const { Client, LocalAuth, MessageTypes } = require('whatsapp-web.js');
@@ -13,26 +15,36 @@ app.use(express.json());
 
 const port = process.env.PORT || 3006;
 
+const puppeteerArgs = [
+    '--no-sandbox', 
+    '--disable-setuid-sandbox', 
+    '--disable-extensions',
+    '--disable-dev-shm-usage',
+    '--disable-accelerated-2d-canvas',
+    '--no-first-run',
+    '--no-zygote',
+    '--disable-gpu'
+];
+
+const puppeteerOptions = {
+    headless: true,
+    args: puppeteerArgs
+};
+
+if (fs.existsSync('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe')) {
+    puppeteerOptions.executablePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+}
+
 // Inicializa o cliente do WhatsApp
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    puppeteer: { 
-        executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        headless: true,
-        args: [
-            '--no-sandbox', 
-            '--disable-setuid-sandbox', 
-            '--disable-extensions',
-            '--disable-web-security',
-            '--disable-features=IsolateOrigins,site-per-process'
-        ],
-        ignoreDefaultArgs: ['--enable-automation']
-    }
+    webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html'
+    },
+    puppeteer: puppeteerOptions
 });
-
-const path = require('path');
-const fs = require('fs');
 
 let latestQr = null;
 let isWhatsAppReady = false;
@@ -979,5 +991,19 @@ app.post('/api/webhook/dispatch', async (req, res) => {
 app.listen(port, () => {
     console.log(`🚀 Servidor backend rodando na porta ${port}`);
     console.log(`⏳ Iniciando o motor do WhatsApp... aguarde o QR Code.`);
-    client.initialize();
+    try {
+        client.initialize().catch(err => {
+            console.error('⚠️ Erro na inicialização do cliente WhatsApp:', err.message);
+        });
+    } catch (e) {
+        console.error('⚠️ Erro ao disparar client.initialize():', e.message);
+    }
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('⚠️ UncaughtException capturado no backend:', err.message);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('⚠️ UnhandledRejection capturado no backend:', reason);
 });
