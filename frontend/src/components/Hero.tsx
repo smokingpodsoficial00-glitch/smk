@@ -37,9 +37,9 @@ export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartC
         aria-label="Ver carrinho"
       >
         <div className="relative">
-          <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
+          <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.7)]" />
           {totalItems > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 grid place-items-center w-4 h-4 rounded-full bg-emerald-500 text-[9px] font-bold text-black border border-black">
+            <span className="absolute -top-1.5 -right-1.5 grid place-items-center w-4 h-4 rounded-full bg-white text-[9px] font-bold text-black border border-black shadow-[0_0_10px_rgba(255,255,255,0.9)]">
               {totalItems}
             </span>
           )}
@@ -48,7 +48,7 @@ export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartC
 
       {/* Destaque Central: Badge de Logo do Negócio + Nome da Loja */}
       <div className="flex flex-col items-center text-center gap-3 sm:gap-4">
-        <div className="relative size-20 sm:size-24 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-2.5 flex items-center justify-center overflow-hidden shadow-[0_0_25px_rgba(16,185,129,0.15)] transition-all hover:scale-105">
+        <div className="relative size-20 sm:size-24 rounded-2xl bg-white/10 border border-white/30 p-2.5 flex items-center justify-center overflow-hidden shadow-[0_0_30px_rgba(255,255,255,0.25)] transition-all hover:scale-105">
           {logoUrl ? (
             <img 
               src={logoUrl} 
@@ -56,7 +56,7 @@ export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartC
               className="size-full object-contain rounded-xl"
             />
           ) : (
-            <Store className="size-9 sm:size-11 text-emerald-400" />
+            <Store className="size-9 sm:size-11 text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]" />
           )}
         </div>
 
@@ -71,7 +71,7 @@ export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartC
 
       {/* Barra de Pesquisa Destacada */}
       <div className="mt-8 sm:mt-10 max-w-xl mx-auto">
-        <div className="glass-strong rounded-full flex items-center gap-3 px-5 py-3.5 border border-white/10 focus-within:border-emerald-500/50 transition-all">
+        <div className="glass-strong rounded-full flex items-center gap-3 px-5 py-3.5 border border-white/10 focus-within:border-white/60 focus-within:shadow-[0_0_20px_rgba(255,255,255,0.15)] transition-all">
           <Search className="size-4 text-muted-foreground shrink-0" />
           <input
             value={query}
@@ -98,7 +98,7 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
     <button
       onClick={onClick}
       className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 border cursor-pointer ${
-        active ? "bg-emerald-500 text-black font-bold border-transparent shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+        active ? "bg-white text-black font-bold border-transparent shadow-[0_0_20px_rgba(255,255,255,0.7)]"
                : "glass text-foreground hover:bg-elevated"
       }`}
     >{label}</button>

@@ -75,7 +75,7 @@ function FlavorItem({ product }: { product: Product }) {
         {outOfStock ? (
            <span className="text-[11px] text-red-400 font-medium">Esgotado</span>
         ) : (
-           <span className="text-[11px] text-emerald-400/90 font-medium">
+           <span className="text-[11px] text-white/90 font-medium drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
              Em estoque ({stockQty} un)
            </span>
         )}
