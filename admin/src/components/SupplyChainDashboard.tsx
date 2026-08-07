@@ -205,7 +205,7 @@ export function SupplyChainDashboard() {
       const { data: realOrders } = await supabase
         .from("smoking_orders")
         .select("items, status")
-        .eq("company_id", targetCompanyId);
+        .or(`company_id.eq.${targetCompanyId},company_id.is.null`);
 
       let realSalesList: any[] = [];
       if (realOrders && realOrders.length > 0) {
@@ -736,16 +736,26 @@ export function SupplyChainDashboard() {
   });
 
   topSelling.forEach((item: any) => {
-    const pName = (item.product_name || item.name || '').toLowerCase();
-    const fName = (item.flavor || '').toLowerCase();
+    const pName = (item.product_name || item.name || '').toLowerCase().trim();
+    const fName = (item.flavor || '').toLowerCase().trim();
     const sold = parseInt(item.total_sold || item.quantity || 0) || 0;
 
     Object.values(modelRankingMap).forEach(m => {
-      const brandLower = m.brand.toLowerCase();
-      const nameLower = m.name.toLowerCase();
-      if (pName.includes(brandLower) || pName.includes(nameLower) || m.modelDisplayName.toLowerCase().includes(pName)) {
+      const brandLower = m.brand.toLowerCase().trim();
+      const nameLower = m.name.toLowerCase().trim();
+      const fullDisplayName = m.modelDisplayName.toLowerCase().trim();
+      const fullBrandModel = `${brandLower} ${nameLower}`.trim();
+
+      // Corresponde se o nome do item for igual ao nome do modelo (ex: "v50" ou "ignite v50")
+      // ou se pName contiver o nome do modelo (ex: "v50") e a marca ("ignite")
+      const isModelMatch = pName === fullDisplayName || 
+                           pName === fullBrandModel || 
+                           (nameLower.length > 1 && pName === nameLower) ||
+                           (nameLower.length > 1 && pName.includes(nameLower) && (brandLower.length > 1 ? pName.includes(brandLower) : true));
+
+      if (isModelMatch) {
         m.totalSold += sold;
-        const foundFlavor = m.flavors.find(f => f.flavor.toLowerCase() === fName);
+        const foundFlavor = m.flavors.find(f => f.flavor.toLowerCase().trim() === fName);
         if (foundFlavor) {
           foundFlavor.totalSold += sold;
         }
