@@ -656,15 +656,15 @@ export function SupplyChainDashboard() {
     group.totalStock = group.realFlavors.reduce((sum, f) => sum + (f.stock || 0), 0);
     group.outOfStockFlavors = group.realFlavors.filter(f => (f.stock || 0) === 0);
     group.lowStockFlavors = group.realFlavors.filter(f => (f.stock || 0) > 0 && (f.stock || 0) < 5);
-    group.inStockFlavors = group.realFlavors.filter(f => (f.stock || 0) >= 5);
+    group.inStockFlavors = group.realFlavors.filter(f => (f.stock || 0) > 0);
   });
 
-  // Step 4: Apply filterTab based on ANY flavor in the model group matching the selected status!
+  // Step 4: Apply filterTab based on stock status
   const skuGroups = Object.values(groupedMap)
     .filter(group => {
-      if (filterTab === 'SEM_ESTOQUE') return group.outOfStockFlavors.length > 0;
+      if (filterTab === 'SEM_ESTOQUE') return group.totalStock === 0 || group.outOfStockFlavors.length > 0;
       if (filterTab === 'BAIXO_ESTOQUE') return group.lowStockFlavors.length > 0;
-      if (filterTab === 'EM_ESTOQUE') return group.inStockFlavors.length > 0;
+      if (filterTab === 'EM_ESTOQUE') return group.totalStock > 0;
       return true; // TODOS
     })
     .sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name));
