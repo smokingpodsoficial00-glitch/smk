@@ -204,7 +204,7 @@ export function SupplyChainDashboard() {
 
       const { data: realOrders } = await supabase
         .from("smoking_orders")
-        .select("items, status")
+        .select("items, delivery_status")
         .or(`company_id.eq.${targetCompanyId},company_id.is.null`);
 
       let realSalesList: any[] = [];
