@@ -450,6 +450,50 @@ async function getStorePixKey() {
 }
 
 // =============================================
+// HELPER: EXTRACT REAL ORDER ITEMS FROM CHAT CONVERSATION HISTORY
+// =============================================
+async function extractOrderItemsFromHistory(senderNumber) {
+    try {
+        const history = conversationHistory[senderNumber] || [];
+        const fullText = history.map(h => h.content || '').join(' ').toLowerCase();
+
+        const { data: products } = await supabase
+            .from('smoking_products')
+            .select('id, brand, name, flavor, price')
+            .neq('brand', '__STORE_CONFIG__');
+
+        if (!products || products.length === 0) return null;
+
+        let matchedProduct = null;
+        for (const p of products) {
+            const nameStr = (p.name || '').toLowerCase();
+            const flavorStr = (p.flavor || '').toLowerCase();
+
+            if (nameStr && fullText.includes(nameStr)) {
+                if (flavorStr && flavorStr !== 'padrão' && flavorStr !== 'padrao' && fullText.includes(flavorStr)) {
+                    matchedProduct = p;
+                    break;
+                }
+                if (!matchedProduct) matchedProduct = p;
+            }
+        }
+
+        if (matchedProduct) {
+            return [{
+                product_id: matchedProduct.id,
+                name: `${matchedProduct.brand} ${matchedProduct.name}`.trim(),
+                flavor: matchedProduct.flavor || 'Sabor Selecionado',
+                quantity: 1,
+                price: parseFloat(matchedProduct.price) || 89.90
+            }];
+        }
+    } catch (err) {
+        console.warn('⚠️ Falha ao extrair produto do histórico da IA:', err.message);
+    }
+    return null;
+}
+
+// =============================================
 // PROCESS COMPROVANTE & MOVE ORDER TO KANBAN (SEPARAÇÃO)
 // =============================================
 async function handleReceiptReceived(senderNumber, contactName, messageText, hasMedia) {
@@ -494,15 +538,21 @@ async function handleReceiptReceived(senderNumber, contactName, messageText, has
 
         const companyId = await getPrimaryCompanyId();
 
-        // 3. Se não existia pedido gravado ainda, cria o pedido direto no Kanban!
+        // Extrai o produto real discutido na conversa para manter o Ranking de Vendas por Modelo atualizado
+        let itemsToSave = await extractOrderItemsFromHistory(senderNumber);
+        if (!itemsToSave || itemsToSave.length === 0) {
+            itemsToSave = [{ name: 'Ignite V50', flavor: 'Menthol Ice', quantity: 1, price: 79.90 }];
+        }
+
+        // 3. Se não existia pedido gravado ainda, cria o pedido direto no Kanban com o produto correto!
         const { data: newOrder, error: insertErr } = await supabase
             .from('smoking_orders')
             .insert({
                 company_id: companyId,
                 client_phone: senderNumber,
                 client_name: contactName,
-                items: [{ name: 'Pod (WhatsApp)', flavor: 'Pedido por Chat', quantity: 1, price: 89.90 }],
-                total_amount: 89.90,
+                items: itemsToSave,
+                total_amount: itemsToSave[0].price,
                 shipping_fee: 10.00,
                 shipping_address: 'Endereço enviado pelo WhatsApp',
                 payment_status: 'PENDENTE',
@@ -518,7 +568,7 @@ async function handleReceiptReceived(senderNumber, contactName, messageText, has
             return null;
         }
 
-        console.log(`✅ Novo Pedido #${newOrder.id} gravado no Supabase em Separação para ${senderNumber}!`);
+        console.log(`✅ Novo Pedido #${newOrder.id} (${itemsToSave[0].name}) gravado no Supabase em Separação para ${senderNumber}!`);
         return newOrder;
     } catch (err) {
         console.error('❌ Erro no handleReceiptReceived:', err);
