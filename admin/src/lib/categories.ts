@@ -78,7 +78,6 @@ export async function fetchProductCategoryMappings(companyId?: string): Promise<
       .from("smoking_orders")
       .select("items")
       .eq("client_phone", SYSTEM_KEY)
-      .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
       .limit(1);
 
     if (!configErr && orderConfig && orderConfig.length > 0 && orderConfig[0].items) {
@@ -163,32 +162,15 @@ export async function updateModelCategories(params: {
 
   // 2. Persistir no Supabase DB via tabela smoking_orders (Persistencia infalivel)
   try {
-    const { data: existingRows } = await supabase
+    // Limpar qualquer linha de configuracao anterior para evitar duplicacao de registros
+    await supabase
       .from("smoking_orders")
-      .select("id, items")
-      .eq("client_phone", SYSTEM_KEY)
-      .eq("company_id", targetCompanyId)
-      .limit(1);
+      .delete()
+      .eq("client_phone", SYSTEM_KEY);
 
-    let currentItems: any[] = [];
-    let existingRowId: string | null = null;
-
-    if (existingRows && existingRows.length > 0) {
-      existingRowId = existingRows[0].id;
-      if (Array.isArray(existingRows[0].items)) {
-        currentItems = existingRows[0].items;
-      }
-    }
-
-    // Filtrar itens para remover este modelo/productIds caso a estrela tenha sido desativada
-    const updatedItems = currentItems.filter((item: any) => {
-      if (item.modelKey === modelKey) return false;
-      if (productIds.includes(item.product_id) || productIds.includes(item.id)) return false;
-      return true;
-    });
-
-    // Se as categorias estiverem ativas, adiciona o novo mapeamento
     if (categoryIds.length > 0) {
+      const updatedItems: any[] = [];
+
       // Adiciona entrada para o modelKey
       updatedItems.push({
         id: "11111111-1111-4111-a111-111111111111",
@@ -220,14 +202,7 @@ export async function updateModelCategories(params: {
           unit_price: 0
         });
       });
-    }
 
-    if (existingRowId) {
-      await supabase
-        .from("smoking_orders")
-        .update({ items: updatedItems })
-        .eq("id", existingRowId);
-    } else {
       await supabase
         .from("smoking_orders")
         .insert({
