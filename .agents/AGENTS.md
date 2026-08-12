@@ -16,3 +16,6 @@ Sempre que um novo chat de trabalho for iniciado neste workspace:
 4. **Regra de Trabalho em Equipe (Git Sync Automático)**:
    - Toda vez que for iniciada uma nova tarefa ou recurso neste workspace, execute primeiro um `git pull` para baixar as novidades do parceiro.
    - Toda vez que uma tarefa for concluída com sucesso, execute automaticamente um `git push` para sincronizar e enviar as alterações para a equipe.
+
+5. **🔒 Regra Absoluta de Estoque e Mercadorias**:
+   - Conforme [.agents/rules/gestao_estoque_exclusiva.md](file:///C:/Users/edu/.gemini/antigravity/scratch/smoking-pods/.agents/rules/gestao_estoque_exclusiva.md), o robô de IA / Chatbot e scripts automáticos têm proibição estrita de alterar, cadastrar ou deletar qualquer sabor, modelo ou estoque. A gestão é 100% exclusiva dos administradores humanos via Painel Admin.
