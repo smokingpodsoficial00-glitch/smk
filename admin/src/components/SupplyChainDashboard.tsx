@@ -1602,7 +1602,7 @@ export function SupplyChainDashboard() {
                           {isGroupVisible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
                         </button>
 
-                        {/* Botão de Estrela ⭐ para Fixar nos Mais Vendidos (Abre Modal com Botão Salvar) */}
+                        {/* Botão de Estrela ⭐ para Alternar nos Mais Vendidos (1-Clique Direto na Interface) */}
                         {(() => {
                           const MAIS_VENDIDOS_ID = "11111111-1111-4111-a111-111111111111";
                           const modelMapping = categoryMappings[group.groupKey];
@@ -1616,23 +1616,44 @@ export function SupplyChainDashboard() {
                           return (
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={async () => {
                                 const targetCatIds = isMaisVendido
                                   ? currentCatIds.filter((id: string) => id !== MAIS_VENDIDOS_ID)
                                   : [...currentCatIds.filter((id: string) => id !== MAIS_VENDIDOS_ID), MAIS_VENDIDOS_ID];
 
                                 const currentOrder = modelMapping?.display_order || flavorMapping?.display_order || 1;
+                                const pIds = group.flavors.map(f => f.id);
 
-                                setEditingCategoryGroup(group);
-                                setSelectedCategoryIds(targetCatIds);
-                                setSelectedDisplayOrder(currentOrder.toString());
+                                // 1. Atualização Otimista no React (Sem abrir qualquer modal ou bolha!)
+                                setCategoryMappings(prev => {
+                                  const next = { ...prev };
+                                  if (targetCatIds.length === 0) {
+                                    delete next[group.groupKey];
+                                    pIds.forEach(id => delete next[id]);
+                                  } else {
+                                    next[group.groupKey] = { category_ids: targetCatIds, display_order: currentOrder };
+                                    pIds.forEach(id => {
+                                      next[id] = { category_ids: targetCatIds, display_order: currentOrder };
+                                    });
+                                  }
+                                  return next;
+                                });
+
+                                // 2. Persistir no Supabase DB e localStorage em segundo plano
+                                await updateModelCategories({
+                                  productIds: pIds,
+                                  modelKey: group.groupKey,
+                                  categoryIds: targetCatIds,
+                                  displayOrder: currentOrder,
+                                  companyId: company?.id
+                                });
                               }}
-                              className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
+                              className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1 active:scale-95 ${
                                 isMaisVendido
                                   ? "bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_10px_rgba(251,191,36,0.35)]"
                                   : "bg-elevated hover:bg-white/10 text-slate-400 hover:text-amber-400 border-white/10"
                               }`}
-                              title={isMaisVendido ? "Gerenciar Posição / Remover dos Mais Vendidos" : "Fixar nos Mais Vendidos (Abrir Modal de Seleção)"}
+                              title={isMaisVendido ? "Remover dos Mais Vendidos (1-Clique)" : "Adicionar aos Mais Vendidos (1-Clique)"}
                             >
                               <Star className={`size-4 ${isMaisVendido ? "fill-amber-400 text-amber-400" : ""}`} />
                             </button>

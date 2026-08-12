@@ -22,6 +22,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
 const LOCAL_STORAGE_CAT_KEY = "smk_product_categories_cache";
 const SYSTEM_KEY = "__SYSTEM_SMK_BEST_SELLERS__";
 const DEFAULT_COMPANY_ID = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function getLocalCategoryMappings(): Record<string, { category_ids: string[]; display_order: number }> {
   try {
@@ -78,6 +79,7 @@ export async function fetchProductCategoryMappings(companyId?: string): Promise<
       .from("smoking_orders")
       .select("items")
       .eq("client_phone", SYSTEM_KEY)
+      .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
       .limit(1);
 
     if (!configErr && orderConfig && orderConfig.length > 0 && orderConfig[0].items) {
@@ -148,11 +150,18 @@ export async function updateModelCategories(params: {
   // 1. Atualizar localStorage imediatamente
   const currentLocal = getLocalCategoryMappings();
   
+  const parts = modelKey.split('__');
+  const bStr = (parts[0] || '').trim();
+  const nStr = (parts[1] || '').trim();
+  const cleanKey = `${bStr.toLowerCase().replace(/\s+/g, '')}__${nStr.toLowerCase().replace(/\s+/g, '')}`;
+
   if (categoryIds.length === 0) {
     delete currentLocal[modelKey];
+    delete currentLocal[cleanKey];
     productIds.forEach((pid) => delete currentLocal[pid]);
   } else {
     currentLocal[modelKey] = { category_ids: categoryIds, display_order: displayOrder };
+    currentLocal[cleanKey] = { category_ids: categoryIds, display_order: displayOrder };
     productIds.forEach((pid) => {
       currentLocal[pid] = { category_ids: categoryIds, display_order: displayOrder };
     });
@@ -160,23 +169,35 @@ export async function updateModelCategories(params: {
 
   saveLocalCategoryMappings(currentLocal);
 
-  // 2. Persistir no Supabase DB via tabela smoking_orders (Persistencia infalivel)
+  // 2. Sincronizar no Supabase DB (preservando todos os outros produtos estrelados salvos!)
   try {
-    // Limpar qualquer linha de configuracao anterior para evitar duplicacao de registros
-    await supabase
+    const { data: existingRows } = await supabase
       .from("smoking_orders")
-      .delete()
-      .eq("client_phone", SYSTEM_KEY);
+      .select("id, items")
+      .eq("client_phone", SYSTEM_KEY)
+      .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
+      .limit(1);
 
+    let currentItems: any[] = [];
+    let existingRowId: string | null = null;
+
+    if (existingRows && existingRows.length > 0) {
+      existingRowId = existingRows[0].id;
+      if (Array.isArray(existingRows[0].items)) {
+        currentItems = existingRows[0].items;
+      }
+    }
+
+    // Filtrar apenas para remover as entradas deste modelo/productIds especifico
+    const preservedItems = currentItems.filter((item: any) => {
+      if (item.modelKey === modelKey || item.modelKey === cleanKey) return false;
+      if (productIds.includes(item.product_id) || productIds.includes(item.id)) return false;
+      return true;
+    });
+
+    // Se a estrela estiver ativada, adicionamos as entradas deste modelo com UUIDs validos para nao falhar no trigger!
     if (categoryIds.length > 0) {
-      const updatedItems: any[] = [];
-      const parts = modelKey.split('__');
-      const bStr = (parts[0] || '').trim();
-      const nStr = (parts[1] || '').trim();
-      const cleanKey = `${bStr.toLowerCase().replace(/\s+/g, '')}__${nStr.toLowerCase().replace(/\s+/g, '')}`;
-
-      // Adiciona entrada para o modelKey
-      updatedItems.push({
+      preservedItems.push({
         id: "11111111-1111-4111-a111-111111111111",
         product_id: "11111111-1111-4111-a111-111111111111",
         modelKey: modelKey,
@@ -190,50 +211,43 @@ export async function updateModelCategories(params: {
         unit_price: 0
       });
 
-      // Adiciona entrada para chave sem espacos
-      if (cleanKey !== modelKey) {
-        updatedItems.push({
-          id: cleanKey,
-          product_id: cleanKey,
-          modelKey: cleanKey,
-          category_ids: categoryIds,
-          category_id: categoryIds[0],
-          display_order: displayOrder,
-          name: cleanKey,
-          flavor: "Padrão",
-          quantity: 1,
-          price: 0,
-          unit_price: 0
-        });
-      }
-
-      // Adiciona entradas para cada productId individual de variante
       productIds.forEach((pid) => {
-        updatedItems.push({
-          id: pid,
-          product_id: pid,
-          modelKey: modelKey,
-          category_ids: categoryIds,
-          category_id: categoryIds[0],
-          display_order: displayOrder,
-          name: modelKey,
-          flavor: "Padrão",
-          quantity: 1,
-          price: 0,
-          unit_price: 0
-        });
+        if (UUID_REGEX.test(pid)) {
+          preservedItems.push({
+            id: pid,
+            product_id: pid,
+            modelKey: modelKey,
+            category_ids: categoryIds,
+            category_id: categoryIds[0],
+            display_order: displayOrder,
+            name: modelKey,
+            flavor: "Padrão",
+            quantity: 1,
+            price: 0,
+            unit_price: 0
+          });
+        }
       });
+    }
 
-      await supabase
+    if (existingRowId) {
+      const { error: updErr } = await supabase
+        .from("smoking_orders")
+        .update({ items: preservedItems })
+        .eq("id", existingRowId);
+      if (updErr) console.warn("Aviso ao atualizar categorias em smoking_orders:", updErr.message);
+    } else if (preservedItems.length > 0) {
+      const { error: insErr } = await supabase
         .from("smoking_orders")
         .insert({
           client_phone: SYSTEM_KEY,
           client_name: "System Config Best Sellers",
           shipping_address: "CONFIG",
-          items: updatedItems,
+          items: preservedItems,
           total_amount: 0,
           company_id: targetCompanyId
         });
+      if (insErr) console.warn("Aviso ao inserir categorias em smoking_orders:", insErr.message);
     }
   } catch (e) {
     console.warn("Erro ao sincronizar categorias em smoking_orders no Supabase:", e);
