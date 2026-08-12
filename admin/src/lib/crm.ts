@@ -28,11 +28,14 @@ export const RealClient = {};
 export async function fetchLiveClients(companyId?: string): Promise<RealClient[]> {
   if (!companyId) return [];
   try {
-    const { data: orders, error: ordersErr } = await supabase
+    const { data: rawOrders, error: ordersErr } = await supabase
       .from('smoking_orders')
       .select('*')
+      .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
+
+    const orders = (rawOrders || []).filter(o => o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' && (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_')));
 
     if (ordersErr) {
       console.error("Erro ao buscar smoking_orders:", ordersErr);

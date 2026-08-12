@@ -60,6 +60,7 @@ export function KanbanBoard() {
       let query = supabase
         .from('smoking_orders')
         .select('*')
+        .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
         .order('created_at', { ascending: false });
 
       if (company?.id) {
@@ -73,7 +74,9 @@ export function KanbanBoard() {
 
       if (data) {
         const completedIds = getCompletedIds();
-        const mapped: AdminOrder[] = data.map(o => {
+        const mapped: AdminOrder[] = data
+          .filter(o => o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' && (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_')))
+          .map(o => {
           const isCompleted = completedIds.includes(o.id) || o.delivery_status === 'CONCLUIDO';
           return {
             id: o.id.substring(0, 8).toUpperCase(),

@@ -13,7 +13,7 @@ export function AdminDashboard() {
       try {
         const { count: compCount } = await supabase.from('companies').select('*', { count: 'exact', head: true });
         const { count: userCount } = await supabase.from('company_users').select('*', { count: 'exact', head: true });
-        const { count: orderCount } = await supabase.from('smoking_orders').select('*', { count: 'exact', head: true });
+        const { count: orderCount } = await supabase.from('smoking_orders').select('*', { count: 'exact', head: true }).neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__');
 
         setTotalCompanies(compCount || 0);
         setTotalUsers(userCount || 0);

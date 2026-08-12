@@ -38,10 +38,13 @@ export function FinanceDashboard() {
       return;
     }
     try {
-      const { data: ordersData } = await supabase
+      const { data: rawOrders } = await supabase
         .from('smoking_orders')
         .select('*')
+        .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
         .eq('company_id', company.id);
+
+      const ordersData = (rawOrders || []).filter(o => o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' && (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_')));
 
       const { data: productsData } = await supabase
         .from('smoking_products')
