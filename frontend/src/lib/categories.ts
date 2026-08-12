@@ -169,7 +169,14 @@ export async function updateModelCategories(params: {
       .eq("client_phone", SYSTEM_KEY);
 
     if (categoryIds.length > 0) {
+<<<<<<< HEAD
       const updatedItems: any[] = [];
+=======
+      const parts = modelKey.split('__');
+      const bStr = (parts[0] || '').trim();
+      const nStr = (parts[1] || '').trim();
+      const cleanKey = `${bStr.toLowerCase().replace(/\s+/g, '')}__${nStr.toLowerCase().replace(/\s+/g, '')}`;
+>>>>>>> 31f6e48 (fix: update star button to open modal with Save button and sync best sellers in real-time to Vercel)
 
       // Adiciona entrada para o modelKey
       updatedItems.push({
@@ -185,6 +192,23 @@ export async function updateModelCategories(params: {
         price: 0,
         unit_price: 0
       });
+
+      // Adiciona entrada para chave sem espacos
+      if (cleanKey !== modelKey) {
+        updatedItems.push({
+          id: cleanKey,
+          product_id: cleanKey,
+          modelKey: cleanKey,
+          category_ids: categoryIds,
+          category_id: categoryIds[0],
+          display_order: displayOrder,
+          name: cleanKey,
+          flavor: "Padrão",
+          quantity: 1,
+          price: 0,
+          unit_price: 0
+        });
+      }
 
       // Adiciona entradas para cada productId individual de variante
       productIds.forEach((pid) => {

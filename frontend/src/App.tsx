@@ -51,10 +51,13 @@ function Menu() {
       loadProducts();
     }, 3000);
 
-    // Inscrição em tempo real para atualizações de estoque no Supabase
+    // Inscrição em tempo real para atualizações no Supabase (produtos e categorias/destaques)
     const subscription = supabase
-      .channel("public:smoking_products")
+      .channel("public:realtime_menu")
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => {
+        loadProducts();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, () => {
         loadProducts();
       })
       .subscribe();
@@ -146,20 +149,26 @@ function Menu() {
       });
       if (hasVariantMatch) return true;
 
-      // 2. Checar por chave bruta do modelo (brand__name)
-      const firstVariant = m.variants[0];
-      if (firstVariant) {
-        const rawKey = `${firstVariant.brand.toLowerCase()}__${firstVariant.name.toLowerCase()}`;
-        const rawCatIds = categoryMappings[rawKey]?.category_ids || [];
-        if (rawCatIds.includes(MAIS_VENDIDOS_ID)) return true;
+      // 2. Checar por variadas chaves do modelo (bruta, limpa, brand__name)
+      for (const v of m.variants) {
+        const b = (v.brand || '').toLowerCase().trim();
+        const n = (v.name || '').toLowerCase().trim();
+        const bClean = b.replace(/\s+/g, '');
+        const nClean = n.replace(/\s+/g, '');
+
+        const keysToCheck = [
+          `${b}__${n}`,
+          `${bClean}__${nClean}`,
+          `${(m.brand || '').toLowerCase()}__${(m.name || '').toLowerCase()}`,
+          `${(m.brand || '').toLowerCase().replace(/\s+/g, '')}__${(m.name || '').toLowerCase().replace(/\s+/g, '')}`
+        ];
+
+        for (const k of keysToCheck) {
+          if (categoryMappings[k]?.category_ids?.includes(MAIS_VENDIDOS_ID)) return true;
+        }
       }
 
-      // 3. Checar por chave m.name e m.brand
-      const modelKey = `${m.brand.toLowerCase()}__${m.name.toLowerCase()}`;
-      const modelCatIds = categoryMappings[modelKey]?.category_ids || [];
-      if (modelCatIds.includes(MAIS_VENDIDOS_ID)) return true;
-
-      // 4. Checar por categorias diretas
+      // 3. Checar por categorias diretas
       return m.categories?.some(c => c.slug === 'mais-vendidos' || c.id === MAIS_VENDIDOS_ID) || false;
     };
 

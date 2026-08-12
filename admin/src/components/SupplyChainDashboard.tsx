@@ -1602,7 +1602,7 @@ export function SupplyChainDashboard() {
                           {isGroupVisible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
                         </button>
 
-                        {/* Botão de Estrela ⭐ para Alternar Instantaneamente "Mais Vendidos" (1-Clique) */}
+                        {/* Botão de Estrela ⭐ para Fixar nos Mais Vendidos (Abre Modal com Botão Salvar) */}
                         {(() => {
                           const MAIS_VENDIDOS_ID = "11111111-1111-4111-a111-111111111111";
                           const modelMapping = categoryMappings[group.groupKey];
@@ -1616,40 +1616,23 @@ export function SupplyChainDashboard() {
                           return (
                             <button
                               type="button"
-                              onClick={async () => {
-                                const newCatIds = isMaisVendido
+                              onClick={() => {
+                                const targetCatIds = isMaisVendido
                                   ? currentCatIds.filter((id: string) => id !== MAIS_VENDIDOS_ID)
-                                  : [...currentCatIds, MAIS_VENDIDOS_ID];
+                                  : [...currentCatIds.filter((id: string) => id !== MAIS_VENDIDOS_ID), MAIS_VENDIDOS_ID];
+
                                 const currentOrder = modelMapping?.display_order || flavorMapping?.display_order || 1;
-                                const pIds = group.flavors.map((f: any) => f.id);
-                                const modelKey = group.groupKey;
-                                const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
 
-                                // Atualiza otimista localmente
-                                setCategoryMappings((prev) => {
-                                  const updated = { ...prev };
-                                  updated[modelKey] = { category_ids: newCatIds, display_order: currentOrder };
-                                  pIds.forEach((pid: string) => {
-                                    updated[pid] = { category_ids: newCatIds, display_order: currentOrder };
-                                  });
-                                  return updated;
-                                });
-
-                                // Persiste no Supabase e localStorage
-                                await updateModelCategories({
-                                  productIds: pIds,
-                                  modelKey: modelKey,
-                                  categoryIds: newCatIds,
-                                  displayOrder: currentOrder,
-                                  companyId: targetCompanyId,
-                                });
+                                setEditingCategoryGroup(group);
+                                setSelectedCategoryIds(targetCatIds);
+                                setSelectedDisplayOrder(currentOrder.toString());
                               }}
                               className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
                                 isMaisVendido
                                   ? "bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_10px_rgba(251,191,36,0.35)]"
                                   : "bg-elevated hover:bg-white/10 text-slate-400 hover:text-amber-400 border-white/10"
                               }`}
-                              title={isMaisVendido ? "Remover dos Mais Vendidos (Desafixar do topo)" : "Fixar nos Mais Vendidos (Exibir no topo do catálogo)"}
+                              title={isMaisVendido ? "Gerenciar Posição / Remover dos Mais Vendidos" : "Fixar nos Mais Vendidos (Abrir Modal de Seleção)"}
                             >
                               <Star className={`size-4 ${isMaisVendido ? "fill-amber-400 text-amber-400" : ""}`} />
                             </button>
