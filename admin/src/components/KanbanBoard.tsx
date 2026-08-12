@@ -815,6 +815,17 @@ function OrderCard({
         <div>
           <span className="text-[9px] uppercase tracking-wider text-white/30 font-mono font-bold">Pedido #{order.id}</span>
           <h4 className="font-bold text-base text-white/90 group-hover:text-white transition-colors mt-0.5">{order.clientName}</h4>
+          {order.phone && (
+            <a 
+              href={`https://wa.me/${order.phone.replace(/\D/g, '')}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400 hover:text-emerald-300 font-semibold mt-0.5 hover:underline"
+              title="Clique para abrir conversa no WhatsApp"
+            >
+              📱 {order.phone}
+            </a>
+          )}
         </div>
         <div className="flex items-center gap-1.5 text-white/40 text-[10px] font-semibold tracking-wider uppercase bg-[#141414] border border-[#222] px-2.5 py-1 rounded-lg shrink-0">
           <Clock className="size-3" />

@@ -66,10 +66,10 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
               <Crown className="size-4 text-amber-400" />
               <h3 className="text-sm font-bold text-white">🥇 Clientes VIPs</h3>
             </div>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">LTV Alto</span>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Até 15 dias</span>
           </div>
           <div className="text-2xl font-bold text-white">{champions.length} clientes</div>
-          <p className="text-xs text-muted-foreground mt-1">Os clientes que mais compram e geram maior faturamento.</p>
+          <p className="text-xs text-muted-foreground mt-1">Clientes que compram pods pelo menos 1x a cada 15 dias.</p>
         </div>
 
         <div 
@@ -81,10 +81,10 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
               <UserCheck className="size-4 text-emerald-400" />
               <h3 className="text-sm font-bold text-white">🔄 Clientes Recorrentes</h3>
             </div>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Frequentes</span>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Pelo menos 1x/mês</span>
           </div>
           <div className="text-2xl font-bold text-white">{loyals.length} clientes</div>
-          <p className="text-xs text-muted-foreground mt-1">Clientes fiéis que fazem pedidos periodicamente.</p>
+          <p className="text-xs text-muted-foreground mt-1">Clientes que compram pods pelo menos 1x por mês (15 a 30 dias).</p>
         </div>
 
         <div 
@@ -96,10 +96,10 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
               <ShieldAlert className="size-4 text-red-400" />
               <h3 className="text-sm font-bold text-white">⚠️ Clientes em Risco</h3>
             </div>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">Sumidos +25d</span>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">Sem compra +30d</span>
           </div>
           <div className="text-2xl font-bold text-white">{atRisk.length} clientes</div>
-          <p className="text-xs text-muted-foreground mt-1">Não compram há tempo. Excelente oportunidade de reconquista!</p>
+          <p className="text-xs text-muted-foreground mt-1">Compraram uma vez e não voltaram a comprar há mais de 30 dias.</p>
         </div>
       </div>
 

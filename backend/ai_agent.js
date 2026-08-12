@@ -462,17 +462,25 @@ async function getAiResponse(phone, message) {
                 groups[key].flavors.push({ flavor: p.flavor, stock: stockQty });
             });
 
-            stockInfo = "\n=== ESTOQUE REAL DA LOJA (USAR APENAS ESTES PRODUTOS NAS RESPOSTAS DA ELOÍSA) ===\n";
+            stockInfo = "\n=== RELATÓRIO DE ESTOQUE REAL DA LOJA EM TEMPO REAL ===\n";
             Object.values(groups).forEach(g => {
-                const flavorDetails = g.flavors
-                    .filter(f => f.stock > 0)
-                    .map(f => `${f.flavor}`)
-                    .join(' e ');
-                if (flavorDetails) {
-                    const priceFormatted = parseFloat(g.price) % 1 === 0 ? parseInt(g.price, 10) : parseFloat(g.price).toFixed(2).replace('.', ',');
-                    stockInfo += `O modelo ${g.brand} ${g.model} sai por ${priceFormatted} e tem em estoque os sabores: ${flavorDetails}.\n`;
+                const availableFlavors = g.flavors.filter(f => f.stock > 0);
+                const outOfStockFlavors = g.flavors.filter(f => f.stock <= 0);
+                const priceFormatted = parseFloat(g.price) % 1 === 0 ? parseInt(g.price, 10) : parseFloat(g.price).toFixed(2).replace('.', ',');
+
+                if (availableFlavors.length > 0) {
+                    const flavorList = availableFlavors.map(f => `${f.flavor} (${f.stock} un)`).join(' e ');
+                    stockInfo += `✅ DISPONÍVEL: O modelo ${g.brand} ${g.model} sai por ${priceFormatted} e tem em estoque os sabores: ${flavorList}.\n`;
+                }
+
+                if (outOfStockFlavors.length > 0) {
+                    const outList = outOfStockFlavors.map(f => `${f.flavor}`).join(', ');
+                    stockInfo += `❌ ESGOTADO (ESTOQUE 0): O modelo ${g.brand} ${g.model} no(s) sabor(es) [${outList}] está 100% ESGOTADO. SE O CLIENTE PEDIR ESTE SABOR, RESPONDA: "infelizmente esse sabor esgotou agora, pode ser outro modelo?". PROIBIDO VENDER!\n`;
                 }
             });
+            if (Object.values(groups).every(g => g.flavors.every(f => f.stock <= 0))) {
+                stockInfo += "⚠️ ALERTA GERAL: TODOS OS PRODUTOS DA LOJA ESTÃO ATUALMENTE COM ESTOQUE 0. INFORME QUE OS PODS ESTÃO ESGOTADOS NO MOMENTO DA COMPRA!\n";
+            }
         } else {
             stockInfo += "Estoque não encontrado ou vazio.\n";
         }
@@ -500,11 +508,11 @@ async function getAiResponse(phone, message) {
 1. PROIBIDO DIGITAR "msg1:", "msg2:", "msg3:" OU QUALQUER PREFIXO DE MENSAGEM NA SUA RESPOSTA! Escreva apenas o texto puro da conversa!
 2. ORDEM PASSO A PASSO INQUEBRÁVEL DO PEDIDO DO CLIENTE:
    - PASSO A (Cliente pede modelo): Diga APENAS a frase com o preço sem R$ e os sabores em 1 ÚNICO BALÃO. É ESTREITAMENTE PROIBIDO ADICIONAR [QUEBRA] OU PEDIR CEP/ENDEREÇO AQUI! PARE E ESPERE O CLIENTE MANDAR A MENSAGEM CONFIRMANDO O SABOR!
-   - PASSO B (Cliente confirma o sabor): Confirme o item E PEÇA APENAS O CEP!
+   - PASSO B (Cliente confirma o sabor): Confirme o item, pergunte o NOME do cliente (caso ele ainda não tenha dito) e peça o CEP!
      Exemplo de resposta:
      perfeito, 1 [modelo] de [sabor] certo?
      [QUEBRA]
-     me passa o seu cep pra eu calcular o frete certinho pra vc amg?
+     qual o seu nome amg? me passa também o seu cep pra eu calcular o frete certinho pra você?
      PROIBIDO PERGUNTAR O NÚMERO DO ENDEREÇO OU COMPLEMENTO AQUI! O CLIENTE AINDA NÃO ENVIOU O CEP!
    - PASSO C (Cliente envia o CEP): Confirme a rua/bairro/cidade E PEÇA O NÚMERO DO ENDEREÇO E COMPLEMENTO!
      Exemplo de resposta:
@@ -535,7 +543,8 @@ async function getAiResponse(phone, message) {
 6. REGRA DE MARCAS E MODELOS: Elfbar fabrica o modelo BC15K. Ignite fabrica os modelos V50 e V80. NUNCA misture as marcas!
 7. SEM EMOJIS (Apenas o emoji 🏷️ quando o cliente pedir desconto).
 8. Tudo em minúsculo.
-9. NUNCA pergunte "algo mais?" ou "alguma dúvida?".]`;
+9. NUNCA pergunte "algo mais?" ou "alguma dúvida?".
+10. REGRA SUPREMA DE COLETA DE NOME DO CLIENTE: Se o cliente veio pelo cardápio digital ([PEDIDO-SMOKING]) ou conversa direta e ainda NÃO informou o nome dele, É ESTRITAMENTE OBRIGATÓRIO PERGUNTAR O NOME no balão em que pede o CEP (ex: "perfeito, recebi o seu pedido do cardápio! qual o seu nome amg pra eu anotar no pedido? e me passa o seu cep pra eu calcular o frete?"). NUNCA avance para o pagamento sem ter perguntado o nome!]`;
     conversationHistory[phone][0].content = originalSystemPrompt + stockInfo + storeShippingInfo + strictReminders;
 
     try {

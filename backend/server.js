@@ -9,6 +9,7 @@ const { getAiResponse, conversationHistory, initConversation } = require('./ai_a
 const { calculateShippingQuote } = require('./uberService');
 const { supabase } = require('./supabase');
 const { transcribeAudio } = require('./audioService');
+const QRCodeImage = require('qrcode');
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -47,12 +48,18 @@ const client = new Client({
 });
 
 let latestQr = null;
+let latestQrDataUrl = null;
 let isWhatsAppReady = false;
 const aiSentMessages = new Set();
 
-client.on('qr', (qr) => {
+client.on('qr', async (qr) => {
     latestQr = qr;
     isWhatsAppReady = false;
+    try {
+        latestQrDataUrl = await QRCodeImage.toDataURL(qr, { width: 400, margin: 2 });
+    } catch (e) {
+        console.warn('⚠️ Erro ao converter QR Code para DataURL:', e.message);
+    }
     console.log('----------------------------------------------------');
     console.log('🤖 Escaneie o QR Code abaixo com o seu WhatsApp:');
     console.log('----------------------------------------------------');
@@ -61,15 +68,17 @@ client.on('qr', (qr) => {
 
 client.on('ready', () => {
     latestQr = null;
+    latestQrDataUrl = null;
     isWhatsAppReady = true;
     console.log('✅ Inteligência Artificial conectada ao WhatsApp com sucesso!');
 });
 
 app.get('/api/qr', (req, res) => {
+    const fallbackUrl = latestQr ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(latestQr)}` : null;
     res.json({
         qr: latestQr,
         isReady: isWhatsAppReady,
-        qrImageUrl: latestQr ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(latestQr)}` : null
+        qrImageUrl: latestQrDataUrl || fallbackUrl
     });
 });
 
@@ -332,8 +341,48 @@ function scheduleOiFollowUp(chatId) {
 }
 
 // =============================================
-// PARSE AND SAVE ORDER (unchanged)
+// PARSE CART FROM DIGITAL MENU (Armazena em memória sem criar pedido no Kanban)
 // =============================================
+const latestCartItems = {};
+
+// Função auxiliar para encontrar produto no Supabase com tolerância a variações de sabor (ex: Menthol Ice -> Menta)
+async function findMatchingProduct(productName, flavor) {
+    try {
+        const { data: allProducts } = await supabase
+            .from('smoking_products')
+            .select('id, price, brand, name, flavor, stock');
+
+        if (!allProducts || allProducts.length === 0) return null;
+
+        const nameLower = (productName || '').toLowerCase().trim();
+        const flavorLower = (flavor || '').toLowerCase().trim();
+
+        // 1. Busca exata
+        let match = allProducts.find(p => 
+            (p.name || '').toLowerCase().includes(nameLower) && 
+            (p.flavor || '').toLowerCase() === flavorLower
+        );
+        if (match) return match;
+
+        // 2. Busca flexível de sabores (menthol/menta, watermelon/melancia)
+        let searchFlavor = flavorLower;
+        if (/menth|menta|mint/i.test(flavorLower)) searchFlavor = 'menta';
+        if (/water|melan/i.test(flavorLower)) searchFlavor = 'melan';
+
+        match = allProducts.find(p => 
+            (p.name || '').toLowerCase().includes(nameLower) && 
+            (p.flavor || '').toLowerCase().includes(searchFlavor)
+        );
+        if (match) return match;
+
+        // 3. Fallback: match por modelo
+        match = allProducts.find(p => (p.name || '').toLowerCase().includes(nameLower));
+        return match || null;
+    } catch (e) {
+        return null;
+    }
+}
+
 async function parseAndSaveOrder(senderNumber, contactName, messageText) {
     if (!messageText.startsWith('[PEDIDO-SMOKING]')) return null;
     
@@ -342,14 +391,6 @@ async function parseAndSaveOrder(senderNumber, contactName, messageText) {
         if (mainParts.length < 2) return null;
         
         const itemsStr = mainParts[0].trim();
-        const totalStr = mainParts[1].replace('Total:', '').trim();
-        const numericTotal = parseFloat(totalStr.replace(/[^\d,.-]/g, '').replace(',', '.'));
-
-        // Salva cliente
-        await supabase
-            .from('smoking_clients')
-            .upsert({ phone: senderNumber, name: contactName }, { onConflict: 'phone' });
-
         const itemsList = itemsStr.split(',').map(item => item.trim());
         const orderItems = [];
 
@@ -360,55 +401,27 @@ async function parseAndSaveOrder(senderNumber, contactName, messageText) {
                 const productName = match[2];
                 const flavor = match[3];
 
-                // Buscar ID do produto no Supabase
-                const { data: product } = await supabase
-                    .from('smoking_products')
-                    .select('id, price, brand')
-                    .eq('name', productName)
-                    .eq('flavor', flavor)
-                    .limit(1)
-                    .maybeSingle();
+                // Buscar produto com correspondência flexível
+                const product = await findMatchingProduct(productName, flavor);
 
                 orderItems.push({
                     product_id: product ? product.id : null,
-                    name: productName,
-                    flavor: flavor,
+                    name: product ? product.name : productName,
+                    flavor: product ? product.flavor : flavor,
                     quantity: quantity,
                     price: product ? parseFloat(product.price) : 90.00
                 });
             }
         }
 
-        // Buscar ID da empresa principal
-        const companyId = await getPrimaryCompanyId();
-
-        // Criar pedido no Supabase
-        const { data: newOrder, error: orderError } = await supabase
-            .from('smoking_orders')
-            .insert({
-                company_id: companyId,
-                client_phone: senderNumber,
-                client_name: contactName,
-                items: orderItems,
-                total_amount: numericTotal,
-                shipping_fee: 0.00,
-                shipping_address: 'Aguardando CEP',
-                payment_status: 'PENDENTE',
-                delivery_status: 'AGUARDANDO_PAGAMENTO',
-                payment_method: 'PIX'
-            })
-            .select()
-            .single();
-
-        if (orderError) {
-            console.error('❌ Erro ao criar pedido no Supabase:', orderError.message);
-            return null;
+        if (orderItems.length > 0) {
+            latestCartItems[senderNumber] = orderItems;
+            console.log(`🛒 [Cardápio Importado] ${orderItems.length} item(ns) salvos em memória temporária para ${senderNumber}.`);
+            return true;
         }
-
-        console.log(`✅ Pedido #${newOrder.id} gravado com sucesso no Supabase para ${senderNumber}!`);
-        return newOrder.id;
+        return null;
     } catch (err) {
-        console.error('❌ Erro no processamento e gravação de pedido:', err);
+        console.error('❌ Erro no processamento do carrinho:', err);
         return null;
     }
 }
@@ -518,12 +531,12 @@ async function handleReceiptReceived(senderNumber, contactName, messageText, has
 
         if (existingOrders && existingOrders.length > 0) {
             const existingOrder = existingOrders[0];
-            // Se o pedido existia, atualiza para PENDENTE & Separação (PREPARANDO)
+            // Anexa a tag de comprovante mantendo o pedido na aba AGUARDANDO_PAGAMENTO para conferência manual do dono
             const { data: updated, error: updateErr } = await supabase
                 .from('smoking_orders')
                 .update({
                     payment_status: 'PENDENTE',
-                    delivery_status: 'PREPARANDO',
+                    delivery_status: 'AGUARDANDO_PAGAMENTO',
                     receipt_url: 'COMPROVANTE_PIX_ENVIADO'
                 })
                 .eq('id', existingOrder.id)
@@ -531,47 +544,224 @@ async function handleReceiptReceived(senderNumber, contactName, messageText, has
                 .single();
 
             if (!updateErr) {
-                console.log(`✅ Pedido #${existingOrder.id} atualizado para PENDENTE / PREPARANDO no Kanban!`);
+                console.log(`✅ Comprovante anexado ao pedido #${existingOrder.id} na aba AGUARDANDO_PAGAMENTO!`);
                 return updated;
             }
         }
 
-        const companyId = await getPrimaryCompanyId();
+        // 3. Se não existia pedido gravado ainda, tenta sincronizar os dados reais do cliente
+        return await syncWhatsAppOrderToKanbanAndDeductStock(senderNumber, contactName, messageText);
+    } catch (err) {
+        console.error('❌ Erro no handleReceiptReceived:', err);
+        return null;
+    }
+}
 
-        // Extrai o produto real discutido na conversa para manter o Ranking de Vendas por Modelo atualizado
-        let itemsToSave = await extractOrderItemsFromHistory(senderNumber);
-        if (!itemsToSave || itemsToSave.length === 0) {
-            itemsToSave = [{ name: 'Ignite V50', flavor: 'Menthol Ice', quantity: 1, price: 79.90 }];
+// =============================================
+// AUTO SYNC WHATSAPP ORDER TO KANBAN & DEDUCT STOCK
+// =============================================
+const latestQuotes = {};
+const latestHouseNumbers = {};
+const latestContactNames = {};
+const latestFormattedPhones = {};
+
+async function syncWhatsAppOrderToKanbanAndDeductStock(senderNumber, contactName, aiResponse) {
+    try {
+        const history = conversationHistory[senderNumber] || [];
+        const fullHistoryText = history.map(h => typeof h.content === 'string' ? h.content : '').join(' ');
+
+        // 1. Extrair nome real do cliente do histórico de mensagens ou perfil
+        let clientName = null;
+        for (let i = 0; i < history.length; i++) {
+            const msg = history[i];
+            if (msg.role === 'user' && typeof msg.content === 'string') {
+                const nameMatch = msg.content.match(/(?:meu nome é|meu nome e|me chamo|sou o|sou a|aqui é o|aqui é a)\s+([a-zA-ZáàâãéèêíïóôõöúçñÁÀÂÃÉÈÍÓÔÕÚÇÑ\s]{2,30})/i);
+                if (nameMatch) {
+                    clientName = nameMatch[1].trim();
+                    break;
+                }
+                const prevMsg = history[i - 1];
+                if (prevMsg && prevMsg.role === 'assistant' && typeof prevMsg.content === 'string' && prevMsg.content.toLowerCase().includes('qual o seu nome')) {
+                    const cleanResp = msg.content.replace(/[^\w\sÁ-ÿ]/gi, '').trim();
+                    if (cleanResp.length >= 2 && cleanResp.length <= 30 && !/\d/.test(cleanResp)) {
+                        clientName = cleanResp;
+                        break;
+                    }
+                }
+            }
         }
 
-        // 3. Se não existia pedido gravado ainda, cria o pedido direto no Kanban com o produto correto!
-        const { data: newOrder, error: insertErr } = await supabase
-            .from('smoking_orders')
-            .insert({
-                company_id: companyId,
-                client_phone: senderNumber,
-                client_name: contactName,
-                items: itemsToSave,
-                total_amount: itemsToSave[0].price,
-                shipping_fee: 10.00,
-                shipping_address: 'Endereço enviado pelo WhatsApp',
-                payment_status: 'PENDENTE',
-                delivery_status: 'PREPARANDO',
-                payment_method: 'PIX',
-                receipt_url: 'COMPROVANTE_PIX_ENVIADO'
-            })
-            .select()
-            .single();
+        if (!clientName) {
+            let pName = latestContactNames[senderNumber] || (contactName && contactName !== 'Cliente WhatsApp' ? contactName : '');
+            if (/^[\d\s+\-()]+$/.test(pName.trim())) {
+                pName = '';
+            }
+            clientName = pName || 'Cliente WhatsApp';
+        }
 
-        if (insertErr) {
-            console.error('❌ Erro ao registrar pedido de comprovante no Supabase:', insertErr);
+        // Determina telefone real formatado
+        const displayPhone = latestFormattedPhones[senderNumber] || senderNumber;
+
+        // 2. Determinar itens do pedido (do cardápio importado ou da conversa)
+        let orderItems = latestCartItems[senderNumber] || [];
+
+        if (orderItems.length === 0) {
+            const { data: allProducts } = await supabase.from('smoking_products').select('*');
+            if (allProducts && allProducts.length > 0) {
+                for (const p of allProducts) {
+                    const flavorLower = (p.flavor || '').toLowerCase();
+                    if (flavorLower && fullHistoryText.toLowerCase().includes(flavorLower)) {
+                        if (!orderItems.some(i => i.product_id === p.id)) {
+                            orderItems.push({
+                                product_id: p.id,
+                                name: p.name || 'Pod',
+                                flavor: p.flavor,
+                                quantity: 1,
+                                price: parseFloat(p.price || 90)
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // VALIDAÇÃO 1: Deve conter pod e sabor real (não genérico)
+        if (orderItems.length === 0 || orderItems.every(i => !i.flavor || i.flavor === 'Atendimento WhatsApp')) {
+            console.log(`⚠️ [Kanban Gate] Sync cancelado: Nenhum produto/sabor identificado para ${senderNumber}.`);
             return null;
         }
 
-        console.log(`✅ Novo Pedido #${newOrder.id} (${itemsToSave[0].name}) gravado no Supabase em Separação para ${senderNumber}!`);
-        return newOrder;
+        // Tenta vincular cada item do carrinho ao produto real do Supabase
+        for (const item of orderItems) {
+            if (!item.product_id) {
+                const matchedP = await findMatchingProduct(item.name, item.flavor);
+                if (matchedP) {
+                    item.product_id = matchedP.id;
+                    item.name = matchedP.name;
+                    item.flavor = matchedP.flavor;
+                    item.price = parseFloat(matchedP.price || item.price);
+                }
+            }
+        }
+
+        // 3. Extrair cotação de frete e número do endereço
+        const storedQuote = latestQuotes[senderNumber];
+        const storedNumber = latestHouseNumbers[senderNumber];
+
+        // VALIDAÇÃO 2: Deve ter frete real e cotação de endereço
+        if (!storedQuote || !storedQuote.address || typeof storedQuote.fee !== 'number' || storedQuote.fee <= 0) {
+            console.log(`⚠️ [Kanban Gate] Sync cancelado: Cotação de frete indisponível para ${senderNumber}.`);
+            return null;
+        }
+
+        const shippingFee = storedQuote.fee;
+        const baseAddr = storedQuote.address || '';
+        const cepStr = storedQuote.cep ? `, CEP: ${storedQuote.cep}` : '';
+        const numStr = storedNumber ? `, Nº ${storedNumber}` : '';
+        const shippingAddress = `${baseAddr}${numStr}${cepStr}`;
+
+        // VALIDAÇÃO 3: Endereço deve ter rua/bairro e número (não pode ser "Aguardando CEP" ou incompleto)
+        if (shippingAddress.includes('Aguardando CEP') || shippingAddress.length < 10) {
+            console.log(`⚠️ [Kanban Gate] Sync cancelado: Endereço incompleto (${shippingAddress}) para ${senderNumber}.`);
+            return null;
+        }
+
+        const itemsTotal = orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+
+        // 4. Grava/Atualiza Cliente em smoking_clients
+        await supabase
+            .from('smoking_clients')
+            .upsert({
+                phone: displayPhone,
+                name: clientName,
+                address: shippingAddress,
+                created_at: new Date().toISOString()
+            }, { onConflict: 'phone' });
+
+        // 5. Se houver um pedido na aba "AGUARDANDO_PAGAMENTO", atualiza os dados dele.
+        // Caso o pedido anterior já esteja em "PREPARANDO", "EM_ROTA" ou "ENTREGUE", cria um NOVO pedido separado!
+        const companyId = await getPrimaryCompanyId();
+
+        const { data: existingOrders } = await supabase
+            .from('smoking_orders')
+            .select('id')
+            .or(`client_phone.eq.${senderNumber},client_phone.eq.${displayPhone}`)
+            .eq('delivery_status', 'AGUARDANDO_PAGAMENTO')
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+        let orderId = null;
+        if (existingOrders && existingOrders.length > 0) {
+            orderId = existingOrders[0].id;
+            const { error: updateErr } = await supabase
+                .from('smoking_orders')
+                .update({
+                    client_name: clientName,
+                    client_phone: displayPhone,
+                    shipping_address: shippingAddress,
+                    items: orderItems,
+                    total_amount: itemsTotal,
+                    shipping_fee: shippingFee,
+                    payment_status: 'PENDENTE',
+                    delivery_status: 'AGUARDANDO_PAGAMENTO',
+                    payment_method: 'PIX'
+                })
+                .eq('id', orderId);
+
+            if (updateErr) {
+                console.error(`❌ Erro ao atualizar pedido no Supabase:`, updateErr.message);
+            }
+        } else {
+            const { data: newOrder, error: insertErr } = await supabase
+                .from('smoking_orders')
+                .insert({
+                    company_id: companyId,
+                    client_phone: displayPhone,
+                    client_name: clientName,
+                    shipping_address: shippingAddress,
+                    items: orderItems,
+                    total_amount: itemsTotal,
+                    shipping_fee: shippingFee,
+                    payment_status: 'PENDENTE',
+                    delivery_status: 'AGUARDANDO_PAGAMENTO',
+                    payment_method: 'PIX'
+                })
+                .select()
+                .single();
+
+            if (insertErr) {
+                console.error(`❌ Erro ao inserir pedido no Supabase:`, insertErr.message);
+            }
+            if (newOrder) orderId = newOrder.id;
+        }
+
+        console.log(`🛒 [Kanban WhatsApp] Pedido #${orderId} registrado na aba "AGUARDANDO_PAGAMENTO"! Cliente: ${clientName} | Frete: R$ ${shippingFee.toFixed(2)} | Endereço: ${shippingAddress}`);
+
+        // 6. Deduz Estoque (Reposicao) dos produtos vendidos
+        for (const item of orderItems) {
+            if (item.product_id) {
+                const { data: p } = await supabase
+                    .from('smoking_products')
+                    .select('id, stock, name, flavor')
+                    .eq('id', item.product_id)
+                    .single();
+
+                if (p) {
+                    const currentStock = typeof p.stock === 'number' ? p.stock : parseInt(String(p.stock || '0'), 10);
+                    const newStock = Math.max(0, currentStock - (item.quantity || 1));
+                    await supabase
+                        .from('smoking_products')
+                        .update({ stock: newStock })
+                        .eq('id', p.id);
+                    console.log(`📉 [Estoque Dedução] "${p.name} - ${p.flavor}": ${currentStock} -> ${newStock}`);
+                }
+            }
+        }
+
+        return orderId;
+>>>>>>> Stashed changes
     } catch (err) {
-        console.error('❌ Erro no handleReceiptReceived:', err);
+        console.error('❌ Erro no syncWhatsAppOrderToKanbanAndDeductStock:', err);
         return null;
     }
 }
@@ -587,9 +777,25 @@ function detectFollowUpTriggers(chatId, aiResponse) {
         scheduleTableFollowUp(chatId);
     }
     
-    // Detect Pix key sent (payment flow started)
-    if (lower.includes('chave pix') || lower.includes('chave pix :')) {
+    // Detect Pix key sent (payment flow started) -> apenas agenda follow-ups de pagamento
+    if (lower.includes('chave pix') || lower.includes('chave pix :') || lower.includes('assim que fizer o pagamento')) {
         schedulePaymentFollowUp(chatId);
+    }
+
+    // =============================================
+    // GATILHO DO KANBAN: Só envia para o painel quando a Eloísa
+    // pergunta a forma de pagamento — momento em que ela JÁ tem:
+    // marca/modelo/sabor + nome + endereço completo com CEP e número + frete.
+    // =============================================
+    const isPaymentMethodQuestion = 
+        lower.includes('forma de pagamento') ||
+        lower.includes('qual seria a forma') ||
+        lower.includes('como vc prefere pagar') ||
+        lower.includes('qual a forma de pagamento');
+
+    if (isPaymentMethodQuestion) {
+        console.log(`✅ [Kanban Gate] Pergunta de forma de pagamento detectada para ${chatId}. Processando envio ao Kanban com dados críticos...`);
+        syncWhatsAppOrderToKanbanAndDeductStock(chatId, 'Cliente WhatsApp', aiResponse);
     }
 }
 
@@ -666,7 +872,28 @@ client.on('message_create', async msg => {
     // --- PERSONAL CONTACT FILTER ---
     try {
         const contact = await msg.getContact();
-        const contactName = (contact.name || contact.pushname || '').toLowerCase();
+
+        let rawPhone = (contact && contact.number && contact.number.length <= 15) ? contact.number : senderNumber;
+        const cleanDigits = rawPhone.replace(/\D/g, '');
+        let formattedPhone = cleanDigits;
+
+        if (cleanDigits.length === 11) {
+            formattedPhone = `(${cleanDigits.substring(0, 2)}) ${cleanDigits.substring(2, 7)}-${cleanDigits.substring(7)}`;
+        } else if (cleanDigits.length === 13 && cleanDigits.startsWith('55')) {
+            formattedPhone = `+55 (${cleanDigits.substring(2, 4)}) ${cleanDigits.substring(4, 9)}-${cleanDigits.substring(9)}`;
+        }
+
+        latestFormattedPhones[senderNumber] = formattedPhone;
+
+        let realWhatsAppName = contact.pushname || contact.name || '';
+        if (/^[\d\s+\-()]+$/.test(realWhatsAppName.trim())) {
+            realWhatsAppName = '';
+        }
+
+        if (realWhatsAppName) {
+            latestContactNames[senderNumber] = realWhatsAppName;
+        }
+        const contactName = (realWhatsAppName || '').toLowerCase();
 
         const personalContacts = [
             'leo pinheiro',
@@ -917,6 +1144,10 @@ async function processMessage(msg, senderNumber, chatId, messageText, accumulate
                 needsShippingCalculation = true;
                 addressToCalculate = messageText;
             } else {
+                // Se já temos a cotação armazenada e a mensagem contém números/complemento, guarda o número da casa
+                if (latestQuotes[senderNumber] && !isQuestionOrInquiry && /\d+/.test(messageText)) {
+                    latestHouseNumbers[senderNumber] = messageText;
+                }
                 needsShippingCalculation = false;
             }
         }
@@ -925,6 +1156,7 @@ async function processMessage(msg, senderNumber, chatId, messageText, accumulate
         if (needsShippingCalculation) {
             try {
                 const quote = await calculateShippingQuote(addressToCalculate);
+                latestQuotes[senderNumber] = quote;
                 
                 initConversation(senderNumber);
                 conversationHistory[senderNumber].push({

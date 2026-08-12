@@ -6,8 +6,9 @@ import { CartSheet } from "@/components/CartSheet";
 import { FlavorSheet } from "@/components/FlavorSheet";
 import { CartProvider } from "@/lib/cart";
 import { fetchProductsFromSupabase, type Product, type PodModel } from "@/lib/products";
+import { fetchCategories, fetchProductCategoryMappings, DEFAULT_CATEGORIES, type Category } from "@/lib/categories";
 import { supabase } from "@/lib/supabase";
-import { Loader2 } from "lucide-react";
+import { Loader2, Star } from "lucide-react";
 
 // Trigger Vercel auto-deploy from Git
 export default function App() {
@@ -20,6 +21,10 @@ export default function App() {
 
 function Menu() {
   const [productList, setProductList] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  const [categoryMappings, setCategoryMappings] = useState<Record<string, { category_ids: string[]; display_order: number }>>({});
+  const [selectedCategorySlug, setSelectedCategorySlug] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [brand, setBrand] = useState<string | null>(null);
@@ -27,8 +32,14 @@ function Menu() {
   const [selectedModel, setSelectedModel] = useState<PodModel | null>(null);
 
   const loadProducts = async () => {
-    const data = await fetchProductsFromSupabase();
+    const [data, cats, catMap] = await Promise.all([
+      fetchProductsFromSupabase(),
+      fetchCategories(),
+      fetchProductCategoryMappings()
+    ]);
     setProductList(data);
+    setCategories(cats);
+    setCategoryMappings(catMap.productMap);
     setLoading(false);
   };
 
@@ -72,17 +83,37 @@ function Menu() {
       }
       map.get(groupKey)!.variants.push(p);
     }
+
     return Array.from(map.values()).map(m => {
       const realFlavors = m.variants.filter(v => {
         const f = (v.flavor || '').trim().toLowerCase();
         return f !== 'padrão' && f !== 'padrao' && f !== '';
       });
+
+      const modelVariants = realFlavors.length > 0 ? realFlavors : m.variants;
+
+      // Identificar categorias do modelo
+      const firstVariant = m.variants[0];
+      const modelKeyStandard = `${m.brand.toLowerCase()}__${m.name.toLowerCase()}`;
+      const modelKeyAlternative = firstVariant ? `${m.brand.toLowerCase()}__${firstVariant.name.toLowerCase()}` : '';
+
+      const mapping = categoryMappings[modelKeyStandard] || 
+                      categoryMappings[modelKeyAlternative] || 
+                      (firstVariant ? categoryMappings[firstVariant.id] : null);
+
+      const modelCategoryIds = mapping?.category_ids || [];
+      const modelDisplayOrder = mapping?.display_order ?? 99;
+
+      const matchedCategories = categories.filter(c => modelCategoryIds.includes(c.id));
+
       return {
         ...m,
-        variants: realFlavors.length > 0 ? realFlavors : m.variants
+        variants: modelVariants,
+        categories: matchedCategories,
+        displayOrder: modelDisplayOrder
       };
     });
-  }, [productList]);
+  }, [productList, categories, categoryMappings]);
 
   const availableBrands = useMemo(() => {
     const set = new Set<string>();
@@ -92,16 +123,111 @@ function Menu() {
     return Array.from(set);
   }, [productList]);
 
-  const filtered = useMemo(() => {
+  // Separar produtos com ⭐ (Mais Vendidos) e produtos normais sem duplicação
+  const { topFeaturedModels, mainCatalogModels, isOnlyMaisVendidosMode } = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return models.filter(m => {
+    
+    // Todos os modelos que passam nos filtros de marca e busca
+    const baseList = models.filter(m => {
       if (brand && m.brand.toLowerCase() !== brand.toLowerCase()) return false;
       if (!q) return true;
       const matchesModel = m.name.toLowerCase().includes(q) || m.brand.toLowerCase().includes(q);
       const matchesFlavor = m.variants.some(v => v.flavor.toLowerCase().includes(q));
       return matchesModel || matchesFlavor;
     });
-  }, [query, brand, models]);
+
+    const MAIS_VENDIDOS_ID = "11111111-1111-4111-a111-111111111111";
+
+    const isMaisVendido = (m: PodModel) => {
+      // 1. Checar por qualquer ID de variante individual no categoryMappings
+      const hasVariantMatch = m.variants.some(v => {
+        const catIds = categoryMappings[v.id]?.category_ids || [];
+        return catIds.includes(MAIS_VENDIDOS_ID);
+      });
+      if (hasVariantMatch) return true;
+
+      // 2. Checar por chave bruta do modelo (brand__name)
+      const firstVariant = m.variants[0];
+      if (firstVariant) {
+        const rawKey = `${firstVariant.brand.toLowerCase()}__${firstVariant.name.toLowerCase()}`;
+        const rawCatIds = categoryMappings[rawKey]?.category_ids || [];
+        if (rawCatIds.includes(MAIS_VENDIDOS_ID)) return true;
+      }
+
+      // 3. Checar por chave m.name e m.brand
+      const modelKey = `${m.brand.toLowerCase()}__${m.name.toLowerCase()}`;
+      const modelCatIds = categoryMappings[modelKey]?.category_ids || [];
+      if (modelCatIds.includes(MAIS_VENDIDOS_ID)) return true;
+
+      // 4. Checar por categorias diretas
+      return m.categories?.some(c => c.slug === 'mais-vendidos' || c.id === MAIS_VENDIDOS_ID) || false;
+    };
+
+    // Se o cliente clicou na pílula "⭐ Mais Vendidos"
+    if (selectedCategorySlug === 'mais-vendidos') {
+      const allStarred = baseList.filter(isMaisVendido).sort((a, b) => {
+        const orderA = a.displayOrder ?? 99;
+        const orderB = b.displayOrder ?? 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return a.name.localeCompare(b.name);
+      });
+      return {
+        topFeaturedModels: [],
+        mainCatalogModels: allStarred,
+        isOnlyMaisVendidosMode: true
+      };
+    }
+
+    // Modo Padrão / Busca / Marca
+    const starredAll = baseList.filter(isMaisVendido).sort((a, b) => {
+      const orderA = a.displayOrder ?? 99;
+      const orderB = b.displayOrder ?? 99;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    });
+
+    // Se há busca ou filtro por marca ativo, exibe em lista única ordenada (starred no topo)
+    if (brand || q) {
+      const sortedSearch = [...baseList].sort((a, b) => {
+        const aStar = isMaisVendido(a);
+        const bStar = isMaisVendido(b);
+        if (aStar && !bStar) return -1;
+        if (!aStar && bStar) return 1;
+        const orderA = a.displayOrder ?? 99;
+        const orderB = b.displayOrder ?? 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return a.name.localeCompare(b.name);
+      });
+
+      return {
+        topFeaturedModels: [],
+        mainCatalogModels: sortedSearch,
+        isOnlyMaisVendidosMode: false
+      };
+    }
+
+    // Modo Padrão (Sem busca, sem marca, "Todas"):
+    // Seção Topo: No máximo os 4 primeiros produtos com ⭐
+    const top4 = starredAll.slice(0, 4);
+
+    // Seção Todos os Produtos: Todos os modelos RESTANTES (sem os 4 que já estão no topo, para evitar duplicação)
+    const rest = baseList.filter(m => !top4.some(top => top.name === m.name)).sort((a, b) => {
+      const aStar = isMaisVendido(a);
+      const bStar = isMaisVendido(b);
+      if (aStar && !bStar) return -1;
+      if (!aStar && bStar) return 1;
+      const orderA = a.displayOrder ?? 99;
+      const orderB = b.displayOrder ?? 99;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    });
+
+    return {
+      topFeaturedModels: top4,
+      mainCatalogModels: rest,
+      isOnlyMaisVendidosMode: false
+    };
+  }, [query, brand, selectedCategorySlug, models]);
 
   return (
     <div className="min-h-screen pb-safe">
@@ -110,6 +236,8 @@ function Menu() {
         onQueryChange={setQuery} 
         activeBrand={brand} 
         onBrandChange={setBrand} 
+        activeCategory={selectedCategorySlug}
+        onCategoryChange={setSelectedCategorySlug}
         onCartClick={() => setCartOpen(true)}
         brands={availableBrands}
       />
@@ -120,13 +248,46 @@ function Menu() {
             <Loader2 className="size-8 text-primary animate-spin" />
             <p>Carregando catálogo digital...</p>
           </div>
-        ) : filtered.length === 0 ? (
+        ) : topFeaturedModels.length === 0 && mainCatalogModels.length === 0 ? (
           <div className="py-24 text-center text-sm text-muted-foreground">Nenhum produto encontrado.</div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 pb-32">
-            {filtered.map(m => (
-              <ProductCard key={m.name} model={m} onClick={() => setSelectedModel(m)} />
-            ))}
+          <div className="space-y-8 pb-32">
+            {/* Seção 1: ⭐ Mais Vendidos (Topo - Máximo 4 Pods no modo padrão) */}
+            {topFeaturedModels.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 border-b border-white/10 pb-2.5">
+                  <Star className="size-4 text-amber-400 fill-amber-400" />
+                  <h2 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider">Mais Vendidos</h2>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                  {topFeaturedModels.map(m => (
+                    <ProductCard key={m.name} model={m} onClick={() => setSelectedModel(m)} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Seção 2: Todos os Produtos / Restante do Catálogo */}
+            {mainCatalogModels.length > 0 && (
+              <div className="space-y-4">
+                {topFeaturedModels.length > 0 && (
+                  <div className="flex items-center gap-2 border-b border-white/10 pb-2.5 pt-2">
+                    <h2 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider">Todos os Produtos</h2>
+                  </div>
+                )}
+                {isOnlyMaisVendidosMode && (
+                  <div className="flex items-center gap-2 border-b border-white/10 pb-2.5">
+                    <Star className="size-4 text-amber-400 fill-amber-400" />
+                    <h2 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider">Mais Vendidos</h2>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                  {mainCatalogModels.map(m => (
+                    <ProductCard key={m.name} model={m} onClick={() => setSelectedModel(m)} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>

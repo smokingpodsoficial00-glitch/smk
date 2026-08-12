@@ -15,6 +15,8 @@ export function ProductCard({ model, onClick }: { model: PodModel; onClick: () =
   const image = variantWithImage?.image_url || brandImages[model.brand] || vapeIgnite;
   const flavorsCount = model.variants.length;
 
+  const primaryCategory = model.categories && model.categories.length > 0 ? model.categories[0] : null;
+
   return (
     <article onClick={onClick} className="group relative flex flex-col rounded-3xl bg-card border border-border overflow-hidden transition-all duration-500 hover:border-white/20 hover:-translate-y-1 cursor-pointer">
       <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-b from-elevated to-card">
@@ -28,6 +30,11 @@ export function ProductCard({ model, onClick }: { model: PodModel; onClick: () =
         <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 glass px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-silver">
           {model.puffs.toLocaleString("pt-BR")} puffs
         </div>
+        {primaryCategory && (
+          <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 glass-strong px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold text-amber-300 border border-amber-400/40 shadow-[0_0_12px_rgba(251,191,36,0.35)]">
+            {primaryCategory.badge_text || primaryCategory.name}
+          </div>
+        )}
       </div>
 
       <div className="p-3.5 sm:p-5 flex flex-col gap-2 sm:gap-3 flex-1">

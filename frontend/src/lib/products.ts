@@ -18,6 +18,8 @@ export interface PodModel {
   puffs: number;
   price: number;
   variants: Product[];
+  categories?: Array<{ id: string; name: string; slug: string; badge_text: string }>;
+  displayOrder?: number;
 }
 
 export const BRANDS = ["Ignite", "Elf Bar", "Lost Mary", "Waka", "Oxbar"] as const;

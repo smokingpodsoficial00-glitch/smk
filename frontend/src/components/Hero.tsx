@@ -3,23 +3,36 @@ import { Search, ShoppingBag, Store } from "lucide-react";
 import { BRANDS } from "@/lib/products";
 import { useCart } from "@/lib/cart";
 import { useStoreConfig } from "@/lib/useStoreConfig";
+import type { Category } from "@/lib/categories";
 
 interface HeroProps {
   query: string;
   onQueryChange: (q: string) => void;
   activeBrand: string | null;
   onBrandChange: (b: string | null) => void;
+  activeCategory?: string | null;
+  onCategoryChange?: (c: string | null) => void;
+  categories?: Category[];
   onCartClick?: () => void;
   brands?: string[];
 }
 
-export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartClick, brands }: HeroProps) {
+export function Hero({ 
+  query, 
+  onQueryChange, 
+  activeBrand, 
+  onBrandChange, 
+  activeCategory = null,
+  onCategoryChange,
+  categories = [],
+  onCartClick, 
+  brands 
+}: HeroProps) {
   const { totalItems } = useCart();
   const { config } = useStoreConfig();
   const brandList = brands && brands.length > 0 ? brands : (BRANDS as unknown as string[]);
 
   const storeName = config?.store_name || "Smoking Pods";
-  const logoUrl = config?.logo_url || "/logo.jpg";
 
   useEffect(() => {
     if (storeName) {
@@ -70,11 +83,38 @@ export function Hero({ query, onQueryChange, activeBrand, onBrandChange, onCartC
         </div>
       </div>
 
-      {/* Filtros por Marca */}
-      <div className="mt-6 flex items-center justify-center gap-2 flex-wrap">
-        <Pill label="Todos" active={activeBrand === null} onClick={() => onBrandChange(null)} />
+      {/* Filtros por Marca e Categoria (Com rolagem horizontal suave no mobile) */}
+      <div className="mt-6 flex items-center justify-center gap-2 overflow-x-auto pb-2 custom-scrollbar max-w-full px-2">
+        <Pill 
+          label="Todas" 
+          active={activeBrand === null && (!activeCategory || activeCategory === null)} 
+          onClick={() => {
+            onBrandChange(null);
+            onCategoryChange?.(null);
+          }} 
+        />
+        {onCategoryChange && (
+          <CategoryPill
+            active={activeCategory === 'mais-vendidos'}
+            onClick={() => {
+              onBrandChange(null);
+              onCategoryChange(activeCategory === 'mais-vendidos' ? null : 'mais-vendidos');
+            }}
+          >
+            <span className="text-amber-400 font-bold mr-1.5 text-sm">★</span>
+            <span>Mais Vendidos</span>
+          </CategoryPill>
+        )}
         {brandList.map(b => (
-          <Pill key={b} label={b} active={activeBrand === b} onClick={() => onBrandChange(b)} />
+          <Pill 
+            key={b} 
+            label={b} 
+            active={activeBrand === b && !activeCategory} 
+            onClick={() => {
+              onCategoryChange?.(null);
+              onBrandChange(activeBrand === b ? null : b);
+            }} 
+          />
         ))}
       </div>
     </section>
@@ -90,5 +130,19 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
                : "glass text-foreground hover:bg-elevated"
       }`}
     >{label}</button>
+  );
+}
+
+function CategoryPill({ children, active, onClick }: { children: React.ReactNode; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all duration-300 border cursor-pointer flex items-center ${
+        active ? "bg-white text-black border-transparent shadow-[0_0_20px_rgba(255,255,255,0.7)]"
+               : "glass text-foreground hover:bg-elevated border-white/10"
+      }`}
+    >
+      {children}
+    </button>
   );
 }

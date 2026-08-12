@@ -4,11 +4,12 @@ import {
   Trash2, Search, Filter, ArrowUpDown, MoreVertical, Copy, Edit3, DollarSign, 
   CheckCircle2, X, TrendingUp, PieChart, ChevronRight, ChevronDown, ChevronUp, 
   Tag, Box, Camera, Download, FileText, BarChart3, Check, Share2, Smartphone, 
-  Monitor, Store, ExternalLink, ListOrdered, Save
+  Monitor, Store, ExternalLink, ListOrdered, Save, Star
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatBRL } from "@/lib/cart";
 import { useAuth } from "../contexts/AuthContext";
+import { fetchCategories, fetchProductCategoryMappings, updateModelCategories, DEFAULT_CATEGORIES, type Category } from "../lib/categories";
 
 // ─── Donut chart colors ───────────────────────────────────
 const DONUT_COLORS = ["#34d399", "#60a5fa", "#a78bfa", "#fbbf24", "#f87171", "#f472b6", "#38bdf8"];
@@ -27,6 +28,14 @@ export function SupplyChainDashboard() {
 
   // ─── Modal Flutuante Centralizado de Novo Produto ──────
   const [showNewProductModal, setShowNewProductModal] = useState(false);
+
+  // ─── Estados de Categorias e Destaques (⭐) ─────────────
+  const [categoriesList, setCategoriesList] = useState<Category[]>(DEFAULT_CATEGORIES);
+  const [categoryMappings, setCategoryMappings] = useState<Record<string, { category_ids: string[]; display_order: number }>>({});
+  const [editingCategoryGroup, setEditingCategoryGroup] = useState<any | null>(null);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [selectedDisplayOrder, setSelectedDisplayOrder] = useState<string>("1");
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
 
   // Form states (Cadastro de Modelo)
   const [name, setName] = useState("");
@@ -58,6 +67,16 @@ export function SupplyChainDashboard() {
   // Estado para grupos expandidos no Accordion
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Record<string, boolean>>({});
 
+  // Função de validação e conversão monetária (suporta '35', '35.00', '35,00', '89,90')
+  const parseMonetaryInput = (val: string): number | null => {
+    if (val === null || val === undefined) return null;
+    const trimmed = val.toString().trim().replace(/\s/g, '').replace(',', '.');
+    if (!trimmed) return null;
+    const num = parseFloat(trimmed);
+    if (isNaN(num) || !isFinite(num) || num < 0) return null;
+    return Math.round(num * 100) / 100;
+  };
+
   // Estado para o menu de 3 pontos do grupo/modelo
   const [activeGroupMenuKey, setActiveGroupMenuKey] = useState<string | null>(null);
 
@@ -65,6 +84,25 @@ export function SupplyChainDashboard() {
   const [editingGroup, setEditingGroup] = useState<any | null>(null);
   const [batchPrice, setBatchPrice] = useState<string>("");
   const [batchCostPrice, setBatchCostPrice] = useState<string>("");
+  const [isSavingBatchPrice, setIsSavingBatchPrice] = useState(false);
+
+  // Estado para Modal de Edição Completa do Produto (Marca, Modelo, Puffs, Preço, Custo, Imagem)
+  const [editingFullProduct, setEditingFullProduct] = useState<any | null>(null);
+  const [editBrand, setEditBrand] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editPuffs, setEditPuffs] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [editCostPrice, setEditCostPrice] = useState("");
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState("");
+  const [isSavingFullProduct, setIsSavingFullProduct] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Estado para Edição de Preço/Custo de Sabor / Variação Individual
+  const [isEditingSingleSkuPrice, setIsEditingSingleSkuPrice] = useState(false);
+  const [singleSkuPriceInput, setSingleSkuPriceInput] = useState("");
+  const [singleSkuCostInput, setSingleSkuCostInput] = useState("");
+  const [isSavingSingleSkuPrice, setIsSavingSingleSkuPrice] = useState(false);
 
   // Estado para Pop-up de Edição de Estoque por Sabor
   const [editingStockSku, setEditingStockSku] = useState<any | null>(null);
@@ -97,7 +135,7 @@ export function SupplyChainDashboard() {
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
   const [copiedCatalogLink, setCopiedCatalogLink] = useState(false);
 
-  const catalogUrl = `${window.location.origin}/catalogo`;
+  const catalogUrl = window.location.port === '5174' ? `${window.location.protocol}//${window.location.hostname}:5175` : `${window.location.origin}/catalogo`;
 
   const handleCopyCatalogLink = () => {
     try {
@@ -205,7 +243,8 @@ export function SupplyChainDashboard() {
       const { data: realOrders } = await supabase
         .from("smoking_orders")
         .select("items, delivery_status")
-        .or(`company_id.eq.${targetCompanyId},company_id.is.null`);
+        .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
+        .neq("delivery_status", "CANCELADO");
 
       let realSalesList: any[] = [];
       if (realOrders && realOrders.length > 0) {
@@ -229,15 +268,27 @@ export function SupplyChainDashboard() {
 
       if (prodData) {
         const mergedProducts = prodData.map((p: any) => {
+          const brandName = (p.brand || "Genérico").trim();
+          const modelName = (p.name || "Pod").trim();
+          const groupKey = `${brandName.toLowerCase()}__${modelName.toLowerCase()}`;
+          const savedCost = localStorage.getItem(`smk_cost_${groupKey}`) || localStorage.getItem(`smk_cost_${p.id}`);
+          const costVal = savedCost ? parseFloat(savedCost) : (parseFloat(p.cost_price) || 35);
           const stagedStock = pendingStockChangesRef.current[p.id];
-          if (stagedStock !== undefined) {
-            return { ...p, stock: stagedStock };
-          }
-          return p;
+          return {
+            ...p,
+            cost_price: costVal,
+            stock: stagedStock !== undefined ? stagedStock : p.stock
+          };
         });
         setProducts(mergedProducts);
       }
       setTopSelling(realSalesList);
+
+      // Carregar Categorias e Mapeamentos
+      const cats = await fetchCategories();
+      setCategoriesList(cats);
+      const catMapRes = await fetchProductCategoryMappings(targetCompanyId);
+      setCategoryMappings(catMapRes.productMap);
     } catch (err) {
       console.error("Erro ao carregar dados do Supabase:", err);
     } finally {
@@ -254,10 +305,32 @@ export function SupplyChainDashboard() {
   // ─── Handlers ───────────────────────────────────────────
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !price.trim()) {
-      alert("Por favor, preencha o Modelo e o Preço para cadastrar.");
+
+    const parsedPrice = parseMonetaryInput(price);
+    if (parsedPrice === null || parsedPrice <= 0) {
+      alert("Por favor, informe um Preço de Venda válido e maior que zero (ex: 104,90).");
       return;
     }
+
+    let parsedCost: number | null = null;
+    if (costPrice.trim() !== "") {
+      parsedCost = parseMonetaryInput(costPrice);
+      if (parsedCost === null) {
+        alert("Por favor, informe um Custo de Reposição numérico válido (ex: 35,00).");
+        return;
+      }
+      if (parsedCost < 0) {
+        alert("O Custo de Reposição não pode ser um número negativo.");
+        return;
+      }
+    }
+    const finalCostVal = parsedCost !== null ? parsedCost : 35.00;
+
+    if (!name.trim()) {
+      alert("Por favor, informe o Modelo do produto.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       let imageUrl = "";
@@ -265,15 +338,28 @@ export function SupplyChainDashboard() {
 
       const newBrandName = brand.trim() || "Genérico";
       const newModelName = name.trim();
-      const newPriceVal = parseFloat(price);
-      const newCostVal = parseFloat(costPrice) || 35.00;
       const newPuffsVal = parseInt(puffs) || 5000;
+      const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+      const groupKey = `${newBrandName.toLowerCase()}__${newModelName.toLowerCase()}`;
+
+      // Persiste o custo no localStorage sob a chave do grupo/modelo
+      try {
+        localStorage.setItem(`smk_cost_${groupKey}`, finalCostVal.toString());
+      } catch (e) {
+        console.warn("Erro ao salvar custo localmente:", e);
+      }
 
       let insertPayload: any = {
-        name: newModelName, brand: newBrandName, flavor: "Padrão",
-        price: newPriceVal, cost_price: newCostVal, stock: 0,
-        puffs: newPuffsVal, image_url: imageUrl, is_active: true,
-        company_id: company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5',
+        name: newModelName, 
+        brand: newBrandName, 
+        flavor: "Padrão",
+        price: parsedPrice, 
+        cost_price: finalCostVal, 
+        stock: 0,
+        puffs: newPuffsVal, 
+        image_url: imageUrl, 
+        is_active: true,
+        company_id: targetCompanyId,
       };
 
       // Garante que o vínculo company_users existe no Supabase antes de inserir
@@ -302,19 +388,32 @@ export function SupplyChainDashboard() {
         data = fallbackRes.data; error = fallbackRes.error;
       }
 
-      // Se inseriu com sucesso OU se o RLS bloqueou temporariamente, insere o produto otimista na tela
-      const createdProduct = (data && data[0]) ? data[0] : {
-        id: `prod-${Date.now()}`,
+      if (error) {
+        console.error("Erro do Supabase ao cadastrar produto:", error);
+        alert("Não foi possível cadastrar o produto no banco de dados. Tente novamente.");
+        return;
+      }
+
+      const insertedId = (data && data[0]) ? data[0].id : `prod-${Date.now()}`;
+      try {
+        localStorage.setItem(`smk_cost_${insertedId}`, finalCostVal.toString());
+      } catch (e) {}
+
+      const createdProduct = (data && data[0]) ? {
+        ...data[0],
+        cost_price: finalCostVal
+      } : {
+        id: insertedId,
         name: newModelName,
         brand: newBrandName,
         flavor: "Padrão",
-        price: newPriceVal,
-        cost_price: newCostVal,
+        price: parsedPrice,
+        cost_price: finalCostVal,
         stock: 0,
         puffs: newPuffsVal,
         image_url: imageUrl,
         is_active: true,
-        company_id: company?.id || null,
+        company_id: targetCompanyId,
         created_at: new Date().toISOString()
       };
 
@@ -325,14 +424,17 @@ export function SupplyChainDashboard() {
       if (fileInputRef.current) fileInputRef.current.value = "";
       setShowNewProductModal(false);
 
+      alert("Modelo cadastrado com sucesso.");
+
       setAddingFlavorGroup({
-        brand: newBrandName, name: newModelName, price: newPriceVal,
-        cost_price: newCostVal, puffs: newPuffsVal, image_url: imageUrl,
+        brand: newBrandName, name: newModelName, price: parsedPrice,
+        cost_price: finalCostVal, puffs: newPuffsVal, image_url: imageUrl,
       });
       setNewFlavorName(""); setNewFlavorStock("");
+      await fetchData();
     } catch (err: any) {
-      console.error(err);
-      alert("Erro ao cadastrar: " + err.message);
+      console.error("Erro inesperado ao cadastrar produto:", err);
+      alert("Não foi possível cadastrar o produto. Tente novamente.");
     } finally {
       setSubmitting(false);
     }
@@ -496,21 +598,263 @@ export function SupplyChainDashboard() {
   };
 
   const handleSaveBatchGroupEdit = async () => {
-    if (!editingGroup) return;
+    if (!editingGroup || isSavingBatchPrice) return;
+
+    const parsedPrice = parseMonetaryInput(batchPrice);
+    const parsedCost = parseMonetaryInput(batchCostPrice);
+
+    if (parsedPrice === null && parsedCost === null) {
+      alert("Por favor, insira um valor monetário válido e maior ou igual a zero.");
+      return;
+    }
+
+    const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
     const ids = editingGroup.flavors.map((f: any) => f.id);
-    const pVal = parseFloat(batchPrice);
-    const cVal = parseFloat(batchCostPrice);
+    if (!ids || ids.length === 0) {
+      alert("Não foi possível identificar os produtos deste modelo.");
+      return;
+    }
+
+    setIsSavingBatchPrice(true);
+
     let updatePayload: any = {};
-    if (!isNaN(pVal) && pVal >= 0) updatePayload.price = pVal;
-    if (!isNaN(cVal) && cVal >= 0) updatePayload.cost_price = cVal;
-    if (Object.keys(updatePayload).length === 0) { setEditingGroup(null); return; }
+    if (parsedPrice !== null) updatePayload.price = parsedPrice;
+    if (parsedCost !== null) updatePayload.cost_price = parsedCost;
+
+    if (parsedCost !== null) {
+      try {
+        localStorage.setItem(`smk_cost_${editingGroup.groupKey}`, parsedCost.toString());
+        ids.forEach((id: string) => localStorage.setItem(`smk_cost_${id}`, parsedCost.toString()));
+      } catch (e) {
+        console.warn("Erro ao salvar no localStorage:", e);
+      }
+    }
+
     try {
-      setProducts(prev => prev.map(p => ids.includes(p.id) ? { ...p, ...updatePayload } : p));
-      await supabase.from("smoking_products").update(updatePayload).in("id", ids);
-    } catch (err) {
-      console.error(err); fetchData();
+      // 1. Atualização Otimista no Estado Local
+      setProducts(prev => prev.map(p => ids.includes(p.id) ? { 
+        ...p, 
+        ...(parsedPrice !== null ? { price: parsedPrice } : {}),
+        ...(parsedCost !== null ? { cost_price: parsedCost } : {})
+      } : p));
+
+      // 2. Persistência no Supabase estritamente por Empresa e IDs
+      let query = supabase.from("smoking_products").update(updatePayload).in("id", ids);
+      if (company?.id) query = query.eq("company_id", company.id);
+      let { error } = await query;
+
+      // Tratamento para caso a coluna cost_price não exista na tabela do Supabase
+      if (error && (error.message?.includes("cost_price") || error.code === "PGRST204")) {
+        const fallbackPayload = { ...updatePayload };
+        delete fallbackPayload.cost_price;
+        if (Object.keys(fallbackPayload).length > 0) {
+          let retryQuery = supabase.from("smoking_products").update(fallbackPayload).in("id", ids);
+          if (company?.id) retryQuery = retryQuery.eq("company_id", company.id);
+          const fallbackRes = await retryQuery;
+          error = fallbackRes.error;
+        } else {
+          error = null;
+        }
+      }
+
+      if (error) {
+        console.error("Erro do Supabase ao atualizar preços:", error);
+        alert("Não foi possível atualizar o preço. Tente novamente.");
+        await fetchData();
+      } else {
+        alert("Preço atualizado com sucesso.");
+        await fetchData();
+        setEditingGroup(null);
+      }
+    } catch (err: any) {
+      console.error("Erro técnico inesperado ao salvar preço:", err);
+      alert("Não foi possível atualizar o preço. Tente novamente.");
+      await fetchData();
     } finally {
-      setEditingGroup(null);
+      setIsSavingBatchPrice(false);
+    }
+  };
+
+  const handleSaveFullProductEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingFullProduct || isSavingFullProduct) return;
+
+    const parsedPrice = parseMonetaryInput(editPrice);
+    if (parsedPrice === null || parsedPrice <= 0) {
+      alert("Por favor, informe um Preço de Venda válido e maior que zero (ex: 79,90).");
+      return;
+    }
+
+    let parsedCost: number | null = null;
+    if (editCostPrice.trim() !== "") {
+      parsedCost = parseMonetaryInput(editCostPrice);
+      if (parsedCost === null) {
+        alert("Por favor, informe um Custo de Reposição numérico válido (ex: 42,00).");
+        return;
+      }
+      if (parsedCost < 0) {
+        alert("O Custo de Reposição não pode ser um número negativo.");
+        return;
+      }
+    }
+    const finalCostVal = parsedCost !== null ? parsedCost : 35.00;
+
+    if (!editName.trim()) {
+      alert("Por favor, informe o Modelo do produto.");
+      return;
+    }
+
+    const ids = editingFullProduct.flavors.map((f: any) => f.id);
+    if (!ids || ids.length === 0) {
+      alert("Não foi possível identificar os produtos deste modelo.");
+      return;
+    }
+
+    setIsSavingFullProduct(true);
+
+    try {
+      let finalImageUrl = editingFullProduct.image_url || "";
+      if (editImageFile) {
+        finalImageUrl = await uploadProductImage(editImageFile);
+      }
+
+      const newBrandName = editBrand.trim() || "Genérico";
+      const newModelName = editName.trim();
+      const newPuffsVal = parseInt(editPuffs) || 5000;
+      const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+      const newGroupKey = `${newBrandName.toLowerCase()}__${newModelName.toLowerCase()}`;
+
+      // 1. Atualiza custo no armazenamento local sob as chaves do modelo e dos IDs
+      try {
+        localStorage.setItem(`smk_cost_${newGroupKey}`, finalCostVal.toString());
+        ids.forEach((id: string) => localStorage.setItem(`smk_cost_${id}`, finalCostVal.toString()));
+      } catch (e) {
+        console.warn("Erro ao salvar custo localmente:", e);
+      }
+
+      // 2. Atualização otimista no estado local sem remover sabores ou IDs
+      setProducts(prev => prev.map(p => ids.includes(p.id) ? {
+        ...p,
+        brand: newBrandName,
+        name: newModelName,
+        puffs: newPuffsVal,
+        price: parsedPrice,
+        cost_price: finalCostVal,
+        image_url: finalImageUrl
+      } : p));
+
+      // 3. Atualizar Supabase com filtro company_id e IDs dos sabores
+      let updatePayload: any = {
+        brand: newBrandName,
+        name: newModelName,
+        puffs: newPuffsVal,
+        price: parsedPrice,
+        cost_price: finalCostVal,
+        image_url: finalImageUrl
+      };
+
+      let query = supabase.from("smoking_products").update(updatePayload).in("id", ids);
+      if (company?.id) query = query.eq("company_id", company.id);
+      let { error } = await query;
+
+      if (error && (error.message?.includes("cost_price") || error.code === "PGRST204")) {
+        const fallbackPayload = { ...updatePayload };
+        delete fallbackPayload.cost_price;
+        let retryQuery = supabase.from("smoking_products").update(fallbackPayload).in("id", ids);
+        if (company?.id) retryQuery = retryQuery.eq("company_id", company.id);
+        const fallbackRes = await retryQuery;
+        error = fallbackRes.error;
+      }
+
+      if (error) {
+        console.error("Erro do Supabase ao atualizar produto completo:", error);
+        alert("Não foi possível salvar as alterações no banco de dados. Tente novamente.");
+        await fetchData();
+      } else {
+        alert("Produto atualizado com sucesso.");
+        await fetchData();
+        setEditingFullProduct(null);
+      }
+    } catch (err: any) {
+      console.error("Erro técnico inesperado ao editar produto:", err);
+      alert("Não foi possível salvar as alterações do produto. Tente novamente.");
+      await fetchData();
+    } finally {
+      setIsSavingFullProduct(false);
+    }
+  };
+
+  const handleSaveSingleSkuPrice = async () => {
+    if (!selectedDrawerSKU || isSavingSingleSkuPrice) return;
+
+    const parsedPrice = parseMonetaryInput(singleSkuPriceInput);
+    const parsedCost = parseMonetaryInput(singleSkuCostInput);
+
+    if (parsedPrice === null && parsedCost === null) {
+      alert("Por favor, insira um valor monetário válido e maior ou igual a zero.");
+      return;
+    }
+
+    const skuId = selectedDrawerSKU.id;
+    setIsSavingSingleSkuPrice(true);
+
+    let updatePayload: any = {};
+    if (parsedPrice !== null) updatePayload.price = parsedPrice;
+    if (parsedCost !== null) updatePayload.cost_price = parsedCost;
+
+    if (parsedCost !== null) {
+      try {
+        localStorage.setItem(`smk_cost_${skuId}`, parsedCost.toString());
+      } catch (e) {}
+    }
+
+    try {
+      // 1. Atualização Otimista no Estado Local (somente o SKU selecionado)
+      setProducts(prev => prev.map(p => p.id === skuId ? {
+        ...p,
+        ...(parsedPrice !== null ? { price: parsedPrice } : {}),
+        ...(parsedCost !== null ? { cost_price: parsedCost } : {})
+      } : p));
+
+      setSelectedDrawerSKU((prev: any) => prev ? {
+        ...prev,
+        ...(parsedPrice !== null ? { price: parsedPrice } : {}),
+        ...(parsedCost !== null ? { cost_price: parsedCost } : {})
+      } : null);
+
+      // 2. Persistência no Supabase estritamente por ID da variação e Empresa
+      let query = supabase.from("smoking_products").update(updatePayload).eq("id", skuId);
+      if (company?.id) query = query.eq("company_id", company.id);
+      let { error } = await query;
+
+      if (error && (error.message?.includes("cost_price") || error.code === "PGRST204")) {
+        const fallbackPayload = { ...updatePayload };
+        delete fallbackPayload.cost_price;
+        if (Object.keys(fallbackPayload).length > 0) {
+          let retryQuery = supabase.from("smoking_products").update(fallbackPayload).eq("id", skuId);
+          if (company?.id) retryQuery = retryQuery.eq("company_id", company.id);
+          const fallbackRes = await retryQuery;
+          error = fallbackRes.error;
+        } else {
+          error = null;
+        }
+      }
+
+      if (error) {
+        console.error("Erro do Supabase ao atualizar variação:", error);
+        alert("Não foi possível atualizar o preço. Tente novamente.");
+        await fetchData();
+      } else {
+        alert("Preço atualizado com sucesso.");
+        await fetchData();
+        setIsEditingSingleSkuPrice(false);
+      }
+    } catch (err: any) {
+      console.error("Erro técnico ao salvar variação:", err);
+      alert("Não foi possível atualizar o preço. Tente novamente.");
+      await fetchData();
+    } finally {
+      setIsSavingSingleSkuPrice(false);
     }
   };
 
@@ -638,6 +982,9 @@ export function SupplyChainDashboard() {
         image_url: product.image_url || "", totalStock: 0, 
         flavors: [], realFlavors: [], outOfStockFlavors: [], lowStockFlavors: [], inStockFlavors: []
       };
+    } else {
+      if (product.price && parseFloat(product.price) > 0) groupedMap[groupKey].price = parseFloat(product.price);
+      if (product.cost_price && parseFloat(product.cost_price) > 0) groupedMap[groupKey].cost_price = parseFloat(product.cost_price);
     }
 
     groupedMap[groupKey].flavors.push(product);
@@ -735,6 +1082,27 @@ export function SupplyChainDashboard() {
     };
   });
 
+  function isFlavorMatch(f1: string, f2: string): boolean {
+    if (!f1 || !f2) return false;
+    const s1 = f1.toLowerCase().trim();
+    const s2 = f2.toLowerCase().trim();
+    if (s1 === s2) return true;
+
+    const isMenthol1 = /menth|menta|mint/i.test(s1);
+    const isMenthol2 = /menth|menta|mint/i.test(s2);
+    if (isMenthol1 && isMenthol2) return true;
+
+    const isWatermelon1 = /water|melan/i.test(s1);
+    const isWatermelon2 = /water|melan/i.test(s2);
+    if (isWatermelon1 && isWatermelon2) return true;
+
+    const isApple1 = /apple|maçã|maca/i.test(s1);
+    const isApple2 = /apple|maçã|maca/i.test(s2);
+    if (isApple1 && isApple2) return true;
+
+    return s1.includes(s2) || s2.includes(s1);
+  }
+
   topSelling.forEach((item: any) => {
     const pName = (item.product_name || item.name || '').toLowerCase().trim();
     const fName = (item.flavor || '').toLowerCase().trim();
@@ -755,7 +1123,7 @@ export function SupplyChainDashboard() {
 
       if (isModelMatch) {
         m.totalSold += sold;
-        const foundFlavor = m.flavors.find(f => f.flavor.toLowerCase().trim() === fName);
+        const foundFlavor = m.flavors.find(f => isFlavorMatch(f.flavor, fName));
         if (foundFlavor) {
           foundFlavor.totalSold += sold;
         }
@@ -1234,6 +1602,60 @@ export function SupplyChainDashboard() {
                           {isGroupVisible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
                         </button>
 
+                        {/* Botão de Estrela ⭐ para Alternar Instantaneamente "Mais Vendidos" (1-Clique) */}
+                        {(() => {
+                          const MAIS_VENDIDOS_ID = "11111111-1111-4111-a111-111111111111";
+                          const modelMapping = categoryMappings[group.groupKey];
+                          const firstFlavor = group.flavors[0];
+                          const flavorMapping = firstFlavor ? categoryMappings[firstFlavor.id] : null;
+                          const currentCatIds = (modelMapping && modelMapping.category_ids.length > 0)
+                            ? modelMapping.category_ids
+                            : (flavorMapping?.category_ids || []);
+                          const isMaisVendido = currentCatIds.includes(MAIS_VENDIDOS_ID);
+
+                          return (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const newCatIds = isMaisVendido
+                                  ? currentCatIds.filter((id: string) => id !== MAIS_VENDIDOS_ID)
+                                  : [...currentCatIds, MAIS_VENDIDOS_ID];
+                                const currentOrder = modelMapping?.display_order || flavorMapping?.display_order || 1;
+                                const pIds = group.flavors.map((f: any) => f.id);
+                                const modelKey = group.groupKey;
+                                const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+
+                                // Atualiza otimista localmente
+                                setCategoryMappings((prev) => {
+                                  const updated = { ...prev };
+                                  updated[modelKey] = { category_ids: newCatIds, display_order: currentOrder };
+                                  pIds.forEach((pid: string) => {
+                                    updated[pid] = { category_ids: newCatIds, display_order: currentOrder };
+                                  });
+                                  return updated;
+                                });
+
+                                // Persiste no Supabase e localStorage
+                                await updateModelCategories({
+                                  productIds: pIds,
+                                  modelKey: modelKey,
+                                  categoryIds: newCatIds,
+                                  displayOrder: currentOrder,
+                                  companyId: targetCompanyId,
+                                });
+                              }}
+                              className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
+                                isMaisVendido
+                                  ? "bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_10px_rgba(251,191,36,0.35)]"
+                                  : "bg-elevated hover:bg-white/10 text-slate-400 hover:text-amber-400 border-white/10"
+                              }`}
+                              title={isMaisVendido ? "Remover dos Mais Vendidos (Desafixar do topo)" : "Fixar nos Mais Vendidos (Exibir no topo do catálogo)"}
+                            >
+                              <Star className={`size-4 ${isMaisVendido ? "fill-amber-400 text-amber-400" : ""}`} />
+                            </button>
+                          );
+                        })()}
+
                         {/* Menu 3 Pontos */}
                         <div className="relative">
                           <button
@@ -1248,6 +1670,46 @@ export function SupplyChainDashboard() {
                               <button
                                 type="button"
                                 onClick={() => {
+                                  const modelMapping = categoryMappings[group.groupKey];
+                                  const firstFlavor = group.flavors[0];
+                                  const flavorMapping = firstFlavor ? categoryMappings[firstFlavor.id] : null;
+
+                                  const catIds = (modelMapping && modelMapping.category_ids.length > 0)
+                                    ? modelMapping.category_ids
+                                    : (flavorMapping?.category_ids || []);
+                                  const order = modelMapping?.display_order || flavorMapping?.display_order || 1;
+
+                                  setEditingCategoryGroup(group);
+                                  setSelectedCategoryIds(catIds);
+                                  setSelectedDisplayOrder(order.toString());
+                                  setActiveGroupMenuKey(null);
+                                }}
+                                className="w-full text-left px-3.5 py-2.5 hover:bg-white/15 hover:text-white flex items-center gap-2.5 text-silver transition-colors cursor-pointer"
+                              >
+                                <Star className="size-3.5 text-amber-400" />
+                                Organizar Posição no Topo
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingFullProduct(group);
+                                  setEditBrand(group.brand || "");
+                                  setEditName(group.name || "");
+                                  setEditPuffs((group.puffs || 5000).toString());
+                                  setEditPrice(group.price.toString());
+                                  setEditCostPrice(group.cost_price.toString());
+                                  setEditImageFile(null);
+                                  setEditImagePreview(group.image_url || "");
+                                  setActiveGroupMenuKey(null);
+                                }}
+                                className="w-full text-left px-3.5 py-2.5 hover:bg-white/15 hover:text-white flex items-center gap-2.5 text-silver transition-colors cursor-pointer"
+                              >
+                                <Edit3 className="size-3.5 text-emerald-400" />
+                                Editar Produto
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
                                   setEditingGroup(group);
                                   setBatchPrice(group.price.toString());
                                   setBatchCostPrice(group.cost_price.toString());
@@ -1255,8 +1717,49 @@ export function SupplyChainDashboard() {
                                 }}
                                 className="w-full text-left px-3.5 py-2.5 hover:bg-white/15 hover:text-white flex items-center gap-2.5 text-silver transition-colors cursor-pointer"
                               >
-                                <Edit3 className="size-3.5 text-blue-400" />
+                                <Tag className="size-3.5 text-blue-400" />
                                 Editar Preço / Custo em Lote
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const maisVendidosCatId = "11111111-1111-4111-a111-111111111111";
+                                  const currentModelMapping = categoryMappings[group.groupKey];
+                                  const currentCatIds = currentModelMapping?.category_ids || [];
+                                  const isPinned = currentCatIds.includes(maisVendidosCatId);
+
+                                  let newCatIds: string[];
+                                  if (isPinned) {
+                                    newCatIds = currentCatIds.filter(id => id !== maisVendidosCatId);
+                                  } else {
+                                    newCatIds = [...currentCatIds, maisVendidosCatId];
+                                  }
+
+                                  const pIds = group.flavors.map((f: any) => f.id);
+                                  const modelKey = group.groupKey;
+                                  const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+
+                                  await updateModelCategories({
+                                    productIds: pIds,
+                                    modelKey: modelKey,
+                                    categoryIds: newCatIds,
+                                    displayOrder: currentModelMapping?.display_order || 1,
+                                    companyId: targetCompanyId,
+                                  });
+
+                                  setCategoryMappings(prev => ({
+                                    ...prev,
+                                    [modelKey]: { category_ids: newCatIds, display_order: currentModelMapping?.display_order || 1 }
+                                  }));
+
+                                  setActiveGroupMenuKey(null);
+                                }}
+                                className="w-full text-left px-3.5 py-2.5 hover:bg-white/15 hover:text-white flex items-center gap-2.5 text-silver transition-colors cursor-pointer"
+                              >
+                                <Star className="size-3.5 text-amber-400 fill-amber-400" />
+                                {categoryMappings[group.groupKey]?.category_ids?.includes("11111111-1111-4111-a111-111111111111")
+                                  ? "Desafixar de Mais Vendidos"
+                                  : "Fixar no Topo (Mais Vendidos)"}
                               </button>
                               <div className="h-px bg-white/10 my-1" />
                               <button
@@ -1514,17 +2017,26 @@ export function SupplyChainDashboard() {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Preço de Venda (R$) *</label>
                   <input 
-                    type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)}
-                    placeholder="90.00" required
-                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium"
+                    type="text" 
+                    inputMode="decimal" 
+                    value={price} 
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="Ex.: 104,90 ou 104.90" 
+                    required
+                    disabled={submitting}
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium disabled:opacity-50"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Custo (R$)</label>
                   <input 
-                    type="number" step="0.01" value={costPrice} onChange={(e) => setCostPrice(e.target.value)}
-                    placeholder="35.00"
-                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium"
+                    type="text" 
+                    inputMode="decimal" 
+                    value={costPrice} 
+                    onChange={(e) => setCostPrice(e.target.value)}
+                    placeholder="Ex.: 35,00 ou 35.00"
+                    disabled={submitting}
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium disabled:opacity-50"
                   />
                 </div>
               </div>
@@ -1567,16 +2079,24 @@ export function SupplyChainDashboard() {
                 <button 
                   type="button"
                   onClick={() => setShowNewProductModal(false)}
-                  className="flex-1 bg-elevated hover:bg-white/10 text-muted-foreground text-xs font-semibold py-2.5 rounded-xl border border-border transition-all cursor-pointer"
+                  disabled={submitting}
+                  className="flex-1 bg-elevated hover:bg-white/10 text-muted-foreground text-xs font-semibold py-2.5 rounded-xl border border-border transition-all cursor-pointer disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs py-2.5 rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs py-2.5 rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                 >
-                  {submitting ? <Loader2 className="size-3.5 animate-spin" /> : "Cadastrar Modelo"}
+                  {submitting ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin text-black" />
+                      Cadastrando...
+                    </>
+                  ) : (
+                    "Cadastrar Modelo"
+                  )}
                 </button>
               </div>
             </form>
@@ -1651,11 +2171,178 @@ export function SupplyChainDashboard() {
         </div>
       )}
 
+      {/* ━━━ MODAL: EDIÇÃO COMPLETA DO PRODUTO (MARCA, MODELO, PUFFS, PREÇO, CUSTO, IMAGEM) ━━━━━━━ */}
+      {editingFullProduct && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-[#121212] border border-border rounded-3xl w-full max-w-md shadow-2xl p-6 relative space-y-5 overflow-hidden">
+            <button 
+              type="button" 
+              onClick={() => setEditingFullProduct(null)} 
+              disabled={isSavingFullProduct} 
+              className="absolute top-4 right-4 text-muted-foreground hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              <X className="size-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 grid place-items-center shrink-0">
+                <Edit3 className="size-5 text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-white">Editar Produto</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {getGroupDisplayName(editingFullProduct.brand, editingFullProduct.name)} ({editingFullProduct.flavors.length} sabores vinculados)
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveFullProductEdit} className="space-y-4">
+              {/* Foto do Pod */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Foto do Pod</label>
+                <div className="flex items-center gap-3">
+                  <div className="relative size-16 rounded-xl overflow-hidden border border-white/10 bg-black/40 shrink-0">
+                    {editImagePreview ? (
+                      <img src={editImagePreview} alt="Preview" className="size-full object-cover" />
+                    ) : (
+                      <ImagePlus className="size-6 text-muted-foreground/30 absolute inset-0 m-auto" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <input 
+                      ref={editFileInputRef} 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setEditImageFile(file);
+                          const reader = new FileReader();
+                          reader.onloadend = () => setEditImagePreview(reader.result as string);
+                          reader.readAsDataURL(file);
+                        }
+                      }} 
+                      className="hidden" 
+                      id="edit-modal-pod-upload" 
+                    />
+                    <label 
+                      htmlFor="edit-modal-pod-upload" 
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-elevated hover:bg-white/10 text-white text-xs font-semibold border border-white/10 cursor-pointer transition-colors"
+                    >
+                      <Camera className="size-3.5 text-emerald-400" />
+                      Alterar Imagem
+                    </label>
+                    <span className="text-[10px] text-muted-foreground block">
+                      {editImageFile ? editImageFile.name : "Manter imagem atual se não selecionar outra"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Marca e Modelo */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Marca</label>
+                  <input 
+                    type="text" 
+                    value={editBrand} 
+                    onChange={(e) => setEditBrand(e.target.value)}
+                    disabled={isSavingFullProduct}
+                    placeholder="Ex.: Ignite, ELF BAR"
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-all font-medium disabled:opacity-50"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Modelo *</label>
+                  <input 
+                    type="text" 
+                    value={editName} 
+                    onChange={(e) => setEditName(e.target.value)}
+                    disabled={isSavingFullProduct}
+                    placeholder="Ex.: V50, BC20K"
+                    required
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-all font-medium disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              {/* Puffs */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Puffs</label>
+                <input 
+                  type="number" 
+                  value={editPuffs} 
+                  onChange={(e) => setEditPuffs(e.target.value)}
+                  disabled={isSavingFullProduct}
+                  placeholder="Ex.: 20000"
+                  className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-all font-medium disabled:opacity-50"
+                />
+              </div>
+
+              {/* Preço de Venda e Custo */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Preço de Venda (R$) *</label>
+                  <input 
+                    type="text" 
+                    inputMode="decimal"
+                    value={editPrice} 
+                    onChange={(e) => setEditPrice(e.target.value)}
+                    disabled={isSavingFullProduct}
+                    placeholder="Ex.: 79,90"
+                    required
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-all font-medium disabled:opacity-50"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Custo (R$)</label>
+                  <input 
+                    type="text" 
+                    inputMode="decimal"
+                    value={editCostPrice} 
+                    onChange={(e) => setEditCostPrice(e.target.value)}
+                    disabled={isSavingFullProduct}
+                    placeholder="Ex.: 42,00"
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-all font-medium disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              {/* Botões */}
+              <div className="flex gap-2.5 pt-3 border-t border-border">
+                <button 
+                  type="button" 
+                  onClick={() => setEditingFullProduct(null)} 
+                  disabled={isSavingFullProduct}
+                  className="flex-1 bg-elevated hover:bg-white/10 text-muted-foreground text-xs font-semibold py-2.5 rounded-xl border border-border transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSavingFullProduct}
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs py-2.5 rounded-xl disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+                >
+                  {isSavingFullProduct ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin text-black" />
+                      Salvando...
+                    </>
+                  ) : (
+                    "Salvar Alterações"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ━━━ MODAL: EDIÇÃO EM LOTE (PREÇO/CUSTO) ━━━━━━━ */}
       {editingGroup && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#121212] border border-border rounded-2xl w-full max-w-sm shadow-2xl p-5 relative animate-in fade-in zoom-in-95 duration-150 space-y-4">
-            <button onClick={() => setEditingGroup(null)} className="absolute top-3 right-3 text-muted-foreground hover:text-white"><X className="size-4" /></button>
+            <button onClick={() => setEditingGroup(null)} disabled={isSavingBatchPrice} className="absolute top-3 right-3 text-muted-foreground hover:text-white disabled:opacity-50"><X className="size-4" /></button>
             <h3 className="font-semibold text-sm text-silver">Editar Valores do Modelo</h3>
             <p className="text-xs text-muted-foreground">
               {getGroupDisplayName(editingGroup.brand, editingGroup.name)} ({editingGroup.flavors.length} sabores afetados)
@@ -1663,18 +2350,53 @@ export function SupplyChainDashboard() {
             <div className="space-y-3">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] uppercase font-semibold text-muted-foreground">Preço de Venda (R$)</label>
-                <input type="number" step="0.01" value={batchPrice} onChange={(e) => setBatchPrice(e.target.value)}
-                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50 font-medium" />
+                <input 
+                  type="text" 
+                  inputMode="decimal"
+                  placeholder="Ex.: 99.90 ou 99,90"
+                  value={batchPrice} 
+                  onChange={(e) => setBatchPrice(e.target.value)}
+                  disabled={isSavingBatchPrice}
+                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50 font-medium disabled:opacity-50" 
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] uppercase font-semibold text-muted-foreground">Custo de Reposição (R$)</label>
-                <input type="number" step="0.01" value={batchCostPrice} onChange={(e) => setBatchCostPrice(e.target.value)}
-                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50 font-medium" />
+                <input 
+                  type="text" 
+                  inputMode="decimal"
+                  placeholder="Ex.: 40.00 ou 40,00"
+                  value={batchCostPrice} 
+                  onChange={(e) => setBatchCostPrice(e.target.value)}
+                  disabled={isSavingBatchPrice}
+                  className="bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50 font-medium disabled:opacity-50" 
+                />
               </div>
             </div>
             <div className="flex gap-2 pt-2">
-              <button onClick={() => setEditingGroup(null)} className="flex-1 bg-elevated hover:bg-white/10 text-muted-foreground text-xs py-2.5 rounded-xl border border-border">Cancelar</button>
-              <button onClick={handleSaveBatchGroupEdit} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs py-2.5 rounded-xl">Salvar em Lote</button>
+              <button 
+                type="button" 
+                onClick={() => setEditingGroup(null)} 
+                disabled={isSavingBatchPrice}
+                className="flex-1 bg-elevated hover:bg-white/10 text-muted-foreground text-xs py-2.5 rounded-xl border border-border disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="button" 
+                onClick={handleSaveBatchGroupEdit} 
+                disabled={isSavingBatchPrice}
+                className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs py-2.5 rounded-xl disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+              >
+                {isSavingBatchPrice ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin text-black" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Salvar"
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -1699,7 +2421,7 @@ export function SupplyChainDashboard() {
                     <p className="text-xs text-muted-foreground">{selectedDrawerSKU.brand} · {selectedDrawerSKU.name}</p>
                   </div>
                 </div>
-                <button onClick={() => setSelectedDrawerSKU(null)} className="p-1.5 rounded-lg text-muted-foreground hover:text-white hover:bg-white/10">
+                <button onClick={() => { setSelectedDrawerSKU(null); setIsEditingSingleSkuPrice(false); }} className="p-1.5 rounded-lg text-muted-foreground hover:text-white hover:bg-white/10">
                   <X className="size-5" />
                 </button>
               </div>
@@ -1720,6 +2442,75 @@ export function SupplyChainDashboard() {
                   </span>
                 </div>
               </div>
+
+              {/* Formulário de Edição Individual de Preço/Custo da Variação */}
+              {isEditingSingleSkuPrice ? (
+                <div className="bg-card border border-emerald-500/30 rounded-xl p-4 space-y-3 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">Editar Valores Deste Sabor</span>
+                    <button onClick={() => setIsEditingSingleSkuPrice(false)} className="text-xs text-muted-foreground hover:text-white"><X className="size-3.5" /></button>
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-[10px] uppercase font-semibold text-muted-foreground block mb-1">Preço de Venda (R$)</label>
+                      <input 
+                        type="text" 
+                        inputMode="decimal"
+                        value={singleSkuPriceInput}
+                        onChange={(e) => setSingleSkuPriceInput(e.target.value)}
+                        disabled={isSavingSingleSkuPrice}
+                        className="w-full bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-semibold text-muted-foreground block mb-1">Custo de Reposição (R$)</label>
+                      <input 
+                        type="text" 
+                        inputMode="decimal"
+                        value={singleSkuCostInput}
+                        onChange={(e) => setSingleSkuCostInput(e.target.value)}
+                        disabled={isSavingSingleSkuPrice}
+                        className="w-full bg-[#0f0f0f] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button 
+                      onClick={() => setIsEditingSingleSkuPrice(false)}
+                      disabled={isSavingSingleSkuPrice}
+                      className="flex-1 bg-elevated hover:bg-white/10 text-muted-foreground text-xs py-2 rounded-xl border border-border"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      onClick={handleSaveSingleSkuPrice}
+                      disabled={isSavingSingleSkuPrice}
+                      className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs py-2 rounded-xl disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      {isSavingSingleSkuPrice ? (
+                        <>
+                          <Loader2 className="size-3.5 animate-spin text-black" />
+                          Salvando...
+                        </>
+                      ) : (
+                        "Salvar"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => {
+                    setIsEditingSingleSkuPrice(true);
+                    setSingleSkuPriceInput(selectedDrawerSKU.price.toString());
+                    setSingleSkuCostInput((selectedDrawerSKU.cost_price || 35).toString());
+                  }}
+                  className="w-full bg-elevated hover:bg-white/10 text-white text-xs font-semibold py-2.5 rounded-xl border border-border flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                >
+                  <Edit3 className="size-4 text-blue-400" />
+                  Editar Preço / Custo Deste Sabor
+                </button>
+              )}
 
               <div className="bg-card border border-border rounded-xl p-4 space-y-2">
                 <div className="flex justify-between items-center text-xs">
@@ -1941,6 +2732,134 @@ export function SupplyChainDashboard() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ━━━ MODAL DE GERENCIAMENTO DE CATEGORIAS E DESTAQUES (⭐) ━━━━━━━━━━━━━━ */}
+      {editingCategoryGroup && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#121212] border border-white/15 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <Star className="size-5 text-amber-400 fill-amber-400" />
+                <h3 className="font-bold text-base text-white">Fixar Pod nos Mais Vendidos</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCategoryGroup(null)}
+                className="text-muted-foreground hover:text-white p-1 rounded-lg hover:bg-white/10"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Modelo selecionado:</p>
+              <p className="text-sm font-bold text-emerald-400">
+                {getGroupDisplayName(editingCategoryGroup.brand, editingCategoryGroup.name)}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-xs font-semibold text-silver uppercase tracking-wider block">
+                Destaque no Topo do Catálogo
+              </label>
+              <div className="space-y-2 bg-black/40 border border-white/10 rounded-xl p-3">
+                {categoriesList.map((cat) => {
+                  const isChecked = selectedCategoryIds.includes(cat.id);
+                  return (
+                    <label
+                      key={cat.id}
+                      className={`flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer ${
+                        isChecked
+                          ? "bg-amber-500/10 border-amber-500/30 text-white font-semibold"
+                          : "bg-white/5 border-transparent text-muted-foreground hover:text-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedCategoryIds((prev) => [...prev, cat.id]);
+                            } else {
+                              setSelectedCategoryIds((prev) => prev.filter((id) => id !== cat.id));
+                            }
+                          }}
+                          className="size-4 accent-amber-400 rounded cursor-pointer"
+                        />
+                        <span className="text-xs font-bold">Fixar em "{cat.name}"</span>
+                      </div>
+                      <span className="text-[10px] text-amber-400/80 font-mono">{cat.badge_text}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-silver uppercase tracking-wider block">
+                Posição no Topo (1, 2, 3, 4...)
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={selectedDisplayOrder}
+                onChange={(e) => setSelectedDisplayOrder(e.target.value)}
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400/50"
+                placeholder="Ex: 1 (menor número = primeiro pod do topo)"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Pods fixados com posição 1, 2, 3 e 4 aparecem nos primeiros 4 slots do topo do catálogo.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setEditingCategoryGroup(null)}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isSavingCategory}
+                onClick={async () => {
+                  setIsSavingCategory(true);
+                  const orderNum = parseInt(selectedDisplayOrder) || 1;
+                  const pIds = editingCategoryGroup.flavors.map((f: any) => f.id);
+                  const modelKey = editingCategoryGroup.groupKey;
+                  const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+
+                  await updateModelCategories({
+                    productIds: pIds,
+                    modelKey: modelKey,
+                    categoryIds: selectedCategoryIds,
+                    displayOrder: orderNum,
+                    companyId: targetCompanyId,
+                  });
+
+                  setCategoryMappings((prev) => {
+                    const updated = { ...prev };
+                    updated[modelKey] = { category_ids: selectedCategoryIds, display_order: orderNum };
+                    pIds.forEach((pid: string) => {
+                      updated[pid] = { category_ids: selectedCategoryIds, display_order: orderNum };
+                    });
+                    return updated;
+                  });
+
+                  setIsSavingCategory(false);
+                  setEditingCategoryGroup(null);
+                }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold transition-all shadow-[0_0_15px_rgba(251,191,36,0.3)] cursor-pointer"
+              >
+                {isSavingCategory ? <Loader2 className="size-4 animate-spin text-black" /> : <Save className="size-4" />}
+                <span>Salvar Categorias</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

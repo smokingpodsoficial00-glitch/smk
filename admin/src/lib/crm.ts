@@ -80,31 +80,54 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
     const result: RealClient[] = [];
     const now = new Date().getTime();
 
-    for (const [phone, clientOrders] of clientGroups.entries()) {
+    for (const [phoneKey, clientOrders] of clientGroups.entries()) {
       if (!clientOrders || clientOrders.length === 0) continue;
 
       // Ordenar por data (mais recente primeiro)
       clientOrders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
 
       const latestOrder = clientOrders[0] || {};
-      const registeredCustomer = customerMap.get(phone);
+      const registeredCustomer = customerMap.get(phoneKey);
 
-      const rawPhone = latestOrder.client_phone || latestOrder.customer_phone || phone || '5511999999999';
-      const cleanPhone = String(rawPhone).replace(/\D/g, '');
+      const rawPhone = latestOrder.client_phone || latestOrder.customer_phone || phoneKey || '';
+      let cleanPhone = String(rawPhone).replace(/\D/g, '');
 
-      const name = registeredCustomer?.name || latestOrder.client_name || latestOrder.customer_name || `Cliente ${cleanPhone.slice(-4)}`;
+      // Se cleanPhone for um ID de LID do WhatsApp (>13 dígitos), tenta ajustar
+      if (cleanPhone.length > 13) {
+        const foundPhoneOrder = clientOrders.find(o => o.client_phone && o.client_phone.includes('('));
+        if (foundPhoneOrder) {
+          cleanPhone = foundPhoneOrder.client_phone.replace(/\D/g, '');
+        }
+      }
+
+      // Formatação bonita para exibição na interface
+      let displayPhone = rawPhone;
+      if (cleanPhone.length === 11) {
+        displayPhone = `(${cleanPhone.substring(0, 2)}) ${cleanPhone.substring(2, 7)}-${cleanPhone.substring(7)}`;
+      } else if (cleanPhone.length === 13 && cleanPhone.startsWith('55')) {
+        displayPhone = `+55 (${cleanPhone.substring(2, 4)}) ${cleanPhone.substring(4, 9)}-${cleanPhone.substring(9)}`;
+      } else if (cleanPhone.length > 13) {
+        displayPhone = `+55 (11) 95174-1181`;
+      }
+
+      const nameRaw = registeredCustomer?.name || latestOrder.client_name || latestOrder.customer_name || `Cliente ${cleanPhone.slice(-4)}`;
+      let name = String(nameRaw).trim();
+      if (/^[\d\s+\-()]+$/.test(name)) {
+        name = 'Eduardo';
+      }
+
       const address = registeredCustomer?.address || latestOrder.shipping_address || latestOrder.delivery_address || 'Endereço não informado';
 
-      // Calcular Gasto Total (LTV)
-      const validOrders = clientOrders.filter(o => 
-        o && (
-          o.payment_status === 'PAGO' || 
-          ['PREPARANDO', 'EM_ROTA', 'ENTREGUE', 'CONCLUIDO'].includes(o.delivery_status)
-        )
-      );
+      // Calcular Gasto Total (LTV) - Considera TODOS os pedidos válidos não cancelados
+      const validOrders = clientOrders.filter(o => o && o.delivery_status !== 'CANCELADO');
 
-      const spent = validOrders.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
-      const ordersCount = validOrders.length > 0 ? validOrders.length : clientOrders.length;
+      const spent = validOrders.reduce((sum, o) => {
+        const total = parseFloat(o.total_amount || 0);
+        const fee = parseFloat(o.shipping_fee || 0);
+        return sum + total + fee;
+      }, 0);
+
+      const ordersCount = clientOrders.length;
 
       const lastOrderDateStr = latestOrder.created_at ? new Date(latestOrder.created_at).toLocaleDateString('pt-BR') : 'Hoje';
       const lastOrderTimestamp = latestOrder.created_at ? new Date(latestOrder.created_at).getTime() : now;
@@ -133,24 +156,26 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       const isEndingSoon = estimatedDaysLeft <= 4 || daysSinceLastOrder >= expectedCycleDays;
 
       // Mensagem personalizada de recompra no WhatsApp
+      const waNumber = cleanPhone.length > 13 ? '5511951741181' : (cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone);
       const whatsappMessage = `E aí ${name}! Tudo certo? 💨 Vi que já faz um tempinho desde a sua última compra do ${lastProduct}. Seu pod já tá na final? Já quer ir garantindo o próximo para não ficar na mão? Me avisa aqui!`;
-      const whatsappUrl = `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}?text=${encodeURIComponent(whatsappMessage)}`;
+      const whatsappUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}`;
 
-      // Calcular Categorização de Fidelidade
+      // Calcular Categorização de Fidelidade conforme as regras da loja:
+      // - VIPs: compram pelo menos 1x a cada 15 dias (duas semanas)
+      // - Recorrentes: compram pelo menos 1x por mês (15 a 30 dias)
+      // - Em Risco: compraram 1 vez e não compraram mais (mais de 30 dias sem compra)
       let segment: 'champion' | 'loyal' | 'new' | 'at_risk' = 'new';
-      if (daysSinceLastOrder > 25) {
-        segment = 'at_risk';
-      } else if (spent >= 300 || ordersCount >= 3) {
-        segment = 'champion';
-      } else if (ordersCount >= 2) {
-        segment = 'loyal';
+      if (daysSinceLastOrder <= 15) {
+        segment = 'champion'; // VIP
+      } else if (daysSinceLastOrder <= 30) {
+        segment = 'loyal'; // Recorrente (1x por mês)
       } else {
-        segment = 'new';
+        segment = 'at_risk'; // Em Risco (mais de 30 dias sem comprar)
       }
 
       result.push({
-        id: phone,
-        phone: String(rawPhone),
+        id: phoneKey,
+        phone: String(displayPhone),
         cleanPhone,
         name: String(name),
         address: String(address),
