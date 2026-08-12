@@ -1602,39 +1602,40 @@ export function SupplyChainDashboard() {
                           {isGroupVisible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
                         </button>
 
-                        {/* Botão de Estrela ⭐ para Alternar nos Mais Vendidos (1-Clique Direto na Interface) */}
+                        {/* Botão de Estrela ⭐ para Alternar nos Mais Vendidos (1-Clique Direto na Interface - Sem Janela) */}
                         {(() => {
                           const MAIS_VENDIDOS_ID = "11111111-1111-4111-a111-111111111111";
-                          const modelMapping = categoryMappings[group.groupKey];
-                          const firstFlavor = group.flavors[0];
-                          const flavorMapping = firstFlavor ? categoryMappings[firstFlavor.id] : null;
-                          const currentCatIds = (modelMapping && modelMapping.category_ids.length > 0)
-                            ? modelMapping.category_ids
-                            : (flavorMapping?.category_ids || []);
-                          const isMaisVendido = currentCatIds.includes(MAIS_VENDIDOS_ID);
+                          const cleanKey = `${group.brand.toLowerCase().replace(/\s+/g, '')}__${group.name.toLowerCase().replace(/\s+/g, '')}`;
+
+                          // Checagem abrangente da estrela ⭐ para garantir que o acendimento/apagamento seja 100% fiel
+                          const isMaisVendido = group.flavors.some((f: any) => {
+                            const catIds = categoryMappings[f.id]?.category_ids || [];
+                            return catIds.includes(MAIS_VENDIDOS_ID);
+                          }) || 
+                          (categoryMappings[group.groupKey]?.category_ids?.includes(MAIS_VENDIDOS_ID)) ||
+                          (categoryMappings[cleanKey]?.category_ids?.includes(MAIS_VENDIDOS_ID));
 
                           return (
                             <button
                               type="button"
                               onClick={async () => {
-                                const targetCatIds = isMaisVendido
-                                  ? currentCatIds.filter((id: string) => id !== MAIS_VENDIDOS_ID)
-                                  : [...currentCatIds.filter((id: string) => id !== MAIS_VENDIDOS_ID), MAIS_VENDIDOS_ID];
+                                const targetCatIds = isMaisVendido ? [] : [MAIS_VENDIDOS_ID];
+                                const currentOrder = 1;
+                                const pIds = group.flavors.map((f: any) => f.id);
 
-                                const currentOrder = modelMapping?.display_order || flavorMapping?.display_order || 1;
-                                const pIds = group.flavors.map(f => f.id);
-
-                                // 1. Atualização Otimista no React (Sem abrir qualquer modal ou bolha!)
+                                // 1. Atualização Otimista Instantânea no Estado do React (Acende ou Apaga a estrela ⭐ no 1-clique sem bolhas!)
                                 setCategoryMappings(prev => {
                                   const next = { ...prev };
-                                  if (targetCatIds.length === 0) {
-                                    delete next[group.groupKey];
-                                    pIds.forEach(id => delete next[id]);
-                                  } else {
-                                    next[group.groupKey] = { category_ids: targetCatIds, display_order: currentOrder };
-                                    pIds.forEach(id => {
-                                      next[id] = { category_ids: targetCatIds, display_order: currentOrder };
+                                  if (!isMaisVendido) {
+                                    next[group.groupKey] = { category_ids: [MAIS_VENDIDOS_ID], display_order: currentOrder };
+                                    next[cleanKey] = { category_ids: [MAIS_VENDIDOS_ID], display_order: currentOrder };
+                                    pIds.forEach((id: string) => {
+                                      next[id] = { category_ids: [MAIS_VENDIDOS_ID], display_order: currentOrder };
                                     });
+                                  } else {
+                                    delete next[group.groupKey];
+                                    delete next[cleanKey];
+                                    pIds.forEach((id: string) => delete next[id]);
                                   }
                                   return next;
                                 });
@@ -1653,7 +1654,7 @@ export function SupplyChainDashboard() {
                                   ? "bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_10px_rgba(251,191,36,0.35)]"
                                   : "bg-elevated hover:bg-white/10 text-slate-400 hover:text-amber-400 border-white/10"
                               }`}
-                              title={isMaisVendido ? "Remover dos Mais Vendidos (1-Clique)" : "Adicionar aos Mais Vendidos (1-Clique)"}
+                              title={isMaisVendido ? "Remover dos Mais Vendidos (1-Clique Direto)" : "Adicionar aos Mais Vendidos (1-Clique Direto)"}
                             >
                               <Star className={`size-4 ${isMaisVendido ? "fill-amber-400 text-amber-400" : ""}`} />
                             </button>
