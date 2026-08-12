@@ -58,8 +58,8 @@ export function FinanceDashboard() {
 
       if (productsData) {
         for (const p of productsData) {
-          const cost = p.cost_price ? parseFloat(p.cost_price) : 35.00;
-          const price = p.price ? parseFloat(p.price) : 90.00;
+          const cost = p.cost_price ? parseFloat(p.cost_price) : 0;
+          const price = p.price ? parseFloat(p.price) : 0;
           const stock = p.stock || 0;
 
           costMap.set(p.id, cost);
@@ -103,7 +103,7 @@ export function FinanceDashboard() {
           for (const item of items) {
             const qty = item.quantity || 1;
             const cost = (item.product_id && costMap.get(item.product_id)) ||
-                         (item.flavor && costMap.get(item.flavor.toLowerCase())) || 35.00;
+                         (item.flavor && costMap.get(item.flavor.toLowerCase())) || 0;
 
             cmvSum += qty * cost;
             podsSoldSum += qty;

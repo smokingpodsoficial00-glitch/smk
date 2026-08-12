@@ -268,15 +268,10 @@ export function SupplyChainDashboard() {
 
       if (prodData) {
         const mergedProducts = prodData.map((p: any) => {
-          const brandName = (p.brand || "Genérico").trim();
-          const modelName = (p.name || "Pod").trim();
-          const groupKey = `${brandName.toLowerCase()}__${modelName.toLowerCase()}`;
-          const savedCost = localStorage.getItem(`smk_cost_${groupKey}`) || localStorage.getItem(`smk_cost_${p.id}`);
-          const costVal = savedCost ? parseFloat(savedCost) : (parseFloat(p.cost_price) || 35);
           const stagedStock = pendingStockChangesRef.current[p.id];
           return {
             ...p,
-            cost_price: costVal,
+            cost_price: p.cost_price !== null && p.cost_price !== undefined ? parseFloat(p.cost_price) : 0,
             stock: stagedStock !== undefined ? stagedStock : p.stock
           };
         });
@@ -324,7 +319,7 @@ export function SupplyChainDashboard() {
         return;
       }
     }
-    const finalCostVal = parsedCost !== null ? parsedCost : 35.00;
+    const finalCostVal = parsedCost !== null ? parsedCost : 0;
 
     if (!name.trim()) {
       alert("Por favor, informe o Modelo do produto.");
@@ -482,7 +477,7 @@ export function SupplyChainDashboard() {
       let insertPayload: any = {
         name: addingFlavorGroup.name, brand: addingFlavorGroup.brand,
         flavor: addedName, price: addingFlavorGroup.price,
-        cost_price: addingFlavorGroup.cost_price || 35.00,
+        cost_price: addingFlavorGroup.cost_price || 0,
         stock: initialStock, puffs: addingFlavorGroup.puffs || 5000,
         image_url: addingFlavorGroup.image_url || "", is_active: true,
         company_id: company?.id || null,
@@ -500,7 +495,7 @@ export function SupplyChainDashboard() {
         brand: addingFlavorGroup.brand,
         flavor: addedName,
         price: addingFlavorGroup.price,
-        cost_price: addingFlavorGroup.cost_price || 35.00,
+        cost_price: addingFlavorGroup.cost_price || 0,
         stock: initialStock,
         puffs: addingFlavorGroup.puffs || 5000,
         image_url: addingFlavorGroup.image_url || "",
@@ -721,37 +716,32 @@ export function SupplyChainDashboard() {
       const newBrandName = editBrand.trim() || "Genérico";
       const newModelName = editName.trim();
       const newPuffsVal = parseInt(editPuffs) || 5000;
-      const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
-      const newGroupKey = `${newBrandName.toLowerCase()}__${newModelName.toLowerCase()}`;
 
-      // 1. Atualiza custo no armazenamento local sob as chaves do modelo e dos IDs
-      try {
-        localStorage.setItem(`smk_cost_${newGroupKey}`, finalCostVal.toString());
-        ids.forEach((id: string) => localStorage.setItem(`smk_cost_${id}`, finalCostVal.toString()));
-      } catch (e) {
-        console.warn("Erro ao salvar custo localmente:", e);
-      }
-
-      // 2. Atualização otimista no estado local sem remover sabores ou IDs
+      // 1. Atualização Otimista estrita no estado local (sem tocar em estoque ou campos não editados)
       setProducts(prev => prev.map(p => ids.includes(p.id) ? {
         ...p,
         brand: newBrandName,
         name: newModelName,
         puffs: newPuffsVal,
-        price: parsedPrice,
-        cost_price: finalCostVal,
+        ...(parsedPrice !== null ? { price: parsedPrice } : {}),
+        ...(parsedCost !== null ? { cost_price: parsedCost } : {}),
         image_url: finalImageUrl
       } : p));
 
-      // 3. Atualizar Supabase com filtro company_id e IDs dos sabores
+      // 2. Atualizar Supabase enviando ESTRITAMENTE APENAS os campos editados (Partial Update Protegido)
       let updatePayload: any = {
         brand: newBrandName,
         name: newModelName,
         puffs: newPuffsVal,
-        price: parsedPrice,
-        cost_price: finalCostVal,
         image_url: finalImageUrl
       };
+
+      if (parsedPrice !== null) {
+        updatePayload.price = parsedPrice;
+      }
+      if (parsedCost !== null) {
+        updatePayload.cost_price = parsedCost;
+      }
 
       let query = supabase.from("smoking_products").update(updatePayload).in("id", ids);
       if (company?.id) query = query.eq("company_id", company.id);
@@ -881,7 +871,7 @@ export function SupplyChainDashboard() {
     try {
       const { data, error } = await supabase.from("smoking_products").insert({
         name: `${sku.name} (Cópia)`, brand: sku.brand, flavor: `${sku.flavor} (Cópia)`,
-        price: sku.price, cost_price: sku.cost_price || 35.00, stock: 0,
+        price: sku.price, cost_price: sku.cost_price || 0, stock: 0,
         puffs: sku.puffs, image_url: sku.image_url, is_active: true,
       }).select();
       if (!error && data) { alert("SKU duplicado com sucesso!"); fetchData(); }
@@ -905,7 +895,7 @@ export function SupplyChainDashboard() {
   const totalProducts = uniqueModelsCount;
   const totalStockUnits = products.reduce((acc, p) => acc + (p.stock || 0), 0);
   const totalStockValue = products.reduce((acc, p) => acc + ((p.stock || 0) * (parseFloat(p.price) || 0)), 0);
-  const totalStockCost = products.reduce((acc, p) => acc + ((p.stock || 0) * (parseFloat(p.cost_price || 35))), 0);
+  const totalStockCost = products.reduce((acc, p) => acc + ((p.stock || 0) * (parseFloat(p.cost_price || 0))), 0);
   const estimatedProfit = totalStockValue - totalStockCost;
   const profitMarginPct = totalStockValue > 0 ? Math.round((estimatedProfit / totalStockValue) * 100) : 0;
   const outOfStockCount = products.filter(p => (p.stock || 0) === 0).length;
@@ -978,7 +968,7 @@ export function SupplyChainDashboard() {
     if (!groupedMap[groupKey]) {
       groupedMap[groupKey] = {
         groupKey, brand: brandName, name: modelName, puffs: product.puffs || 5000,
-        price: parseFloat(product.price) || 0, cost_price: parseFloat(product.cost_price) || 35,
+        price: parseFloat(product.price) || 0, cost_price: parseFloat(product.cost_price) || 0,
         image_url: product.image_url || "", totalStock: 0, 
         flavors: [], realFlavors: [], outOfStockFlavors: [], lowStockFlavors: [], inStockFlavors: []
       };
@@ -1026,7 +1016,7 @@ export function SupplyChainDashboard() {
     if (!globalGroupedMap[groupKey]) {
       globalGroupedMap[groupKey] = {
         groupKey, brand: brandName, name: modelName, puffs: product.puffs || 5000,
-        price: parseFloat(product.price) || 0, cost_price: parseFloat(product.cost_price) || 35,
+        price: parseFloat(product.price) || 0, cost_price: parseFloat(product.cost_price) || 0,
         image_url: product.image_url || "", totalStock: 0, 
         flavors: [], realFlavors: [], outOfStockFlavors: [], lowStockFlavors: [], inStockFlavors: []
       };
