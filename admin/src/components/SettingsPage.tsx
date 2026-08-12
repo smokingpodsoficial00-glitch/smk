@@ -5,9 +5,12 @@ import {
   Trash2, Eye, Type, X, Smartphone, CreditCard, Copy, ExternalLink, Check
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function SettingsPage() {
   const { config, loading, saving, saveStatus, updateConfig, uploadLogo } = useStoreConfig();
+  const { company, refreshCompany } = useAuth() as any || {};
 
   // Form state local
   const [storeName, setStoreName] = useState("");

@@ -614,9 +614,6 @@ export function KanbanBoard() {
                                       <button
                                         onClick={async () => {
                                           if (confirm(`Deseja realmente excluir o histórico do pedido #${order.id}?`)) {
-                                            if (order.status !== 'ENTREGUE') {
-                                              await returnStockForOrderItems(order.items);
-                                            }
                                             const { error } = await supabase
                                               .from('smoking_orders')
                                               .delete()

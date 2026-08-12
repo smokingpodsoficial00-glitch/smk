@@ -38,7 +38,7 @@ export function DashboardLayout() {
             <div className="flex items-center gap-2.5 min-w-0">
               {company?.logo_url || config?.logo_url ? (
                 <img 
-                  src={company?.logo_url || config?.logo_url} 
+                  src={(company?.logo_url || config?.logo_url) ?? undefined} 
                   alt={displayName} 
                   className="w-7 h-7 rounded-lg object-contain shrink-0" 
                 />
@@ -60,7 +60,7 @@ export function DashboardLayout() {
             <div className="flex items-center justify-center w-full">
               {company?.logo_url || config?.logo_url ? (
                 <img 
-                  src={company?.logo_url || config?.logo_url} 
+                  src={(company?.logo_url || config?.logo_url) ?? undefined} 
                   alt={displayName} 
                   className="w-6 h-6 rounded-md object-contain shrink-0" 
                 />

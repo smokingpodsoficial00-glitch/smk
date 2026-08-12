@@ -245,12 +245,13 @@ export function useStoreConfig() {
       // 2. Salva na tabela dedicada `store_config` e na tabela `companies` no Supabase
       try {
         const rowId = (config && config.id && config.id !== 'local-config-id') ? config.id : 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+        const { id: _ignoreId, ...configWithoutId } = newConfig;
         await supabase
           .from("store_config")
           .upsert({
             id: rowId,
             company_id: rowId,
-            ...newConfig,
+            ...configWithoutId,
             updated_at: new Date().toISOString()
           });
 

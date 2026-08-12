@@ -169,14 +169,11 @@ export async function updateModelCategories(params: {
       .eq("client_phone", SYSTEM_KEY);
 
     if (categoryIds.length > 0) {
-<<<<<<< HEAD
       const updatedItems: any[] = [];
-=======
       const parts = modelKey.split('__');
       const bStr = (parts[0] || '').trim();
       const nStr = (parts[1] || '').trim();
       const cleanKey = `${bStr.toLowerCase().replace(/\s+/g, '')}__${nStr.toLowerCase().replace(/\s+/g, '')}`;
->>>>>>> 31f6e48 (fix: update star button to open modal with Save button and sync best sellers in real-time to Vercel)
 
       // Adiciona entrada para o modelKey
       updatedItems.push({

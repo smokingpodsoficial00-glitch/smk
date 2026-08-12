@@ -125,7 +125,7 @@ export function ChatbotPage() {
   const [newOrderCreatedToast, setNewOrderCreatedToast] = useState<{ id: string; clientName: string; total: number; productName: string } | null>(null);
 
   // OpenAI Integration State (lê de forma segura sem expor na UI)
-  const [openAiKey] = useState<string>(() => {
+  const [openAiKey, setOpenAiKey] = useState<string>(() => {
     const envKey = (import.meta as any).env?.VITE_OPENAI_API_KEY;
     const localKey = localStorage.getItem("openai_api_key_v1");
     if (localKey && localKey.startsWith("sk-")) return localKey;
@@ -529,7 +529,7 @@ export function ChatbotPage() {
         const flavorLower = p.flavor.toLowerCase();
         return lastMsgLower.includes(flavorLower) || 
                fuzzyMatch(lastMsgLower, flavorLower) || 
-               flavorLower.split(" ").some(word => word.length > 3 && lastMsgLower.includes(word));
+               flavorLower.split(" ").some((word: string) => word.length > 3 && lastMsgLower.includes(word));
       });
 
       // 2. Busca match por nome ou marca no estoque
@@ -890,7 +890,7 @@ ${isOngoingConversation
       } else if (rawAnswer.includes("SMOKING PODS AGRADECE SEU PEDIDO")) {
         const match = rawAnswer.match(/([\s\S]*?)(SMOKING PODS AGRADECE SEU PEDIDO[\s\S]*)/i);
         if (match) {
-          const firstPart = match[1].split("\n").map(l => l.trim()).filter(l => l.length > 0);
+          const firstPart = match[1].split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
           const pixPart = match[2].trim();
           lines = [...firstPart, pixPart];
         } else {
@@ -999,10 +999,6 @@ ${isOngoingConversation
     try {
       // 1. Zerar histórico local do simulador
       setMessages([]);
-      setClientName("");
-      setUserProvidedName("");
-      setCepDetected(false);
-      setDetectedStreetAndBairro("");
       setOrderCreatedThisSession(false);
       orderCreatedRef.current = false;
 
