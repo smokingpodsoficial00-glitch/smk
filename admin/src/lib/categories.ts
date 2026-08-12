@@ -66,14 +66,9 @@ export async function fetchCategories(): Promise<Category[]> {
 export async function fetchProductCategoryMappings(companyId?: string): Promise<{
   productMap: Record<string, { category_ids: string[]; display_order: number }>;
 }> {
-  const result: Record<string, { category_ids: string[]; display_order: number }> = {};
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
 
-  // 1. Inicia com dados locais salvos
-  const localData = getLocalCategoryMappings();
-  Object.assign(result, localData);
-
-  // 2. Busca configuracao em smoking_orders (Persistencia infalivel no Supabase DB)
+  // 1. Busca a configuracao oficial diretamente no Supabase DB (Fonte Unica da Verdade)
   try {
     const { data: orderConfig, error: configErr } = await supabase
       .from("smoking_orders")
@@ -82,8 +77,10 @@ export async function fetchProductCategoryMappings(companyId?: string): Promise<
       .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
       .limit(1);
 
-    if (!configErr && orderConfig && orderConfig.length > 0 && orderConfig[0].items) {
+    if (!configErr && orderConfig && orderConfig.length > 0) {
+      const result: Record<string, { category_ids: string[]; display_order: number }> = {};
       const items = orderConfig[0].items;
+
       if (Array.isArray(items)) {
         items.forEach((item: any) => {
           const catIds = item.category_ids || (item.category_id ? [item.category_id] : ["11111111-1111-4111-a111-111111111111"]);
@@ -100,41 +97,18 @@ export async function fetchProductCategoryMappings(companyId?: string): Promise<
           }
         });
       }
+
+      // Sincroniza o cache local com os dados oficiais do Supabase DB
+      saveLocalCategoryMappings(result);
+      return { productMap: result };
     }
   } catch (e) {
     console.warn("Erro ao buscar configuracao em smoking_orders:", e);
   }
 
-  // 3. Tenta buscar da tabela product_categories (fallback caso exista)
-  try {
-    let query = supabase.from("product_categories").select("*");
-    if (companyId) {
-      query = query.or(`company_id.eq.${companyId},company_id.is.null`);
-    }
-    const { data, error } = await query;
-
-    if (!error && data && data.length > 0) {
-      data.forEach((row: any) => {
-        const pId = row.product_id;
-        if (!result[pId]) {
-          result[pId] = { category_ids: [], display_order: row.display_order || 0 };
-        }
-        if (!result[pId].category_ids.includes(row.category_id)) {
-          result[pId].category_ids.push(row.category_id);
-        }
-        if (row.display_order !== undefined && row.display_order !== null) {
-          result[pId].display_order = row.display_order;
-        }
-      });
-    }
-  } catch (e) {
-    // Ignora silenciosamente
-  }
-
-  // Atualiza cache local com o resultado mesclado do Supabase
-  saveLocalCategoryMappings(result);
-
-  return { productMap: result };
+  // 2. Fallback para cache local apenas se o banco estiver offline
+  const localData = getLocalCategoryMappings();
+  return { productMap: localData };
 }
 
 export async function updateModelCategories(params: {
@@ -211,6 +185,22 @@ export async function updateModelCategories(params: {
         unit_price: 0
       });
 
+      if (cleanKey !== modelKey) {
+        preservedItems.push({
+          id: "11111111-1111-4111-a111-111111111111",
+          product_id: "11111111-1111-4111-a111-111111111111",
+          modelKey: cleanKey,
+          category_ids: categoryIds,
+          category_id: categoryIds[0],
+          display_order: displayOrder,
+          name: cleanKey,
+          flavor: "Padrão",
+          quantity: 1,
+          price: 0,
+          unit_price: 0
+        });
+      }
+
       productIds.forEach((pid) => {
         if (UUID_REGEX.test(pid)) {
           preservedItems.push({
@@ -251,33 +241,6 @@ export async function updateModelCategories(params: {
     }
   } catch (e) {
     console.warn("Erro ao sincronizar categorias em smoking_orders no Supabase:", e);
-  }
-
-  // 3. Tentar persisitr tambem em product_categories (caso venha a existir)
-  try {
-    if (productIds.length > 0) {
-      let delQuery = supabase.from("product_categories").delete().in("product_id", productIds);
-      if (companyId) delQuery = delQuery.eq("company_id", companyId);
-      await delQuery;
-    }
-
-    if (categoryIds.length > 0 && productIds.length > 0) {
-      const rowsToInsert: any[] = [];
-      productIds.forEach((pid) => {
-        categoryIds.forEach((cid) => {
-          rowsToInsert.push({
-            product_id: pid,
-            category_id: cid,
-            display_order: displayOrder,
-            company_id: targetCompanyId,
-          });
-        });
-      });
-
-      await supabase.from("product_categories").insert(rowsToInsert);
-    }
-  } catch (e) {
-    // Ignora se a tabela nao existir
   }
 
   return true;
