@@ -249,7 +249,7 @@ export function SupplyChainDashboard() {
 
       const { data: realOrders } = await supabase
         .from("smoking_orders")
-        .select("items, delivery_status")
+        .select("items, delivery_status, client_phone, client_name")
         .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
         .neq("delivery_status", "CANCELADO");
 
@@ -257,6 +257,17 @@ export function SupplyChainDashboard() {
       if (realOrders && realOrders.length > 0) {
         const flavorSalesMap: Record<string, { product_name: string; flavor: string; total_sold: number }> = {};
         realOrders.forEach((ord: any) => {
+          const phone = (ord.client_phone || "").trim();
+          const name = (ord.client_name || "").trim().toLowerCase();
+          // Ignorar estritamente dados de configuracao interna de sistema (Best Sellers, Product Costs, etc.)
+          if (
+            phone.startsWith("__SYSTEM_") ||
+            name.includes("system config") ||
+            name.includes("system_config")
+          ) {
+            return;
+          }
+
           if (ord.items && Array.isArray(ord.items)) {
             ord.items.forEach((it: any) => {
               const pName = it.name || it.product_name || 'Pod';
