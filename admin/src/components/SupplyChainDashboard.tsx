@@ -1910,16 +1910,6 @@ export function SupplyChainDashboard() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {hasModalPendingChanges && (
-                    <button
-                      onClick={handleSaveAllStockChanges}
-                      disabled={isSavingStock}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.35)] animate-pulse cursor-pointer active:scale-95 disabled:opacity-50"
-                    >
-                      {isSavingStock ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                      <span>Salvar no Cardápio</span>
-                    </button>
-                  )}
                   <button
                     onClick={() => {
                       setAddingFlavorGroup(currentGroup);
@@ -1967,7 +1957,7 @@ export function SupplyChainDashboard() {
                         </div>
                       </div>
 
-                      {/* Controles de Estoque Estáveis + Botão Vender */}
+                      {/* Controles de Estoque Estáveis */}
                       <div className="flex items-center gap-2.5 shrink-0">
                         <button
                           onClick={() => handleUpdateStock(f.id, Math.max(0, (f.stock || 0) - 1))}
@@ -1988,21 +1978,6 @@ export function SupplyChainDashboard() {
                         >
                           <Plus className="size-4" />
                         </button>
-                        
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setViewingFlavorsGroup(null);
-                            setPreSelectedGroupForSale(null);
-                            setPreSelectedFlavorIdForSale(f.id);
-                            setIsManualSaleModalOpen(true);
-                          }}
-                          className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 text-xs font-bold transition-all cursor-pointer active:scale-95 ml-1"
-                          title="Registrar venda manual deste sabor"
-                        >
-                          <ShoppingCart className="size-3.5" />
-                          <span>⚡ Vender</span>
-                        </button>
                       </div>
                     </div>
                   );
@@ -2014,22 +1989,7 @@ export function SupplyChainDashboard() {
               </div>
 
               {/* Modal Footer */}
-              <div className="p-4 border-t border-border bg-black/40 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const currentGrp = viewingFlavorsGroup;
-                    setViewingFlavorsGroup(null);
-                    setPreSelectedFlavorIdForSale(null);
-                    setPreSelectedGroupForSale(currentGrp);
-                    setIsManualSaleModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 text-xs font-bold transition-colors cursor-pointer"
-                >
-                  <ShoppingCart className="size-4" />
-                  <span>⚡ Registrar Venda Deste Pod</span>
-                </button>
-
+              <div className="p-4 border-t border-border bg-black/40 flex justify-end">
                 <button
                   onClick={() => setViewingFlavorsGroup(null)}
                   className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer"

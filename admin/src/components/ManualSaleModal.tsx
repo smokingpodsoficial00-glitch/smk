@@ -3,26 +3,18 @@ import { supabase } from "@/lib/supabase";
 import {
   ShoppingCart,
   User,
-  Phone,
   Package,
-  DollarSign,
-  CreditCard,
-  Truck,
   CheckCircle2,
   X,
   Loader2,
   Plus,
   Trash2,
-  Sparkles,
-  MapPin
 } from "lucide-react";
 
 interface ManualSaleModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSaleSuccess: () => void;
-  preSelectedFlavorId?: string | null;
-  preSelectedGroup?: any | null;
   companyId?: string;
 }
 
@@ -30,22 +22,20 @@ export function ManualSaleModal({
   isOpen,
   onClose,
   onSaleSuccess,
-  preSelectedFlavorId,
-  preSelectedGroup,
   companyId = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5",
 }: ManualSaleModalProps) {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [productsList, setProductsList] = useState<any[]>([]);
   const [clientsList, setClientsList] = useState<any[]>([]);
 
-  // Dados da Venda
+  // Dados do Cliente
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("PIX");
   const [shippingFee, setShippingFee] = useState<string>("0");
 
-  // Lista de Itens do Pedido
+  // Lista de Itens no Pedido
   const [items, setItems] = useState<
     Array<{
       productId: string;
@@ -60,8 +50,7 @@ export function ManualSaleModal({
     }>
   >([]);
 
-  // Item sendo adicionado no formulário atual
-  const [selectedBrand, setSelectedBrand] = useState("");
+  // Seletores do formulário de adição de item (Modelo -> Sabor)
   const [selectedModelKey, setSelectedModelKey] = useState("");
   const [selectedFlavorId, setSelectedFlavorId] = useState("");
   const [itemQuantity, setItemQuantity] = useState(1);
@@ -71,14 +60,16 @@ export function ManualSaleModal({
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  // Carregar produtos e clientes do Supabase ao abrir
+  // Carregar produtos e clientes limpos do Supabase
   useEffect(() => {
     if (!isOpen) return;
 
     const loadInitialData = async () => {
       setLoadingProducts(true);
+      setErrorMessage("");
+      setSuccessMessage("");
       try {
-        // 1. Buscar Todos os Produtos Ativos
+        // 1. Buscar Produtos Ativos
         const { data: prods, error: pErr } = await supabase
           .from("smoking_products")
           .select("*")
@@ -90,25 +81,39 @@ export function ManualSaleModal({
           setProductsList(prods);
         }
 
-        // 2. Buscar Clientes Recentes para Auto-completar
+        // 2. Buscar Clientes Reais (Filtrando qualquer configuracao de sistema)
         const { data: orders } = await supabase
           .from("smoking_orders")
           .select("client_name, client_phone, shipping_address")
-          .neq("client_phone", "__SYSTEM_SMK_BEST_SELLERS__")
           .order("created_at", { ascending: false })
-          .limit(50);
+          .limit(100);
 
         if (orders) {
           const uniqueClients = new Map<string, any>();
           orders.forEach((o) => {
-            if (o.client_phone && !uniqueClients.has(o.client_phone)) {
-              uniqueClients.set(o.client_phone, o);
+            const phone = (o.client_phone || "").trim();
+            const name = (o.client_name || "").trim();
+
+            // Ignorar dados de sistema
+            if (
+              phone &&
+              !phone.startsWith("__SYSTEM_") &&
+              !name.toLowerCase().includes("system") &&
+              !name.toLowerCase().includes("config")
+            ) {
+              if (!uniqueClients.has(phone)) {
+                uniqueClients.set(phone, {
+                  client_name: name,
+                  client_phone: phone,
+                  shipping_address: o.shipping_address || "",
+                });
+              }
             }
           });
           setClientsList(Array.from(uniqueClients.values()));
         }
       } catch (err) {
-        console.error("Erro ao carregar dados para venda manual:", err);
+        console.error("Erro ao carregar catálogo para venda manual:", err);
       } finally {
         setLoadingProducts(false);
       }
@@ -117,74 +122,18 @@ export function ManualSaleModal({
     loadInitialData();
   }, [isOpen, companyId]);
 
-  // Se houver pre-selecao por sabor/grupo enviado pelo componente pai
-  useEffect(() => {
-    if (!isOpen || productsList.length === 0) return;
-
-    if (preSelectedFlavorId) {
-      const foundProd = productsList.find((p) => p.id === preSelectedFlavorId);
-      if (foundProd) {
-        setItems([
-          {
-            productId: foundProd.id,
-            brand: foundProd.brand,
-            modelName: foundProd.name,
-            flavor: foundProd.flavor || "Padrão",
-            quantity: 1,
-            price: Number(foundProd.price) || 0,
-            costPrice: Number(foundProd.cost_price) || 0,
-            maxStock: Number(foundProd.stock) || 0,
-            image_url: foundProd.image_url,
-          },
-        ]);
-        return;
-      }
-    }
-
-    if (preSelectedGroup && preSelectedGroup.flavors && preSelectedGroup.flavors.length > 0) {
-      const firstFlavor = preSelectedGroup.flavors[0];
-      const foundProd = productsList.find((p) => p.id === firstFlavor.id) || firstFlavor;
-      if (foundProd) {
-        setItems([
-          {
-            productId: foundProd.id,
-            brand: preSelectedGroup.brand || foundProd.brand,
-            modelName: preSelectedGroup.name || foundProd.name,
-            flavor: foundProd.flavor || "Padrão",
-            quantity: 1,
-            price: Number(preSelectedGroup.price || foundProd.price) || 0,
-            costPrice: Number(preSelectedGroup.cost_price || foundProd.cost_price) || 0,
-            maxStock: Number(foundProd.stock) || 0,
-            image_url: preSelectedGroup.image_url || foundProd.image_url,
-          },
-        ]);
-      }
-    }
-  }, [isOpen, preSelectedFlavorId, preSelectedGroup, productsList]);
-
-  // Lista de Marcas Disponíveis
-  const availableBrands = useMemo(() => {
-    const set = new Set<string>();
-    productsList.forEach((p) => {
-      if (p.brand) set.add(p.brand);
-    });
-    return Array.from(set).sort();
-  }, [productsList]);
-
-  // Modelos filtrados por Marca selecionada
+  // Lista Simplificada de Todos os Modelos (ex: "ELFBAR - BC15K")
   const availableModels = useMemo(() => {
-    if (!selectedBrand) return [];
-    const map = new Map<string, { modelName: string; key: string }>();
-    productsList
-      .filter((p) => p.brand?.toLowerCase() === selectedBrand.toLowerCase())
-      .forEach((p) => {
-        const key = `${p.brand}__${p.name}`.toLowerCase();
-        if (!map.has(key)) {
-          map.set(key, { modelName: p.name, key });
-        }
-      });
-    return Array.from(map.values());
-  }, [productsList, selectedBrand]);
+    const map = new Map<string, { label: string; key: string }>();
+    productsList.forEach((p) => {
+      const key = `${p.brand}__${p.name}`.toLowerCase();
+      const label = `${p.brand} ${p.name}`.trim();
+      if (!map.has(key)) {
+        map.set(key, { label, key });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [productsList]);
 
   // Sabores filtrados por Modelo selecionado
   const availableFlavors = useMemo(() => {
@@ -195,7 +144,7 @@ export function ManualSaleModal({
     });
   }, [productsList, selectedModelKey]);
 
-  // Quando o sabor selecionado mudar no dropdown
+  // Preencher valor do produto ao selecionar o sabor
   useEffect(() => {
     if (selectedFlavorId) {
       const prod = productsList.find((p) => p.id === selectedFlavorId);
@@ -205,10 +154,10 @@ export function ManualSaleModal({
     }
   }, [selectedFlavorId, productsList]);
 
-  // Adicionar item ao pedido
+  // Adicionar item ao carrinho do pedido
   const handleAddItem = () => {
     if (!selectedFlavorId) {
-      setErrorMessage("Por favor, selecione um sabor de pod.");
+      setErrorMessage("Por favor, selecione um sabor disponível.");
       return;
     }
 
@@ -216,8 +165,6 @@ export function ManualSaleModal({
     if (!prod) return;
 
     const unitPrice = parseFloat(customPrice.replace(",", ".")) || Number(prod.price) || 0;
-
-    // Checar se ja existe no carrinho do pedido
     const existingIdx = items.findIndex((i) => i.productId === prod.id);
 
     if (existingIdx >= 0) {
@@ -242,7 +189,7 @@ export function ManualSaleModal({
       ]);
     }
 
-    // Resetar campos de selecao parcial
+    // Resetar campos parciais
     setSelectedFlavorId("");
     setItemQuantity(1);
     setCustomPrice("");
@@ -253,7 +200,7 @@ export function ManualSaleModal({
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Calculos da Venda
+  // Cálculos do Pedido
   const subtotal = useMemo(() => {
     return items.reduce((acc, item) => acc + item.price * item.quantity, 0);
   }, [items]);
@@ -266,7 +213,7 @@ export function ManualSaleModal({
   const grandTotal = subtotal + numericShippingFee;
   const estimatedProfit = grandTotal - totalCost;
 
-  // Selecionar Cliente Existente
+  // Preencher dados ao selecionar cliente recente
   const handleSelectExistingClient = (phone: string) => {
     const found = clientsList.find((c) => c.client_phone === phone);
     if (found) {
@@ -276,13 +223,13 @@ export function ManualSaleModal({
     }
   };
 
-  // Finalizar e Registrar a Venda no Supabase DB
+  // Finalizar e Registrar Venda
   const handleSubmitSale = async () => {
     setErrorMessage("");
     setSuccessMessage("");
 
     if (items.length === 0) {
-      setErrorMessage("Adicione pelo menos 1 pod ao pedido antes de finalizar.");
+      setErrorMessage("Adicione pelo menos 1 pod ao pedido antes de concluir.");
       return;
     }
 
@@ -294,7 +241,7 @@ export function ManualSaleModal({
     setSubmitting(true);
 
     try {
-      // 1. Montar array de itens no formato padrao do smoking_orders
+      // 1. Array de itens do pedido no formato do smoking_orders
       const orderItems = items.map((item) => {
         const modelKey = `${item.brand}__${item.modelName}`.toLowerCase();
         return {
@@ -310,7 +257,7 @@ export function ManualSaleModal({
         };
       });
 
-      // 2. Inserir Pedido Concluído em smoking_orders
+      // 2. Inserir Pedido PAGO e ENTREGUE em smoking_orders
       const { error: orderErr } = await supabase.from("smoking_orders").insert({
         client_name: clientName.trim(),
         client_phone: clientPhone.trim() || "5511999999999",
@@ -330,7 +277,6 @@ export function ManualSaleModal({
 
       // 3. Dar baixa no Estoque em smoking_products para cada item
       for (const item of items) {
-        // Buscar estoque atual em tempo real para evitar saldo negativo
         const { data: pData } = await supabase
           .from("smoking_products")
           .select("stock")
@@ -340,31 +286,29 @@ export function ManualSaleModal({
         const currentStock = pData ? Number(pData.stock) || 0 : item.maxStock;
         const newStock = Math.max(0, currentStock - item.quantity);
 
-        const { error: stockErr } = await supabase
+        await supabase
           .from("smoking_products")
           .update({ stock: newStock })
           .eq("id", item.productId);
-
-        if (stockErr) {
-          console.warn(`Aviso ao dar baixa no estoque do pod ${item.productId}:`, stockErr.message);
-        }
       }
 
-      setSuccessMessage("✅ Venda registrada com sucesso! Estoque abatido e ranking atualizado.");
+      setSuccessMessage("✅ Venda registrada! Estoque abatido, ranking e CRM atualizados.");
 
       setTimeout(() => {
         onSaleSuccess();
         onClose();
-        // Resetar Modal
+        // Limpar formulário
         setItems([]);
         setClientName("");
         setClientPhone("");
         setShippingAddress("");
+        setSelectedModelKey("");
+        setSelectedFlavorId("");
         setSuccessMessage("");
-      }, 1200);
+      }, 1000);
     } catch (err: any) {
       console.error("Erro ao registrar venda manual:", err);
-      setErrorMessage(err.message || "Ocorreu um erro ao processar a venda.");
+      setErrorMessage(err.message || "Ocorreu um erro ao registrar a venda.");
     } finally {
       setSubmitting(false);
     }
@@ -374,7 +318,7 @@ export function ManualSaleModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-[#111113] border border-white/15 rounded-3xl max-w-2xl w-full p-5 sm:p-6 space-y-5 shadow-2xl my-auto text-white">
+      <div className="bg-[#111113] border border-white/15 rounded-3xl max-w-xl w-full p-5 sm:p-6 space-y-5 shadow-2xl my-auto text-white">
         {/* Cabeçalho do Modal */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-3">
@@ -385,11 +329,11 @@ export function ManualSaleModal({
               <h3 className="font-bold text-base text-white flex items-center gap-2">
                 <span>⚡ Registrar Venda Manual</span>
                 <span className="text-[10px] font-semibold bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">
-                  Baixa Real
+                  Atendimento
                 </span>
               </h3>
               <p className="text-xs text-muted-foreground">
-                Atualiza estoque, ranking de vendas, financeiro e CRM em 1 clique.
+                Atualiza estoque, ranking de vendas, financeiro e CRM automaticamente.
               </p>
             </div>
           </div>
@@ -405,11 +349,11 @@ export function ManualSaleModal({
         {loadingProducts ? (
           <div className="py-12 text-center space-y-3">
             <Loader2 className="size-8 animate-spin text-amber-400 mx-auto" />
-            <p className="text-xs text-muted-foreground">Carregando catálogo de produtos...</p>
+            <p className="text-xs text-muted-foreground">Carregando produtos...</p>
           </div>
         ) : (
           <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1 custom-scrollbar">
-            {/* Mensagens de Feedback */}
+            {/* Feedback Messages */}
             {errorMessage && (
               <div className="bg-red-500/15 border border-red-500/30 text-red-400 p-3.5 rounded-2xl text-xs font-semibold">
                 ⚠️ {errorMessage}
@@ -422,7 +366,7 @@ export function ManualSaleModal({
               </div>
             )}
 
-            {/* 1. SEÇÃO DO CLIENTE (CRM) */}
+            {/* 1. DADOS DO CLIENTE */}
             <div className="space-y-3 bg-white/5 border border-white/10 rounded-2xl p-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs uppercase font-bold text-amber-400 tracking-wider flex items-center gap-1.5">
@@ -431,9 +375,9 @@ export function ManualSaleModal({
                 {clientsList.length > 0 && (
                   <select
                     onChange={(e) => handleSelectExistingClient(e.target.value)}
-                    className="bg-black/60 border border-white/10 rounded-lg text-xs text-muted-foreground px-2 py-1 focus:outline-none focus:border-amber-400/50"
+                    className="bg-black/60 border border-white/10 rounded-lg text-xs text-muted-foreground px-2.5 py-1 focus:outline-none focus:border-amber-400/50"
                   >
-                    <option value="">-- Cliente Recente --</option>
+                    <option value="">-- Selecionar Cliente Existente --</option>
                     {clientsList.map((c) => (
                       <option key={c.client_phone} value={c.client_phone}>
                         {c.client_name} ({c.client_phone})
@@ -467,56 +411,34 @@ export function ManualSaleModal({
               </div>
             </div>
 
-            {/* 2. SEÇÃO DE ADICIONAR PODS AO PEDIDO */}
+            {/* 2. SELEÇÃO DE PODS (MODELO -> SABOR SIMPLIFICADO) */}
             <div className="space-y-3 bg-white/5 border border-white/10 rounded-2xl p-4">
               <span className="text-xs uppercase font-bold text-amber-400 tracking-wider flex items-center gap-1.5">
-                <Package className="size-3.5" /> 2. Selecionar Pods & Sabores Vendidos
+                <Package className="size-3.5" /> 2. Selecionar Modelo & Sabor
               </span>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {/* Marca */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Dropdown 1: Modelo */}
                 <div>
-                  <label className="text-[11px] text-silver font-medium block mb-1">Marca</label>
+                  <label className="text-[11px] text-silver font-medium block mb-1">Modelo do Pod</label>
                   <select
-                    value={selectedBrand}
-                    onChange={(e) => {
-                      setSelectedBrand(e.target.value);
-                      setSelectedModelKey("");
-                      setSelectedFlavorId("");
-                    }}
-                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400/50"
-                  >
-                    <option value="">-- Selecione Marca --</option>
-                    {availableBrands.map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Modelo */}
-                <div>
-                  <label className="text-[11px] text-silver font-medium block mb-1">Modelo</label>
-                  <select
-                    disabled={!selectedBrand}
                     value={selectedModelKey}
                     onChange={(e) => {
                       setSelectedModelKey(e.target.value);
                       setSelectedFlavorId("");
                     }}
-                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400/50 disabled:opacity-40"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400/50 font-semibold"
                   >
-                    <option value="">-- Selecione Modelo --</option>
+                    <option value="">-- Selecione o Modelo --</option>
                     {availableModels.map((m) => (
                       <option key={m.key} value={m.key}>
-                        {m.modelName}
+                        {m.label}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Sabor */}
+                {/* Dropdown 2: Sabor Disponível */}
                 <div>
                   <label className="text-[11px] text-silver font-medium block mb-1">Sabor Disponível</label>
                   <select
@@ -525,7 +447,7 @@ export function ManualSaleModal({
                     onChange={(e) => setSelectedFlavorId(e.target.value)}
                     className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400/50 disabled:opacity-40"
                   >
-                    <option value="">-- Selecione Sabor --</option>
+                    <option value="">-- Selecione o Sabor --</option>
                     {availableFlavors.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.flavor || "Padrão"} ({p.stock} un em estoque)
@@ -535,7 +457,7 @@ export function ManualSaleModal({
                 </div>
               </div>
 
-              {/* Quantidade e Preço Customizado */}
+              {/* Quantidade e Preço Unitário */}
               {selectedFlavorId && (
                 <div className="flex items-center justify-between gap-3 pt-2 border-t border-white/10 animate-in fade-in duration-150">
                   <div className="flex items-center gap-3">
@@ -572,11 +494,11 @@ export function ManualSaleModal({
                 </div>
               )}
 
-              {/* Tabela de Itens Adicionados no Pedido */}
+              {/* Lista de Itens no Pedido */}
               {items.length > 0 && (
                 <div className="space-y-2 pt-2 border-t border-white/10">
                   <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider block">
-                    Itens no Pedido ({items.length}):
+                    Itens Adicionados ({items.length}):
                   </span>
                   <div className="space-y-1.5">
                     {items.map((item, idx) => (
@@ -584,22 +506,13 @@ export function ManualSaleModal({
                         key={idx}
                         className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/10 text-xs"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          {item.image_url ? (
-                            <img src={item.image_url} alt="" className="size-7 rounded-lg object-cover border border-white/10" />
-                          ) : (
-                            <div className="size-7 rounded-lg bg-elevated border border-white/10 flex items-center justify-center text-muted-foreground">
-                              <Package className="size-3.5" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <p className="font-bold text-white truncate">
-                              {item.brand} {item.modelName}
-                            </p>
-                            <p className="text-[10px] text-emerald-400 font-medium">
-                              Sabor: {item.flavor}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="font-bold text-white">
+                            {item.brand} {item.modelName}
+                          </p>
+                          <p className="text-[10px] text-emerald-400 font-medium">
+                            Sabor: {item.flavor}
+                          </p>
                         </div>
 
                         <div className="flex items-center gap-4 shrink-0">
@@ -644,7 +557,7 @@ export function ManualSaleModal({
               </div>
 
               <div>
-                <label className="text-[11px] text-silver font-medium block mb-1">Taxa de Entrega / Frete (R$)</label>
+                <label className="text-[11px] text-silver font-medium block mb-1">Taxa de Frete (R$)</label>
                 <input
                   type="text"
                   value={shippingFee}
@@ -655,8 +568,8 @@ export function ManualSaleModal({
               </div>
             </div>
 
-            {/* RESUMO E BOTÃO DE FINALIZAR */}
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-3">
+            {/* RESUMO DO PEDIDO */}
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-silver">Subtotal dos Pods:</span>
                 <span className="font-bold text-white">R$ {subtotal.toFixed(2).replace(".", ",")}</span>
@@ -668,7 +581,7 @@ export function ManualSaleModal({
                 </div>
               )}
               <div className="flex items-center justify-between text-sm pt-2 border-t border-amber-500/20">
-                <span className="font-bold text-white uppercase tracking-wider">Total do Pedido:</span>
+                <span className="font-bold text-white uppercase tracking-wider">TOTAL DO PEDIDO:</span>
                 <span className="font-extrabold text-lg text-emerald-400">
                   R$ {grandTotal.toFixed(2).replace(".", ",")}
                 </span>
@@ -680,7 +593,7 @@ export function ManualSaleModal({
           </div>
         )}
 
-        {/* Rodapé de Ações */}
+        {/* Rodapé do Modal */}
         <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
           <button
             type="button"
