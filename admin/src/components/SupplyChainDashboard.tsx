@@ -1,16 +1,16 @@
-import { useState, useEffect, useRef, useMemo } from "react";
 import { 
   PackageSearch, Plus, Minus, Eye, EyeOff, Loader2, ImagePlus, Upload, 
   Trash2, Search, Filter, ArrowUpDown, MoreVertical, Copy, Edit3, DollarSign, 
   CheckCircle2, X, TrendingUp, PieChart, ChevronRight, ChevronDown, ChevronUp, 
   Tag, Box, Camera, Download, FileText, BarChart3, Check, Share2, Smartphone, 
-  Monitor, Store, ExternalLink, ListOrdered, Save, Star
+  Monitor, Store, ExternalLink, ListOrdered, Save, Star, ShoppingCart
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatBRL } from "@/lib/cart";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchCategories, fetchProductCategoryMappings, updateModelCategories, DEFAULT_CATEGORIES, type Category } from "../lib/categories";
 import { fetchProductCostsMap, updateProductCost } from "../lib/productCosts";
+import { ManualSaleModal } from "./ManualSaleModal";
 
 // ─── Donut chart colors ───────────────────────────────────
 const DONUT_COLORS = ["#34d399", "#60a5fa", "#a78bfa", "#fbbf24", "#f87171", "#f472b6", "#38bdf8"];
@@ -29,6 +29,11 @@ export function SupplyChainDashboard() {
 
   // ─── Modal Flutuante Centralizado de Novo Produto ──────
   const [showNewProductModal, setShowNewProductModal] = useState(false);
+
+  // ─── Modal de Registro de Vendas Manuais ──────────────
+  const [isManualSaleModalOpen, setIsManualSaleModalOpen] = useState(false);
+  const [preSelectedFlavorIdForSale, setPreSelectedFlavorIdForSale] = useState<string | null>(null);
+  const [preSelectedGroupForSale, setPreSelectedGroupForSale] = useState<any | null>(null);
 
   // ─── Estados de Categorias e Destaques (⭐) ─────────────
   const [categoriesList, setCategoriesList] = useState<Category[]>(DEFAULT_CATEGORIES);
@@ -1191,14 +1196,29 @@ export function SupplyChainDashboard() {
               </p>
             </div>
 
-            {/* Apenas o Botão + Novo Produto no Topo Superior Direito */}
-            <button
-              onClick={() => setShowNewProductModal(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] cursor-pointer active:scale-[0.97]"
-            >
-              <Plus className="size-4" />
-              <span>Novo Produto</span>
-            </button>
+            {/* Botões Superiores Direitos: Registrar Venda e Novo Produto */}
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setPreSelectedFlavorIdForSale(null);
+                  setPreSelectedGroupForSale(null);
+                  setIsManualSaleModalOpen(true);
+                }}
+                className="inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black text-xs font-extrabold transition-all shadow-[0_0_15px_rgba(245,158,11,0.35)] cursor-pointer active:scale-[0.97]"
+              >
+                <ShoppingCart className="size-4 text-black" />
+                <span>⚡ Registrar Venda</span>
+              </button>
+
+              <button
+                onClick={() => setShowNewProductModal(true)}
+                className="inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] cursor-pointer active:scale-[0.97]"
+              >
+                <Plus className="size-4" />
+                <span>Novo Produto</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1946,7 +1966,7 @@ export function SupplyChainDashboard() {
                         </div>
                       </div>
 
-                      {/* Controles de Estoque Estáveis */}
+                      {/* Controles de Estoque Estáveis + Botão Vender */}
                       <div className="flex items-center gap-2.5 shrink-0">
                         <button
                           onClick={() => handleUpdateStock(f.id, Math.max(0, (f.stock || 0) - 1))}
@@ -1967,6 +1987,21 @@ export function SupplyChainDashboard() {
                         >
                           <Plus className="size-4" />
                         </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setViewingFlavorsGroup(null);
+                            setPreSelectedGroupForSale(null);
+                            setPreSelectedFlavorIdForSale(f.id);
+                            setIsManualSaleModalOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 text-xs font-bold transition-all cursor-pointer active:scale-95 ml-1"
+                          title="Registrar venda manual deste sabor"
+                        >
+                          <ShoppingCart className="size-3.5" />
+                          <span>⚡ Vender</span>
+                        </button>
                       </div>
                     </div>
                   );
@@ -1978,7 +2013,22 @@ export function SupplyChainDashboard() {
               </div>
 
               {/* Modal Footer */}
-              <div className="p-4 border-t border-border bg-black/40 flex justify-end">
+              <div className="p-4 border-t border-border bg-black/40 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentGrp = viewingFlavorsGroup;
+                    setViewingFlavorsGroup(null);
+                    setPreSelectedFlavorIdForSale(null);
+                    setPreSelectedGroupForSale(currentGrp);
+                    setIsManualSaleModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <ShoppingCart className="size-4" />
+                  <span>⚡ Registrar Venda Deste Pod</span>
+                </button>
+
                 <button
                   onClick={() => setViewingFlavorsGroup(null)}
                   className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer"
@@ -2944,6 +2994,22 @@ export function SupplyChainDashboard() {
           </div>
         </div>
       )}
+
+      {/* ━━━ MODAL DE REGISTRO DE VENDA MANUAL ━━━━━━━━━━━━━━━━ */}
+      <ManualSaleModal
+        isOpen={isManualSaleModalOpen}
+        onClose={() => {
+          setIsManualSaleModalOpen(false);
+          setPreSelectedFlavorIdForSale(null);
+          setPreSelectedGroupForSale(null);
+        }}
+        onSaleSuccess={() => {
+          fetchData();
+        }}
+        preSelectedFlavorId={preSelectedFlavorIdForSale}
+        preSelectedGroup={preSelectedGroupForSale}
+        companyId={company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5"}
+      />
     </div>
   );
 }
