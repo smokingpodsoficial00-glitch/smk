@@ -58,7 +58,7 @@ async function seedOrders() {
       client_phone: phone,
       client_name: name,
       items: items,
-      total_amount: total,
+      total_amount: total + 15.00,
       shipping_fee: 15.00,
       shipping_address: address,
       payment_status: 'PAGO',

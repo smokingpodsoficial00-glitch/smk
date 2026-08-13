@@ -85,12 +85,12 @@ export function KanbanBoard() {
             phone: o.client_phone,
             address: o.shipping_address,
             items: Array.isArray(o.items) ? o.items.map((i: any) => ({
-              model: i.name || '',
+              model: i.name || i.model || '',
               flavor: i.flavor || '',
               quantity: i.quantity || 1,
-              price: i.price ? parseFloat(i.price) : 90
+              price: i.price ? parseFloat(i.price) : (i.unit_price ? parseFloat(i.unit_price) : 0)
             })) : [],
-            totalAmount: parseFloat(o.total_amount || 0) + parseFloat(o.shipping_fee || 0),
+            totalAmount: parseFloat(o.total_amount || 0),
             shippingFee: parseFloat(o.shipping_fee || 0),
             paymentMethod: o.payment_method,
             receiptUrl: o.receipt_url,
@@ -863,15 +863,33 @@ function OrderCard({
       {/* Itens do Pedido */}
       <div className="flex flex-col gap-3 py-1">
         <div className="text-[9px] font-bold tracking-wider text-white/30 uppercase">Itens</div>
-        {order.items.map((item, idx) => (
-          <div key={idx} className="flex gap-2 text-xs items-center">
-            <span className="text-emerald-400 font-bold text-xs shrink-0 select-none">{item.quantity}x</span>
-            <div className="flex flex-col">
-              <span className="font-semibold text-white/80">{item.flavor}</span>
-              <span className="text-[10px] text-white/40 mt-0.5">{item.model}</span>
+        {order.items.map((item, idx) => {
+          const itemPrice = item.price || 0;
+          const itemSubtotal = itemPrice * (item.quantity || 1);
+          return (
+            <div key={idx} className="flex items-center justify-between text-xs py-1 border-b border-white/5 last:border-0 gap-2">
+              <div className="flex gap-2 text-xs items-center min-w-0">
+                <span className="text-emerald-400 font-bold text-xs shrink-0 select-none">{item.quantity}x</span>
+                <div className="flex flex-col min-w-0">
+                  <span className="font-semibold text-white/80 truncate">{item.flavor}</span>
+                  <span className="text-[10px] text-white/40 mt-0.5 truncate">{item.model}</span>
+                </div>
+              </div>
+              {itemPrice > 0 && (
+                <div className="text-right shrink-0">
+                  <span className="font-mono text-xs font-semibold text-white/90">
+                    {formatBRL(itemSubtotal)}
+                  </span>
+                  {item.quantity > 1 && (
+                    <span className="text-[9px] text-white/40 block font-mono">
+                      ({formatBRL(itemPrice)} cada)
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Endereço e Taxa de Entrega */}

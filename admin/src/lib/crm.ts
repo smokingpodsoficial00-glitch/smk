@@ -126,8 +126,7 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
 
       const spent = validOrders.reduce((sum, o) => {
         const total = parseFloat(o.total_amount || 0);
-        const fee = parseFloat(o.shipping_fee || 0);
-        return sum + total + fee;
+        return sum + total;
       }, 0);
 
       const ordersCount = clientOrders.length;
