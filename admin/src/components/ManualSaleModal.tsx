@@ -94,7 +94,6 @@ export function ManualSaleModal({
             const phone = (o.client_phone || "").trim();
             const name = (o.client_name || "").trim();
 
-            // Ignorar dados de sistema
             if (
               phone &&
               !phone.startsWith("__SYSTEM_") &&
@@ -122,7 +121,7 @@ export function ManualSaleModal({
     loadInitialData();
   }, [isOpen, companyId]);
 
-  // Lista Simplificada de Todos os Modelos (ex: "ELFBAR - BC15K")
+  // Lista Simplificada de Todos os Modelos (ex: "ELFBAR ICE KING")
   const availableModels = useMemo(() => {
     const map = new Map<string, { label: string; key: string }>();
     productsList.forEach((p) => {
@@ -154,42 +153,49 @@ export function ManualSaleModal({
     }
   }, [selectedFlavorId, productsList]);
 
-  // Adicionar item ao carrinho do pedido
-  const handleAddItem = () => {
-    if (!selectedFlavorId) {
-      setErrorMessage("Por favor, selecione um sabor disponível.");
+  // Item ativo no formulário (caso o usuário tenha selecionado nos dropdowns mas não tenha clicado no botão adicional)
+  const activeFormItem = useMemo(() => {
+    if (!selectedFlavorId) return null;
+    const prod = productsList.find((p) => p.id === selectedFlavorId);
+    if (!prod) return null;
+
+    const unitPrice = parseFloat(customPrice.replace(",", ".")) || Number(prod.price) || 0;
+    return {
+      productId: prod.id,
+      brand: prod.brand,
+      modelName: prod.name,
+      flavor: prod.flavor || "Padrão",
+      quantity: itemQuantity,
+      price: unitPrice,
+      costPrice: Number(prod.cost_price) || 0,
+      maxStock: Number(prod.stock) || 0,
+      image_url: prod.image_url,
+    };
+  }, [selectedFlavorId, itemQuantity, customPrice, productsList]);
+
+  // Lista Efetiva de Itens no Pedido (se a lista de itens estiver vazia mas houver um pod selecionado no formulário, inclui automaticamente)
+  const effectiveItems = useMemo(() => {
+    if (items.length > 0) return items;
+    return activeFormItem ? [activeFormItem] : [];
+  }, [items, activeFormItem]);
+
+  // Adicionar Pod Adicional (para pedidos com múltiplos pods)
+  const handleAddAnotherItem = () => {
+    if (!activeFormItem) {
+      setErrorMessage("Por favor, selecione um sabor disponível antes de adicionar outro.");
       return;
     }
 
-    const prod = productsList.find((p) => p.id === selectedFlavorId);
-    if (!prod) return;
-
-    const unitPrice = parseFloat(customPrice.replace(",", ".")) || Number(prod.price) || 0;
-    const existingIdx = items.findIndex((i) => i.productId === prod.id);
-
+    const existingIdx = items.findIndex((i) => i.productId === activeFormItem.productId);
     if (existingIdx >= 0) {
       const updated = [...items];
-      updated[existingIdx].quantity += itemQuantity;
-      updated[existingIdx].price = unitPrice;
+      updated[existingIdx].quantity += activeFormItem.quantity;
+      updated[existingIdx].price = activeFormItem.price;
       setItems(updated);
     } else {
-      setItems([
-        ...items,
-        {
-          productId: prod.id,
-          brand: prod.brand,
-          modelName: prod.name,
-          flavor: prod.flavor || "Padrão",
-          quantity: itemQuantity,
-          price: unitPrice,
-          costPrice: Number(prod.cost_price) || 0,
-          maxStock: Number(prod.stock) || 0,
-          image_url: prod.image_url,
-        },
-      ]);
+      setItems([...items, activeFormItem]);
     }
 
-    // Resetar campos parciais
     setSelectedFlavorId("");
     setItemQuantity(1);
     setCustomPrice("");
@@ -202,12 +208,12 @@ export function ManualSaleModal({
 
   // Cálculos do Pedido
   const subtotal = useMemo(() => {
-    return items.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  }, [items]);
+    return effectiveItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  }, [effectiveItems]);
 
   const totalCost = useMemo(() => {
-    return items.reduce((acc, item) => acc + item.costPrice * item.quantity, 0);
-  }, [items]);
+    return effectiveItems.reduce((acc, item) => acc + item.costPrice * item.quantity, 0);
+  }, [effectiveItems]);
 
   const numericShippingFee = parseFloat(shippingFee.replace(",", ".")) || 0;
   const grandTotal = subtotal + numericShippingFee;
@@ -228,8 +234,8 @@ export function ManualSaleModal({
     setErrorMessage("");
     setSuccessMessage("");
 
-    if (items.length === 0) {
-      setErrorMessage("Adicione pelo menos 1 pod ao pedido antes de concluir.");
+    if (effectiveItems.length === 0) {
+      setErrorMessage("Por favor, selecione um modelo e sabor de pod para a venda.");
       return;
     }
 
@@ -241,8 +247,28 @@ export function ManualSaleModal({
     setSubmitting(true);
 
     try {
-      // 1. Array de itens do pedido no formato do smoking_orders
-      const orderItems = items.map((item) => {
+      // 1. Inserir/Atualizar Cliente no CRM (smoking_customers)
+      const rawPhone = clientPhone.trim();
+      const cleanPhone = rawPhone.replace(/\D/g, "");
+      const formattedPhone = cleanPhone ? (cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`) : "5511999999999";
+
+      try {
+        await supabase.from("smoking_customers").upsert(
+          {
+            phone: formattedPhone,
+            name: clientName.trim(),
+            address: shippingAddress.trim() || "Atendimento Balcão / WhatsApp",
+            company_id: companyId,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "phone" }
+        );
+      } catch (custErr) {
+        // Ignora caso tabela nao tenha constraint de conflito
+      }
+
+      // 2. Formatar Itens do Pedido no padrão smoking_orders
+      const orderItems = effectiveItems.map((item) => {
         const modelKey = `${item.brand}__${item.modelName}`.toLowerCase();
         return {
           id: item.productId,
@@ -257,10 +283,10 @@ export function ManualSaleModal({
         };
       });
 
-      // 2. Inserir Pedido PAGO e ENTREGUE em smoking_orders
+      // 3. Inserir Pedido PAGO e ENTREGUE em smoking_orders
       const { error: orderErr } = await supabase.from("smoking_orders").insert({
         client_name: clientName.trim(),
-        client_phone: clientPhone.trim() || "5511999999999",
+        client_phone: formattedPhone,
         shipping_address: shippingAddress.trim() || "Atendimento Balcão / WhatsApp",
         items: orderItems,
         total_amount: grandTotal,
@@ -275,8 +301,8 @@ export function ManualSaleModal({
         throw new Error(`Erro ao salvar pedido: ${orderErr.message}`);
       }
 
-      // 3. Dar baixa no Estoque em smoking_products para cada item
-      for (const item of items) {
+      // 4. Dar baixa no Estoque em smoking_products para cada item
+      for (const item of effectiveItems) {
         const { data: pData } = await supabase
           .from("smoking_products")
           .select("stock")
@@ -292,7 +318,7 @@ export function ManualSaleModal({
           .eq("id", item.productId);
       }
 
-      setSuccessMessage("✅ Venda registrada! Estoque abatido, ranking e CRM atualizados.");
+      setSuccessMessage("✅ Venda registrada com sucesso! Estoque abatido, ranking e CRM atualizados.");
 
       setTimeout(() => {
         onSaleSuccess();
@@ -349,7 +375,7 @@ export function ManualSaleModal({
         {loadingProducts ? (
           <div className="py-12 text-center space-y-3">
             <Loader2 className="size-8 animate-spin text-amber-400 mx-auto" />
-            <p className="text-xs text-muted-foreground">Carregando produtos...</p>
+            <p className="text-xs text-muted-foreground">Carregando catálogo de produtos...</p>
           </div>
         ) : (
           <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1 custom-scrollbar">
@@ -375,7 +401,7 @@ export function ManualSaleModal({
                 {clientsList.length > 0 && (
                   <select
                     onChange={(e) => handleSelectExistingClient(e.target.value)}
-                    className="bg-black/60 border border-white/10 rounded-lg text-xs text-muted-foreground px-2.5 py-1 focus:outline-none focus:border-amber-400/50"
+                    className="bg-black/60 border border-white/10 rounded-lg text-xs text-muted-foreground px-2.5 py-1 focus:outline-none focus:border-amber-400/50 cursor-pointer"
                   >
                     <option value="">-- Selecionar Cliente Existente --</option>
                     {clientsList.map((c) => (
@@ -394,8 +420,8 @@ export function ManualSaleModal({
                     type="text"
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
-                    placeholder="Ex: João Silva"
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400/50"
+                    placeholder="Ex: Samuel"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400/50 font-semibold"
                   />
                 </div>
                 <div>
@@ -404,8 +430,8 @@ export function ManualSaleModal({
                     type="text"
                     value={clientPhone}
                     onChange={(e) => setClientPhone(e.target.value)}
-                    placeholder="Ex: 11999998888"
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400/50"
+                    placeholder="Ex: 11943856234"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400/50 font-semibold"
                   />
                 </div>
               </div>
@@ -427,7 +453,7 @@ export function ManualSaleModal({
                       setSelectedModelKey(e.target.value);
                       setSelectedFlavorId("");
                     }}
-                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400/50 font-semibold"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400/50 font-semibold cursor-pointer"
                   >
                     <option value="">-- Selecione o Modelo --</option>
                     {availableModels.map((m) => (
@@ -445,7 +471,7 @@ export function ManualSaleModal({
                     disabled={!selectedModelKey}
                     value={selectedFlavorId}
                     onChange={(e) => setSelectedFlavorId(e.target.value)}
-                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400/50 disabled:opacity-40"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400/50 disabled:opacity-40 font-semibold cursor-pointer"
                   >
                     <option value="">-- Selecione o Sabor --</option>
                     {availableFlavors.map((p) => (
@@ -468,7 +494,7 @@ export function ManualSaleModal({
                         min="1"
                         value={itemQuantity}
                         onChange={(e) => setItemQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-20 bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-center text-white focus:outline-none focus:border-amber-400/50"
+                        className="w-20 bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-center text-white focus:outline-none focus:border-amber-400/50 font-bold"
                       />
                     </div>
                     <div>
@@ -485,20 +511,20 @@ export function ManualSaleModal({
 
                   <button
                     type="button"
-                    onClick={handleAddItem}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(245,158,11,0.3)] cursor-pointer self-end"
+                    onClick={handleAddAnotherItem}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all border border-white/10 cursor-pointer"
                   >
-                    <Plus className="size-4" />
-                    <span>Adicionar Pod</span>
+                    <Plus className="size-3.5 text-amber-400" />
+                    <span>+ Outro Pod neste Pedido</span>
                   </button>
                 </div>
               )}
 
-              {/* Lista de Itens no Pedido */}
+              {/* Lista de Itens no Pedido (para pedidos com múltiplos pods) */}
               {items.length > 0 && (
                 <div className="space-y-2 pt-2 border-t border-white/10">
                   <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider block">
-                    Itens Adicionados ({items.length}):
+                    Pods Adicionados no Pedido ({items.length}):
                   </span>
                   <div className="space-y-1.5">
                     {items.map((item, idx) => (
@@ -563,7 +589,7 @@ export function ManualSaleModal({
                   value={shippingFee}
                   onChange={(e) => setShippingFee(e.target.value)}
                   placeholder="0,00"
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400/50"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400/50 font-bold"
                 />
               </div>
             </div>
@@ -604,7 +630,7 @@ export function ManualSaleModal({
           </button>
           <button
             type="button"
-            disabled={submitting || items.length === 0}
+            disabled={submitting || effectiveItems.length === 0}
             onClick={handleSubmitSale}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-black text-xs font-extrabold transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
