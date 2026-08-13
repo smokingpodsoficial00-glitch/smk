@@ -10,6 +10,11 @@ import {
   ShoppingBag,
   Layers,
   Sparkles,
+  Wallet,
+  Megaphone,
+  Landmark,
+  PiggyBank,
+  Check,
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { supabase } from "@/lib/supabase";
@@ -61,6 +66,17 @@ export function FinanceDashboard() {
   const [stockAssetCost, setStockAssetCost] = useState(0);
   const [stockAssetRetail, setStockAssetRetail] = useState(0);
   const [stockAssetUnits, setStockAssetUnits] = useState(0);
+
+  // Tesouraria & Fluxo de Caixa (Marketing & Outros Custos)
+  const [marketingSpent, setMarketingSpent] = useState<string>(() => {
+    return localStorage.getItem("smk_mkt_investment") || "0";
+  });
+  const [isEditingMarketing, setIsEditingMarketing] = useState(false);
+
+  const saveMarketingInvestment = (val: string) => {
+    setMarketingSpent(val);
+    localStorage.setItem("smk_mkt_investment", val);
+  };
 
   const fetchFinanceData = async () => {
     const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
@@ -205,6 +221,11 @@ export function FinanceDashboard() {
     };
   }, [company?.id]);
 
+  // Cálculos do Fluxo de Caixa / Tesouraria
+  const numericMarketingSpent = parseFloat(marketingSpent.replace(",", ".")) || 0;
+  const netCashAvailable = Math.max(0, grossRevenue - logisticsFee - numericMarketingSpent);
+  const realNetProfitPostMarketing = netProfit - numericMarketingSpent;
+  const totalCompanyEquity = netCashAvailable + stockAssetCost;
   const stockAssetProfit = stockAssetRetail - stockAssetCost;
 
   if (loading) {
@@ -223,10 +244,10 @@ export function FinanceDashboard() {
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
             <Sparkles className="size-6 text-emerald-400" />
-            <span>Inteligência Financeira (DRE Real)</span>
+            <span>Inteligência Financeira & Fluxo de Caixa</span>
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Demonstrativo de Resultado com métricas exatas de Faturamento, CMV, Frete e Patrimônio.
+            DRE em tempo real, Tesouraria, Investimentos em Marketing e Patrimônio Global da Empresa.
           </p>
         </div>
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 self-start sm:self-auto">
@@ -294,7 +315,7 @@ export function FinanceDashboard() {
           </div>
 
           <div className="pt-2 border-t border-white/10 text-[10px] text-muted-foreground">
-            Custo pago ao fornecedor pelos pods vendidos
+            Custo pago ao fornecedor pelos {totalPodsSold} pods vendidos
           </div>
         </div>
 
@@ -349,7 +370,111 @@ export function FinanceDashboard() {
         </div>
       </div>
 
-      {/* ━━━ BLOCO 2: DETALHAMENTO DRE VISUAL + PATRIMÔNIO EM ESTOQUE ━━━━━━━━━━━━━━ */}
+      {/* ━━━ BLOCO 2: FLUXO DE CAIXA & TESOURARIA EXECUTIVA (NOVO!) ━━━━━━━━━━━━━━ */}
+      <div className="bg-[#121316] border border-amber-500/30 rounded-3xl p-5 sm:p-6 space-y-6 shadow-2xl bg-gradient-to-r from-amber-500/5 via-transparent to-emerald-500/5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Wallet className="size-5 text-amber-400" />
+              <span>Gestão de Tesouraria & Fluxo de Caixa Real</span>
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Visão 360° do dinheiro disponível em caixa, investimento em marketing e patrimônio imobilizado.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-amber-400 bg-amber-500/20 px-3 py-1 rounded-xl border border-amber-500/30">
+              ⚡ Caixa & Investimentos
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: Dinheiro em Caixa Livre */}
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
+            <span className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider block flex items-center gap-1.5">
+              <PiggyBank className="size-4 text-emerald-400" /> Caixa Livre Acumulado
+            </span>
+            <div className="text-xl font-extrabold text-emerald-400">
+              {formatBRL(netCashAvailable)}
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Bruto Recebido das vendas (-) Fretes e (-) Marketing investido.
+            </p>
+          </div>
+
+          {/* Card 2: Investimento em Marketing (Editável) */}
+          <div className="bg-white/5 border border-amber-500/30 rounded-2xl p-4 space-y-2 relative">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-amber-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+                <Megaphone className="size-4" /> Anúncios / Marketing
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsEditingMarketing(!isEditingMarketing)}
+                className="text-[10px] text-amber-400 hover:underline font-bold"
+              >
+                {isEditingMarketing ? "Salvar" : "Editar"}
+              </button>
+            </div>
+
+            {isEditingMarketing ? (
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  value={marketingSpent}
+                  onChange={(e) => saveMarketingInvestment(e.target.value)}
+                  placeholder="Ex: 50.00"
+                  className="w-full bg-black/60 border border-amber-500/50 rounded-xl px-2.5 py-1 text-xs font-bold text-amber-400 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsEditingMarketing(false)}
+                  className="p-1.5 rounded-xl bg-amber-500 text-black hover:bg-amber-400 transition-colors"
+                >
+                  <Check className="size-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="text-xl font-extrabold text-amber-400">
+                {formatBRL(numericMarketingSpent)}
+              </div>
+            )}
+
+            <p className="text-[10px] text-muted-foreground">
+              Total investido em anúncios Meta/Insta e tráfego pago.
+            </p>
+          </div>
+
+          {/* Card 3: Custo do Estoque Parado */}
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
+            <span className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider block flex items-center gap-1.5">
+              <Box className="size-4 text-silver" /> Capital no Estoque
+            </span>
+            <div className="text-xl font-extrabold text-white">
+              {formatBRL(stockAssetCost)}
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Valor pago ao fornecedor pelos {stockAssetUnits} pods parados.
+            </p>
+          </div>
+
+          {/* Card 4: Patrimônio Total da Empresa */}
+          <div className="bg-gradient-to-br from-emerald-500/20 to-amber-500/20 border border-emerald-400/40 rounded-2xl p-4 space-y-2">
+            <span className="text-[11px] text-emerald-300 uppercase font-extrabold tracking-wider block flex items-center gap-1.5">
+              <Landmark className="size-4 text-emerald-400" /> Patrimônio Total Loja
+            </span>
+            <div className="text-xl font-black text-emerald-300">
+              {formatBRL(totalCompanyEquity)}
+            </div>
+            <p className="text-[10px] text-emerald-200/80 font-medium">
+              Caixa Livre ({formatBRL(netCashAvailable)}) + Custo do Estoque ({formatBRL(stockAssetCost)})
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ━━━ BLOCO 3: DETALHAMENTO DRE VISUAL + PATRIMÔNIO EM ESTOQUE ━━━━━━━━━━━━━━ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Gráfico Detalhamento DRE (Real) */}
         <div className="lg:col-span-2 bg-[#121316] border border-white/10 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl">
