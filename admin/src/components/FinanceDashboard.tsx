@@ -87,8 +87,16 @@ export function FinanceDashboard() {
         let revenueSum = 0;
         let cmvSum = 0;
         let shippingCollectedSum = 0;
-        let estimatedShippingExpenseSum = 0;
         let podsSoldSum = 0;
+
+        // Tabela de custos padrão por modelo (fallback caso o pod não tenha cost_price salvo na época)
+        const DEFAULT_MODEL_COSTS: Record<string, number> = {
+          'elfbar__ice king': 70,
+          'lost mary__dura 35k': 65,
+          'elfbar__bc15k': 48,
+          'oxbar__50k': 65,
+          'ignite__v50': 65,
+        };
 
         for (const order of validOrders) {
           const orderTotal = parseFloat(order.total_amount || 0);
@@ -96,27 +104,37 @@ export function FinanceDashboard() {
           revenueSum += orderTotal;
           shippingCollectedSum += shippingFee;
 
-          // Estimated logistics expense per order: R$ 15.00 or shippingFee
-          estimatedShippingExpenseSum += Math.max(15, shippingFee);
-
-          const items: OrderItem[] = Array.isArray(order.items) ? order.items : [];
+          const items: any[] = Array.isArray(order.items) ? order.items : [];
           for (const item of items) {
-            const qty = item.quantity || 1;
-            const cost = (item.product_id && costMap.get(item.product_id)) ||
-                         (item.flavor && costMap.get(item.flavor.toLowerCase())) || 0;
+            const qty = Number(item.quantity) || 1;
+            const modelKey = (item.modelKey || `${item.brand || ''}__${item.name || ''}`).toLowerCase();
+            
+            // Puxa custo salvo no item, ou no costMap por ID, ou por chave de modelo, ou fallback R$ 65
+            let itemCost = Number(item.cost_price || item.costPrice || item.cost) || 0;
+            if (!itemCost && item.product_id && costMap.has(item.product_id)) {
+              itemCost = costMap.get(item.product_id) || 0;
+            }
+            if (!itemCost && item.id && costMap.has(item.id)) {
+              itemCost = costMap.get(item.id) || 0;
+            }
+            if (!itemCost && modelKey && DEFAULT_MODEL_COSTS[modelKey]) {
+              itemCost = DEFAULT_MODEL_COSTS[modelKey];
+            }
+            if (!itemCost) {
+              itemCost = 65; // Custo médio padrão por pod
+            }
 
-            cmvSum += qty * cost;
+            cmvSum += qty * itemCost;
             podsSoldSum += qty;
           }
         }
 
-        const subsidy = Math.max(0, estimatedShippingExpenseSum - shippingCollectedSum);
-        const net = revenueSum - cmvSum - subsidy;
+        const net = revenueSum - cmvSum;
         const margin = revenueSum > 0 ? (net / revenueSum) * 100 : 0;
 
         setGrossRevenue(revenueSum);
         setCmv(cmvSum);
-        setLogisticsSubsidy(subsidy);
+        setLogisticsSubsidy(shippingCollectedSum);
         setNetProfit(net);
         setProfitMargin(parseFloat(margin.toFixed(1)));
         setTotalOrders(validOrders.length);
@@ -192,11 +210,10 @@ export function FinanceDashboard() {
           negative
         />
         <KPICard 
-          title="Subsídio de Frete" 
+          title="Frete Total (Logística)" 
           value={formatBRL(logisticsSubsidy)} 
           icon={<AlertTriangle className="size-5 text-orange-400" />} 
-          description={`${subsidyPct}% investidos cobrindo logística`} 
-          negative
+          description={`Total registrado nas entregas`} 
         />
         <KPICard 
           title="Lucro Líquido Real" 
