@@ -1255,31 +1255,31 @@ export function SupplyChainDashboard() {
           {/* Valor em Estoque */}
           <div className="bg-card border border-emerald-500/20 rounded-2xl p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Valor em Estoque</span>
+              <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Valor de Venda do Estoque</span>
               <div className="size-8 rounded-lg bg-emerald-500/10 grid place-items-center">
                 <DollarSign className="size-4 text-emerald-400" />
               </div>
             </div>
             <div className="text-2xl font-bold text-emerald-400">{formatBRL(totalStockValue)}</div>
-            <span className="text-[10px] text-emerald-400/60">valor total a preço de venda</span>
+            <span className="text-[10px] text-emerald-400/60">valor bruto dos {totalStockUnits} pods na prateleira</span>
           </div>
 
-          {/* Custo Total */}
+          {/* Custo dos Pods em Estoque */}
           <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Custo Total</span>
+              <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Custo dos Pods em Estoque</span>
               <div className="size-8 rounded-lg bg-white/5 grid place-items-center">
                 <Tag className="size-4 text-muted-foreground" />
               </div>
             </div>
             <div className="text-2xl font-bold text-silver">{formatBRL(totalStockCost)}</div>
-            <span className="text-[10px] text-muted-foreground">custo de reposição total</span>
+            <span className="text-[10px] text-muted-foreground">custo pago nos {totalStockUnits} pods na prateleira</span>
           </div>
 
-          {/* Lucro Estimado */}
+          {/* Lucro Potencial do Estoque */}
           <div className="bg-card border border-emerald-500/20 rounded-2xl p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Lucro Estimado</span>
+              <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Lucro Potencial do Estoque</span>
               <div className="size-8 rounded-lg bg-emerald-500/10 grid place-items-center">
                 <TrendingUp className="size-4 text-emerald-400" />
               </div>
@@ -1287,7 +1287,7 @@ export function SupplyChainDashboard() {
             <div className="text-2xl font-bold text-emerald-400">{formatBRL(estimatedProfit)}</div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold">{profitMarginPct}%</span>
-              <span className="text-[10px] text-muted-foreground">margem bruta</span>
+              <span className="text-[10px] text-muted-foreground">se vender os {totalStockUnits} pods parados</span>
             </div>
           </div>
         </div>
