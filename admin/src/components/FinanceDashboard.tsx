@@ -88,13 +88,19 @@ export function FinanceDashboard() {
 
   // Tesouraria & Fluxo de Caixa (Marketing & Outros Custos)
   const [marketingSpent, setMarketingSpent] = useState<string>(() => {
-    return localStorage.getItem("smk_mkt_investment") || "0";
+    try {
+      return localStorage.getItem("smk_mkt_investment") || "0";
+    } catch (e) {
+      return "0";
+    }
   });
   const [isEditingMarketing, setIsEditingMarketing] = useState(false);
 
   const saveMarketingInvestment = (val: string) => {
     setMarketingSpent(val);
-    localStorage.setItem("smk_mkt_investment", val);
+    try {
+      localStorage.setItem("smk_mkt_investment", val);
+    } catch (e) {}
   };
 
   const fetchFinanceData = async () => {
@@ -103,7 +109,7 @@ export function FinanceDashboard() {
       setLoading(true);
 
       // 1. Carregar Mapa de Custos Persistidos
-      const persistedCosts = await fetchProductCostsMap(targetCompanyId);
+      const persistedCosts = await fetchProductCostsMap(targetCompanyId).catch(() => ({}));
 
       // 2. Carregar Pedidos Reais de Clientes
       const { data: rawOrders } = await supabase
@@ -282,12 +288,12 @@ export function FinanceDashboard() {
     };
   }, [company?.id]);
 
-  // Cálculos do Fluxo de Caixa / Tesouraria
-  const numericMarketingSpent = parseFloat(marketingSpent.replace(",", ".")) || 0;
-  const netCashAvailable = Math.max(0, grossRevenue - logisticsFee - numericMarketingSpent);
-  const realNetProfitPostMarketing = netProfit - numericMarketingSpent;
-  const totalCompanyEquity = grossRevenue + stockAssetCost;
-  const stockAssetProfit = stockAssetRetail - stockAssetCost;
+  // Cálculos Seguros de Tesouraria & Fluxo de Caixa
+  const numericMarketingSpent = parseFloat(String(marketingSpent || "0").replace(",", ".")) || 0;
+  const netCashAvailable = Math.max(0, (grossRevenue || 0) - (logisticsFee || 0) - numericMarketingSpent);
+  const realNetProfitPostMarketing = (netProfit || 0) - numericMarketingSpent;
+  const totalCompanyEquity = (grossRevenue || 0) + (stockAssetCost || 0);
+  const stockAssetProfit = (stockAssetRetail || 0) - (stockAssetCost || 0);
 
   if (loading) {
     return (
@@ -426,12 +432,12 @@ export function FinanceDashboard() {
           </div>
 
           <div className="pt-2 border-t border-emerald-500/20 text-[10px] text-emerald-300/80 font-medium">
-            Fat (R$ {grossRevenue.toFixed(2)}) - CMV (R$ {cmv.toFixed(2)}) - Frete (R$ {logisticsFee.toFixed(2)})
+            Fat (R$ {(grossRevenue || 0).toFixed(2)}) - CMV (R$ {(cmv || 0).toFixed(2)}) - Frete (R$ {(logisticsFee || 0).toFixed(2)})
           </div>
         </div>
       </div>
 
-      {/* ━━━ BLOCO 2: GESTÃO UNIFICADA DE TESOURARIA, FLUXO DE CAIXA & ESTOQUE (AGORA NO TOPO!) ━━━━━━━━━━━━━━ */}
+      {/* ━━━ BLOCO 2: GESTÃO UNIFICADA DE TESOURARIA, FLUXO DE CAIXA & ESTOQUE ━━━━━━━━━━━━━━ */}
       <div className="bg-[#121316] border border-amber-500/30 rounded-3xl p-5 sm:p-6 space-y-6 shadow-2xl bg-gradient-to-r from-amber-500/5 via-transparent to-emerald-500/5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
@@ -483,7 +489,7 @@ export function FinanceDashboard() {
               <div className="flex items-center gap-2 pt-1">
                 <input
                   type="text"
-                  value={marketingSpent}
+                  value={marketingSpent || ""}
                   onChange={(e) => saveMarketingInvestment(e.target.value)}
                   placeholder="Ex: 50.00"
                   className="w-full bg-black/60 border border-amber-500/50 rounded-xl px-2.5 py-1 text-xs font-bold text-amber-400 focus:outline-none"
@@ -561,7 +567,7 @@ export function FinanceDashboard() {
         </div>
       </div>
 
-      {/* ━━━ BLOCO 3: 🏆 CAMPEÕES DE VENDA & ANÁLISE DE LUCRO POR POD (NOVA SEÇÃO ESTRATÉGICA!) ━━━━━━━━━━━━━━ */}
+      {/* ━━━ BLOCO 3: 🏆 CAMPEÕES DE VENDA & ANÁLISE DE LUCRO POR POD (SEÇÃO ESTRATÉGICA) ━━━━━━━━━━━━━━ */}
       <div className="bg-[#121316] border border-white/10 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
