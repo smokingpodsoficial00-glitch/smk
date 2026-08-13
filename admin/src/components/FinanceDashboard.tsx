@@ -390,16 +390,16 @@ export function FinanceDashboard() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Dinheiro em Caixa Livre */}
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
-            <span className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider block flex items-center gap-1.5">
-              <PiggyBank className="size-4 text-emerald-400" /> Caixa Livre Acumulado
+          {/* Card 1: Saldo Bruto em Conta (Caixa de Vendas) */}
+          <div className="bg-white/5 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
+            <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider block flex items-center gap-1.5">
+              <PiggyBank className="size-4 text-emerald-400" /> Saldo Bruto em Conta (PIX/Caixa)
             </span>
             <div className="text-xl font-extrabold text-emerald-400">
-              {formatBRL(netCashAvailable)}
+              {formatBRL(grossRevenue)}
             </div>
-            <p className="text-[10px] text-muted-foreground">
-              Bruto Recebido das vendas (-) Fretes e (-) Marketing investido.
+            <p className="text-[10px] text-emerald-300/80">
+              Dinheiro bruto total em conta para giro e recompra de estoque.
             </p>
           </div>
 
