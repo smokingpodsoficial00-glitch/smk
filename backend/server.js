@@ -704,6 +704,7 @@ async function syncWhatsAppOrderToKanbanAndDeductStock(senderNumber, contactName
                     shipping_fee: shippingFee,
                     payment_status: 'PENDENTE',
                     delivery_status: 'AGUARDANDO_PAGAMENTO',
+                    order_source: 'WHATSAPP',
                     payment_method: 'PIX'
                 })
                 .eq('id', orderId);
@@ -724,6 +725,7 @@ async function syncWhatsAppOrderToKanbanAndDeductStock(senderNumber, contactName
                     shipping_fee: shippingFee,
                     payment_status: 'PENDENTE',
                     delivery_status: 'AGUARDANDO_PAGAMENTO',
+                    order_source: 'WHATSAPP',
                     payment_method: 'PIX'
                 })
                 .select()

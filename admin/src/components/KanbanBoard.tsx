@@ -77,7 +77,7 @@ export function KanbanBoard() {
         const mapped: AdminOrder[] = data
           .filter(o => o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' && (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_')))
           .map(o => {
-          const isCompleted = completedIds.includes(o.id) || o.delivery_status === 'CONCLUIDO';
+          const isCompleted = completedIds.includes(o.id) || o.delivery_status === 'CONCLUIDO' || o.order_source === 'MANUAL' || (o.shipping_address && (o.shipping_address.includes('Balcão') || o.shipping_address.includes('Balcao')));
           return {
             id: o.id.substring(0, 8).toUpperCase(),
             realId: o.id,
@@ -161,7 +161,7 @@ export function KanbanBoard() {
       const { error } = await supabase
         .from('smoking_orders')
         .update({
-          delivery_status: newDeliveryStatus === 'CONCLUIDO' ? 'ENTREGUE' : newDeliveryStatus,
+          delivery_status: newDeliveryStatus,
           ...paymentUpdate
         })
         .eq('id', realId);

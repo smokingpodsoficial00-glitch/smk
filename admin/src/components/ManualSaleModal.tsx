@@ -287,8 +287,10 @@ export function ManualSaleModal({
         };
       });
 
-      // 3. Inserir Pedido PAGO e ENTREGUE em smoking_orders
-      const { error: orderErr } = await supabase.from("smoking_orders").insert({
+      // 3. Inserir Pedido PAGO e CONCLUIDO em smoking_orders (order_source = MANUAL)
+      let insertedOrderId: string | null = null;
+      
+      const payload: any = {
         client_name: clientName.trim(),
         client_phone: formattedPhone,
         shipping_address: shippingAddress.trim() || "Atendimento Balcão / WhatsApp",
@@ -296,31 +298,49 @@ export function ManualSaleModal({
         total_amount: grandTotal,
         shipping_fee: numericShippingFee,
         payment_status: "PAGO",
-        delivery_status: "ENTREGUE",
+        delivery_status: "CONCLUIDO",
+        order_source: "MANUAL",
         payment_method: paymentMethod,
         company_id: companyId,
-      });
+      };
+
+      let { data: insertedData, error: orderErr } = await supabase
+        .from("smoking_orders")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (orderErr && orderErr.message?.includes("smoking_orders_delivery_status_check")) {
+        // Fallback para constraint legada do Supabase
+        payload.delivery_status = "ENTREGUE";
+        delete payload.order_source;
+        const fallbackRes = await supabase
+          .from("smoking_orders")
+          .insert(payload)
+          .select("id")
+          .single();
+        orderErr = fallbackRes.error;
+        insertedData = fallbackRes.data;
+      }
 
       if (orderErr) {
         throw new Error(`Erro ao salvar pedido: ${orderErr.message}`);
       }
 
-      // 4. Dar baixa no Estoque em smoking_products para cada item
-      for (const item of effectiveItems) {
-        const { data: pData } = await supabase
-          .from("smoking_products")
-          .select("stock")
-          .eq("id", item.productId)
-          .single();
-
-        const currentStock = pData ? Number(pData.stock) || 0 : item.maxStock;
-        const newStock = Math.max(0, currentStock - item.quantity);
-
-        await supabase
-          .from("smoking_products")
-          .update({ stock: newStock })
-          .eq("id", item.productId);
+      if (insertedData?.id) {
+        insertedOrderId = insertedData.id;
+        try {
+          const completedIds = JSON.parse(localStorage.getItem('smoking_completed_order_ids') || '[]');
+          if (!completedIds.includes(insertedOrderId)) {
+            completedIds.push(insertedOrderId);
+            localStorage.setItem('smoking_completed_order_ids', JSON.stringify(completedIds));
+          }
+        } catch {}
       }
+
+      // 4. A baixa de estoque em smoking_products é realizada automaticamente
+      // pela Trigger SQL no Supabase (decrement_stock_on_payment) ao inserir o pedido com payment_status = 'PAGO'.
+      // Não fazemos segundo update em JS para evitar baixa duplicada!
 
       setSuccessMessage("✅ Venda registrada com sucesso! Estoque abatido, ranking e CRM atualizados.");
 
