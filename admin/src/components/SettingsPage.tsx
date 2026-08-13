@@ -33,24 +33,47 @@ export function SettingsPage() {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Dynamic Catalog Link (Front-End do Cliente na Porta 5175)
-  const catalogUrl = typeof window !== 'undefined'
-    ? window.location.origin.replace(":5174", ":5175")
-    : "http://localhost:5175";
+  // Slugifier seguro com suporte a acentos e caracteres especiais em Português
+  const generateSlug = (str: string) => {
+    return str
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/-+/g, "-");
+  };
 
-  // Sync form state when config loads
+  // Dynamic Catalog Link (Suporta local e produção)
+  const getCatalogUrl = () => {
+    if (typeof window === 'undefined') return "http://localhost:5175";
+    const { origin, port, hostname } = window.location;
+    if (port === "5174" || port === "8082" || port === "3000") {
+      return `${window.location.protocol}//${hostname}:5175`;
+    }
+    const slug = generateSlug(storeName || config?.store_name || "loja");
+    return `${origin}/loja/${slug}`;
+  };
+
+  const catalogUrl = getCatalogUrl();
+
+  // Sync form state when config loads (Protege edições locais em andamento)
   useEffect(() => {
     if (config && !loading) {
-      setStoreName(config.store_name || "");
-      setPrimaryColor(config.primary_color || "#10b981");
-      setWhatsappNumber(config.whatsapp_number || "");
-      setPixKey(config.pix_key || "");
-      setLogoPreview(config.logo_url || null);
-      setAddress(config.address || "Rua Alexandra Lunardi Fanani, 57 - Assunção, São Bernardo do Campo - SP, 09810-200");
-      setOriginCep(config.origin_cep || "09810-200");
-      setBaseFare(String(config.base_fare ?? 8.50));
-      setIncludedKm(String(config.included_km ?? 3.0));
-      setExtraKmFee(String(config.extra_km_fee ?? 1.40));
+      // Sincroniza se o usuário ainda não modificou o formulário localmente
+      if (!storeName && !whatsappNumber && !pixKey && !address) {
+        setStoreName(config.store_name || "");
+        setPrimaryColor(config.primary_color || "#10b981");
+        setWhatsappNumber(config.whatsapp_number || "");
+        setPixKey(config.pix_key || "");
+        setLogoPreview(config.logo_url || null);
+        setAddress(config.address || "Rua Alexandra Lunardi Fanani, 57 - Assunção, São Bernardo do Campo - SP, 09810-200");
+        setOriginCep(config.origin_cep || "09810-200");
+        setBaseFare(String(config.base_fare ?? 8.50));
+        setIncludedKm(String(config.included_km ?? 3.0));
+        setExtraKmFee(String(config.extra_km_fee ?? 1.40));
+      }
     }
   }, [config, loading]);
 
@@ -74,7 +97,7 @@ export function SettingsPage() {
   };
 
   const handleSave = async () => {
-    let logoUrl = config.logo_url;
+    let logoUrl = config?.logo_url || null;
 
     // Upload logo if changed
     if (logoFile) {
@@ -101,9 +124,9 @@ export function SettingsPage() {
       return isNaN(num) ? fallback : num;
     };
 
-    await updateConfig({
+    const success = await updateConfig({
       store_name: finalStoreName,
-      store_slug: finalStoreName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
+      store_slug: generateSlug(finalStoreName),
       description: "",
       primary_color: primaryColor,
       whatsapp_number: whatsappNumber.replace(/\D/g, ""),
@@ -126,8 +149,10 @@ export function SettingsPage() {
           pix_key: pixKey,
           phone: whatsappNumber.replace(/\D/g, "")
         }).eq('id', company.id);
-        await refreshCompany();
-      } catch (e) {}
+        if (refreshCompany) await refreshCompany();
+      } catch (e) {
+        console.warn("Erro ao atualizar empresa:", e);
+      }
     }
 
     // Sincroniza fallback smoking_products (__STORE_CONFIG__) para o catálogo do cliente
@@ -135,6 +160,7 @@ export function SettingsPage() {
       const configJson = JSON.stringify({
         store_name: finalStoreName,
         logo_url: logoUrl,
+        primary_color: primaryColor,
         pix_key: pixKey,
         whatsapp_number: whatsappNumber.replace(/\D/g, ""),
         address: address.trim(),
@@ -148,7 +174,9 @@ export function SettingsPage() {
           flavor: configJson,
           company_id: company?.id || null
         }, { onConflict: 'brand' });
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Erro ao sincronizar catálogo:", e);
+    }
   };
 
   const hasChanges = () => {
@@ -248,7 +276,61 @@ export function SettingsPage() {
                   placeholder="Ex: Smoking Pods, Vape House..."
                   className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-semibold"
                 />
-                <p className="text-[11px] text-muted-foreground">Este nome será exibido no topo da loja para os seus clientes.</p>
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>Este nome será exibido no topo da loja para os seus clientes.</span>
+                  {storeName && (
+                    <span className="font-mono text-emerald-400/80 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                      /{generateSlug(storeName)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Seletor de Cor Primária da Marca */}
+              <div className="space-y-2.5 pt-2 border-t border-white/5">
+                <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-2">
+                  <Palette className="size-3.5 text-emerald-400" />
+                  Cor Primária da Marca
+                </label>
+                <div className="flex items-center gap-3">
+                  {[
+                    { name: "Esmeralda", hex: "#10b981" },
+                    { name: "Azul Safira", hex: "#3b82f6" },
+                    { name: "Roxo Neon", hex: "#8b5cf6" },
+                    { name: "Âmbar Gold", hex: "#f59e0b" },
+                    { name: "Ruby Red", hex: "#f43f5e" },
+                    { name: "Ciano Light", hex: "#06b6d4" },
+                  ].map((color) => (
+                    <button
+                      key={color.hex}
+                      type="button"
+                      onClick={() => setPrimaryColor(color.hex)}
+                      className={`size-7 rounded-full border-2 transition-all flex items-center justify-center cursor-pointer ${
+                        primaryColor.toLowerCase() === color.hex.toLowerCase()
+                          ? "border-white scale-110 shadow-lg shadow-black"
+                          : "border-transparent opacity-80 hover:opacity-100 hover:scale-105"
+                      }`}
+                      style={{ backgroundColor: color.hex }}
+                      title={color.name}
+                    >
+                      {primaryColor.toLowerCase() === color.hex.toLowerCase() && (
+                        <Check className="size-3.5 text-black stroke-[3]" />
+                      )}
+                    </button>
+                  ))}
+
+                  {/* Custom Hex Picker Input */}
+                  <div className="relative flex items-center gap-2 ml-auto">
+                    <input
+                      type="color"
+                      value={primaryColor}
+                      onChange={(e) => setPrimaryColor(e.target.value)}
+                      className="size-8 rounded-lg cursor-pointer bg-transparent border-0 p-0"
+                      title="Escolher Cor Personalizada"
+                    />
+                    <span className="text-xs font-mono font-bold text-white uppercase">{primaryColor}</span>
+                  </div>
+                </div>
               </div>
             </div>
 

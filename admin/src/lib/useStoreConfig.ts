@@ -244,16 +244,27 @@ export function useStoreConfig() {
 
       // 2. Salva na tabela dedicada `store_config` e na tabela `companies` no Supabase
       try {
-        const rowId = (config && config.id && config.id !== 'local-config-id') ? config.id : 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+        const rowId = (config && config.id && config.id !== 'local-config-id') ? config.id : undefined;
         const { id: _ignoreId, ...configWithoutId } = newConfig;
-        await supabase
+        
+        const payload: any = {
+          ...configWithoutId,
+          updated_at: new Date().toISOString()
+        };
+        if (rowId) {
+          payload.id = rowId;
+        }
+
+        const { data: upsertData, error: upsertError } = await supabase
           .from("store_config")
-          .upsert({
-            id: rowId,
-            company_id: rowId,
-            ...configWithoutId,
-            updated_at: new Date().toISOString()
-          });
+          .upsert(payload)
+          .select("id")
+          .single();
+
+        if (!upsertError && upsertData?.id) {
+          newConfig.id = upsertData.id;
+          cachedConfig.id = upsertData.id;
+        }
 
         if (updates.store_name) {
           await supabase.from("companies").update({

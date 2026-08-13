@@ -35,6 +35,7 @@ interface OrderItem {
   flavor?: string;
   quantity?: number;
   price?: number;
+  unit_price?: number;
   costPrice?: number;
   cost_price?: number;
   modelKey?: string;
@@ -146,14 +147,16 @@ export function FinanceDashboard() {
           const isPadrao = flavorName === "padrão" || flavorName === "padrao" || flavorName === "";
 
           if (stock > 0 && !isPadrao) {
+            const pCosts = (persistedCosts || {}) as Record<string, number>;
+            const dCosts = (DEFAULT_MODEL_COSTS || {}) as Record<string, number>;
             const brandName = (p.brand || "").trim();
             const modelName = (p.name || "").trim();
             const groupKey = `${brandName.toLowerCase()}__${modelName.toLowerCase()}`;
 
             let unitCost = Number(p.cost_price) || 0;
-            if (!unitCost && persistedCosts[p.id]) unitCost = persistedCosts[p.id];
-            if (!unitCost && persistedCosts[groupKey]) unitCost = persistedCosts[groupKey];
-            if (!unitCost && DEFAULT_MODEL_COSTS[groupKey]) unitCost = DEFAULT_MODEL_COSTS[groupKey];
+            if (!unitCost && p.id && pCosts[p.id]) unitCost = pCosts[p.id];
+            if (!unitCost && groupKey && pCosts[groupKey]) unitCost = pCosts[groupKey];
+            if (!unitCost && groupKey && dCosts[groupKey]) unitCost = dCosts[groupKey];
             if (!unitCost) unitCost = 65; // Custo médio padrão
 
             totalStockCostSum += stock * unitCost;
@@ -178,6 +181,9 @@ export function FinanceDashboard() {
         { brand: string; name: string; unitsSold: number; revenue: number; totalCost: number }
       > = {};
 
+      const pCosts = (persistedCosts || {}) as Record<string, number>;
+      const dCosts = (DEFAULT_MODEL_COSTS || {}) as Record<string, number>;
+
       for (const order of validOrders) {
         const orderTotal = parseFloat(order.total_amount || 0);
         const shippingFee = parseFloat(order.shipping_fee || 0);
@@ -194,11 +200,11 @@ export function FinanceDashboard() {
 
           // Custo unitário do item
           let itemCost = Number(item.cost_price || item.costPrice) || 0;
-          if (!itemCost && item.product_id && persistedCosts[item.product_id]) {
-            itemCost = persistedCosts[item.product_id];
+          if (!itemCost && item.product_id && pCosts[item.product_id]) {
+            itemCost = pCosts[item.product_id];
           }
-          if (!itemCost && modelKey && DEFAULT_MODEL_COSTS[modelKey]) {
-            itemCost = DEFAULT_MODEL_COSTS[modelKey];
+          if (!itemCost && modelKey && dCosts[modelKey]) {
+            itemCost = dCosts[modelKey];
           }
           if (!itemCost) itemCost = 65;
 

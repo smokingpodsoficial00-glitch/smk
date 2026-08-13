@@ -16,6 +16,8 @@ interface ManualSaleModalProps {
   onClose: () => void;
   onSaleSuccess: () => void;
   companyId?: string;
+  preSelectedFlavorId?: string | null;
+  preSelectedGroup?: any;
 }
 
 export function ManualSaleModal({
@@ -23,6 +25,8 @@ export function ManualSaleModal({
   onClose,
   onSaleSuccess,
   companyId = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5",
+  preSelectedFlavorId,
+  preSelectedGroup,
 }: ManualSaleModalProps) {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [productsList, setProductsList] = useState<any[]>([]);
