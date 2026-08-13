@@ -268,10 +268,22 @@ export function SupplyChainDashboard() {
 
       if (prodData) {
         const mergedProducts = prodData.map((p: any) => {
+          const brandName = (p.brand || "Genérico").trim();
+          const modelName = (p.name || "Pod").trim();
+          const groupKey = `${brandName.toLowerCase()}__${modelName.toLowerCase()}`;
+          const savedCost = localStorage.getItem(`smk_cost_${groupKey}`) || localStorage.getItem(`smk_cost_${p.id}`);
+
+          let costVal: number | null = null;
+          if (p.cost_price !== null && p.cost_price !== undefined && parseFloat(p.cost_price) > 0) {
+            costVal = parseFloat(p.cost_price);
+          } else if (savedCost && parseFloat(savedCost) > 0) {
+            costVal = parseFloat(savedCost);
+          }
+
           const stagedStock = pendingStockChangesRef.current[p.id];
           return {
             ...p,
-            cost_price: p.cost_price !== null && p.cost_price !== undefined ? parseFloat(p.cost_price) : 0,
+            cost_price: costVal,
             stock: stagedStock !== undefined ? stagedStock : p.stock
           };
         });
@@ -1787,13 +1799,15 @@ export function SupplyChainDashboard() {
                       <div className="h-3 w-px bg-white/10" />
                       <div className="flex items-center gap-1.5">
                         <span className="text-muted-foreground">Custo</span>
-                        <span className="font-medium text-muted-foreground">{formatBRL(group.cost_price)}</span>
+                        <span className="font-medium text-muted-foreground">{group.cost_price ? formatBRL(group.cost_price) : "—"}</span>
                       </div>
                       <div className="h-3 w-px bg-white/10" />
                       <div className="flex items-center gap-1.5">
                         <span className="text-muted-foreground">Lucro</span>
-                        <span className="font-bold text-emerald-400">{formatBRL(profit)}</span>
-                        <span className="text-[10px] text-emerald-400/80 font-semibold">({marginPct}%)</span>
+                        <span className="font-bold text-emerald-400">{group.cost_price ? formatBRL(profit) : "—"}</span>
+                        {group.cost_price ? (
+                          <span className="text-[10px] text-emerald-400/80 font-semibold">({marginPct}%)</span>
+                        ) : null}
                       </div>
                     </div>
                   </div>
