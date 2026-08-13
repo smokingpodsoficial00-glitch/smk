@@ -1013,8 +1013,13 @@ export function SupplyChainDashboard() {
     if (!groupedMap[groupKey].image_url && product.image_url) groupedMap[groupKey].image_url = product.image_url;
   });
 
-  // Step 3: Compute real flavor lists & stock counts per model group
+  // Step 3: Compute real flavor lists, cost_price & stock counts per model group
   Object.values(groupedMap).forEach(group => {
+    const validCostFlavor = group.flavors.find(f => f.cost_price !== null && f.cost_price !== undefined && parseFloat(f.cost_price) > 0);
+    if (validCostFlavor) {
+      group.cost_price = parseFloat(validCostFlavor.cost_price);
+    }
+
     const specificFlavors = group.flavors.filter((f: any) => {
       const fName = (f.flavor || '').trim().toLowerCase();
       return fName !== 'padrão' && fName !== 'padrao' && fName !== '';
