@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { formatBRL } from "@/lib/cart";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchCategories, fetchProductCategoryMappings, updateModelCategories, DEFAULT_CATEGORIES, type Category } from "../lib/categories";
+import { fetchProductCostsMap, updateProductCost } from "../lib/productCosts";
 
 // ─── Donut chart colors ───────────────────────────────────
 const DONUT_COLORS = ["#34d399", "#60a5fa", "#a78bfa", "#fbbf24", "#f87171", "#f472b6", "#38bdf8"];
@@ -266,18 +267,25 @@ export function SupplyChainDashboard() {
         realSalesList = Object.values(flavorSalesMap);
       }
 
+      // Carregar Custos Persistidos no Supabase DB
+      const costsMap = await fetchProductCostsMap(targetCompanyId);
+
       if (prodData) {
         const mergedProducts = prodData.map((p: any) => {
           const brandName = (p.brand || "Genérico").trim();
           const modelName = (p.name || "Pod").trim();
           const groupKey = `${brandName.toLowerCase()}__${modelName.toLowerCase()}`;
-          const savedCost = localStorage.getItem(`smk_cost_${groupKey}`) || localStorage.getItem(`smk_cost_${p.id}`);
+          const cleanKey = `${brandName.toLowerCase().replace(/\s+/g, '')}__${modelName.toLowerCase().replace(/\s+/g, '')}`;
 
           let costVal: number | null = null;
           if (p.cost_price !== null && p.cost_price !== undefined && parseFloat(p.cost_price) > 0) {
             costVal = parseFloat(p.cost_price);
-          } else if (savedCost && parseFloat(savedCost) > 0) {
-            costVal = parseFloat(savedCost);
+          } else if (costsMap[p.id] && costsMap[p.id] > 0) {
+            costVal = costsMap[p.id];
+          } else if (costsMap[groupKey] && costsMap[groupKey] > 0) {
+            costVal = costsMap[groupKey];
+          } else if (costsMap[cleanKey] && costsMap[cleanKey] > 0) {
+            costVal = costsMap[cleanKey];
           }
 
           const stagedStock = pendingStockChangesRef.current[p.id];
@@ -739,6 +747,18 @@ export function SupplyChainDashboard() {
         ...(parsedCost !== null ? { cost_price: parsedCost } : {}),
         image_url: finalImageUrl
       } : p));
+
+      const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+      const newGroupKey = `${newBrandName.toLowerCase()}__${newModelName.toLowerCase()}`;
+
+      if (parsedCost !== null && parsedCost > 0) {
+        await updateProductCost({
+          modelKey: newGroupKey,
+          productIds: ids,
+          costPrice: parsedCost,
+          companyId: targetCompanyId
+        });
+      }
 
       // 2. Atualizar Supabase enviando ESTRITAMENTE APENAS os campos editados (Partial Update Protegido)
       let updatePayload: any = {
