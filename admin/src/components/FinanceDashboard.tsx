@@ -19,7 +19,7 @@ import {
   Flame,
   Award,
   ArrowUpRight,
-  ReceiptCheck,
+  ReceiptText,
   FileSpreadsheet,
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
