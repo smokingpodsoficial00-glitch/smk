@@ -839,12 +839,14 @@ client.on('message_create', async msg => {
             return; // Resposta enviada pela própria Eloísa, ignora para evitar loop
         }
 
-        // Se uma pessoa real digitou pelo WhatsApp Web ou celular, silencia a Eloisa para este cliente por 2 horas
+        // Se uma pessoa real digitou pelo WhatsApp Web ou celular, silencia a Eloisa para este cliente por 4 horas
         const targetRecipient = msg.to ? msg.to.split('@')[0] : '';
         if (targetRecipient && !targetRecipient.endsWith('@g.us')) {
-            const silenceExpiry = Date.now() + (2 * 60 * 60 * 1000); // 2 horas
+            const silenceExpiry = Date.now() + (4 * 60 * 60 * 1000); // 4 horas
             silencedChatsMap.set(targetRecipient, silenceExpiry);
-            console.log(`👤 [Human Takeover] Atendente humano respondeu para ${targetRecipient}. Eloisa silenciada neste chat por 2h.`);
+            const cleanTarget = targetRecipient.replace(/\D/g, '');
+            silencedChatsMap.set(cleanTarget, silenceExpiry);
+            console.log(`👤 [Human Takeover] Atendente humano respondeu para ${targetRecipient}. Eloisa silenciada neste chat por 4h.`);
         }
         return; // Não processa mensagens enviadas por humanos como entrada da IA
     }
@@ -1569,18 +1571,22 @@ app.get('/api/chatbot/security-status', (req, res) => {
             silencedList.push({
                 phone,
                 remainingMinutes: Math.ceil((expiry - now) / 60000),
-                expiresAt: new Date(expiry).toISOString()
+                expiresAt: new Date(expiry).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
             });
         } else {
             silencedChatsMap.delete(phone);
         }
     }
 
+    // Exibe apenas a versão canônica (com 55) dos números no painel para não duplicar visualmente
+    const displayBlacklist = Array.from(blacklistPhonesSet)
+        .filter(p => p.startsWith('55') || !blacklistPhonesSet.has(`55${p}`));
+
     return res.json({
         isEloisaAiActive,
         isWhatsAppReady,
         silencedChats: silencedList,
-        blacklist: Array.from(blacklistPhonesSet)
+        blacklist: displayBlacklist
     });
 });
 
@@ -1596,9 +1602,9 @@ app.post('/api/chatbot/toggle-master', (req, res) => {
     return res.json({ success: true, isEloisaAiActive });
 });
 
-// Forçar Silenciamento Manual ou Des-silenciamento de um Chat
+// Forçar Silenciamento Manual ou Des-silenciamento de um Chat (Padrão 4 Horas)
 app.post('/api/chatbot/silence-chat', (req, res) => {
-    const { phone, durationHours = 2, action = 'silence' } = req.body;
+    const { phone, durationHours = 4, action = 'silence' } = req.body;
     if (!phone) return res.status(400).json({ error: 'Telefone obrigatório.' });
     
     const cleanPhone = String(phone).replace(/\D/g, '');
@@ -1620,22 +1626,19 @@ app.post('/api/chatbot/blacklist', (req, res) => {
     const { phone, action = 'add' } = req.body;
     if (!phone) return res.status(400).json({ error: 'Telefone obrigatório.' });
     
-    const cleanPhone = String(phone).replace(/\D/g, '');
+    const rawClean = String(phone).replace(/\D/g, '');
+    const canonicalPhone = rawClean.startsWith('55') ? rawClean : `55${rawClean}`;
+    const shortPhone = canonicalPhone.startsWith('55') ? canonicalPhone.slice(2) : canonicalPhone;
+
     if (action === 'remove') {
-        blacklistPhonesSet.delete(cleanPhone);
+        blacklistPhonesSet.delete(canonicalPhone);
+        blacklistPhonesSet.delete(shortPhone);
         blacklistPhonesSet.delete(phone);
-        blacklistPhonesSet.delete(`55${cleanPhone}`);
-        console.log(`🟢 [Blacklist] ${cleanPhone} removido da lista de contatos ignorados.`);
-        return res.json({ success: true, blacklist: Array.from(blacklistPhonesSet) });
+        console.log(`🟢 [Blacklist] ${canonicalPhone} removido da lista de contatos ignorados.`);
     } else {
-        blacklistPhonesSet.add(cleanPhone);
+        blacklistPhonesSet.add(canonicalPhone);
+        blacklistPhonesSet.add(shortPhone);
         blacklistPhonesSet.add(phone);
-        // Se começar com 55, adiciona sem 55 também
-        if (cleanPhone.startsWith('55')) {
-            blacklistPhonesSet.add(cleanPhone.slice(2));
-        } else {
-            blacklistPhonesSet.add(`55${cleanPhone}`);
-        }
         console.log(`🚫 [Blacklist] ${cleanPhone} (${phone}) adicionado à lista de contatos ignorados com variações de DDD.`);
         return res.json({ success: true, blacklist: Array.from(blacklistPhonesSet) });
     }
