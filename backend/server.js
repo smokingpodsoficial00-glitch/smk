@@ -1377,7 +1377,14 @@ async function processMessage(msg, senderNumber, chatId, messageText, accumulate
             aiResponse = aiResponse.replace(callCenterRegex, '');
             
             aiResponse = aiResponse.trim();
-            aiResponse = aiResponse.replace(/[,.!?;]+$/, ''); // Limpeza de pontuacao solta no final
+            // Preserva pontuação legítima de interrogação da tabela digital
+            if (aiResponse.toLowerCase().includes('posso enviar nossa tabela digital')) {
+                if (!aiResponse.endsWith('?')) {
+                    aiResponse = aiResponse.replace(/[,.!;]+$/, '') + '?';
+                }
+            } else {
+                aiResponse = aiResponse.replace(/[,.!?;]+$/, ''); // Limpeza de pontuacao solta no final
+            }
 
             if (aiResponse.length === 0) {
                 aiResponse = null;
