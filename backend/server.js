@@ -58,6 +58,28 @@ let isEloisaAiActive = true; // Master Switch (Liga/Desliga Geral)
 const silencedChatsMap = new Map(); // Human Takeover: { [phoneOrChatId]: expireTimestamp }
 const blacklistPhonesSet = new Set(); // Blacklist de números ignorados permanentemente
 
+// Persistência em disco da Blacklist (Arquivo JSON)
+const BLACKLIST_FILE = path.join(__dirname, 'blacklist_phones.json');
+try {
+    if (fs.existsSync(BLACKLIST_FILE)) {
+        const savedBlacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE, 'utf8'));
+        if (Array.isArray(savedBlacklist)) {
+            savedBlacklist.forEach(p => blacklistPhonesSet.add(String(p)));
+            console.log(`🔒 [Blacklist] ${blacklistPhonesSet.size} contatos ignorados carregados do arquivo persistente.`);
+        }
+    }
+} catch (err) {
+    console.warn('⚠️ Aviso ao carregar blacklist_phones.json:', err.message);
+}
+
+const saveBlacklistToDisk = () => {
+    try {
+        fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(Array.from(blacklistPhonesSet), null, 2), 'utf8');
+    } catch (e) {
+        console.error('❌ Erro ao salvar blacklist em disco:', e.message);
+    }
+};
+
 client.on('qr', async (qr) => {
     latestQr = qr;
     isWhatsAppReady = false;
@@ -1634,14 +1656,20 @@ app.post('/api/chatbot/blacklist', (req, res) => {
         blacklistPhonesSet.delete(canonicalPhone);
         blacklistPhonesSet.delete(shortPhone);
         blacklistPhonesSet.delete(phone);
+        saveBlacklistToDisk();
         console.log(`🟢 [Blacklist] ${canonicalPhone} removido da lista de contatos ignorados.`);
     } else {
         blacklistPhonesSet.add(canonicalPhone);
         blacklistPhonesSet.add(shortPhone);
         blacklistPhonesSet.add(phone);
-        console.log(`🚫 [Blacklist] ${cleanPhone} (${phone}) adicionado à lista de contatos ignorados com variações de DDD.`);
-        return res.json({ success: true, blacklist: Array.from(blacklistPhonesSet) });
+        saveBlacklistToDisk();
+        console.log(`🚫 [Blacklist] ${canonicalPhone} adicionado à lista de contatos ignorados.`);
     }
+
+    const displayBlacklist = Array.from(blacklistPhonesSet)
+        .filter(p => p.startsWith('55') || !blacklistPhonesSet.has(`55${p}`));
+
+    return res.json({ success: true, blacklist: displayBlacklist });
 });
 app.post('/api/marketing/send-direct', async (req, res) => {
     try {
