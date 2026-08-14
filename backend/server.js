@@ -1318,6 +1318,77 @@ app.post('/api/webhook/dispatch', async (req, res) => {
 });
 
 // =============================================
+// MARKETING: LISTAR CONTATOS DA AGENDA E GRUPOS DO WHATSAPP
+// =============================================
+app.get('/api/marketing/whatsapp-data', async (req, res) => {
+    try {
+        if (!isWhatsAppReady || !client) {
+            return res.status(503).json({ 
+                error: 'WhatsApp não está conectado.',
+                isReady: false,
+                contacts: [],
+                groups: []
+            });
+        }
+
+        console.log('🔄 [Marketing] Buscando contatos e grupos reais da agenda do WhatsApp...');
+        
+        // 1. Puxa todos os contatos salvos no chip
+        let rawContacts = [];
+        try {
+            rawContacts = await client.getContacts();
+        } catch (e) {
+            console.warn('Aviso ao buscar contatos:', e.message);
+        }
+
+        const contacts = rawContacts
+            .filter(c => c && c.id && c.id.user && !c.isGroup && !c.isEnterprise)
+            .map(c => {
+                const phone = c.id.user || '';
+                const name = c.name || c.pushname || c.shortName || `Cliente ${phone.slice(-4)}`;
+                return {
+                    id: c.id._serialized || `${phone}@c.us`,
+                    phone,
+                    name,
+                    isSaved: !!c.name,
+                };
+            })
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        // 2. Puxa todos os grupos que o chip participa
+        let rawChats = [];
+        try {
+            rawChats = await client.getChats();
+        } catch (e) {
+            console.warn('Aviso ao buscar chats:', e.message);
+        }
+
+        const groups = rawChats
+            .filter(chat => chat && chat.isGroup)
+            .map(g => ({
+                id: g.id._serialized,
+                name: g.name || 'Grupo Sem Nome',
+                unreadCount: g.unreadCount || 0,
+                participantsCount: (g.groupMetadata && g.groupMetadata.participants) ? g.groupMetadata.participants.length : 0
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        console.log(`✅ [Marketing] Encontrados ${contacts.length} contatos e ${groups.length} grupos no WhatsApp.`);
+
+        return res.json({
+            isReady: true,
+            contactsCount: contacts.length,
+            groupsCount: groups.length,
+            contacts,
+            groups
+        });
+    } catch (err) {
+        console.error('❌ Erro ao buscar dados do WhatsApp para marketing:', err);
+        return res.status(500).json({ error: 'Erro ao buscar dados do WhatsApp.', details: err.message });
+    }
+});
+
+// =============================================
 // MARKETING & DISPAROS EXCLUSIVOS SMOKING PODS
 // =============================================
 app.post('/api/marketing/send-direct', async (req, res) => {
