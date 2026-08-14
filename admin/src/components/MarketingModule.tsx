@@ -49,6 +49,36 @@ interface WhatsAppGroup {
   participantsCount: number;
 }
 
+export const OFFICIAL_SMOKING_GROUPS: WhatsAppGroup[] = [
+  { id: 'grp_smk_material_marketing@g.us', name: 'SMK Material Marketing', participantsCount: 0 },
+  { id: 'grp_smk_financas_geral@g.us', name: 'SMK/Finanças/Geral', participantsCount: 0 },
+  { id: 'grp_smk_financeiro@g.us', name: 'SMK/Financeiro', participantsCount: 0 },
+  { id: 'grp_banco_de_dados_n_ai@g.us', name: 'Banco de Dados N.AI', participantsCount: 0 },
+  { id: 'grp_trip_angle_5@g.us', name: 'Trip Angle 5', participantsCount: 0 },
+  { id: 'grp_milionarios@g.us', name: 'Milionários', participantsCount: 0 },
+  { id: 'grp_arthur_pacete@g.us', name: 'Arthur Pacete', participantsCount: 0 },
+  { id: 'grp_founders_ai_economy@g.us', name: 'Founders AI Economy', participantsCount: 0 },
+  { id: 'grp_network_digital@g.us', name: 'Network Digital', participantsCount: 0 },
+  { id: 'grp_script_vendas_call_wpp@g.us', name: 'Script Vendas Call/Wpp', participantsCount: 0 },
+  { id: 'grp_instagram_noma@g.us', name: 'Instagram Noma', participantsCount: 0 },
+  { id: 'grp_10_operacao_lucro_2x_g4_grupo_primo@g.us', name: '#10 OPERAÇÃO LUCRO 2X - G4 & GRUPO PRIMO', participantsCount: 0 },
+  { id: 'grp_promocoes_nki_viagens@g.us', name: 'Promoções Nki Viagens', participantsCount: 0 },
+  { id: 'grp_promos_clube_do_homem_175@g.us', name: 'Promos Clube do Homem | 175', participantsCount: 0 },
+  { id: 'grp_grupo_jdt_c02@g.us', name: 'Grupo JDT C02', participantsCount: 0 },
+  { id: 'grp_badai_surpresa_do_juan@g.us', name: 'Badai Surpresa do Juan', participantsCount: 0 },
+  { id: 'grp_stock_info@g.us', name: 'Stock Info', participantsCount: 0 },
+  { id: 'grp_line_iluminados@g.us', name: 'Line Iluminados', participantsCount: 0 },
+  { id: 'grp_continental@g.us', name: 'Continental', participantsCount: 0 },
+  { id: 'grp_delivery_sao_bernardo@g.us', name: 'Delivery São Bernardo', participantsCount: 0 },
+  { id: 'grp_dia_5_ju@g.us', name: 'Dia 5/Ju', participantsCount: 0 },
+  { id: 'grp_plano_operacional_nia@g.us', name: 'Plano Operacional Nia', participantsCount: 0 },
+  { id: 'grp_rotina_minima_diaria@g.us', name: 'Rotina Mínima Diária', participantsCount: 0 },
+  { id: 'grp_noma_ai@g.us', name: 'Noma AI', participantsCount: 0 },
+  { id: 'grp_prompts_nia@g.us', name: 'Prompts Nia', participantsCount: 0 },
+  { id: 'grp_comprovantes_vendas@g.us', name: 'Comprovantes Vendas', participantsCount: 0 },
+  { id: 'grp_agencia_noma@g.us', name: 'Agência Noma', participantsCount: 0 },
+].sort((a, b) => a.name.localeCompare(b.name));
+
 const OFFICIAL_TEMPLATES = [
   {
     id: 'weekend_vip',
@@ -81,7 +111,7 @@ export function MarketingModule() {
   
   // Base Global de Contatos e Grupos do WhatsApp
   const [allContacts, setAllContacts] = useState<ContactItem[]>([]);
-  const [whatsAppGroups, setWhatsAppGroups] = useState<WhatsAppGroup[]>([]);
+  const [whatsAppGroups, setWhatsAppGroups] = useState<WhatsAppGroup[]>(OFFICIAL_SMOKING_GROUPS);
   const [loadingSync, setLoadingSync] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
@@ -257,13 +287,19 @@ export function MarketingModule() {
       if (savedContacts) {
         setAllContacts(JSON.parse(savedContacts));
       }
+      
+      let baseGroups = [...OFFICIAL_SMOKING_GROUPS];
       if (savedGroups) {
-        setWhatsAppGroups(JSON.parse(savedGroups));
+        const parsed = JSON.parse(savedGroups);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((pg: WhatsAppGroup) => {
+            if (!baseGroups.some(bg => bg.name.toLowerCase().trim() === pg.name.toLowerCase().trim())) {
+              baseGroups.push(pg);
+            }
+          });
+        }
       }
-      // Se nunca sincronizou antes, roda a primeira vez suavemente
-      if (!savedContacts && !savedGroups) {
-        syncWhatsAppContactsAndGroups();
-      }
+      setWhatsAppGroups(baseGroups.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (e) {
       console.warn('Erro ao carregar cache do marketing:', e);
     }
