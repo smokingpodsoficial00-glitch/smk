@@ -37,7 +37,8 @@ export function ManualSaleModal({
   const [clientPhone, setClientPhone] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("PIX");
-  const [shippingFee, setShippingFee] = useState<string>("0");
+  const [shippingFee, setShippingFee] = useState<string>("0"); // Cobrado do cliente
+  const [shippingCost, setShippingCost] = useState<string>("0"); // Custo real pago ao motoboy/Uber
 
   // Lista de Itens no Pedido
   const [items, setItems] = useState<
@@ -220,8 +221,15 @@ export function ManualSaleModal({
   }, [effectiveItems]);
 
   const numericShippingFee = parseFloat(shippingFee.replace(",", ".")) || 0;
+  const numericShippingCost = parseFloat(shippingCost.replace(",", ".")) || 0;
   const grandTotal = subtotal + numericShippingFee;
-  const estimatedProfit = grandTotal - totalCost;
+  
+  // Lucro nos Produtos (Preço de Venda - Custo do Pod)
+  const productProfit = subtotal - totalCost;
+  // Lucro no Frete (Taxa cobrada do cliente - Custo real pago ao motoboy)
+  const shippingProfit = numericShippingFee - numericShippingCost;
+  // Lucro Total Líquido
+  const estimatedProfit = productProfit + shippingProfit;
 
   // Preencher dados ao selecionar cliente recente
   const handleSelectExistingClient = (phone: string) => {
@@ -584,41 +592,60 @@ export function ManualSaleModal({
               )}
             </div>
 
-            {/* 3. PAGAMENTO E FRETE */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white/5 border border-white/10 rounded-2xl p-4">
-              <div>
-                <label className="text-[11px] text-silver font-medium block mb-1">Forma de Pagamento</label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {["PIX", "DINHEIRO", "CARTAO"].map((method) => (
-                    <button
-                      key={method}
-                      type="button"
-                      onClick={() => setPaymentMethod(method)}
-                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                        paymentMethod === method
-                          ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
-                          : "bg-black/40 border-white/10 text-muted-foreground hover:text-white"
-                      }`}
-                    >
-                      {method}
-                    </button>
-                  ))}
+            {/* 3. PAGAMENTO, FRETE E CUSTO DE ENTREGA */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] text-silver font-medium block mb-1">Forma de Pagamento</label>
+                  <div className="grid grid-cols-3 gap-1">
+                    {["PIX", "DINHEIRO", "CARTAO"].map((method) => (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => setPaymentMethod(method)}
+                        className={`py-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                          paymentMethod === method
+                            ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+                            : "bg-black/40 border-white/10 text-muted-foreground hover:text-white"
+                        }`}
+                      >
+                        {method}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="text-[11px] text-silver font-medium block mb-1">Taxa de Frete (R$)</label>
-                <input
-                  type="text"
-                  value={shippingFee}
-                  onChange={(e) => setShippingFee(e.target.value)}
-                  placeholder="0,00"
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400/50 font-bold"
-                />
+                <div>
+                  <label className="text-[11px] text-silver font-medium block mb-1">
+                    Frete Cobrado (R$)
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingFee}
+                    onChange={(e) => setShippingFee(e.target.value)}
+                    placeholder="Ex: 12,90"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-emerald-400 focus:outline-none focus:border-emerald-400/50 font-bold"
+                  />
+                  <span className="text-[9px] text-white/30 block mt-0.5">Valor pago pelo cliente</span>
+                </div>
+
+                <div>
+                  <label className="text-[11px] text-silver font-medium block mb-1">
+                    Custo Motoboy/Uber (R$)
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingCost}
+                    onChange={(e) => setShippingCost(e.target.value)}
+                    placeholder="Ex: 5,00"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-amber-300 focus:outline-none focus:border-amber-400/50 font-bold"
+                  />
+                  <span className="text-[9px] text-white/30 block mt-0.5">Custo real de entrega</span>
+                </div>
               </div>
             </div>
 
-            {/* RESUMO DO PEDIDO */}
+            {/* RESUMO DO PEDIDO E MARGEM DE LUCRO */}
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-silver">Subtotal dos Pods:</span>
@@ -626,7 +653,7 @@ export function ManualSaleModal({
               </div>
               {numericShippingFee > 0 && (
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-silver">Taxa de Frete:</span>
+                  <span className="text-silver">Taxa de Frete (Cliente):</span>
                   <span className="font-bold text-white">R$ {numericShippingFee.toFixed(2).replace(".", ",")}</span>
                 </div>
               )}
@@ -636,9 +663,26 @@ export function ManualSaleModal({
                   R$ {grandTotal.toFixed(2).replace(".", ",")}
                 </span>
               </div>
-              <p className="text-[10px] text-muted-foreground text-right font-medium">
-                Lucro estimado nesta venda: <span className="text-emerald-400 font-bold">R$ {estimatedProfit.toFixed(2).replace(".", ",")}</span>
-              </p>
+
+              {/* Detalhamento de Lucro Real */}
+              <div className="pt-2 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 text-[11px]">
+                <div className="flex items-center gap-2 text-white/60">
+                  {numericShippingCost > 0 && (
+                    <span>
+                      Margem no Frete:{" "}
+                      <strong className={shippingProfit >= 0 ? "text-emerald-400" : "text-red-400"}>
+                        {shippingProfit >= 0 ? "+" : ""}R$ {shippingProfit.toFixed(2).replace(".", ",")}
+                      </strong>
+                    </span>
+                  )}
+                </div>
+                <div className="text-right w-full sm:w-auto font-medium">
+                  Lucro Líquido Estimado:{" "}
+                  <span className={`font-extrabold text-xs ${estimatedProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    R$ {estimatedProfit.toFixed(2).replace(".", ",")}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         )}
