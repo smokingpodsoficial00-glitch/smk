@@ -1392,145 +1392,30 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
             })
             .sort((a, b) => a.name.localeCompare(b.name));
 
-        // 2. Extração profunda de grupos via Puppeteer com scroll assíncrono real
-        let groups = [];
-        try {
-            const rawGroups = await client.pupPage.evaluate(async () => {
-                const results = [];
-                const seenTitles = new Set();
-                
-                try {
-                    const sidePane = document.querySelector('#pane-side');
-                    if (sidePane) {
-                        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-                        
-                        const extractVisible = () => {
-                            const items = sidePane.querySelectorAll('div[tabindex="-1"], div[role="listitem"], div[data-testid="cell-frame-container"]');
-                            items.forEach(el => {
-                                const titleEl = el.querySelector('[title]');
-                                const title = titleEl ? titleEl.getAttribute('title')?.trim() : '';
-                                if (!title || seenTitles.has(title)) return;
-
-                                // Verifica se o item tem elementos de grupo ou palavras-chave conhecidas
-                                const isGrp = el.querySelector('[data-testid="default-group"]') || 
-                                              el.querySelector('[data-icon="default-group"]') || 
-                                              el.innerHTML.includes('default-group') ||
-                                              el.innerHTML.includes('community') ||
-                                              el.querySelector('span[data-icon="status-group"]') ||
-                                              title.includes('SMK') || 
-                                              title.includes('Smoking') || 
-                                              title.includes('VIP') || 
-                                              title.includes('Grupo') || 
-                                              title.includes('GRUPO') || 
-                                              title.includes('Promos') || 
-                                              title.includes('Promoções') || 
-                                              title.includes('Operação') || 
-                                              title.includes('OPERAÇÃO') || 
-                                              title.includes('Nia') || 
-                                              title.includes('Noma') || 
-                                              title.includes('Comprovantes') || 
-                                              title.includes('Delivery') || 
-                                              title.includes('Banco') || 
-                                              title.includes('Trip') || 
-                                              title.includes('Milionários') || 
-                                              title.includes('Arthur') || 
-                                              title.includes('Founders') || 
-                                              title.includes('Network') || 
-                                              title.includes('Script') || 
-                                              title.includes('Instagram') || 
-                                              title.includes('Badai') || 
-                                              title.includes('Stock') || 
-                                              title.includes('Line') || 
-                                              title.includes('Continental') || 
-                                              title.includes('Plano') || 
-                                              title.includes('Rotina') || 
-                                              title.includes('Prompts') || 
-                                              title.includes('Dia') || 
-                                              title.includes('#');
-
-                                if (isGrp) {
-                                    seenTitles.add(title);
-                                    results.push({
-                                        id: `grp_${title.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}@g.us`,
-                                        name: title,
-                                        unreadCount: 0,
-                                        participantsCount: 0
-                                    });
-                                }
-                            });
-                        };
-
-                        // Realiza scroll gradual com delay de renderização
-                        extractVisible();
-                        const maxScroll = sidePane.scrollHeight || 8000;
-                        for (let top = 400; top <= maxScroll; top += 400) {
-                            sidePane.scrollTop = top;
-                            await sleep(80);
-                            extractVisible();
-                        }
-                        sidePane.scrollTop = 0; // Volta ao topo
-                    }
-                    return results;
-                } catch (err) {
-                    return [{ error: err.message }];
-                }
-            });
-
-            if (Array.isArray(rawGroups)) {
-                rawGroups.forEach(g => {
-                    if (g && g.id && !g.error && !groups.some(existing => existing.name === g.name)) {
-                        groups.push(g);
-                    }
-                });
-            }
-        } catch (groupEvalErr) {
-            console.warn('⚠️ [Marketing] Falha na leitura de grupos:', groupEvalErr.message);
-        }
-
-        // Lista mestre oficial dos 27 Grupos da Smoking Pods / Agência
-        const officialKnownGroups = [
-            { name: "SMK Material Marketing" },
-            { name: "SMK/Finanças/Geral" },
-            { name: "SMK/Financeiro" },
-            { name: "Banco de Dados N.AI" },
-            { name: "Trip Angle 5" },
-            { name: "Milionários" },
-            { name: "Arthur Pacete" },
-            { name: "Founders AI Economy" },
-            { name: "Network Digital" },
-            { name: "Script Vendas Call/Wpp" },
-            { name: "Instagram Noma" },
-            { name: "#10 OPERAÇÃO LUCRO 2X - G4 & GRUPO PRIMO" },
-            { name: "Promoções Nki Viagens" },
-            { name: "Promos Clube do Homem | 175" },
-            { name: "Grupo JDT C02" },
-            { name: "Badai Surpresa do Juan" },
-            { name: "Stock Info" },
-            { name: "Line Iluminados" },
-            { name: "Continental" },
-            { name: "Delivery São Bernardo" },
-            { name: "Dia 5/Ju" },
-            { name: "Plano Operacional Nia" },
-            { name: "Rotina Mínima Diária" },
-            { name: "Noma AI" },
-            { name: "Prompts Nia" },
-            { name: "Comprovantes Vendas" },
-            { name: "Agência Noma" }
-        ];
-
-        // Mescla grupos encontrados na tela com a lista oficial
-        officialKnownGroups.forEach(og => {
-            if (!groups.some(g => g.name.toLowerCase().includes(og.name.toLowerCase()) || og.name.toLowerCase().includes(g.name.toLowerCase()))) {
-                groups.push({
-                    id: `grp_${og.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}@g.us`,
-                    name: og.name,
+        // 2. Extração 100% NATIVA e REAL dos grupos a partir dos contatos do WhatsApp (onde isGroup === true)
+        const seenGroups = new Set();
+        const groups = rawContacts
+            .filter(c => {
+                if (!c || !c.id) return false;
+                const isGroupJid = c.isGroup || c.id.server === 'g.us' || String(c.id._serialized || '').endsWith('@g.us');
+                return isGroupJid;
+            })
+            .map(c => {
+                const idStr = c.id._serialized || `${c.id.user}@g.us`;
+                const groupName = c.name || c.formattedTitle || c.subject || c.pushname || 'Grupo WhatsApp';
+                return {
+                    id: idStr,
+                    name: groupName,
                     unreadCount: 0,
                     participantsCount: 0
-                });
-            }
-        });
-
-        groups.sort((a, b) => a.name.localeCompare(b.name));
+                };
+            })
+            .filter(g => {
+                if (seenGroups.has(g.id) || !g.name || g.name === 'Grupo WhatsApp') return false;
+                seenGroups.add(g.id);
+                return true;
+            })
+            .sort((a, b) => a.name.localeCompare(b.name));
 
         // Se ainda vazio, inclui grupos detectados por mensagens recebidas recentemente
         if (typeof detectedGroups !== 'undefined') {
@@ -1581,79 +1466,6 @@ app.post('/api/marketing/send-direct', async (req, res) => {
                 console.warn('⚠️ Não foi possível resolver convite de grupo:', invErr.message);
                 formattedNumber = phone;
             }
-        } else if (String(phone).startsWith('grp_') || String(phone).startsWith('dom_') || name) {
-            // Localiza e abre o grupo diretamente usando a barra de busca do WhatsApp Web
-            try {
-                const targetName = name || '';
-                console.log(`🔍 [Marketing] Abrindo grupo "${targetName}" pelo campo de busca...`);
-                
-                const opened = await client.pupPage.evaluate(async (grpName) => {
-                    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-                    
-                    // 1. Procura o campo de pesquisa do WhatsApp Web
-                    const searchInput = document.querySelector('div[contenteditable="true"][data-tab="3"]') || 
-                                        document.querySelector('div[contenteditable="true"][role="textbox"]') ||
-                                        document.querySelector('#side [contenteditable="true"]');
-                    
-                    if (searchInput) {
-                        searchInput.focus();
-                        document.execCommand('selectAll', false, null);
-                        document.execCommand('delete', false, null);
-                        document.execCommand('insertText', false, grpName);
-                        await sleep(1200);
-
-                        // Clica no primeiro resultado de conversa encontrado
-                        const firstResult = document.querySelector('#pane-side [role="listitem"], #pane-side [data-testid="cell-frame-container"]');
-                        if (firstResult) {
-                            firstResult.click();
-                            await sleep(1000);
-                            return true;
-                        }
-                    }
-
-                    // 2. Se não achou na busca, tenta clique direto no painel
-                    const items = document.querySelectorAll('#pane-side [role="listitem"], #pane-side [title]');
-                    for (const item of items) {
-                        const title = item.getAttribute('title') || item.innerText || '';
-                        if (title.toLowerCase().includes(grpName.toLowerCase())) {
-                            item.click();
-                            await sleep(1000);
-                            return true;
-                        }
-                    }
-                    return false;
-                }, targetName);
-
-                if (opened) {
-                    await new Promise(r => setTimeout(r, 1500));
-                    // Digita e envia a mensagem na conversa aberta
-                    const sent = await client.pupPage.evaluate(async (msgToSend) => {
-                        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-                        const input = document.querySelector('footer div[contenteditable="true"]');
-                        if (input) {
-                            input.focus();
-                            document.execCommand('insertText', false, msgToSend);
-                            await sleep(500);
-                            const sendBtn = document.querySelector('footer button[aria-label="Enviar"], footer span[data-icon="send"]');
-                            if (sendBtn) {
-                                sendBtn.click();
-                            } else {
-                                input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', which: 13, bubbles: true }));
-                            }
-                            return true;
-                        }
-                        return false;
-                    }, text);
-
-                    if (sent) {
-                        console.log(`✅ [Marketing] Mensagem entregue no grupo "${targetName}" com sucesso!`);
-                        return res.json({ success: true, message: 'Mensagem enviada com sucesso no grupo!' });
-                    }
-                }
-            } catch (e) {
-                console.warn('⚠️ Falha ao abrir e enviar no grupo via UI:', e.message);
-            }
-            formattedNumber = String(phone);
         } else if (String(phone).includes('@g.us') || String(phone).includes('@c.us')) {
             formattedNumber = String(phone);
         } else {
