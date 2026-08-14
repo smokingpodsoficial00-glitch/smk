@@ -1433,32 +1433,62 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
                         }
                     }
 
-                    // 3. Varredura completa do painel lateral com scroll
+                    // 3. Varredura completa do painel lateral com scroll em múltiplas passagens
                     const sidePane = document.querySelector('#pane-side');
                     if (sidePane) {
-                        const items = sidePane.querySelectorAll('div[tabindex="-1"], div[role="listitem"], div[data-testid="cell-frame-container"]');
-                        items.forEach(el => {
-                            const titleEl = el.querySelector('[title]');
-                            const title = titleEl ? titleEl.getAttribute('title') : '';
-                            
-                            // Procura imagens de avatar de grupo ou título com indicador de grupo
-                            const isGroupIndicator = el.querySelector('[data-testid="default-group"]') || 
-                                                     el.querySelector('[data-icon="default-group"]') || 
-                                                     el.innerHTML.includes('default-group') ||
-                                                     (title && (title.includes('VIP') || title.includes('Smoking') || title.includes('SMK') || title.includes('GRUPO') || title.includes('ENVIOS') || title.includes('OPERAÇÃO')));
+                        const seenTitles = new Set();
+                        
+                        // Função auxiliar para extrair do estado atual
+                        const extractVisible = () => {
+                            const items = sidePane.querySelectorAll('div[tabindex="-1"], div[role="listitem"], div[data-testid="cell-frame-container"]');
+                            items.forEach(el => {
+                                const titleEl = el.querySelector('[title]');
+                                const title = titleEl ? titleEl.getAttribute('title')?.trim() : '';
+                                if (!title || seenTitles.has(title)) return;
 
-                            if (title && (isGroupIndicator || title.includes('#'))) {
-                                // Tenta achar o id do elemento
-                                const linkEl = el.closest('a') || el.querySelector('a');
-                                const rawHref = linkEl ? linkEl.getAttribute('href') : '';
-                                results.push({
-                                    id: `grp_${title.replace(/\s+/g, '_').toLowerCase()}@g.us`,
-                                    name: title,
-                                    unreadCount: 0,
-                                    participantsCount: 0
-                                });
-                            }
-                        });
+                                // Verifica se é um grupo (ícone de grupo, ou padrão de nome de grupo)
+                                const isGrp = el.querySelector('[data-testid="default-group"]') || 
+                                              el.querySelector('[data-icon="default-group"]') || 
+                                              el.innerHTML.includes('default-group') ||
+                                              el.innerHTML.includes('community') ||
+                                              title.includes('SMK') || 
+                                              title.includes('Smoking') || 
+                                              title.includes('VIP') || 
+                                              title.includes('Grupo') || 
+                                              title.includes('GRUPO') || 
+                                              title.includes('Promos') || 
+                                              title.includes('Operação') || 
+                                              title.includes('Nia') || 
+                                              title.includes('Noma') || 
+                                              title.includes('Comprovantes') || 
+                                              title.includes('Delivery') || 
+                                              title.includes('#');
+
+                                if (isGrp) {
+                                    seenTitles.add(title);
+                                    results.push({
+                                        id: `grp_${title.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}@g.us`,
+                                        name: title,
+                                        unreadCount: 0,
+                                        participantsCount: 0
+                                    });
+                                }
+                            });
+                        };
+
+                        // Passagem 1: topo
+                        extractVisible();
+                        
+                        // Passagens seguintes com scroll
+                        sidePane.scrollTop = 400;
+                        extractVisible();
+                        sidePane.scrollTop = 1000;
+                        extractVisible();
+                        sidePane.scrollTop = 2000;
+                        extractVisible();
+                        sidePane.scrollTop = 3500;
+                        extractVisible();
+                        sidePane.scrollTop = 0; // Retorna ao topo
                     }
                 } catch (err) {
                     return [{ error: err.message }];

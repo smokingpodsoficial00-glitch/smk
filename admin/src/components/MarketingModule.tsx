@@ -230,6 +230,12 @@ export function MarketingModule() {
 
       setAllContacts(fetchedContacts);
       setWhatsAppGroups(fetchedGroups);
+      
+      try {
+        localStorage.setItem('SP_MARKETING_CONTACTS', JSON.stringify(fetchedContacts));
+        localStorage.setItem('SP_MARKETING_GROUPS', JSON.stringify(fetchedGroups));
+      } catch (storeErr) {}
+
       setSyncStatus(`Sincronizado com sucesso! ${fetchedContacts.length} contatos e ${fetchedGroups.length} grupos carregados.`);
       
       // NÃO auto-preenche listas - o usuário deve selecionar manualmente os contatos
@@ -243,8 +249,24 @@ export function MarketingModule() {
     }
   };
 
+  // Carrega contatos e grupos do localStorage ao iniciar
   useEffect(() => {
-    syncWhatsAppContactsAndGroups();
+    try {
+      const savedContacts = localStorage.getItem('SP_MARKETING_CONTACTS');
+      const savedGroups = localStorage.getItem('SP_MARKETING_GROUPS');
+      if (savedContacts) {
+        setAllContacts(JSON.parse(savedContacts));
+      }
+      if (savedGroups) {
+        setWhatsAppGroups(JSON.parse(savedGroups));
+      }
+      // Se nunca sincronizou antes, roda a primeira vez suavemente
+      if (!savedContacts && !savedGroups) {
+        syncWhatsAppContactsAndGroups();
+      }
+    } catch (e) {
+      console.warn('Erro ao carregar cache do marketing:', e);
+    }
   }, [company?.id]);
 
   // Abre Modal de Criar/Editar Lista
