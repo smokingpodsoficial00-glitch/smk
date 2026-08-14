@@ -53,6 +53,11 @@ let isWhatsAppReady = false;
 const aiSentMessages = new Set();
 const detectedGroups = {};
 
+// 🛡️ CONTROLE DE SEGURANÇA E ATENDIMENTO DA IA ELOISA
+let isEloisaAiActive = true; // Master Switch (Liga/Desliga Geral)
+const silencedChatsMap = new Map(); // Human Takeover: { [phoneOrChatId]: expireTimestamp }
+const blacklistPhonesSet = new Set(); // Blacklist de números ignorados permanentemente
+
 client.on('qr', async (qr) => {
     latestQr = qr;
     isWhatsAppReady = false;
@@ -820,13 +825,27 @@ client.on('message_create', async msg => {
     // Avoid status broadcasts
     if (msg.from === 'status@broadcast') return;
 
-    // Permite testes pelo próprio número no WhatsApp (ignora respostas automáticas enviadas pela Eloísa)
+    // --- SEGURANÇA 1: HUMAN TAKEOVER (Se o operador humano digitar pelo celular/painel) ---
     if (msg.fromMe) {
         const bodyLower = (msg.body || '').trim().toLowerCase();
         if (aiSentMessages.has(bodyLower)) {
             aiSentMessages.delete(bodyLower);
             return; // Resposta enviada pela própria Eloísa, ignora para evitar loop
         }
+
+        // Se uma pessoa real digitou pelo WhatsApp Web ou celular, silencia a Eloisa para este cliente por 2 horas
+        const targetRecipient = msg.to ? msg.to.split('@')[0] : '';
+        if (targetRecipient && !targetRecipient.endsWith('@g.us')) {
+            const silenceExpiry = Date.now() + (2 * 60 * 60 * 1000); // 2 horas
+            silencedChatsMap.set(targetRecipient, silenceExpiry);
+            console.log(`👤 [Human Takeover] Atendente humano respondeu para ${targetRecipient}. Eloisa silenciada neste chat por 2h.`);
+        }
+        return; // Não processa mensagens enviadas por humanos como entrada da IA
+    }
+
+    // --- SEGURANÇA 2: MASTER SWITCH (Botão Liga/Desliga Geral) ---
+    if (!isEloisaAiActive) {
+        return; // IA pausada pelo lojista no painel
     }
 
     // Ignore groups completely for AI chatbot, but register for Marketing module
@@ -849,6 +868,27 @@ client.on('message_create', async msg => {
         return;
     }
 
+    const senderNumber = msg.from ? msg.from.split('@')[0] : '';
+    const rawCleanPhone = senderNumber.replace(/\D/g, '');
+
+    // --- SEGURANÇA 3: BLACKLIST / CONTATOS IGNORADOS ---
+    if (blacklistPhonesSet.has(senderNumber) || blacklistPhonesSet.has(rawCleanPhone)) {
+        console.log(`🚫 [Blacklist] Mensagem de ${senderNumber} ignorada (contato na lista de exceções).`);
+        return;
+    }
+
+    // --- SEGURANÇA 4: CHECAGEM DE SILENCIAMENTO ATIVO (Human Takeover) ---
+    if (silencedChatsMap.has(senderNumber)) {
+        const expiry = silencedChatsMap.get(senderNumber);
+        if (Date.now() < expiry) {
+            const remainingMins = Math.ceil((expiry - Date.now()) / 60000);
+            console.log(`🤫 [Silenciada] Eloisa em pausa para ${senderNumber} (restam ${remainingMins} min de Human Takeover).`);
+            return;
+        } else {
+            silencedChatsMap.delete(senderNumber); // Expirou, retoma atendimento
+        }
+    }
+
     // Ignore old messages (WhatsApp Web sync backlog)
     const now = Math.floor(Date.now() / 1000);
     if (now - msg.timestamp > 60) {
@@ -860,7 +900,6 @@ client.on('message_create', async msg => {
         return;
     }
 
-    const senderNumber = msg.fromMe ? (msg.to ? msg.to.split('@')[0] : msg.from.split('@')[0]) : msg.from.split('@')[0];
     let messageText = msg.body || '';
     const chatId = `${senderNumber}`;
 
@@ -1442,8 +1481,81 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
 });
 
 // =============================================
-// MARKETING & DISPAROS EXCLUSIVOS SMOKING PODS
+// SEGURANÇA E CONTROLE DA IA ELOISA (ADMIN API)
 // =============================================
+
+// Status geral do Bot (Master Switch, Silenciados e Blacklist)
+app.get('/api/chatbot/security-status', (req, res) => {
+    const silencedList = [];
+    const now = Date.now();
+    for (const [phone, expiry] of silencedChatsMap.entries()) {
+        if (now < expiry) {
+            silencedList.push({
+                phone,
+                remainingMinutes: Math.ceil((expiry - now) / 60000),
+                expiresAt: new Date(expiry).toISOString()
+            });
+        } else {
+            silencedChatsMap.delete(phone);
+        }
+    }
+
+    return res.json({
+        isEloisaAiActive,
+        isWhatsAppReady,
+        silencedChats: silencedList,
+        blacklist: Array.from(blacklistPhonesSet)
+    });
+});
+
+// Master Switch: Liga / Desliga Atendimento Automático Geral
+app.post('/api/chatbot/toggle-master', (req, res) => {
+    const { active } = req.body;
+    if (typeof active === 'boolean') {
+        isEloisaAiActive = active;
+    } else {
+        isEloisaAiActive = !isEloisaAiActive;
+    }
+    console.log(`🛡️ [Master Switch] Eloisa IA agora está: ${isEloisaAiActive ? '🟢 ATIVA' : '🔴 PAUSADA'}`);
+    return res.json({ success: true, isEloisaAiActive });
+});
+
+// Forçar Silenciamento Manual ou Des-silenciamento de um Chat
+app.post('/api/chatbot/silence-chat', (req, res) => {
+    const { phone, durationHours = 2, action = 'silence' } = req.body;
+    if (!phone) return res.status(400).json({ error: 'Telefone obrigatório.' });
+    
+    const cleanPhone = String(phone).replace(/\D/g, '');
+    if (action === 'resume') {
+        silencedChatsMap.delete(cleanPhone);
+        silencedChatsMap.delete(phone);
+        console.log(`▶️ [Human Takeover] Atendimento da Eloisa retomado manualmente para ${cleanPhone}`);
+        return res.json({ success: true, message: 'Chat reativado para a IA.' });
+    } else {
+        const expiry = Date.now() + (durationHours * 60 * 60 * 1000);
+        silencedChatsMap.set(cleanPhone, expiry);
+        console.log(`🤫 [Human Takeover] Chat ${cleanPhone} silenciado manualmente por ${durationHours}h.`);
+        return res.json({ success: true, message: `Chat silenciado por ${durationHours}h.` });
+    }
+});
+
+// Adicionar / Remover Número da Blacklist
+app.post('/api/chatbot/blacklist', (req, res) => {
+    const { phone, action = 'add' } = req.body;
+    if (!phone) return res.status(400).json({ error: 'Telefone obrigatório.' });
+    
+    const cleanPhone = String(phone).replace(/\D/g, '');
+    if (action === 'remove') {
+        blacklistPhonesSet.delete(cleanPhone);
+        blacklistPhonesSet.delete(phone);
+        console.log(`🟢 [Blacklist] ${cleanPhone} removido da lista de contatos ignorados.`);
+        return res.json({ success: true, blacklist: Array.from(blacklistPhonesSet) });
+    } else {
+        blacklistPhonesSet.add(cleanPhone);
+        console.log(`🚫 [Blacklist] ${cleanPhone} adicionado à lista de contatos ignorados.`);
+        return res.json({ success: true, blacklist: Array.from(blacklistPhonesSet) });
+    }
+});
 app.post('/api/marketing/send-direct', async (req, res) => {
     try {
         const { phone, name, text } = req.body;

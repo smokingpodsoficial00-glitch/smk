@@ -1023,6 +1023,93 @@ ${isOngoingConversation
     setTimeout(() => setCopiedPrompt(false), 2000);
   };
 
+  // 🛡️ Estados de Segurança do Módulo 1 (Master Switch, Silenciamento & Blacklist)
+  const [isEloisaMasterActive, setIsEloisaMasterActive] = useState(true);
+  const [silencedChats, setSilencedChats] = useState<Array<{ phone: string; remainingMinutes: number; expiresAt: string }>>([]);
+  const [blacklist, setBlacklist] = useState<string[]>([]);
+  const [newBlacklistPhone, setNewBlacklistPhone] = useState("");
+  const [loadingSecurity, setLoadingSecurity] = useState(false);
+
+  // Busca status de segurança do backend
+  const fetchSecurityStatus = async () => {
+    try {
+      const res = await fetch("http://localhost:3006/api/chatbot/security-status");
+      if (res.ok) {
+        const data = await res.json();
+        setIsEloisaMasterActive(data.isEloisaAiActive);
+        setSilencedChats(data.silencedChats || []);
+        setBlacklist(data.blacklist || []);
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    fetchSecurityStatus();
+    const interval = setInterval(fetchSecurityStatus, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleToggleMasterSwitch = async () => {
+    setLoadingSecurity(true);
+    try {
+      const next = !isEloisaMasterActive;
+      const res = await fetch("http://localhost:3006/api/chatbot/toggle-master", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: next })
+      });
+      if (res.ok) {
+        setIsEloisaMasterActive(next);
+      }
+    } catch (e) {
+      alert("Erro ao alterar status da Eloisa no servidor.");
+    } finally {
+      setLoadingSecurity(false);
+    }
+  };
+
+  const handleResumeChat = async (phone: string) => {
+    try {
+      await fetch("http://localhost:3006/api/chatbot/silence-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, action: "resume" })
+      });
+      fetchSecurityStatus();
+    } catch (e) {}
+  };
+
+  const handleAddBlacklist = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBlacklistPhone.trim()) return;
+    try {
+      const res = await fetch("http://localhost:3006/api/chatbot/blacklist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: newBlacklistPhone.trim(), action: "add" })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBlacklist(data.blacklist || []);
+        setNewBlacklistPhone("");
+      }
+    } catch (e) {}
+  };
+
+  const handleRemoveBlacklist = async (phone: string) => {
+    try {
+      const res = await fetch("http://localhost:3006/api/chatbot/blacklist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, action: "remove" })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBlacklist(data.blacklist || []);
+      }
+    } catch (e) {}
+  };
+
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar bg-background p-6 space-y-8 relative">
       
@@ -1044,7 +1131,7 @@ ${isOngoingConversation
         </div>
       )}
 
-      {/* Header com Status */}
+      {/* Header com Status e Master Switch */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border">
         <div className="flex items-center gap-3">
           <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.15)]">
@@ -1063,36 +1150,140 @@ ${isOngoingConversation
           </div>
         </div>
 
-        {/* Status Card Topo */}
-        <div className="flex items-center gap-3 bg-card border border-border p-3 rounded-2xl">
-          <div className={`size-3 rounded-full animate-pulse ${isConnected ? "bg-emerald-400 shadow-[0_0_10px_#10b981]" : "bg-amber-400"}`} />
-          <div className="text-xs">
-            <p className="font-semibold text-white">
-              {isConnected ? "Eloisa Conectada" : "Aguardando Leitura do QR Code"}
-            </p>
-            <p className="text-muted-foreground text-[10px]">
-              {isConnected ? "Sessão Ativa no WhatsApp" : "Escaneie o código para conectar"}
-            </p>
+        {/* Status Card Topo & Master Switch */}
+        <div className="flex flex-wrap items-center gap-3 bg-card border border-border p-2.5 rounded-2xl">
+          {/* Master Switch Liga / Desliga Geral */}
+          <button
+            type="button"
+            onClick={handleToggleMasterSwitch}
+            disabled={loadingSecurity}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
+              isEloisaMasterActive
+                ? "bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                : "bg-red-500/20 hover:bg-red-500/30 text-red-300 border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+            }`}
+            title="Liga ou pausa todas as respostas automáticas da Eloisa no WhatsApp instantaneamente"
+          >
+            <Power className="size-3.5" />
+            <span>{isEloisaMasterActive ? "IA ELOISA: ATIVA" : "IA ELOISA: PAUSADA"}</span>
+          </button>
+
+          <div className="h-6 w-px bg-white/10 hidden sm:block" />
+
+          <div className="flex items-center gap-2">
+            <div className={`size-2.5 rounded-full animate-pulse ${isConnected ? "bg-emerald-400 shadow-[0_0_10px_#10b981]" : "bg-amber-400"}`} />
+            <div className="text-xs">
+              <p className="font-semibold text-white">
+                {isConnected ? "Sessão Conectada" : "Desconectado"}
+              </p>
+            </div>
           </div>
+
           <button
             onClick={handleResetHistory}
             disabled={isResettingHistory}
-            className="px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
             title="Zera todas as mensagens e histórico da IA para iniciar novos testes do zero"
           >
             {isResettingHistory ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
-            <span>Zerar Histórico da IA</span>
+            <span className="hidden sm:inline">Zerar Histórico</span>
           </button>
           <button
             onClick={handleToggleConnection}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
               isConnected
                 ? "bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20"
                 : "bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30"
             }`}
           >
-            {isConnected ? "Desconectar" : "Conectar Eloisa"}
+            {isConnected ? "Desconectar" : "Conectar"}
           </button>
+        </div>
+      </div>
+
+      {/* 🛡️ BANNER DE CONTROLE DE SEGURANÇA (HUMAN TAKEOVER & BLACKLIST) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Card de Chats Silenciados por Human Takeover */}
+        <div className="bg-[#050505] border border-white/10 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="size-2 rounded-full bg-amber-400 animate-pulse" />
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                Human Takeover Ativo ({silencedChats.length})
+              </h3>
+            </div>
+            <span className="text-[10px] text-white/40">Eloisa se cala quando humano responde</span>
+          </div>
+
+          {silencedChats.length === 0 ? (
+            <p className="text-xs text-white/40 italic py-2">
+              Nenhuma conversa pausada. A Eloisa está respondendo normalmente a todos os clientes.
+            </p>
+          ) : (
+            <div className="space-y-1.5 max-h-28 overflow-y-auto custom-scrollbar">
+              {silencedChats.map(sc => (
+                <div key={sc.phone} className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-amber-300">{sc.phone}</span>
+                    <span className="text-[10px] text-white/50 font-sans">({sc.remainingMinutes} min restantes)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleResumeChat(sc.phone)}
+                    className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[10px] font-bold cursor-pointer"
+                  >
+                    Retomar IA
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Card de Blacklist / Contatos Ignorados */}
+        <div className="bg-[#050505] border border-white/10 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="size-2 rounded-full bg-red-400" />
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                Contatos Ignorados / Blacklist ({blacklist.length})
+              </h3>
+            </div>
+            <span className="text-[10px] text-white/40">Amigos, Fornecedores & Motoboys</span>
+          </div>
+
+          <form onSubmit={handleAddBlacklist} className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Ex: 5511999999999"
+              value={newBlacklistPhone}
+              onChange={(e) => setNewBlacklistPhone(e.target.value)}
+              className="flex-1 bg-black border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-red-500/50"
+            />
+            <button
+              type="submit"
+              className="px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 text-xs font-bold cursor-pointer"
+            >
+              + Ignorar
+            </button>
+          </form>
+
+          {blacklist.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto custom-scrollbar">
+              {blacklist.map(phone => (
+                <div key={phone} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-[11px] text-red-300 font-mono">
+                  <span>{phone}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveBlacklist(phone)}
+                    className="text-red-400 hover:text-white ml-1 font-bold text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
