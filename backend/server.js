@@ -868,43 +868,58 @@ client.on('message_create', async msg => {
         return;
     }
 
-    // Obtém o número e identificadores reais do remetente
+    // 🔍 ARMADILHA & RESOLUÇÃO DE IDENTIDADE REAL (LID vs TELEFONE)
     let senderNumber = msg.from ? msg.from.split('@')[0] : '';
     let contactNumber = senderNumber;
-    let contactNameResolved = '';
-    
+    let contactName = '';
+    let serializedContactId = msg.from || '';
+
     try {
         const contact = await msg.getContact();
         if (contact) {
-            contactNumber = contact.number || senderNumber;
-            contactNameResolved = contact.name || contact.pushname || '';
+            contactNumber = contact.number || (contact.id && contact.id.user) || senderNumber;
+            contactName = contact.name || contact.pushname || '';
+            serializedContactId = (contact.id && contact.id._serialized) || serializedContactId;
         }
     } catch (cErr) {}
 
-    // Fallback: Se o WhatsApp enviou um LID interno (número estranho com mais de 14 dígitos não iniciado por 55)
-    // Busca na agenda de contatos sincronizada pelo ID ou se o nome bater com a blacklist
     const cleanSender = senderNumber.replace(/\D/g, '');
     const cleanContact = contactNumber.replace(/\D/g, '');
 
-    // --- SEGURANÇA 3: BLACKLIST / CONTATOS IGNORADOS ---
-    const isBlacklisted = blacklistPhonesSet.has(senderNumber) || 
-                          blacklistPhonesSet.has(cleanSender) ||
-                          blacklistPhonesSet.has(contactNumber) ||
-                          blacklistPhonesSet.has(cleanContact) ||
-                          Array.from(blacklistPhonesSet).some(bp => {
-                              const cleanBp = bp.replace(/\D/g, '');
-                              if (!cleanBp) return false;
-                              return cleanSender.includes(cleanBp) || 
-                                     cleanContact.includes(cleanBp) ||
-                                     cleanBp.includes(cleanSender) || 
-                                     cleanBp.includes(cleanContact) ||
-                                     (cleanSender.length >= 8 && cleanBp.endsWith(cleanSender.slice(-8))) ||
-                                     (cleanContact.length >= 8 && cleanBp.endsWith(cleanContact.slice(-8)));
-                          });
+    // --- SEGURANÇA 3: BLACKLIST / CONTATOS IGNORADOS (TRAVA BLINDADA) ---
+    let isBlacklisted = false;
+
+    // 1. Checagem direta em memória
+    if (blacklistPhonesSet.has(senderNumber) || 
+        blacklistPhonesSet.has(cleanSender) || 
+        blacklistPhonesSet.has(contactNumber) || 
+        blacklistPhonesSet.has(cleanContact)) {
+        isBlacklisted = true;
+    }
+
+    // 2. Checagem de sufixos numéricos (DDD + 8 ou 9 dígitos do Brasil)
+    if (!isBlacklisted && blacklistPhonesSet.size > 0) {
+        for (const bp of blacklistPhonesSet) {
+            const cleanBp = bp.replace(/\D/g, '');
+            if (!cleanBp) continue;
+
+            // Se bater os últimos 8 dígitos (número do celular)
+            const bpLast8 = cleanBp.slice(-8);
+            const senderLast8 = cleanSender.slice(-8);
+            const contactLast8 = cleanContact.slice(-8);
+
+            if ((cleanBp.length >= 8 && (senderLast8 === bpLast8 || contactLast8 === bpLast8)) ||
+                cleanSender.includes(cleanBp) || cleanBp.includes(cleanSender) ||
+                cleanContact.includes(cleanBp) || cleanBp.includes(cleanContact)) {
+                isBlacklisted = true;
+                break;
+            }
+        }
+    }
 
     if (isBlacklisted) {
-        console.log(`🚫 [Blacklist] Mensagem de "${contactNameResolved}" (${contactNumber || senderNumber}) BLOQUEADA COM SUCESSO! A Eloisa NÃO responderá.`);
-        return;
+        console.log(`🚫 [Blacklist Ativa] Mensagem de "${contactName}" (Tel: ${contactNumber} | ID: ${senderNumber}) BLOQUEADA COM SUCESSO! A Eloisa NÃO responderá.`);
+        return; // ABORTA IMEDIATAMENTE ANTES DE QUALQUER COISA
     }
 
     // --- SEGURANÇA 4: CHECAGEM DE SILENCIAMENTO ATIVO (Human Takeover) ---
@@ -1581,11 +1596,19 @@ app.post('/api/chatbot/blacklist', (req, res) => {
     if (action === 'remove') {
         blacklistPhonesSet.delete(cleanPhone);
         blacklistPhonesSet.delete(phone);
+        blacklistPhonesSet.delete(`55${cleanPhone}`);
         console.log(`🟢 [Blacklist] ${cleanPhone} removido da lista de contatos ignorados.`);
         return res.json({ success: true, blacklist: Array.from(blacklistPhonesSet) });
     } else {
         blacklistPhonesSet.add(cleanPhone);
-        console.log(`🚫 [Blacklist] ${cleanPhone} adicionado à lista de contatos ignorados.`);
+        blacklistPhonesSet.add(phone);
+        // Se começar com 55, adiciona sem 55 também
+        if (cleanPhone.startsWith('55')) {
+            blacklistPhonesSet.add(cleanPhone.slice(2));
+        } else {
+            blacklistPhonesSet.add(`55${cleanPhone}`);
+        }
+        console.log(`🚫 [Blacklist] ${cleanPhone} (${phone}) adicionado à lista de contatos ignorados com variações de DDD.`);
         return res.json({ success: true, blacklist: Array.from(blacklistPhonesSet) });
     }
 });
