@@ -66,6 +66,18 @@ client.on('qr', async (qr) => {
     qrcode.generate(qr, { small: true });
 });
 
+client.on('authenticated', () => {
+    latestQr = null;
+    latestQrDataUrl = null;
+    console.log('🔑 WhatsApp Autenticado com sucesso! Carregando conversas...');
+});
+
+client.on('loading_screen', (percent, message) => {
+    latestQr = null;
+    latestQrDataUrl = null;
+    console.log(`⏳ Carregando WhatsApp Web: ${percent}% - ${message}`);
+});
+
 client.on('ready', () => {
     latestQr = null;
     latestQrDataUrl = null;
@@ -1341,11 +1353,25 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
             console.warn('Aviso ao buscar contatos:', e.message);
         }
 
+        // Filtra APENAS contatos que estão realmente salvos na agenda (c.name existe)
+        // ou que possuem isMyContact == true (contato do telefone, não apenas chat aleatório)
+        const seenPhones = new Set();
         const contacts = rawContacts
-            .filter(c => c && c.id && c.id.user && !c.isGroup && !c.isEnterprise)
+            .filter(c => {
+                if (!c || !c.id || !c.id.user || c.isGroup || c.isEnterprise) return false;
+                // Apenas contatos com nome salvo na agenda OU marcados como "meu contato"
+                if (!c.name && !c.isMyContact) return false;
+                // Remove contatos com número muito curto (inválidos)
+                if (c.id.user.length < 8) return false;
+                // Deduplicação por número de telefone
+                const phone = c.id.user;
+                if (seenPhones.has(phone)) return false;
+                seenPhones.add(phone);
+                return true;
+            })
             .map(c => {
                 const phone = c.id.user || '';
-                const name = c.name || c.pushname || c.shortName || `Cliente ${phone.slice(-4)}`;
+                const name = c.name || c.pushname || c.shortName || `Contato ${phone.slice(-4)}`;
                 return {
                     id: c.id._serialized || `${phone}@c.us`,
                     phone,
@@ -1356,22 +1382,53 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
             .sort((a, b) => a.name.localeCompare(b.name));
 
         // 2. Puxa todos os grupos que o chip participa
-        let rawChats = [];
+        let groups = [];
         try {
-            rawChats = await client.getChats();
-        } catch (e) {
-            console.warn('Aviso ao buscar chats:', e.message);
-        }
+            // Tentativa 1: getChats() padrão
+            let rawChats = [];
+            try {
+                rawChats = await client.getChats();
+                console.log(`📊 [Marketing] getChats() retornou ${rawChats.length} chats no total.`);
+            } catch (e) {
+                console.warn('⚠️ [Marketing] getChats() falhou, tentando fallback...', e.message);
+                // Fallback: busca grupos via pupPage
+                try {
+                    const groupIds = await client.pupPage.evaluate(() => {
+                        const store = window.Store;
+                        if (!store || !store.Chat) return [];
+                        return store.Chat.getModelsArray()
+                            .filter(c => c.isGroup)
+                            .map(c => ({ id: c.id._serialized, name: c.name || c.formattedTitle || 'Grupo' }));
+                    });
+                    if (groupIds && groupIds.length > 0) {
+                        groups = groupIds.map(g => ({
+                            id: g.id,
+                            name: g.name,
+                            unreadCount: 0,
+                            participantsCount: 0
+                        }));
+                        console.log(`✅ [Marketing] Fallback encontrou ${groups.length} grupos via pupPage.`);
+                    }
+                } catch (fallbackErr) {
+                    console.warn('⚠️ [Marketing] Fallback de grupos também falhou:', fallbackErr.message);
+                }
+            }
 
-        const groups = rawChats
-            .filter(chat => chat && chat.isGroup)
-            .map(g => ({
-                id: g.id._serialized,
-                name: g.name || 'Grupo Sem Nome',
-                unreadCount: g.unreadCount || 0,
-                participantsCount: (g.groupMetadata && g.groupMetadata.participants) ? g.groupMetadata.participants.length : 0
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name));
+            if (groups.length === 0 && rawChats.length > 0) {
+                groups = rawChats
+                    .filter(chat => chat && chat.isGroup)
+                    .map(g => ({
+                        id: g.id._serialized,
+                        name: g.name || 'Grupo Sem Nome',
+                        unreadCount: g.unreadCount || 0,
+                        participantsCount: (g.groupMetadata && g.groupMetadata.participants) ? g.groupMetadata.participants.length : 0
+                    }));
+            }
+            
+            groups.sort((a, b) => a.name.localeCompare(b.name));
+        } catch (groupErr) {
+            console.warn('⚠️ [Marketing] Erro geral ao buscar grupos:', groupErr.message);
+        }
 
         console.log(`✅ [Marketing] Encontrados ${contacts.length} contatos e ${groups.length} grupos no WhatsApp.`);
 

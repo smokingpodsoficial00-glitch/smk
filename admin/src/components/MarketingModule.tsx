@@ -102,6 +102,7 @@ export function MarketingModule() {
   const [listFormDesc, setListFormDesc] = useState('');
   const [listFormSelectedContacts, setListFormSelectedContacts] = useState<Set<string>>(new Set());
   const [contactSearchQuery, setContactSearchQuery] = useState('');
+  const [contactsVisibleCount, setContactsVisibleCount] = useState(50);
 
   // Formulário de Criação de Campanha
   const [campaignFormName, setCampaignFormName] = useState('');
@@ -231,12 +232,7 @@ export function MarketingModule() {
       setWhatsAppGroups(fetchedGroups);
       setSyncStatus(`Sincronizado com sucesso! ${fetchedContacts.length} contatos e ${fetchedGroups.length} grupos carregados.`);
       
-      // Auto-preenche a primeira lista se estiver vazia
-      if (broadcastLists.length > 0 && broadcastLists[0].contacts.length === 0 && fetchedContacts.length > 0) {
-        const updated = [...broadcastLists];
-        updated[0].contacts = fetchedContacts;
-        saveListsToStorage(updated);
-      }
+      // NÃO auto-preenche listas - o usuário deve selecionar manualmente os contatos
 
       setTimeout(() => setSyncStatus(null), 4000);
     } catch (err: any) {
@@ -993,51 +989,86 @@ export function MarketingModule() {
                   type="text"
                   placeholder="Buscar contato por nome ou telefone..."
                   value={contactSearchQuery}
-                  onChange={(e) => setContactSearchQuery(e.target.value)}
+                  onChange={(e) => { setContactSearchQuery(e.target.value); setContactsVisibleCount(50); }}
                   className="w-full bg-[#050505] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500/50"
                 />
 
                 <div className="h-60 overflow-y-auto border border-white/10 rounded-xl bg-[#050505] p-2 space-y-1 custom-scrollbar">
-                  {allContacts
-                    .filter(c => 
-                      c.name.toLowerCase().includes(contactSearchQuery.toLowerCase()) || 
-                      c.phone.includes(contactSearchQuery)
-                    )
-                    .map(contact => {
-                      const isSelected = listFormSelectedContacts.has(contact.id);
-                      return (
-                        <div
-                          key={contact.id}
-                          onClick={() => {
-                            const next = new Set(listFormSelectedContacts);
-                            if (next.has(contact.id)) next.delete(contact.id);
-                            else next.add(contact.id);
-                            setListFormSelectedContacts(next);
-                          }}
-                          className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-all ${
-                            isSelected ? 'bg-purple-500/15 border border-purple-500/30' : 'hover:bg-white/5 border border-transparent'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              readOnly
-                              className="rounded border-white/20 bg-black text-purple-500 focus:ring-0 size-4 cursor-pointer"
-                            />
-                            <div className="min-w-0">
-                              <span className="text-xs font-bold text-white block truncate">{contact.name}</span>
-                              <span className="text-[10px] text-white/40 font-mono truncate">{contact.phone}</span>
-                            </div>
+                  {(() => {
+                    const query = contactSearchQuery.toLowerCase().trim();
+                    const filtered = allContacts
+                      .filter(c => 
+                        c.name.toLowerCase().includes(query) || 
+                        c.phone.includes(contactSearchQuery)
+                      )
+                      .sort((a, b) => {
+                        if (!query) return a.name.localeCompare(b.name);
+                        const aStarts = a.name.toLowerCase().startsWith(query);
+                        const bStarts = b.name.toLowerCase().startsWith(query);
+                        if (aStarts && !bStarts) return -1;
+                        if (!aStarts && bStarts) return 1;
+                        return a.name.localeCompare(b.name);
+                      });
+                    const CONTACTS_PER_PAGE = 50;
+                    const visibleContacts = filtered.slice(0, contactsVisibleCount || CONTACTS_PER_PAGE);
+                    const hasMore = filtered.length > visibleContacts.length;
+                    
+                    return (
+                      <>
+                        {filtered.length > CONTACTS_PER_PAGE && (
+                          <div className="text-[10px] text-white/40 text-center py-1">
+                            Mostrando {visibleContacts.length} de {filtered.length} contatos
                           </div>
-                          {contact.isSaved && (
-                            <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded">
-                              Salvo
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
+                        )}
+                        {visibleContacts.map(contact => {
+                          const isSelected = listFormSelectedContacts.has(contact.id);
+                          return (
+                            <div
+                              key={contact.id}
+                              onClick={() => {
+                                const next = new Set(listFormSelectedContacts);
+                                if (next.has(contact.id)) next.delete(contact.id);
+                                else next.add(contact.id);
+                                setListFormSelectedContacts(next);
+                              }}
+                              className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-all ${
+                                isSelected ? 'bg-purple-500/15 border border-purple-500/30' : 'hover:bg-white/5 border border-transparent'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  readOnly
+                                  className="rounded border-white/20 bg-black text-purple-500 focus:ring-0 size-4 cursor-pointer"
+                                />
+                                <div className="min-w-0">
+                                  <span className="text-xs font-bold text-white block truncate">{contact.name}</span>
+                                  <span className="text-[10px] text-white/40 font-mono truncate">{contact.phone}</span>
+                                </div>
+                              </div>
+                              {contact.isSaved && (
+                                <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                                  Salvo
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {hasMore && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setContactsVisibleCount((prev: number) => (prev || CONTACTS_PER_PAGE) + CONTACTS_PER_PAGE);
+                            }}
+                            className="w-full py-2 mt-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-purple-400 text-xs font-bold cursor-pointer transition-all"
+                          >
+                            Carregar mais {Math.min(CONTACTS_PER_PAGE, filtered.length - visibleContacts.length)} contatos...
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -1180,17 +1211,30 @@ export function MarketingModule() {
                 {campaignFormTargetType === 'group' && (
                   <div className="p-3.5 bg-[#050505] border border-white/10 rounded-xl space-y-2">
                     <span className="text-xs font-bold text-white block">Selecione o Grupo do WhatsApp:</span>
-                    <select
-                      value={campaignFormTargetGroup}
-                      onChange={(e) => setCampaignFormTargetGroup(e.target.value)}
-                      className="w-full bg-black border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500/50 font-sans"
-                    >
-                      {whatsAppGroups.map(g => (
-                        <option key={g.id} value={g.id}>
-                          {g.name} ({g.participantsCount} participantes)
-                        </option>
-                      ))}
-                    </select>
+                    {whatsAppGroups.length === 0 ? (
+                      <div className="text-center py-3">
+                        <p className="text-xs text-white/50 mb-2">Nenhum grupo encontrado. Sincronize o WhatsApp primeiro.</p>
+                        <button
+                          onClick={(e) => { e.preventDefault(); syncWhatsAppContactsAndGroups(); }}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold cursor-pointer"
+                        >
+                          🔄 Sincronizar WhatsApp
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        value={campaignFormTargetGroup}
+                        onChange={(e) => setCampaignFormTargetGroup(e.target.value)}
+                        className="w-full bg-black border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500/50 font-sans"
+                      >
+                        <option value="">-- Selecione um grupo --</option>
+                        {whatsAppGroups.map(g => (
+                          <option key={g.id} value={g.id}>
+                            {g.name} {g.participantsCount > 0 ? `(${g.participantsCount} participantes)` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 )}
               </div>
