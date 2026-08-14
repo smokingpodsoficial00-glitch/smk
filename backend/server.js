@@ -868,24 +868,46 @@ client.on('message_create', async msg => {
         return;
     }
 
-    const senderNumber = msg.from ? msg.from.split('@')[0] : '';
-    const rawCleanPhone = senderNumber.replace(/\D/g, '');
+    // Obtém o número e identificadores reais do remetente
+    let senderNumber = msg.from ? msg.from.split('@')[0] : '';
+    let contactNumber = senderNumber;
+    try {
+        const contact = await msg.getContact();
+        if (contact && contact.number) {
+            contactNumber = contact.number;
+        }
+    } catch (cErr) {}
+
+    const cleanSender = senderNumber.replace(/\D/g, '');
+    const cleanContact = contactNumber.replace(/\D/g, '');
 
     // --- SEGURANÇA 3: BLACKLIST / CONTATOS IGNORADOS ---
-    if (blacklistPhonesSet.has(senderNumber) || blacklistPhonesSet.has(rawCleanPhone)) {
-        console.log(`🚫 [Blacklist] Mensagem de ${senderNumber} ignorada (contato na lista de exceções).`);
+    const isBlacklisted = blacklistPhonesSet.has(senderNumber) || 
+                          blacklistPhonesSet.has(cleanSender) ||
+                          blacklistPhonesSet.has(contactNumber) ||
+                          blacklistPhonesSet.has(cleanContact) ||
+                          Array.from(blacklistPhonesSet).some(bp => {
+                              const cleanBp = bp.replace(/\D/g, '');
+                              return cleanBp && (cleanSender.endsWith(cleanBp) || cleanBp.endsWith(cleanSender) || cleanContact.endsWith(cleanBp) || cleanBp.endsWith(cleanContact));
+                          });
+
+    if (isBlacklisted) {
+        console.log(`🚫 [Blacklist] Mensagem de ${contactNumber || senderNumber} IGNORADA com sucesso (contato na lista de exceções).`);
         return;
     }
 
     // --- SEGURANÇA 4: CHECAGEM DE SILENCIAMENTO ATIVO (Human Takeover) ---
-    if (silencedChatsMap.has(senderNumber)) {
-        const expiry = silencedChatsMap.get(senderNumber);
+    const isSilenced = silencedChatsMap.has(senderNumber) || silencedChatsMap.has(cleanSender) || silencedChatsMap.has(cleanContact);
+    if (isSilenced) {
+        const expiry = silencedChatsMap.get(senderNumber) || silencedChatsMap.get(cleanSender) || silencedChatsMap.get(cleanContact);
         if (Date.now() < expiry) {
             const remainingMins = Math.ceil((expiry - Date.now()) / 60000);
-            console.log(`🤫 [Silenciada] Eloisa em pausa para ${senderNumber} (restam ${remainingMins} min de Human Takeover).`);
+            console.log(`🤫 [Silenciada] Eloisa em pausa para ${contactNumber || senderNumber} (restam ${remainingMins} min de Human Takeover).`);
             return;
         } else {
-            silencedChatsMap.delete(senderNumber); // Expirou, retoma atendimento
+            silencedChatsMap.delete(senderNumber);
+            silencedChatsMap.delete(cleanSender);
+            silencedChatsMap.delete(cleanContact);
         }
     }
 
