@@ -592,55 +592,70 @@ export function ManualSaleModal({
               )}
             </div>
 
-            {/* 3. PAGAMENTO, FRETE E CUSTO DE ENTREGA */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-[11px] text-silver font-medium block mb-1">Forma de Pagamento</label>
-                  <div className="grid grid-cols-3 gap-1">
-                    {["PIX", "DINHEIRO", "CARTAO"].map((method) => (
+            {/* 3. PAGAMENTO, FRETE E MARGEM */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3.5">
+              {/* Seletor de Forma de Pagamento */}
+              <div>
+                <label className="text-[11px] text-silver font-semibold block mb-1.5">
+                  Forma de Pagamento
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "PIX", label: "Pix" },
+                    { id: "DINHEIRO", label: "Dinheiro" },
+                    { id: "CARTAO", label: "Cartão" },
+                  ].map((method) => {
+                    const isSelected = paymentMethod === method.id;
+                    return (
                       <button
-                        key={method}
+                        key={method.id}
                         type="button"
-                        onClick={() => setPaymentMethod(method)}
-                        className={`py-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
-                          paymentMethod === method
-                            ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
-                            : "bg-black/40 border-white/10 text-muted-foreground hover:text-white"
+                        onClick={() => setPaymentMethod(method.id)}
+                        className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center flex items-center justify-center ${
+                          isSelected
+                            ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_12px_rgba(16,185,129,0.25)]"
+                            : "bg-black/40 border-white/10 text-white/60 hover:text-white hover:border-white/20"
                         }`}
                       >
-                        {method}
+                        {method.label}
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
+              </div>
 
+              {/* Inputs de Frete Cobrado vs Custo Real do Motoboy */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-white/5">
                 <div>
                   <label className="text-[11px] text-silver font-medium block mb-1">
-                    Frete Cobrado (R$)
+                    Frete Cobrado do Cliente (R$)
                   </label>
                   <input
                     type="text"
                     value={shippingFee}
                     onChange={(e) => setShippingFee(e.target.value)}
-                    placeholder="Ex: 12,90"
+                    placeholder="0,00"
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-emerald-400 focus:outline-none focus:border-emerald-400/50 font-bold"
                   />
-                  <span className="text-[9px] text-white/30 block mt-0.5">Valor pago pelo cliente</span>
+                  <span className="text-[9px] text-white/40 block mt-1">
+                    Taxa paga pelo comprador
+                  </span>
                 </div>
 
                 <div>
                   <label className="text-[11px] text-silver font-medium block mb-1">
-                    Custo Motoboy/Uber (R$)
+                    Custo Real do Motoboy/Uber (R$)
                   </label>
                   <input
                     type="text"
                     value={shippingCost}
                     onChange={(e) => setShippingCost(e.target.value)}
-                    placeholder="Ex: 5,00"
+                    placeholder="0,00"
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-amber-300 focus:outline-none focus:border-amber-400/50 font-bold"
                   />
-                  <span className="text-[9px] text-white/30 block mt-0.5">Custo real de entrega</span>
+                  <span className="text-[9px] text-white/40 block mt-1">
+                    Gasto que você terá na entrega
+                  </span>
                 </div>
               </div>
             </div>
