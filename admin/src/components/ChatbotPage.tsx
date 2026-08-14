@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import {
   Bot, QrCode, RefreshCw, CheckCircle2,
   Send, Sparkles, Power, Check, Copy, Key, Zap,
-  CheckCheck, Phone, Video, MoreVertical, ShoppingBag, ArrowRight, RotateCcw, Loader2
+  CheckCheck, Phone, Video, MoreVertical, ShoppingBag, ArrowRight, RotateCcw, Loader2,
+  Search, Users, ShieldAlert, X
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
@@ -1030,6 +1031,12 @@ ${isOngoingConversation
   const [newBlacklistPhone, setNewBlacklistPhone] = useState("");
   const [loadingSecurity, setLoadingSecurity] = useState(false);
 
+  // Modal de Seleção de Contatos para a Blacklist
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [availableContacts, setAvailableContacts] = useState<Array<{ id: string; name: string; phone: string; cleanPhone: string }>>([]);
+  const [contactFilterQuery, setContactFilterQuery] = useState("");
+  const [loadingContactsList, setLoadingContactsList] = useState(false);
+
   // Busca status de segurança do backend
   const fetchSecurityStatus = async () => {
     try {
@@ -1048,6 +1055,31 @@ ${isOngoingConversation
     const interval = setInterval(fetchSecurityStatus, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // Abre modal e carrega contatos sincronizados
+  const handleOpenContactModal = async () => {
+    setIsContactModalOpen(true);
+    try {
+      const cached = localStorage.getItem('SP_MARKETING_CONTACTS');
+      if (cached) {
+        setAvailableContacts(JSON.parse(cached));
+      } else {
+        setLoadingContactsList(true);
+        const res = await fetch('http://localhost:3006/api/marketing/whatsapp-data');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.contacts) {
+            setAvailableContacts(data.contacts);
+            localStorage.setItem('SP_MARKETING_CONTACTS', JSON.stringify(data.contacts));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Erro ao buscar contatos para blacklist:", e);
+    } finally {
+      setLoadingContactsList(false);
+    }
+  };
 
   const handleToggleMasterSwitch = async () => {
     setLoadingSecurity(true);
@@ -1079,19 +1111,19 @@ ${isOngoingConversation
     } catch (e) {}
   };
 
-  const handleAddBlacklist = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newBlacklistPhone.trim()) return;
+  const handleAddBlacklist = async (phoneToAdd?: string) => {
+    const targetPhone = phoneToAdd || newBlacklistPhone.trim();
+    if (!targetPhone) return;
     try {
       const res = await fetch("http://localhost:3006/api/chatbot/blacklist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: newBlacklistPhone.trim(), action: "add" })
+        body: JSON.stringify({ phone: targetPhone, action: "add" })
       });
       if (res.ok) {
         const data = await res.json();
         setBlacklist(data.blacklist || []);
-        setNewBlacklistPhone("");
+        if (!phoneToAdd) setNewBlacklistPhone("");
       }
     } catch (e) {}
   };
@@ -1109,6 +1141,23 @@ ${isOngoingConversation
       }
     } catch (e) {}
   };
+
+  // Filtro inteligente de contatos por relevância
+  const filteredContacts = availableContacts
+    .filter(c => {
+      const q = contactFilterQuery.toLowerCase().trim();
+      if (!q) return true;
+      return (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q) || (c.cleanPhone || '').includes(q);
+    })
+    .sort((a, b) => {
+      const q = contactFilterQuery.toLowerCase().trim();
+      if (!q) return (a.name || '').localeCompare(b.name || '');
+      const aStarts = (a.name || '').toLowerCase().startsWith(q);
+      const bStarts = (b.name || '').toLowerCase().startsWith(q);
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
 
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar bg-background p-6 space-y-8 relative">
@@ -1249,16 +1298,23 @@ ${isOngoingConversation
                 Contatos Ignorados / Blacklist ({blacklist.length})
               </h3>
             </div>
-            <span className="text-[10px] text-white/40">Amigos, Fornecedores & Motoboys</span>
+            <button
+              type="button"
+              onClick={handleOpenContactModal}
+              className="px-2.5 py-1 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+            >
+              <Users className="size-3.5" />
+              <span>Ver Contatos</span>
+            </button>
           </div>
 
-          <form onSubmit={handleAddBlacklist} className="flex gap-2">
+          <form onSubmit={(e) => { e.preventDefault(); handleAddBlacklist(); }} className="flex gap-2">
             <input
               type="text"
-              placeholder="Ex: 5511999999999"
+              placeholder="Digitar número manual (Ex: 5511999999999)"
               value={newBlacklistPhone}
               onChange={(e) => setNewBlacklistPhone(e.target.value)}
-              className="flex-1 bg-black border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-red-500/50"
+              className="flex-1 bg-black border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-red-500/50 font-mono"
             />
             <button
               type="submit"
@@ -1268,7 +1324,7 @@ ${isOngoingConversation
             </button>
           </form>
 
-          {blacklist.length > 0 && (
+          {blacklist.length > 0 ? (
             <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto custom-scrollbar">
               {blacklist.map(phone => (
                 <div key={phone} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-[11px] text-red-300 font-mono">
@@ -1277,15 +1333,143 @@ ${isOngoingConversation
                     type="button"
                     onClick={() => handleRemoveBlacklist(phone)}
                     className="text-red-400 hover:text-white ml-1 font-bold text-xs"
+                    title="Remover da Blacklist"
                   >
                     ×
                   </button>
                 </div>
               ))}
             </div>
+          ) : (
+            <p className="text-xs text-white/40 italic py-1">
+              Nenhum contato na blacklist. Clique em "Ver Contatos" para selecionar quem ignorar.
+            </p>
           )}
         </div>
       </div>
+
+      {/* 📱 MODAL: SELEÇÃO DE CONTATOS PARA A BLACKLIST (IGNORADOS) */}
+      {isContactModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0c0c0c] border border-white/15 rounded-3xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200">
+            {/* Header do Modal */}
+            <div className="p-5 border-b border-white/10 flex items-center justify-between bg-black/50">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400">
+                  <ShieldAlert className="size-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white flex items-center gap-2">
+                    Gerenciar Contatos Ignorados (Blacklist)
+                    <span className="text-xs font-mono text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">
+                      {blacklist.length} ignorados
+                    </span>
+                  </h2>
+                  <p className="text-xs text-white/50">
+                    Selecione contatos pessoais, amigos ou fornecedores para a Eloisa NUNCA responder.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsContactModalOpen(false)}
+                className="size-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* Barra de Busca de Contatos */}
+            <div className="p-4 border-b border-white/10 bg-black/30">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/40" />
+                <input
+                  type="text"
+                  value={contactFilterQuery}
+                  onChange={(e) => setContactFilterQuery(e.target.value)}
+                  placeholder="Buscar por nome ou número (ex: Cliente, Amigo, Fornecedor)..."
+                  className="w-full bg-black border border-white/10 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-white/40 focus:outline-none focus:border-red-500/50"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Lista de Contatos com Checkbox/Status */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+              {loadingContactsList ? (
+                <div className="text-center py-12 space-y-3">
+                  <Loader2 className="size-8 animate-spin text-red-400 mx-auto" />
+                  <p className="text-xs text-white/50">Carregando contatos sincronizados do WhatsApp...</p>
+                </div>
+              ) : filteredContacts.length === 0 ? (
+                <div className="text-center py-12 space-y-2">
+                  <Users className="size-8 text-white/20 mx-auto" />
+                  <p className="text-xs text-white/50 font-medium">Nenhum contato encontrado.</p>
+                  <p className="text-[11px] text-white/30">Tente buscar por outro termo ou sincronize no módulo Marketing.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {filteredContacts.slice(0, 100).map(c => {
+                    const phoneOnly = c.cleanPhone || c.phone.replace(/\D/g, '');
+                    const isIgnored = blacklist.includes(phoneOnly) || blacklist.includes(c.phone);
+
+                    return (
+                      <div
+                        key={c.id}
+                        onClick={() => {
+                          if (isIgnored) {
+                            handleRemoveBlacklist(phoneOnly);
+                          } else {
+                            handleAddBlacklist(phoneOnly);
+                          }
+                        }}
+                        className={`p-3 rounded-2xl border cursor-pointer flex items-center justify-between transition-all select-none ${
+                          isIgnored
+                            ? 'bg-red-500/15 border-red-500/40 text-white'
+                            : 'bg-black/50 border-white/5 hover:border-white/15 text-white/70'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className={`size-5 rounded-lg border flex items-center justify-center transition-colors shrink-0 ${
+                            isIgnored ? 'bg-red-500 border-red-400 text-white' : 'border-white/20 bg-black/40'
+                          }`}>
+                            {isIgnored && <Check className="size-3.5 stroke-[3]" />}
+                          </div>
+                          <div className="truncate">
+                            <p className="text-xs font-bold text-white truncate">{c.name}</p>
+                            <p className="text-[10px] text-white/40 font-mono">{c.phone}</p>
+                          </div>
+                        </div>
+
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
+                          isIgnored ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-white/5 text-white/30'
+                        }`}>
+                          {isIgnored ? 'Ignorado' : 'Atendido'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer do Modal */}
+            <div className="p-4 border-t border-white/10 bg-black/50 flex items-center justify-between">
+              <span className="text-xs text-white/50">
+                Mostrando {Math.min(filteredContacts.length, 100)} de {availableContacts.length} contatos
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsContactModalOpen(false)}
+                className="px-5 py-2 rounded-xl bg-white text-black font-bold text-xs hover:bg-white/90 transition-colors cursor-pointer"
+              >
+                Concluir Seleção
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Grid Principal */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
