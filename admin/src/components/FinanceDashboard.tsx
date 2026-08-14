@@ -343,22 +343,22 @@ export function FinanceDashboard() {
       {/* ━━━ BLOCO 1: KPIs PRINCIPAIS DE VENDAS REALIZADAS ━━━━━━━━━━━━━━ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* 1. Faturamento Bruto Real */}
-        <div className="bg-[#121316] border border-emerald-500/30 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-emerald-500/50 transition-all">
+        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
               Faturamento Bruto Real
             </span>
-            <div className="size-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <div className="size-9 rounded-xl bg-white/5 border border-white/15 flex items-center justify-center text-white">
               <DollarSign className="size-5" />
             </div>
           </div>
 
           <div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-emerald-400">
+            <div className="text-2xl sm:text-3xl font-extrabold text-white">
               {formatBRL(grossRevenue)}
             </div>
-            <p className="text-xs font-medium text-white/70 mt-1 flex items-center gap-1.5">
-              <ShoppingBag className="size-3.5 text-emerald-400" />
+            <p className="text-xs font-medium text-white/60 mt-1 flex items-center gap-1.5">
+              <ShoppingBag className="size-3.5 text-white/60" />
               <span>{totalOrders} pedidos ({totalPodsSold} pods vendidos)</span>
             </p>
           </div>
@@ -369,7 +369,7 @@ export function FinanceDashboard() {
               {brandSales.map((b) => (
                 <span
                   key={b.brand}
-                  className="text-[10px] font-bold bg-white/5 border border-white/10 text-emerald-300 px-2 py-0.5 rounded-full"
+                  className="text-[10px] font-semibold bg-white/5 border border-white/10 text-white/80 px-2 py-0.5 rounded-full"
                 >
                   {b.brand}: {b.count} un
                 </span>
@@ -379,12 +379,12 @@ export function FinanceDashboard() {
         </div>
 
         {/* 2. Custo de Reposição (CMV) */}
-        <div className="bg-[#121316] border border-red-500/30 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-red-500/50 transition-all">
+        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
               Custo Reposição (CMV)
             </span>
-            <div className="size-9 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400">
+            <div className="size-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
               <TrendingDown className="size-5" />
             </div>
           </div>
@@ -393,48 +393,48 @@ export function FinanceDashboard() {
             <div className="text-2xl sm:text-3xl font-extrabold text-red-400">
               {formatBRL(cmv)}
             </div>
-            <p className="text-xs font-medium text-red-300/80 mt-1">
+            <p className="text-xs font-medium text-white/50 mt-1">
               {grossRevenue > 0 ? ((cmv / grossRevenue) * 100).toFixed(1) : 0}% do faturamento em reposição
             </p>
           </div>
 
-          <div className="pt-2 border-t border-white/10 text-[10px] text-muted-foreground">
+          <div className="pt-2 border-t border-white/10 text-[10px] text-white/40">
             Custo pago ao fornecedor pelos {totalPodsSold} pods vendidos
           </div>
         </div>
 
         {/* 3. Logística & Frete */}
-        <div className="bg-[#121316] border border-amber-500/30 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-amber-500/50 transition-all">
+        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
               Frete Total (Logística)
             </span>
-            <div className="size-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <div className="size-9 rounded-xl bg-white/5 border border-white/15 flex items-center justify-center text-white/80">
               <Truck className="size-5" />
             </div>
           </div>
 
           <div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-amber-400">
+            <div className="text-2xl sm:text-3xl font-extrabold text-white">
               {formatBRL(logisticsFee)}
             </div>
-            <p className="text-xs font-medium text-amber-300/80 mt-1">
+            <p className="text-xs font-medium text-white/50 mt-1">
               Total registrado nas entregas efetuadas
             </p>
           </div>
 
-          <div className="pt-2 border-t border-white/10 text-[10px] text-muted-foreground">
+          <div className="pt-2 border-t border-white/10 text-[10px] text-white/40">
             Fretes cobrados/gastos na expedição dos pedidos
           </div>
         </div>
 
         {/* 4. Lucro Líquido Real */}
-        <div className="bg-[#121316] border border-emerald-400/50 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-xl bg-gradient-to-b from-emerald-500/10 to-transparent">
+        <div className="bg-[#0e0e10] border border-emerald-500/40 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-xl bg-gradient-to-b from-emerald-500/5 to-transparent hover:border-emerald-400 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider">
               Lucro Líquido Real
             </span>
-            <div className="size-9 rounded-xl bg-emerald-500/30 border border-emerald-400/50 flex items-center justify-center text-emerald-300">
+            <div className="size-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-300">
               <TrendingUp className="size-5" />
             </div>
           </div>
@@ -448,26 +448,26 @@ export function FinanceDashboard() {
             </p>
           </div>
 
-          <div className="pt-2 border-t border-emerald-500/20 text-[10px] text-emerald-300/80 font-medium">
+          <div className="pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
             Fat (R$ {(grossRevenue || 0).toFixed(2)}) - CMV (R$ {(cmv || 0).toFixed(2)}) - Frete (R$ {(logisticsFee || 0).toFixed(2)})
           </div>
         </div>
       </div>
 
       {/* ━━━ BLOCO DEDICADO: 🎯 EFICIÊNCIA COMERCIAL, TICKET MÉDIO & MARGENS MÉDIAS ━━━━━━━━━━━━━━ */}
-      <div className="bg-[#121316] border border-cyan-500/30 rounded-3xl p-5 sm:p-6 space-y-5 shadow-2xl bg-gradient-to-r from-cyan-500/5 via-transparent to-emerald-500/5">
+      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Target className="size-5 text-cyan-400" />
+              <Target className="size-5 text-white" />
               <span>Eficiência Comercial, Ticket Médio & Margens Médias por Venda</span>
             </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="text-xs text-white/50 mt-0.5">
               Análise dinâmica de valor médio por carrinho, lucro limpo gerado por pedido e margem média líquida real.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-cyan-400 bg-cyan-500/20 px-3 py-1 rounded-xl border border-cyan-500/30">
+            <span className="text-xs font-bold text-white bg-white/10 px-3 py-1 rounded-xl border border-white/15">
               ⚡ Métricas por Pedido
             </span>
           </div>
@@ -475,65 +475,65 @@ export function FinanceDashboard() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card 1: Ticket Médio por Pedido */}
-          <div className="bg-white/5 border border-cyan-500/30 rounded-2xl p-5 space-y-2 hover:border-cyan-500/50 transition-all">
-            <span className="text-[11px] text-cyan-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <ReceiptText className="size-4 text-cyan-400" /> Ticket Médio por Pedido
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <ReceiptText className="size-4 text-white/70" /> Ticket Médio por Pedido
             </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-cyan-300">
+            <div className="text-2xl sm:text-3xl font-extrabold text-white">
               {formatBRL(averageTicket)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-white/50">
               Valor médio gasto por cliente a cada compra realizada.
             </p>
-            <div className="pt-2 border-t border-white/10 text-[10px] text-cyan-400/80 font-medium">
+            <div className="pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
               Faturamento Bruto ({formatBRL(grossRevenue)}) ÷ {totalOrders} pedidos
             </div>
           </div>
 
           {/* Card 2: Margem Média Líquida (%) */}
-          <div className="bg-white/5 border border-emerald-500/30 rounded-2xl p-5 space-y-2 hover:border-emerald-500/50 transition-all">
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
             <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
               <Percent className="size-4 text-emerald-400" /> Margem Média Líquida
             </span>
             <div className="text-2xl sm:text-3xl font-extrabold text-emerald-400">
               {averageNetMarginPercent.toFixed(1)}%
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-white/50">
               Porcentagem líquida que sobra limpa no bolso de cada venda.
             </p>
-            <div className="pt-2 border-t border-white/10 text-[10px] text-emerald-400/80 font-medium">
+            <div className="pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
               Lucro Líquido Real ÷ Faturamento Bruto
             </div>
           </div>
 
           {/* Card 3: Lucro Médio Líquido por Pedido */}
-          <div className="bg-white/5 border border-emerald-500/30 rounded-2xl p-5 space-y-2 hover:border-emerald-500/50 transition-all">
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
             <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
               <TrendingUp className="size-4 text-emerald-400" /> Lucro Líquido por Pedido
             </span>
             <div className="text-2xl sm:text-3xl font-extrabold text-emerald-300">
               {formatBRL(averageNetProfitPerOrder)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-white/50">
               Ganho líquido médio embolsado a cada checkout finalizado.
             </p>
-            <div className="pt-2 border-t border-white/10 text-[10px] text-emerald-400/80 font-medium">
+            <div className="pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
               Lucro Líquido ({formatBRL(realNetProfitPostMarketing)}) ÷ {totalOrders} pedidos
             </div>
           </div>
 
           {/* Card 4: Ticket Médio por Pod Vendido */}
-          <div className="bg-white/5 border border-amber-500/30 rounded-2xl p-5 space-y-2 hover:border-amber-500/50 transition-all">
-            <span className="text-[11px] text-amber-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <Box className="size-4 text-amber-400" /> Preço Médio por Pod
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <Box className="size-4 text-white/70" /> Preço Médio por Pod
             </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-amber-300">
+            <div className="text-2xl sm:text-3xl font-extrabold text-white">
               {formatBRL(averagePricePerPod)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-white/50">
               Preço médio de venda praticado por unidade entregue.
             </p>
-            <div className="pt-2 border-t border-white/10 text-[10px] text-amber-300/80 font-medium">
+            <div className="pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
               Faturamento ({formatBRL(grossRevenue)}) ÷ {totalPodsSold} pods
             </div>
           </div>
@@ -541,19 +541,19 @@ export function FinanceDashboard() {
       </div>
 
       {/* ━━━ BLOCO 2: GESTÃO UNIFICADA DE TESOURARIA, FLUXO DE CAIXA & ESTOQUE ━━━━━━━━━━━━━━ */}
-      <div className="bg-[#121316] border border-amber-500/30 rounded-3xl p-5 sm:p-6 space-y-6 shadow-2xl bg-gradient-to-r from-amber-500/5 via-transparent to-emerald-500/5">
+      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Wallet className="size-5 text-amber-400" />
+              <Wallet className="size-5 text-white" />
               <span>Gestão de Tesouraria, Fluxo de Caixa & Patrimônio em Estoque</span>
             </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="text-xs text-white/50 mt-0.5">
               Visão unificada 360° do caixa bancário, investimentos em tráfego e mercadorias na prateleira.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-amber-400 bg-amber-500/20 px-3 py-1 rounded-xl border border-amber-500/30">
+            <span className="text-xs font-bold text-white bg-white/10 px-3 py-1 rounded-xl border border-white/15">
               ⚡ Tesouraria & Patrimônio
             </span>
           </div>
@@ -561,28 +561,28 @@ export function FinanceDashboard() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Card 1: Saldo Bruto em Conta */}
-          <div className="bg-white/5 border border-emerald-500/30 rounded-2xl p-5 space-y-2">
-            <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider block flex items-center gap-1.5">
-              <PiggyBank className="size-4 text-emerald-400" /> Saldo Bruto em Conta (PIX/Caixa)
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider block flex items-center gap-1.5">
+              <PiggyBank className="size-4 text-white" /> Saldo Bruto em Conta (PIX/Caixa)
             </span>
-            <div className="text-2xl font-extrabold text-emerald-400">
+            <div className="text-2xl font-extrabold text-white">
               {formatBRL(grossRevenue)}
             </div>
-            <p className="text-xs text-emerald-300/80">
+            <p className="text-xs text-white/50">
               Dinheiro bruto total em conta para giro e recompra de estoque.
             </p>
           </div>
 
           {/* Card 2: Investimento em Marketing (Editável) */}
-          <div className="bg-white/5 border border-amber-500/30 rounded-2xl p-5 space-y-2 relative">
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 relative hover:border-white/30 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-amber-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
-                <Megaphone className="size-4" /> Anúncios / Marketing (Meta Ads)
+              <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
+                <Megaphone className="size-4 text-white/70" /> Anúncios / Marketing (Meta Ads)
               </span>
               <button
                 type="button"
                 onClick={() => setIsEditingMarketing(!isEditingMarketing)}
-                className="text-[10px] text-amber-400 hover:underline font-bold"
+                className="text-[10px] text-white/80 hover:text-white hover:underline font-bold"
               >
                 {isEditingMarketing ? "Salvar" : "Editar"}
               </button>
@@ -595,75 +595,75 @@ export function FinanceDashboard() {
                   value={marketingSpent || ""}
                   onChange={(e) => saveMarketingInvestment(e.target.value)}
                   placeholder="Ex: 50.00"
-                  className="w-full bg-black/60 border border-amber-500/50 rounded-xl px-2.5 py-1 text-xs font-bold text-amber-400 focus:outline-none"
+                  className="w-full bg-black/60 border border-white/30 rounded-xl px-2.5 py-1 text-xs font-bold text-white focus:outline-none focus:border-white/50"
                 />
                 <button
                   type="button"
                   onClick={() => setIsEditingMarketing(false)}
-                  className="p-1.5 rounded-xl bg-amber-500 text-black hover:bg-amber-400 transition-colors"
+                  className="p-1.5 rounded-xl bg-white text-black hover:bg-white/90 transition-colors"
                 >
                   <Check className="size-3.5" />
                 </button>
               </div>
             ) : (
-              <div className="text-2xl font-extrabold text-amber-400">
+              <div className="text-2xl font-extrabold text-white">
                 {formatBRL(numericMarketingSpent)}
               </div>
             )}
 
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-white/50">
               Total investido em anúncios Meta/Insta e tráfego pago.
             </p>
           </div>
 
           {/* Card 3: Custo dos Pods na Prateleira */}
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-2">
-            <span className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider block flex items-center gap-1.5">
-              <Box className="size-4 text-silver" /> Custo dos Pods na Prateleira
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider block flex items-center gap-1.5">
+              <Box className="size-4 text-white/70" /> Custo dos Pods na Prateleira
             </span>
             <div className="text-2xl font-extrabold text-white">
               {formatBRL(stockAssetCost)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-white/50">
               Capital imobilizado nos {stockAssetUnits} pods parados no armazém.
             </p>
           </div>
 
           {/* Card 4: Valor Potencial de Venda */}
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-5 space-y-2">
-            <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider block flex items-center gap-1.5">
-              <DollarSign className="size-4 text-emerald-400" /> Valor de Venda do Estoque
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider block flex items-center gap-1.5">
+              <DollarSign className="size-4 text-white/70" /> Valor de Venda do Estoque
             </span>
-            <div className="text-2xl font-extrabold text-emerald-400">
+            <div className="text-2xl font-extrabold text-white">
               {formatBRL(stockAssetRetail)}
             </div>
-            <p className="text-xs text-emerald-400/80">
+            <p className="text-xs text-white/50">
               Faturamento bruto total se os {stockAssetUnits} pods forem vendidos.
             </p>
           </div>
 
           {/* Card 5: Lucro Potencial do Estoque */}
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 space-y-2">
-            <span className="text-[11px] text-amber-400 uppercase font-bold tracking-wider block flex items-center gap-1.5">
-              <TrendingUp className="size-4 text-amber-400" /> Lucro Potencial do Estoque
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider block flex items-center gap-1.5">
+              <TrendingUp className="size-4 text-emerald-400" /> Lucro Potencial do Estoque
             </span>
-            <div className="text-2xl font-extrabold text-amber-400">
+            <div className="text-2xl font-extrabold text-emerald-400">
               {formatBRL(stockAssetProfit)}
             </div>
-            <p className="text-xs text-amber-300/80">
+            <p className="text-xs text-white/50">
               Lucro bruto futuro ao zerar os {stockAssetUnits} pods parados.
             </p>
           </div>
 
           {/* Card 6: Patrimônio Total da Empresa */}
-          <div className="bg-gradient-to-br from-emerald-500/20 to-amber-500/20 border border-emerald-400/40 rounded-2xl p-5 space-y-2">
-            <span className="text-[11px] text-emerald-300 uppercase font-extrabold tracking-wider block flex items-center gap-1.5">
-              <Landmark className="size-4 text-emerald-400" /> Patrimônio Total da Loja
+          <div className="bg-gradient-to-br from-white/10 to-emerald-500/10 border border-white/30 rounded-2xl p-5 space-y-2 hover:border-white/50 transition-all">
+            <span className="text-[11px] text-white uppercase font-extrabold tracking-wider block flex items-center gap-1.5">
+              <Landmark className="size-4 text-white" /> Patrimônio Total da Loja
             </span>
-            <div className="text-2xl font-black text-emerald-300">
+            <div className="text-2xl sm:text-3xl font-black text-white">
               {formatBRL(totalCompanyEquity)}
             </div>
-            <p className="text-xs text-emerald-200/80 font-medium">
+            <p className="text-xs text-white/70 font-medium">
               Caixa em Conta ({formatBRL(grossRevenue)}) + Venda Total do Estoque ({formatBRL(stockAssetRetail)})
             </p>
           </div>
@@ -671,24 +671,24 @@ export function FinanceDashboard() {
       </div>
 
       {/* ━━━ BLOCO 3: 🏆 CAMPEÕES DE VENDA & ANÁLISE DE LUCRO POR POD (SEÇÃO ESTRATÉGICA) ━━━━━━━━━━━━━━ */}
-      <div className="bg-[#121316] border border-white/10 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl">
+      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Trophy className="size-5 text-amber-400" />
+              <Trophy className="size-5 text-white" />
               <span>Campeões de Venda & Lucro por Produto (Direcionador Estratégico)</span>
             </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="text-xs text-white/50 mt-0.5">
               Descubra exatamente quais modelos geram maior lucro líquido para direcionar seus investimentos de tráfego.
             </p>
           </div>
-          <span className="text-xs font-bold bg-amber-500/10 text-amber-400 px-3 py-1 rounded-xl border border-amber-500/30 self-start sm:self-auto">
+          <span className="text-xs font-bold bg-white/10 text-white px-3 py-1 rounded-xl border border-white/15 self-start sm:self-auto">
             🔥 Estratégia de Crescimento
           </span>
         </div>
 
         {modelProfits.length === 0 ? (
-          <p className="text-xs text-muted-foreground py-6 text-center italic">
+          <p className="text-xs text-white/40 py-6 text-center italic">
             Nenhuma venda registrada ainda para calcular o ranking estratégico.
           </p>
         ) : (
@@ -696,11 +696,11 @@ export function FinanceDashboard() {
             {modelProfits.map((item, idx) => (
               <div
                 key={item.modelKey}
-                className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3 hover:border-amber-500/40 transition-all relative"
+                className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-3 hover:border-white/30 transition-all relative"
               >
                 {/* Badge de Posição */}
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-amber-400 bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1">
+                  <span className="text-xs font-extrabold text-white bg-white/10 px-2.5 py-0.5 rounded-full border border-white/20 flex items-center gap-1">
                     {idx === 0 ? "🥇 1º Lugar" : idx === 1 ? "🥈 2º Lugar" : idx === 2 ? "🥉 3º Lugar" : `#${idx + 1}`}
                   </span>
                   <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
@@ -713,7 +713,7 @@ export function FinanceDashboard() {
                   <h4 className="font-extrabold text-sm text-white">
                     {item.brand} {item.name}
                   </h4>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-white/50">
                     {item.unitsSold} {item.unitsSold === 1 ? "unidade vendida" : "unidades vendidas"}
                   </p>
                 </div>
@@ -721,7 +721,7 @@ export function FinanceDashboard() {
                 {/* Métricas de Lucro */}
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10 text-xs">
                   <div>
-                    <span className="text-[10px] text-silver font-medium block">Receita Gerada</span>
+                    <span className="text-[10px] text-white/50 font-medium block">Receita Gerada</span>
                     <span className="font-bold text-white">{formatBRL(item.revenue)}</span>
                   </div>
                   <div>
@@ -731,10 +731,10 @@ export function FinanceDashboard() {
                 </div>
 
                 {/* Recomendação Estratégica */}
-                <div className="pt-2 border-t border-white/10 text-[10px] text-amber-300/90 font-semibold flex items-center gap-1">
-                  <Flame className="size-3.5 text-amber-400 shrink-0" />
+                <div className="pt-2 border-t border-white/10 text-[10px] text-white/70 font-semibold flex items-center gap-1">
+                  <Flame className="size-3.5 text-emerald-400 shrink-0" />
                   <span>
-                    {item.marginPct > 20 ? "🔥 Alta Margem - Escalar Tráfego Pago" : "⭐ Produto Relevante no Volume"}
+                    {item.marginPct > 20 ? "Alta Margem - Escalar Tráfego Pago" : "Produto Relevante no Volume"}
                   </span>
                 </div>
               </div>
@@ -744,7 +744,7 @@ export function FinanceDashboard() {
       </div>
 
       {/* ━━━ BLOCO 4: DEMONSTRATIVO DE RESULTADO (DRE EXECUTIVO EM TABELA LIMPA) ━━━━━━━━━━━━━━ */}
-      <div className="bg-[#121316] border border-white/10 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl">
+      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
