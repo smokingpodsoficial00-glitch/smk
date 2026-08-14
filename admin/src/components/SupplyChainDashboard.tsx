@@ -12,7 +12,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { fetchCategories, fetchProductCategoryMappings, updateModelCategories, DEFAULT_CATEGORIES, type Category } from "../lib/categories";
 import { fetchProductCostsMap, updateProductCost } from "../lib/productCosts";
 import { ManualSaleModal } from "./ManualSaleModal";
-import { ReplenishmentPlannerModal } from "./ReplenishmentPlannerModal";
+import { ReplenishmentPlannerModal, loadSavedGoals, type FinancialGoals } from "./ReplenishmentPlannerModal";
 
 // ─── Donut chart colors ───────────────────────────────────
 const DONUT_COLORS = ["#34d399", "#60a5fa", "#a78bfa", "#fbbf24", "#f87171", "#f472b6", "#38bdf8"];
@@ -31,6 +31,7 @@ export function SupplyChainDashboard() {
 
   // ─── Modal de Planejador de Reposição & Metas de Escala ──
   const [showReplenishmentModal, setShowReplenishmentModal] = useState(false);
+  const [financialGoals, setFinancialGoals] = useState<FinancialGoals>(loadSavedGoals);
 
   // ─── Modal Flutuante Centralizado de Novo Produto ──────
   const [showNewProductModal, setShowNewProductModal] = useState(false);
@@ -1343,36 +1344,47 @@ export function SupplyChainDashboard() {
           </div>
         </div>
 
-        {/* ── BANNER INTELIGENTE DE REPOSIÇÃO & GATILHO R$ 1.000 ── */}
-        <div className="bg-gradient-to-r from-emerald-950/40 via-card to-amber-950/20 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-[0_0_20px_rgba(16,185,129,0.06)]">
-          <div className="flex items-center gap-3.5">
-            <div className="size-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 grid place-items-center shrink-0 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-              <Boxes className="size-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs sm:text-sm font-extrabold text-white">
-                  Gatilho de Recompra: Lote Mínimo de R$ 1.000,00 (Remessa #2 SP)
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-extrabold">
-                  Frete R$ 2,94/pod
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Caixa atual em R$ 513,00 (51%) — Faltam apenas ~5 a 6 pods para acionar a compra sem queimar margem líquida!
-              </p>
-            </div>
-          </div>
+        {/* ── BANNER INTELIGENTE DE REPOSIÇÃO & GATILHO DINÂMICO ── */}
+        {(() => {
+          const reorderGoal = financialGoals?.reorderCashGoal || 1000;
+          const currentCashSim = 513;
+          const cashNeeded = Math.max(0, reorderGoal - currentCashSim);
+          const reorderPct = reorderGoal > 0 ? Math.min(100, Math.round((currentCashSim / reorderGoal) * 100)) : 100;
+          const avgPodPrice = totalStockUnits > 0 ? (totalStockValue / totalStockUnits) : 86.9;
+          const podsRemaining = avgPodPrice > 0 ? Math.ceil(cashNeeded / avgPodPrice) : 0;
 
-          <button
-            type="button"
-            onClick={() => setShowReplenishmentModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)] shrink-0 cursor-pointer active:scale-[0.97]"
-          >
-            <span>Abrir Planejador & Metas</span>
-            <ChevronRight className="size-4" />
-          </button>
-        </div>
+          return (
+            <div className="bg-gradient-to-r from-emerald-950/40 via-card to-amber-950/20 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-[0_0_20px_rgba(16,185,129,0.06)]">
+              <div className="flex items-center gap-3.5">
+                <div className="size-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 grid place-items-center shrink-0 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                  <Boxes className="size-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm font-extrabold text-white">
+                      Gatilho de Recompra: Lote Mínimo de R$ {reorderGoal.toLocaleString("pt-BR")}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-extrabold">
+                      Frete R$ 2,94/pod
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Caixa em R$ {currentCashSim.toFixed(2)} ({reorderPct}%) — {cashNeeded > 0 ? `Faltam apenas ~${podsRemaining} pods vendidos para acionar a compra com frete diluído!` : "🎉 Meta de caixa atingida! Lote pronto para compra!"}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowReplenishmentModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)] shrink-0 cursor-pointer active:scale-[0.97]"
+              >
+                <span>Abrir Planejador & Metas</span>
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+          );
+        })()}
 
         {/* ── GRÁFICOS: RANKING + DONUT ────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3055,6 +3067,7 @@ export function SupplyChainDashboard() {
         stockRetailValue={totalStockValue || 1042.89}
         stockCostValue={totalStockCost || 783}
         totalPodsInStock={totalStockUnits || 12}
+        onGoalsUpdated={(newGoals) => setFinancialGoals(newGoals)}
       />
     </div>
   );

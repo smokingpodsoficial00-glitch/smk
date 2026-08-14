@@ -21,7 +21,9 @@ import {
   ExternalLink,
   Flame,
   Layers,
-  ChevronRight
+  ChevronRight,
+  Sliders,
+  CheckCircle2
 } from "lucide-react";
 
 interface ReplenishmentPlannerModalProps {
@@ -31,17 +33,18 @@ interface ReplenishmentPlannerModalProps {
   stockRetailValue?: number;
   stockCostValue?: number;
   totalPodsInStock?: number;
+  onGoalsUpdated?: (newGoals: FinancialGoals) => void;
 }
 
-interface FinancialGoals {
-  reorderCashGoal: number; // ex: 1000
-  paraguayScaleGoal: number; // ex: 5000
+export interface FinancialGoals {
+  reorderCashGoal: number; // ex: 1000, 2000, 5000
+  paraguayScaleGoal: number; // ex: 5000, 10000, 25000
   monthlyRevenueGoal: number; // ex: 8000
   quarterlyRevenueGoal: number; // ex: 25000
   annualRevenueGoal: number; // ex: 100000
 }
 
-const DEFAULT_GOALS: FinancialGoals = {
+export const DEFAULT_GOALS: FinancialGoals = {
   reorderCashGoal: 1000,
   paraguayScaleGoal: 5000,
   monthlyRevenueGoal: 8000,
@@ -49,7 +52,15 @@ const DEFAULT_GOALS: FinancialGoals = {
   annualRevenueGoal: 100000,
 };
 
-const LOCAL_STORAGE_GOALS_KEY = "smk_financial_goals_v1";
+export const LOCAL_STORAGE_GOALS_KEY = "smk_financial_goals_v1";
+
+export function loadSavedGoals(): FinancialGoals {
+  try {
+    const saved = localStorage.getItem(LOCAL_STORAGE_GOALS_KEY);
+    if (saved) return { ...DEFAULT_GOALS, ...JSON.parse(saved) };
+  } catch (e) {}
+  return DEFAULT_GOALS;
+}
 
 export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps> = ({
   isOpen,
@@ -58,21 +69,16 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
   stockRetailValue = 1042.89,
   stockCostValue = 783,
   totalPodsInStock = 12,
+  onGoalsUpdated,
 }) => {
   const [activeTab, setActiveTab] = useState<"goals" | "order" | "contingency">("goals");
 
   // Estado das Metas Editáveis
-  const [goals, setGoals] = useState<FinancialGoals>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_GOALS_KEY);
-      if (saved) return { ...DEFAULT_GOALS, ...JSON.parse(saved) };
-    } catch (e) {}
-    return DEFAULT_GOALS;
-  });
-
+  const [goals, setGoals] = useState<FinancialGoals>(loadSavedGoals);
   const [isEditingGoals, setIsEditingGoals] = useState(false);
   const [tempGoals, setTempGoals] = useState<FinancialGoals>(goals);
   const [copiedOrder, setCopiedOrder] = useState(false);
+  const [savedSuccessAlert, setSavedSuccessAlert] = useState(false);
 
   // Marca Nova Selecionada no Buffer
   const [selectedNewBrand, setSelectedNewBrand] = useState("Geek Bar Pulse 15K");
@@ -80,23 +86,27 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
 
   useEffect(() => {
     if (isOpen) {
-      try {
-        const saved = localStorage.getItem(LOCAL_STORAGE_GOALS_KEY);
-        if (saved) {
-          const parsed = { ...DEFAULT_GOALS, ...JSON.parse(saved) };
-          setGoals(parsed);
-          setTempGoals(parsed);
-        }
-      } catch (e) {}
+      const current = loadSavedGoals();
+      setGoals(current);
+      setTempGoals(current);
+      setIsEditingGoals(false);
+      setSavedSuccessAlert(false);
     }
   }, [isOpen]);
 
   const handleSaveGoals = () => {
     setGoals(tempGoals);
     setIsEditingGoals(false);
+    setSavedSuccessAlert(true);
+    setTimeout(() => setSavedSuccessAlert(false), 3000);
+
     try {
       localStorage.setItem(LOCAL_STORAGE_GOALS_KEY, JSON.stringify(tempGoals));
     } catch (e) {}
+
+    if (onGoalsUpdated) {
+      onGoalsUpdated(tempGoals);
+    }
   };
 
   const handleResetGoals = () => {
@@ -106,16 +116,23 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
     try {
       localStorage.removeItem(LOCAL_STORAGE_GOALS_KEY);
     } catch (e) {}
+
+    if (onGoalsUpdated) {
+      onGoalsUpdated(DEFAULT_GOALS);
+    }
   };
 
-  // Cálculos de Progresso
+  // Cálculos de Progresso em Tempo Real
+  const activeReorderGoal = isEditingGoals ? tempGoals.reorderCashGoal : goals.reorderCashGoal;
+  const activeParaguayGoal = isEditingGoals ? tempGoals.paraguayScaleGoal : goals.paraguayScaleGoal;
+
   const totalEquity = currentCash + stockRetailValue;
-  const cashNeededForReorder = Math.max(0, goals.reorderCashGoal - currentCash);
-  const reorderProgressPct = Math.min(100, Math.round((currentCash / goals.reorderCashGoal) * 100));
+  const cashNeededForReorder = Math.max(0, activeReorderGoal - currentCash);
+  const reorderProgressPct = activeReorderGoal > 0 ? Math.min(100, Math.round((currentCash / activeReorderGoal) * 100)) : 100;
 
   const averagePodPrice = totalPodsInStock > 0 ? stockRetailValue / totalPodsInStock : 86.9;
   const podsNeededToSell = averagePodPrice > 0 ? Math.ceil(cashNeededForReorder / averagePodPrice) : 0;
-  const paraguayProgressPct = Math.min(100, Math.round((totalEquity / goals.paraguayScaleGoal) * 100));
+  const paraguayProgressPct = activeParaguayGoal > 0 ? Math.min(100, Math.round((totalEquity / activeParaguayGoal) * 100)) : 100;
 
   // Itens da Ordem de Compra Fixa
   const fixedOrderItems = [
@@ -142,14 +159,13 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
   const supplierShippingFee = 50;
   const totalSpentWithShipping = totalOrderCostWithBuffer + supplierShippingFee;
   const projectedNetProfit = totalOrderSellWithBuffer - totalSpentWithShipping;
-  const projectedRoiPct = totalSpentWithShipping > 0 ? ((projectedNetProfit / totalSpentWithShipping) * 100).toFixed(1) : 0;
   const dilutedShippingPerPod = totalOrderUnits > 0 ? (supplierShippingFee / totalOrderUnits).toFixed(2) : "2.94";
 
   // Gerador de Texto para WhatsApp do Fornecedor
   const generatedWhatsAppMessage = useMemo(() => {
     return `📦 *PEDIDO DE REPOSIÇÃO — SMOKING PODS*
 📍 *Origem:* São Bernardo do Campo / SP
-💰 *Lote Fechado:* ~R$ 1.000,00
+💰 *Lote Fechado:* ~R$ ${goals.reorderCashGoal.toLocaleString("pt-BR")},00
 
 *LISTA DE MODELOS E QUANTIDADES:*
 ${fixedOrderItems.map(item => `• ${item.qty}x ${item.brand} ${item.model} (${item.flavors})`).join("\n")}
@@ -159,7 +175,7 @@ ${fixedOrderItems.map(item => `• ${item.qty}x ${item.brand} ${item.model} (${i
 *Frete Estimado:* R$ 50,00 (Diluído: R$ ${dilutedShippingPerPod}/pod)
 
 Por favor, me confirme a disponibilidade destes sabores e a chave Pix para faturarmos o pedido! 🚀`;
-  }, [fixedOrderItems, selectedNewBrand, totalOrderUnits, dilutedShippingPerPod]);
+  }, [fixedOrderItems, selectedNewBrand, totalOrderUnits, dilutedShippingPerPod, goals.reorderCashGoal]);
 
   const handleCopyOrderText = () => {
     try {
@@ -189,11 +205,11 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                   Planejador de Estoque & Metas de Escala
                 </h3>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-extrabold uppercase tracking-wider">
-                  Remessa #2 SP
+                  Lote Ativo: R$ {goals.reorderCashGoal.toLocaleString("pt-BR")}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Gatilhos automáticos de compra, diluição de frete e metas dinâmicas de patrimônio
+                Gatilhos automáticos 100% editáveis, diluição de frete e metas dinâmicas de patrimônio
               </p>
             </div>
           </div>
@@ -207,52 +223,103 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
           </button>
         </div>
 
-        {/* ─── NAVEGAÇÃO DE ABAS ─── */}
-        <div className="flex border-b border-white/10 px-4 sm:px-6 bg-black/30">
-          <button
-            type="button"
-            onClick={() => setActiveTab("goals")}
-            className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-              activeTab === "goals"
-                ? "border-emerald-400 text-emerald-400 bg-emerald-500/5"
-                : "border-transparent text-muted-foreground hover:text-white hover:bg-white/5"
-            }`}
-          >
-            <Target className="size-3.5" />
-            <span>🎯 Metas & Termômetro de Caixa</span>
-          </button>
+        {/* ─── NAVEGAÇÃO DE ABAS + BOTÃO GLOBAL DE EDITAR ─── */}
+        <div className="flex flex-wrap items-center justify-between border-b border-white/10 px-4 sm:px-6 bg-black/30 gap-2">
+          <div className="flex">
+            <button
+              type="button"
+              onClick={() => setActiveTab("goals")}
+              className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                activeTab === "goals"
+                  ? "border-emerald-400 text-emerald-400 bg-emerald-500/5"
+                  : "border-transparent text-muted-foreground hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <Target className="size-3.5" />
+              <span>🎯 Metas & Termômetro de Caixa</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("order")}
-            className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-              activeTab === "order"
-                ? "border-amber-400 text-amber-400 bg-amber-500/5"
-                : "border-transparent text-muted-foreground hover:text-white hover:bg-white/5"
-            }`}
-          >
-            <ShoppingCart className="size-3.5" />
-            <span>📦 Pedido Ativo & WhatsApp</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("order")}
+              className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                activeTab === "order"
+                  ? "border-amber-400 text-amber-400 bg-amber-500/5"
+                  : "border-transparent text-muted-foreground hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <ShoppingCart className="size-3.5" />
+              <span>📦 Pedido Ativo & WhatsApp</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("contingency")}
-            className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-              activeTab === "contingency"
-                ? "border-cyan-400 text-cyan-400 bg-cyan-500/5"
-                : "border-transparent text-muted-foreground hover:text-white hover:bg-white/5"
-            }`}
-          >
-            <ShieldCheck className="size-3.5" />
-            <span>🔄 Matriz de Substitutos</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("contingency")}
+              className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                activeTab === "contingency"
+                  ? "border-cyan-400 text-cyan-400 bg-cyan-500/5"
+                  : "border-transparent text-muted-foreground hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <ShieldCheck className="size-3.5" />
+              <span>🔄 Matriz de Substitutos</span>
+            </button>
+          </div>
+
+          {/* Botões de Ação de Metas no Topo */}
+          {activeTab === "goals" && (
+            <div className="py-2 flex items-center gap-2">
+              {savedSuccessAlert && (
+                <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20 animate-in fade-in">
+                  <CheckCircle2 className="size-3.5" /> Metas salvas!
+                </span>
+              )}
+              {!isEditingGoals ? (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingGoals(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black text-xs font-extrabold shadow-[0_0_15px_rgba(245,158,11,0.25)] transition-all cursor-pointer active:scale-95"
+                >
+                  <Edit3 className="size-3.5 text-black" />
+                  <span>Editar Todos os Gatilhos & Metas</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleResetGoals}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold border border-red-500/20 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="size-3" />
+                    <span>Padrão</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingGoals(false)}
+                    className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveGoals}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold transition-all shadow-[0_0_15px_rgba(16,185,129,0.35)] cursor-pointer active:scale-95"
+                  >
+                    <Save className="size-3.5 text-black" />
+                    <span>Salvar Alterações</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ─── CONTEÚDO PRINCIPAL (SCROLLÁVEL) ─── */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar">
 
-          {/* ABA 1: METAS & TERMÔMETRO DE CAIXA */}
+          {/* ════════════════════════════════════════════════════════════
+              ABA 1: METAS & TERMÔMETRO DE CAIXA
+          ════════════════════════════════════════════════════════════ */}
           {activeTab === "goals" && (
             <div className="space-y-6">
 
@@ -291,24 +358,49 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                 </div>
               </div>
 
-              {/* GATILHO #1: META DO LOTE DE R$ 1.000 (IMEDIATO) */}
+              {/* 🎯 GATILHO #1: META DO LOTE DE COMPRA (100% EDITÁVEL) */}
               <div className="bg-card border border-emerald-500/30 rounded-2xl p-5 space-y-4 bg-gradient-to-b from-emerald-950/20 to-transparent shadow-[0_0_20px_rgba(16,185,129,0.05)]">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="size-8 rounded-lg bg-emerald-500/20 text-emerald-400 grid place-items-center">
+                    <div className="size-8 rounded-lg bg-emerald-500/20 text-emerald-400 grid place-items-center shrink-0">
                       <Zap className="size-4" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-white">
-                        Gatilho de Recompra: Lote Mínimo de R$ {goals.reorderCashGoal.toLocaleString("pt-BR")}
-                      </h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-white">
+                          Gatilho de Recompra: Lote Mínimo de R$ {activeReorderGoal.toLocaleString("pt-BR")}
+                        </h4>
+                        {!isEditingGoals && (
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingGoals(true)}
+                            className="text-[10px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-0.5 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 cursor-pointer"
+                            title="Editar valor deste gatilho"
+                          >
+                            <Edit3 className="size-3" />
+                            <span>Ajustar Gatilho</span>
+                          </button>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        Diluição de frete de SP para R$ 2,94/pod — Máxima margem líquida
+                        Diluição de frete de SP para ~R$ 2,94/pod — Protege a margem e cresce junto com o caixa
                       </p>
                     </div>
                   </div>
 
-                  <div className="text-right">
+                  <div className="text-right flex items-center gap-3 self-end sm:self-center">
+                    {isEditingGoals && (
+                      <div className="flex items-center gap-1.5 bg-black/60 border border-emerald-400/50 rounded-xl px-2.5 py-1">
+                        <span className="text-xs font-bold text-emerald-400">R$</span>
+                        <input
+                          type="number"
+                          value={tempGoals.reorderCashGoal}
+                          onChange={(e) => setTempGoals({ ...tempGoals, reorderCashGoal: Number(e.target.value) || 0 })}
+                          className="w-24 bg-transparent text-sm font-extrabold text-white focus:outline-none"
+                          placeholder="1000"
+                        />
+                      </div>
+                    )}
                     <span className="text-xs font-bold text-emerald-400">
                       {reorderProgressPct}% Concluído
                     </span>
@@ -325,19 +417,19 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                     <span>R$ {currentCash.toFixed(2)} acumulados</span>
-                    <span className="font-semibold text-white">Meta: R$ {goals.reorderCashGoal.toFixed(2)}</span>
+                    <span className="font-semibold text-white">Meta do Lote: R$ {activeReorderGoal.toFixed(2)}</span>
                   </div>
                 </div>
 
                 {/* Diagnóstico de Vendas Restantes */}
-                <div className="bg-black/30 border border-white/5 rounded-xl p-3.5 flex items-center justify-between">
+                <div className="bg-black/30 border border-white/5 rounded-xl p-3.5 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <Flame className="size-4 text-amber-400 shrink-0" />
                     <span className="text-xs text-silver">
                       {cashNeededForReorder > 0 ? (
                         <>Faltam apenas <strong className="text-emerald-400">R$ {cashNeededForReorder.toFixed(2)}</strong> em vendas (<strong className="text-amber-300">~{podsNeededToSell} pods</strong> vendidos) para acionar a compra!</>
                       ) : (
-                        <strong className="text-emerald-400">🎉 META ALCANÇADA! O caixa já tem saldo suficiente para o lote de R$ 1.000!</strong>
+                        <strong className="text-emerald-400">🎉 META ALCANÇADA! O caixa já tem saldo suficiente para o lote de R$ {activeReorderGoal.toLocaleString("pt-BR")}!</strong>
                       )}
                     </span>
                   </div>
@@ -353,24 +445,49 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                 </div>
               </div>
 
-              {/* GATILHO #2: TRANSIÇÃO PARA O PARAGUAI */}
+              {/* 🎯 GATILHO #2: TRANSIÇÃO DE ESCALA / PARAGUAI (100% EDITÁVEL) */}
               <div className="bg-card border border-white/10 rounded-2xl p-5 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="size-8 rounded-lg bg-cyan-500/20 text-cyan-400 grid place-items-center">
+                    <div className="size-8 rounded-lg bg-cyan-500/20 text-cyan-400 grid place-items-center shrink-0">
                       <Target className="size-4" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-white">
-                        Meta de Transição: Compras no Paraguai / Foz (R$ {goals.paraguayScaleGoal.toLocaleString("pt-BR")})
-                      </h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-white">
+                          Meta de Transição / Escala: R$ {activeParaguayGoal.toLocaleString("pt-BR")}
+                        </h4>
+                        {!isEditingGoals && (
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingGoals(true)}
+                            className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-0.5 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20 cursor-pointer"
+                            title="Editar valor desta meta de escala"
+                          >
+                            <Edit3 className="size-3" />
+                            <span>Ajustar Escala</span>
+                          </button>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        Destrava freteiro dedicado e aumenta a margem em +30% a +40% por unidade
+                        Destrava compras diretas no Paraguai / Foz (+30% a +40% de margem líquida com freteiro)
                       </p>
                     </div>
                   </div>
 
-                  <div className="text-right">
+                  <div className="text-right flex items-center gap-3 self-end sm:self-center">
+                    {isEditingGoals && (
+                      <div className="flex items-center gap-1.5 bg-black/60 border border-cyan-400/50 rounded-xl px-2.5 py-1">
+                        <span className="text-xs font-bold text-cyan-400">R$</span>
+                        <input
+                          type="number"
+                          value={tempGoals.paraguayScaleGoal}
+                          onChange={(e) => setTempGoals({ ...tempGoals, paraguayScaleGoal: Number(e.target.value) || 0 })}
+                          className="w-24 bg-transparent text-sm font-extrabold text-white focus:outline-none"
+                          placeholder="5000"
+                        />
+                      </div>
+                    )}
                     <span className="text-xs font-bold text-cyan-400">
                       {paraguayProgressPct}% Concluído (Patrimônio R$ {totalEquity.toFixed(0)})
                     </span>
@@ -385,91 +502,75 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                 </div>
               </div>
 
-              {/* PAINEL DE METAS PERIÓDICAS EDITÁVEIS */}
+              {/* 🎯 PAINEL DE METAS PERIÓDICAS (MENSAL, TRIMESTRAL, ANUAL) — 100% EDITÁVEIS */}
               <div className="bg-card border border-white/10 rounded-2xl p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="size-4 text-amber-400" />
                     <h4 className="text-xs uppercase font-bold text-silver tracking-wider">
-                      Metas Estratégicas Periódicas (Editáveis)
+                      Metas Estratégicas Periódicas (Faturamento & Patrimônio)
                     </h4>
                   </div>
-
-                  {!isEditingGoals ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingGoals(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs font-bold border border-white/10 transition-colors cursor-pointer"
-                    >
-                      <Edit3 className="size-3.5 text-amber-400" />
-                      <span>Editar Metas</span>
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleResetGoals}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold border border-red-500/20 transition-colors cursor-pointer"
-                      >
-                        <RotateCcw className="size-3" />
-                        <span>Restaurar</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSaveGoals}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer"
-                      >
-                        <Save className="size-3.5" />
-                        <span>Salvar</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="border border-white/10 rounded-xl p-3.5 bg-black/20 space-y-1">
+                  {/* Meta Mensal */}
+                  <div className="border border-white/10 rounded-xl p-3.5 bg-black/20 space-y-1.5">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground">Meta Mensal (Faturamento)</span>
                     {isEditingGoals ? (
-                      <input
-                        type="number"
-                        value={tempGoals.monthlyRevenueGoal}
-                        onChange={(e) => setTempGoals({ ...tempGoals, monthlyRevenueGoal: Number(e.target.value) || 0 })}
-                        className="w-full bg-black/50 border border-amber-400/50 rounded-lg px-2 py-1 text-sm font-bold text-amber-300 focus:outline-none"
-                      />
+                      <div className="flex items-center gap-1 bg-black/50 border border-amber-400/50 rounded-lg px-2 py-1">
+                        <span className="text-xs font-bold text-amber-400">R$</span>
+                        <input
+                          type="number"
+                          value={tempGoals.monthlyRevenueGoal}
+                          onChange={(e) => setTempGoals({ ...tempGoals, monthlyRevenueGoal: Number(e.target.value) || 0 })}
+                          className="w-full bg-transparent text-sm font-bold text-amber-300 focus:outline-none"
+                        />
+                      </div>
                     ) : (
                       <div className="text-lg font-bold text-white">
                         R$ {goals.monthlyRevenueGoal.toLocaleString("pt-BR")}
                       </div>
                     )}
-                    <span className="text-[10px] text-muted-foreground block">~{Math.round(goals.monthlyRevenueGoal / 85)} pods/mês</span>
+                    <span className="text-[10px] text-muted-foreground block">
+                      ~{Math.round((isEditingGoals ? tempGoals.monthlyRevenueGoal : goals.monthlyRevenueGoal) / 85)} pods/mês
+                    </span>
                   </div>
 
-                  <div className="border border-white/10 rounded-xl p-3.5 bg-black/20 space-y-1">
+                  {/* Meta Trimestral */}
+                  <div className="border border-white/10 rounded-xl p-3.5 bg-black/20 space-y-1.5">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground">Meta Trimestral (Q1..Q4)</span>
                     {isEditingGoals ? (
-                      <input
-                        type="number"
-                        value={tempGoals.quarterlyRevenueGoal}
-                        onChange={(e) => setTempGoals({ ...tempGoals, quarterlyRevenueGoal: Number(e.target.value) || 0 })}
-                        className="w-full bg-black/50 border border-amber-400/50 rounded-lg px-2 py-1 text-sm font-bold text-amber-300 focus:outline-none"
-                      />
+                      <div className="flex items-center gap-1 bg-black/50 border border-amber-400/50 rounded-lg px-2 py-1">
+                        <span className="text-xs font-bold text-amber-400">R$</span>
+                        <input
+                          type="number"
+                          value={tempGoals.quarterlyRevenueGoal}
+                          onChange={(e) => setTempGoals({ ...tempGoals, quarterlyRevenueGoal: Number(e.target.value) || 0 })}
+                          className="w-full bg-transparent text-sm font-bold text-amber-300 focus:outline-none"
+                        />
+                      </div>
                     ) : (
                       <div className="text-lg font-bold text-white">
                         R$ {goals.quarterlyRevenueGoal.toLocaleString("pt-BR")}
                       </div>
                     )}
-                    <span className="text-[10px] text-muted-foreground block">Escala de capital</span>
+                    <span className="text-[10px] text-muted-foreground block">Escala contínua</span>
                   </div>
 
-                  <div className="border border-white/10 rounded-xl p-3.5 bg-black/20 space-y-1">
+                  {/* Meta Anual */}
+                  <div className="border border-white/10 rounded-xl p-3.5 bg-black/20 space-y-1.5">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground">Meta Anual (Consolidação)</span>
                     {isEditingGoals ? (
-                      <input
-                        type="number"
-                        value={tempGoals.annualRevenueGoal}
-                        onChange={(e) => setTempGoals({ ...tempGoals, annualRevenueGoal: Number(e.target.value) || 0 })}
-                        className="w-full bg-black/50 border border-amber-400/50 rounded-lg px-2 py-1 text-sm font-bold text-amber-300 focus:outline-none"
-                      />
+                      <div className="flex items-center gap-1 bg-black/50 border border-emerald-400/50 rounded-lg px-2 py-1">
+                        <span className="text-xs font-bold text-emerald-400">R$</span>
+                        <input
+                          type="number"
+                          value={tempGoals.annualRevenueGoal}
+                          onChange={(e) => setTempGoals({ ...tempGoals, annualRevenueGoal: Number(e.target.value) || 0 })}
+                          className="w-full bg-transparent text-sm font-bold text-emerald-300 focus:outline-none"
+                        />
+                      </div>
                     ) : (
                       <div className="text-lg font-bold text-emerald-400">
                         R$ {goals.annualRevenueGoal.toLocaleString("pt-BR")}
@@ -483,7 +584,9 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
             </div>
           )}
 
-          {/* ABA 2: PEDIDO ATIVO & WHATSAPP */}
+          {/* ════════════════════════════════════════════════════════════
+              ABA 2: PEDIDO ATIVO & WHATSAPP
+          ════════════════════════════════════════════════════════════ */}
           {activeTab === "order" && (
             <div className="space-y-6">
               
@@ -624,7 +727,9 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
             </div>
           )}
 
-          {/* ABA 3: MATRIZ DE SUBSTITUTOS DE FORNECEDOR */}
+          {/* ════════════════════════════════════════════════════════════
+              ABA 3: MATRIZ DE SUBSTITUTOS DE FORNECEDOR
+          ════════════════════════════════════════════════════════════ */}
           {activeTab === "contingency" && (
             <div className="space-y-4">
               <div className="bg-card border border-white/10 rounded-2xl p-5 space-y-4">
