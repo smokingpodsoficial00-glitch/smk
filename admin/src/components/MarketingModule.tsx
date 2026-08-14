@@ -1131,51 +1131,51 @@ export function MarketingModule() {
                 {campaignFormTargetType === 'group' && (
                   <div className="p-3.5 bg-[#050505] border border-white/10 rounded-xl space-y-2">
                     <span className="text-xs font-bold text-white block">Selecione o Grupo do WhatsApp:</span>
-                    {whatsAppGroups.length === 0 ? (
-                      <div className="text-center py-3 space-y-2">
-                        <p className="text-xs text-white/50">Nenhum grupo sincronizado no momento.</p>
-                        <div className="flex justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={async (e) => {
-                              e.preventDefault();
-                              await syncWhatsAppContactsAndGroups();
-                            }}
-                            disabled={loadingSync}
-                            className="px-3.5 py-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 mx-auto"
-                          >
-                            <RefreshCw className={`size-3.5 ${loadingSync ? 'animate-spin' : ''}`} />
-                            <span>{loadingSync ? 'Buscando grupos...' : 'Sincronizar Grupos do Chip'}</span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
+                    <div className="space-y-3">
+                      {whatsAppGroups.length > 0 ? (
                         <select
                           value={campaignFormTargetGroup}
                           onChange={(e) => setCampaignFormTargetGroup(e.target.value)}
                           className="w-full bg-black border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500/50 font-sans"
                         >
-                          <option value="">-- Selecione o grupo de destino --</option>
+                          <option value="">-- Selecione o grupo sincronizado --</option>
                           {whatsAppGroups.map(g => (
                             <option key={g.id} value={g.id}>
                               {g.name} {g.participantsCount > 0 ? `(${g.participantsCount} membros)` : ''}
                             </option>
                           ))}
                         </select>
-                        <div className="flex justify-end">
+                      ) : (
+                        <div className="text-center py-2 bg-white/5 rounded-xl border border-white/5 p-3 space-y-2">
+                          <p className="text-xs text-white/50">Nenhum grupo listado automaticamente.</p>
                           <button
                             type="button"
                             onClick={syncWhatsAppContactsAndGroups}
                             disabled={loadingSync}
-                            className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 font-semibold cursor-pointer"
+                            className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                           >
-                            <RefreshCw className={`size-3 ${loadingSync ? 'animate-spin' : ''}`} />
-                            <span>Atualizar lista de grupos</span>
+                            <RefreshCw className={`size-3.5 ${loadingSync ? 'animate-spin' : ''}`} />
+                            <span>{loadingSync ? 'Buscando no WhatsApp...' : 'Tentar Sincronizar Grupos Novamente'}</span>
                           </button>
                         </div>
+                      )}
+
+                      <div className="pt-2 border-t border-white/10 space-y-1">
+                        <label className="text-[11px] text-white/60 font-semibold block">
+                          Ou digite o Link de Convite / Nome / ID do Grupo VIP:
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: https://chat.whatsapp.com/Bk2rFAAgHlvKgc8pQANqYg ou 120363...@g.us"
+                          value={campaignFormTargetGroup}
+                          onChange={(e) => setCampaignFormTargetGroup(e.target.value)}
+                          className="w-full bg-black border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500/50"
+                        />
+                        <p className="text-[10px] text-white/40">
+                          Se o grupo não aparecer na lista suspensa, basta colar o link de convite ou ID acima!
+                        </p>
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
               </div>

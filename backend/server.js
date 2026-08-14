@@ -1345,85 +1345,69 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
 
         console.log('🔄 [Marketing] Buscando contatos e grupos reais da agenda do WhatsApp...');
         
-        // 1. Puxa contatos e grupos direto do motor do WhatsApp Web com fallback de alta resiliência
-        let contacts = [];
-        let groups = [];
-
+        // 1. Puxa todos os contatos salvos no chip
+        let rawContacts = [];
         try {
-            const data = await client.pupPage.evaluate(() => {
-                const results = { contacts: [], groups: [] };
-                try {
-                    const store = window.Store;
-                    if (store && store.Contact) {
-                        const allC = store.Contact.getModelsArray();
-                        allC.forEach(c => {
-                            if (!c || !c.id || !c.id.user || c.isGroup || c.isEnterprise) return;
-                            const name = c.name || c.formattedTitle || c.pushname || '';
-                            // Apenas contatos com nome salvo ou marcados como contato
-                            if (c.name || c.isMyContact || (name && !name.startsWith('+') && !name.match(/^\d+$/))) {
-                                results.contacts.push({
-                                    id: c.id._serialized || `${c.id.user}@c.us`,
-                                    phone: c.id.user,
-                                    name: c.name || c.formattedTitle || c.pushname || `Contato ${c.id.user.slice(-4)}`,
-                                    isSaved: !!c.name
-                                });
-                            }
-                        });
-                    }
+            rawContacts = await client.getContacts();
+        } catch (e) {
+            console.warn('Aviso ao buscar contatos:', e.message);
+        }
 
-                    if (store && store.Chat) {
-                        const allChats = store.Chat.getModelsArray();
-                        allChats.forEach(chat => {
-                            if (chat && chat.isGroup) {
-                                results.groups.push({
-                                    id: chat.id._serialized,
-                                    name: chat.name || chat.formattedTitle || 'Grupo WhatsApp',
-                                    unreadCount: chat.unreadCount || 0,
-                                    participantsCount: (chat.groupMetadata && chat.groupMetadata.participants) ? chat.groupMetadata.participants.length : 0
-                                });
-                            }
-                        });
-                    }
-                } catch (evalErr) {
-                    console.error('Erro no evaluate interno:', evalErr);
-                }
-                return results;
-            });
+        const seenPhones = new Set();
+        const contacts = rawContacts
+            .filter(c => {
+                if (!c || !c.id || !c.id.user || c.isGroup || c.isEnterprise) return false;
+                if (!c.name && !c.isMyContact) return false;
+                if (c.id.user.length < 8) return false;
+                const phone = c.id.user;
+                if (seenPhones.has(phone)) return false;
+                seenPhones.add(phone);
+                return true;
+            })
+            .map(c => {
+                const phone = c.id.user || '';
+                const name = c.name || c.pushname || c.shortName || `Contato ${phone.slice(-4)}`;
+                return {
+                    id: c.id._serialized || `${phone}@c.us`,
+                    phone,
+                    name,
+                    isSaved: !!c.name,
+                };
+            })
+            .sort((a, b) => a.name.localeCompare(b.name));
 
-            if (data && Array.isArray(data.contacts) && data.contacts.length > 0) {
-                // Deduplica contatos por número
-                const seen = new Set();
-                contacts = data.contacts.filter(c => {
-                    if (!c.phone || c.phone.length < 8 || seen.has(c.phone)) return false;
-                    seen.add(c.phone);
-                    return true;
-                }).sort((a, b) => a.name.localeCompare(b.name));
-            }
-
-            if (data && Array.isArray(data.groups)) {
-                groups = data.groups.sort((a, b) => a.name.localeCompare(b.name));
-            }
-        } catch (pupErr) {
-            console.warn('⚠️ [Marketing] Extração direta falhou, usando API padrão...', pupErr.message);
+        // 2. Puxa grupos varrendo chats abertos no WhatsApp
+        let groups = [];
+        try {
+            const rawChats = await client.getChats();
+            groups = rawChats
+                .filter(chat => chat && (chat.isGroup || (chat.id && chat.id._serialized && chat.id._serialized.endsWith('@g.us'))))
+                .map(g => ({
+                    id: g.id._serialized,
+                    name: g.name || 'Grupo VIP WhatsApp',
+                    unreadCount: g.unreadCount || 0,
+                    participantsCount: (g.groupMetadata && g.groupMetadata.participants) ? g.groupMetadata.participants.length : 0
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+        } catch (chatErr) {
+            console.warn('⚠️ [Marketing] getChats falhou, tentando varredura direta...', chatErr.message);
             try {
-                const rawContacts = await client.getContacts();
-                const seenPhones = new Set();
-                contacts = rawContacts
-                    .filter(c => c && c.id && c.id.user && !c.isGroup && !c.isEnterprise && (c.name || c.isMyContact))
-                    .map(c => ({
-                        id: c.id._serialized || `${c.id.user}@c.us`,
-                        phone: c.id.user,
-                        name: c.name || c.pushname || `Contato ${c.id.user.slice(-4)}`,
-                        isSaved: !!c.name,
-                    }))
-                    .filter(c => {
-                        if (seenPhones.has(c.phone)) return false;
-                        seenPhones.add(c.phone);
-                        return true;
-                    })
-                    .sort((a, b) => a.name.localeCompare(b.name));
+                const directGroups = await client.pupPage.evaluate(() => {
+                    if (!window.Store || !window.Store.Chat) return [];
+                    return window.Store.Chat.models
+                        .filter(m => m.isGroup || (m.id && m.id._serialized && m.id._serialized.includes('@g.us')))
+                        .map(m => ({
+                            id: m.id._serialized,
+                            name: m.name || m.formattedTitle || 'Grupo WhatsApp',
+                            unreadCount: 0,
+                            participantsCount: 0
+                        }));
+                });
+                if (Array.isArray(directGroups)) {
+                    groups = directGroups;
+                }
             } catch (e) {
-                console.warn('Aviso getContacts fallback:', e.message);
+                console.warn('⚠️ Fallback grupos:', e.message);
             }
         }
 
@@ -1457,9 +1441,23 @@ app.post('/api/marketing/send-direct', async (req, res) => {
             return res.status(503).json({ error: 'WhatsApp não está conectado no momento.' });
         }
 
-        const rawPhone = String(phone).replace(/\D/g, '');
-        const cleanPhone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
-        const formattedNumber = `${cleanPhone}@c.us`;
+        let formattedNumber = '';
+        if (String(phone).includes('chat.whatsapp.com/')) {
+            try {
+                const inviteCode = String(phone).split('chat.whatsapp.com/')[1].trim().split('?')[0];
+                const groupChat = await client.acceptInvite(inviteCode);
+                formattedNumber = groupChat || `${inviteCode}@g.us`;
+            } catch (invErr) {
+                console.warn('⚠️ Não foi possível resolver convite de grupo:', invErr.message);
+                formattedNumber = phone;
+            }
+        } else if (String(phone).includes('@g.us') || String(phone).includes('@c.us')) {
+            formattedNumber = String(phone);
+        } else {
+            const rawPhone = String(phone).replace(/\D/g, '');
+            const cleanPhone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
+            formattedNumber = `${cleanPhone}@c.us`;
+        }
 
         console.log(`📢 [Marketing] Enviando mensagem personalizada para ${formattedNumber} (${name || 'Cliente'})...`);
 
