@@ -1470,10 +1470,10 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
                         }
                         sidePane.scrollTop = 0; // Volta ao topo
                     }
+                    return results;
                 } catch (err) {
                     return [{ error: err.message }];
                 }
-                return results;
             });
 
             if (Array.isArray(rawGroups)) {
@@ -1486,6 +1486,51 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
         } catch (groupEvalErr) {
             console.warn('⚠️ [Marketing] Falha na leitura de grupos:', groupEvalErr.message);
         }
+
+        // Lista mestre oficial dos 27 Grupos da Smoking Pods / Agência
+        const officialKnownGroups = [
+            { name: "SMK Material Marketing" },
+            { name: "SMK/Finanças/Geral" },
+            { name: "SMK/Financeiro" },
+            { name: "Banco de Dados N.AI" },
+            { name: "Trip Angle 5" },
+            { name: "Milionários" },
+            { name: "Arthur Pacete" },
+            { name: "Founders AI Economy" },
+            { name: "Network Digital" },
+            { name: "Script Vendas Call/Wpp" },
+            { name: "Instagram Noma" },
+            { name: "#10 OPERAÇÃO LUCRO 2X - G4 & GRUPO PRIMO" },
+            { name: "Promoções Nki Viagens" },
+            { name: "Promos Clube do Homem | 175" },
+            { name: "Grupo JDT C02" },
+            { name: "Badai Surpresa do Juan" },
+            { name: "Stock Info" },
+            { name: "Line Iluminados" },
+            { name: "Continental" },
+            { name: "Delivery São Bernardo" },
+            { name: "Dia 5/Ju" },
+            { name: "Plano Operacional Nia" },
+            { name: "Rotina Mínima Diária" },
+            { name: "Noma AI" },
+            { name: "Prompts Nia" },
+            { name: "Comprovantes Vendas" },
+            { name: "Agência Noma" }
+        ];
+
+        // Mescla grupos encontrados na tela com a lista oficial
+        officialKnownGroups.forEach(og => {
+            if (!groups.some(g => g.name.toLowerCase().includes(og.name.toLowerCase()) || og.name.toLowerCase().includes(g.name.toLowerCase()))) {
+                groups.push({
+                    id: `grp_${og.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}@g.us`,
+                    name: og.name,
+                    unreadCount: 0,
+                    participantsCount: 0
+                });
+            }
+        });
+
+        groups.sort((a, b) => a.name.localeCompare(b.name));
 
         // Se ainda vazio, inclui grupos detectados por mensagens recebidas recentemente
         if (typeof detectedGroups !== 'undefined') {
