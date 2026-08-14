@@ -21,6 +21,9 @@ import {
   ArrowUpRight,
   ReceiptText,
   FileSpreadsheet,
+  Target,
+  Percent,
+  BarChart3,
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { supabase } from "@/lib/supabase";
@@ -298,9 +301,16 @@ export function FinanceDashboard() {
   const numericMarketingSpent = parseFloat(String(marketingSpent || "0").replace(",", ".")) || 0;
   const netCashAvailable = Math.max(0, (grossRevenue || 0) - (logisticsFee || 0) - numericMarketingSpent);
   const realNetProfitPostMarketing = (netProfit || 0) - numericMarketingSpent;
+  
   // Patrimônio Real Total da Loja = Caixa em Conta + Valor de Venda do Estoque (Custo dos Pods + Lucro Potencial)
   const totalCompanyEquity = (grossRevenue || 0) + (stockAssetRetail || 0);
   const stockAssetProfit = (stockAssetRetail || 0) - (stockAssetCost || 0);
+
+  // Métricas de Eficiência Comercial & Ticket Médio
+  const averageTicket = totalOrders > 0 ? grossRevenue / totalOrders : 0;
+  const averageNetProfitPerOrder = totalOrders > 0 ? realNetProfitPostMarketing / totalOrders : 0;
+  const averageNetMarginPercent = grossRevenue > 0 ? (realNetProfitPostMarketing / grossRevenue) * 100 : 0;
+  const averagePricePerPod = totalPodsSold > 0 ? grossRevenue / totalPodsSold : 0;
 
   if (loading) {
     return (
@@ -440,6 +450,92 @@ export function FinanceDashboard() {
 
           <div className="pt-2 border-t border-emerald-500/20 text-[10px] text-emerald-300/80 font-medium">
             Fat (R$ {(grossRevenue || 0).toFixed(2)}) - CMV (R$ {(cmv || 0).toFixed(2)}) - Frete (R$ {(logisticsFee || 0).toFixed(2)})
+          </div>
+        </div>
+      </div>
+
+      {/* ━━━ BLOCO DEDICADO: 🎯 EFICIÊNCIA COMERCIAL, TICKET MÉDIO & MARGENS MÉDIAS ━━━━━━━━━━━━━━ */}
+      <div className="bg-[#121316] border border-cyan-500/30 rounded-3xl p-5 sm:p-6 space-y-5 shadow-2xl bg-gradient-to-r from-cyan-500/5 via-transparent to-emerald-500/5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Target className="size-5 text-cyan-400" />
+              <span>Eficiência Comercial, Ticket Médio & Margens Médias por Venda</span>
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Análise dinâmica de valor médio por carrinho, lucro limpo gerado por pedido e margem média líquida real.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-cyan-400 bg-cyan-500/20 px-3 py-1 rounded-xl border border-cyan-500/30">
+              ⚡ Métricas por Pedido
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: Ticket Médio por Pedido */}
+          <div className="bg-white/5 border border-cyan-500/30 rounded-2xl p-5 space-y-2 hover:border-cyan-500/50 transition-all">
+            <span className="text-[11px] text-cyan-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <ReceiptText className="size-4 text-cyan-400" /> Ticket Médio por Pedido
+            </span>
+            <div className="text-2xl sm:text-3xl font-extrabold text-cyan-300">
+              {formatBRL(averageTicket)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Valor médio gasto por cliente a cada compra realizada.
+            </p>
+            <div className="pt-2 border-t border-white/10 text-[10px] text-cyan-400/80 font-medium">
+              Faturamento Bruto ({formatBRL(grossRevenue)}) ÷ {totalOrders} pedidos
+            </div>
+          </div>
+
+          {/* Card 2: Margem Média Líquida (%) */}
+          <div className="bg-white/5 border border-emerald-500/30 rounded-2xl p-5 space-y-2 hover:border-emerald-500/50 transition-all">
+            <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <Percent className="size-4 text-emerald-400" /> Margem Média Líquida
+            </span>
+            <div className="text-2xl sm:text-3xl font-extrabold text-emerald-400">
+              {averageNetMarginPercent.toFixed(1)}%
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Porcentagem líquida que sobra limpa no bolso de cada venda.
+            </p>
+            <div className="pt-2 border-t border-white/10 text-[10px] text-emerald-400/80 font-medium">
+              Lucro Líquido Real ÷ Faturamento Bruto
+            </div>
+          </div>
+
+          {/* Card 3: Lucro Médio Líquido por Pedido */}
+          <div className="bg-white/5 border border-emerald-500/30 rounded-2xl p-5 space-y-2 hover:border-emerald-500/50 transition-all">
+            <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="size-4 text-emerald-400" /> Lucro Líquido por Pedido
+            </span>
+            <div className="text-2xl sm:text-3xl font-extrabold text-emerald-300">
+              {formatBRL(averageNetProfitPerOrder)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Ganho líquido médio embolsado a cada checkout finalizado.
+            </p>
+            <div className="pt-2 border-t border-white/10 text-[10px] text-emerald-400/80 font-medium">
+              Lucro Líquido ({formatBRL(realNetProfitPostMarketing)}) ÷ {totalOrders} pedidos
+            </div>
+          </div>
+
+          {/* Card 4: Ticket Médio por Pod Vendido */}
+          <div className="bg-white/5 border border-amber-500/30 rounded-2xl p-5 space-y-2 hover:border-amber-500/50 transition-all">
+            <span className="text-[11px] text-amber-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <Box className="size-4 text-amber-400" /> Preço Médio por Pod
+            </span>
+            <div className="text-2xl sm:text-3xl font-extrabold text-amber-300">
+              {formatBRL(averagePricePerPod)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Preço médio de venda praticado por unidade entregue.
+            </p>
+            <div className="pt-2 border-t border-white/10 text-[10px] text-amber-300/80 font-medium">
+              Faturamento ({formatBRL(grossRevenue)}) ÷ {totalPodsSold} pods
+            </div>
           </div>
         </div>
       </div>
