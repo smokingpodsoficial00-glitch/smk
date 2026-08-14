@@ -240,43 +240,49 @@ function isSpamMessage(text) {
 }
 
 // =============================================
-// SEND SEQUENTIAL MESSAGES (with fixed timing per script)
+// SEND SEQUENTIAL MESSAGES (Humanized Realistic Typing Simulation)
 // =============================================
-// Timing rules:
-//   - First message of first conversation: 20000ms delay before typing
-//   - Subsequent messages after first response: 4000ms delay before typing
-//   - Typing indicator: always 5000ms
-//   - Between consecutive messages: 4000ms (includes the typing time)
 async function sendSequentialMessages(chat, msg, messagesArray, chatId, isFirstMessage) {
     try {
+        // Garante que o objeto Chat esteja disponível para mostrar "digitando..."
+        let activeChat = chat;
+        if (!activeChat && client && msg && msg.from) {
+            try {
+                activeChat = await client.getChatById(msg.from);
+            } catch (e) {}
+        }
+
         for (let i = 0; i < messagesArray.length; i++) {
             const currentMsg = messagesArray[i];
+            if (!currentMsg) continue;
 
-            // --- Pre-typing delay ---
+            // 1. Pausa inicial antes de começar a digitar (Tempo de leitura humana)
+            let readPauseMs = 1200;
             if (i === 0) {
-                if (isFirstMessage) {
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                } else {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                }
+                readPauseMs = isFirstMessage ? 2500 : 1500;
             } else {
-                await new Promise(resolve => setTimeout(resolve, 1500));
+                readPauseMs = 1800;
             }
+            await new Promise(resolve => setTimeout(resolve, readPauseMs));
 
-            // --- Typing indicator: safe fallback ---
-            if (chat && typeof chat.sendStateTyping === 'function') {
+            // 2. Tempo de "Digitando..." proporcional ao tamanho da frase (40ms por caractere, mín 2.5s, máx 6s)
+            const charCount = currentMsg.length;
+            const typingDurationMs = Math.min(Math.max(charCount * 45, 2500), 6000);
+
+            if (activeChat && typeof activeChat.sendStateTyping === 'function') {
                 try {
-                    await chat.sendStateTyping();
-                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    await activeChat.sendStateTyping();
                 } catch (e) {}
             }
 
-            // --- Send message directly via msg.reply or client ---
+            // Aguarda o tempo realista enquanto a barra mostra "digitando..."
+            await new Promise(resolve => setTimeout(resolve, typingDurationMs));
+
+            // 3. Envia a mensagem
             try {
-                if (currentMsg) {
-                    aiSentMessages.add(currentMsg.trim().toLowerCase());
-                }
-                if (msg && typeof msg.reply === 'function') {
+                aiSentMessages.add(currentMsg.trim().toLowerCase());
+                
+                if (msg && typeof msg.reply === 'function' && !msg.from.includes('@g.us')) {
                     await msg.reply(currentMsg);
                 } else if (client) {
                     await client.sendMessage(msg.from, currentMsg);
@@ -288,8 +294,11 @@ async function sendSequentialMessages(chat, msg, messagesArray, chatId, isFirstM
                 }
             }
 
-            if (chat && typeof chat.clearState === 'function') {
-                try { await chat.clearState(); } catch (e) {}
+            // 4. Limpa o estado de digitação
+            if (activeChat && typeof activeChat.clearState === 'function') {
+                try { 
+                    await activeChat.clearState(); 
+                } catch (e) {}
             }
         }
     } catch (err) {
