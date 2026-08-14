@@ -244,35 +244,46 @@ function isSpamMessage(text) {
 // =============================================
 async function sendSequentialMessages(chat, msg, messagesArray, chatId, isFirstMessage) {
     try {
-        // Garante que o objeto Chat esteja disponível para mostrar "digitando..."
-        let activeChat = chat;
-        if (!activeChat && client && msg && msg.from) {
-            try {
-                activeChat = await client.getChatById(msg.from);
-            } catch (e) {}
-        }
+        const targetChatId = msg && (msg.from || (msg.id && msg.id.remote));
 
         for (let i = 0; i < messagesArray.length; i++) {
             const currentMsg = messagesArray[i];
             if (!currentMsg) continue;
 
             // 1. Pausa inicial antes de começar a digitar (Tempo de leitura humana)
-            let readPauseMs = 1200;
-            if (i === 0) {
-                readPauseMs = isFirstMessage ? 2500 : 1500;
-            } else {
-                readPauseMs = 1800;
-            }
+            let readPauseMs = i === 0 ? (isFirstMessage ? 2500 : 1500) : 1800;
             await new Promise(resolve => setTimeout(resolve, readPauseMs));
 
-            // 2. Tempo de "Digitando..." proporcional ao tamanho da frase (40ms por caractere, mín 2.5s, máx 6s)
+            // 2. Tempo de "Digitando..." proporcional ao tamanho da frase (50ms por caractere, mín 3.0s, máx 6.5s)
             const charCount = currentMsg.length;
-            const typingDurationMs = Math.min(Math.max(charCount * 45, 2500), 6000);
+            const typingDurationMs = Math.min(Math.max(charCount * 50, 3000), 6500);
 
-            if (activeChat && typeof activeChat.sendStateTyping === 'function') {
+            // Dispara indicador "digitando..." via WhatsApp Web diretamente
+            if (client && targetChatId) {
                 try {
-                    await activeChat.sendStateTyping();
-                } catch (e) {}
+                    // Tenta via chat nativo ou via evaluate direto no WhatsApp Web
+                    if (chat && typeof chat.sendStateTyping === 'function') {
+                        await chat.sendStateTyping();
+                    } else {
+                        await client.pupPage.evaluate(async (jid) => {
+                            if (window.WWebJS && window.WWebJS.sendPresenceAvailable) {
+                                window.WWebJS.sendPresenceAvailable();
+                            }
+                            if (window.Store && window.Store.Chat) {
+                                const c = await window.Store.Chat.get(jid) || window.Store.Chat.find(jid);
+                                if (c && c.markComposing) {
+                                    c.markComposing();
+                                }
+                            }
+                        }, targetChatId);
+                    }
+                } catch (tErr) {
+                    // Fallback se getChat falhar
+                    try {
+                        const resolvedChat = await client.getChatById(targetChatId);
+                        if (resolvedChat) await resolvedChat.sendStateTyping();
+                    } catch (e2) {}
+                }
             }
 
             // Aguarda o tempo realista enquanto a barra mostra "digitando..."
@@ -282,23 +293,34 @@ async function sendSequentialMessages(chat, msg, messagesArray, chatId, isFirstM
             try {
                 aiSentMessages.add(currentMsg.trim().toLowerCase());
                 
-                if (msg && typeof msg.reply === 'function' && !msg.from.includes('@g.us')) {
+                if (client && targetChatId) {
+                    await client.sendMessage(targetChatId, currentMsg);
+                } else if (msg && typeof msg.reply === 'function') {
                     await msg.reply(currentMsg);
-                } else if (client) {
-                    await client.sendMessage(msg.from, currentMsg);
                 }
             } catch (sendErr) {
-                console.warn('⚠️ Falha no msg.reply, enviando por client.sendMessage:', sendErr.message);
-                if (client) {
-                    await client.sendMessage(msg.from, currentMsg);
+                console.warn('⚠️ Falha no sendMessage:', sendErr.message);
+                if (msg && typeof msg.reply === 'function') {
+                    await msg.reply(currentMsg);
                 }
             }
 
             // 4. Limpa o estado de digitação
-            if (activeChat && typeof activeChat.clearState === 'function') {
-                try { 
-                    await activeChat.clearState(); 
-                } catch (e) {}
+            if (client && targetChatId) {
+                try {
+                    if (chat && typeof chat.clearState === 'function') {
+                        await chat.clearState();
+                    } else {
+                        await client.pupPage.evaluate(async (jid) => {
+                            if (window.Store && window.Store.Chat) {
+                                const c = await window.Store.Chat.get(jid) || window.Store.Chat.find(jid);
+                                if (c && c.markPaused) {
+                                    c.markPaused();
+                                }
+                            }
+                        }, targetChatId);
+                    }
+                } catch (cErr) {}
             }
         }
     } catch (err) {
