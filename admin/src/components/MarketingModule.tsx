@@ -1178,21 +1178,6 @@ export function MarketingModule() {
                         </div>
                       )}
 
-                      <div className="pt-2 border-t border-white/10 space-y-1">
-                        <label className="text-[11px] text-white/60 font-semibold block">
-                          Ou digite o Link de Convite / Nome / ID do Grupo VIP:
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Ex: https://chat.whatsapp.com/Bk2rFAAgHlvKgc8pQANqYg ou 120363...@g.us"
-                          value={campaignFormTargetGroup}
-                          onChange={(e) => setCampaignFormTargetGroup(e.target.value)}
-                          className="w-full bg-black border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500/50"
-                        />
-                        <p className="text-[10px] text-white/40">
-                          Se o grupo não aparecer na lista suspensa, basta colar o link de convite ou ID acima!
-                        </p>
-                      </div>
                     </div>
                   </div>
                 )}
@@ -1241,7 +1226,7 @@ export function MarketingModule() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-white/70">Mensagem da Campanha</label>
-                  <span className="text-[10px] text-white/40 font-mono">Variáveis: [Nome], [LINK_DO_CARDAPIO_VERCEL], [LINK_DO_GRUPO_VIP_WHATSAPP]</span>
+                  <span className="text-[10px] text-white/40 font-mono">Variável: [Nome]</span>
                 </div>
 
                 {/* Modelos Prontos */}
@@ -1259,35 +1244,12 @@ export function MarketingModule() {
                 </div>
 
                 <textarea
-                  rows={7}
+                  rows={8}
                   value={campaignFormMessage}
                   onChange={(e) => setCampaignFormMessage(e.target.value)}
                   className="w-full bg-[#050505] border border-white/10 rounded-xl p-3.5 text-xs text-white font-mono leading-relaxed focus:outline-none focus:border-emerald-500/50"
                   placeholder="Escreva sua mensagem aqui..."
                 />
-              </div>
-
-              {/* Links de Apoio */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-bold text-white/60 block mb-1">Link do Cardápio Vercel</label>
-                  <input
-                    type="text"
-                    value={cardapioUrl}
-                    onChange={(e) => setCardapioUrl(e.target.value)}
-                    className="w-full bg-[#050505] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-white/60 block mb-1">Link do Grupo VIP WhatsApp</label>
-                  <input
-                    type="text"
-                    value={grupoVipUrl}
-                    onChange={(e) => setGrupoVipUrl(e.target.value)}
-                    placeholder="https://chat.whatsapp.com/..."
-                    className="w-full bg-[#050505] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50"
-                  />
-                </div>
               </div>
             </div>
 
