@@ -1345,89 +1345,86 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
 
         console.log('🔄 [Marketing] Buscando contatos e grupos reais da agenda do WhatsApp...');
         
-        // 1. Puxa todos os contatos salvos no chip
-        let rawContacts = [];
-        try {
-            rawContacts = await client.getContacts();
-        } catch (e) {
-            console.warn('Aviso ao buscar contatos:', e.message);
-        }
-
-        // Filtra APENAS contatos que estão realmente salvos na agenda (c.name existe)
-        // ou que possuem isMyContact == true (contato do telefone, não apenas chat aleatório)
-        const seenPhones = new Set();
-        const contacts = rawContacts
-            .filter(c => {
-                if (!c || !c.id || !c.id.user || c.isGroup || c.isEnterprise) return false;
-                // Apenas contatos com nome salvo na agenda OU marcados como "meu contato"
-                if (!c.name && !c.isMyContact) return false;
-                // Remove contatos com número muito curto (inválidos)
-                if (c.id.user.length < 8) return false;
-                // Deduplicação por número de telefone
-                const phone = c.id.user;
-                if (seenPhones.has(phone)) return false;
-                seenPhones.add(phone);
-                return true;
-            })
-            .map(c => {
-                const phone = c.id.user || '';
-                const name = c.name || c.pushname || c.shortName || `Contato ${phone.slice(-4)}`;
-                return {
-                    id: c.id._serialized || `${phone}@c.us`,
-                    phone,
-                    name,
-                    isSaved: !!c.name,
-                };
-            })
-            .sort((a, b) => a.name.localeCompare(b.name));
-
-        // 2. Puxa todos os grupos que o chip participa
+        // 1. Puxa contatos e grupos direto do motor do WhatsApp Web com fallback de alta resiliência
+        let contacts = [];
         let groups = [];
+
         try {
-            // Tentativa 1: getChats() padrão
-            let rawChats = [];
-            try {
-                rawChats = await client.getChats();
-                console.log(`📊 [Marketing] getChats() retornou ${rawChats.length} chats no total.`);
-            } catch (e) {
-                console.warn('⚠️ [Marketing] getChats() falhou, tentando fallback...', e.message);
-                // Fallback: busca grupos via pupPage
+            const data = await client.pupPage.evaluate(() => {
+                const results = { contacts: [], groups: [] };
                 try {
-                    const groupIds = await client.pupPage.evaluate(() => {
-                        const store = window.Store;
-                        if (!store || !store.Chat) return [];
-                        return store.Chat.getModelsArray()
-                            .filter(c => c.isGroup)
-                            .map(c => ({ id: c.id._serialized, name: c.name || c.formattedTitle || 'Grupo' }));
-                    });
-                    if (groupIds && groupIds.length > 0) {
-                        groups = groupIds.map(g => ({
-                            id: g.id,
-                            name: g.name,
-                            unreadCount: 0,
-                            participantsCount: 0
-                        }));
-                        console.log(`✅ [Marketing] Fallback encontrou ${groups.length} grupos via pupPage.`);
+                    const store = window.Store;
+                    if (store && store.Contact) {
+                        const allC = store.Contact.getModelsArray();
+                        allC.forEach(c => {
+                            if (!c || !c.id || !c.id.user || c.isGroup || c.isEnterprise) return;
+                            const name = c.name || c.formattedTitle || c.pushname || '';
+                            // Apenas contatos com nome salvo ou marcados como contato
+                            if (c.name || c.isMyContact || (name && !name.startsWith('+') && !name.match(/^\d+$/))) {
+                                results.contacts.push({
+                                    id: c.id._serialized || `${c.id.user}@c.us`,
+                                    phone: c.id.user,
+                                    name: c.name || c.formattedTitle || c.pushname || `Contato ${c.id.user.slice(-4)}`,
+                                    isSaved: !!c.name
+                                });
+                            }
+                        });
                     }
-                } catch (fallbackErr) {
-                    console.warn('⚠️ [Marketing] Fallback de grupos também falhou:', fallbackErr.message);
+
+                    if (store && store.Chat) {
+                        const allChats = store.Chat.getModelsArray();
+                        allChats.forEach(chat => {
+                            if (chat && chat.isGroup) {
+                                results.groups.push({
+                                    id: chat.id._serialized,
+                                    name: chat.name || chat.formattedTitle || 'Grupo WhatsApp',
+                                    unreadCount: chat.unreadCount || 0,
+                                    participantsCount: (chat.groupMetadata && chat.groupMetadata.participants) ? chat.groupMetadata.participants.length : 0
+                                });
+                            }
+                        });
+                    }
+                } catch (evalErr) {
+                    console.error('Erro no evaluate interno:', evalErr);
                 }
+                return results;
+            });
+
+            if (data && Array.isArray(data.contacts) && data.contacts.length > 0) {
+                // Deduplica contatos por número
+                const seen = new Set();
+                contacts = data.contacts.filter(c => {
+                    if (!c.phone || c.phone.length < 8 || seen.has(c.phone)) return false;
+                    seen.add(c.phone);
+                    return true;
+                }).sort((a, b) => a.name.localeCompare(b.name));
             }
 
-            if (groups.length === 0 && rawChats.length > 0) {
-                groups = rawChats
-                    .filter(chat => chat && chat.isGroup)
-                    .map(g => ({
-                        id: g.id._serialized,
-                        name: g.name || 'Grupo Sem Nome',
-                        unreadCount: g.unreadCount || 0,
-                        participantsCount: (g.groupMetadata && g.groupMetadata.participants) ? g.groupMetadata.participants.length : 0
-                    }));
+            if (data && Array.isArray(data.groups)) {
+                groups = data.groups.sort((a, b) => a.name.localeCompare(b.name));
             }
-            
-            groups.sort((a, b) => a.name.localeCompare(b.name));
-        } catch (groupErr) {
-            console.warn('⚠️ [Marketing] Erro geral ao buscar grupos:', groupErr.message);
+        } catch (pupErr) {
+            console.warn('⚠️ [Marketing] Extração direta falhou, usando API padrão...', pupErr.message);
+            try {
+                const rawContacts = await client.getContacts();
+                const seenPhones = new Set();
+                contacts = rawContacts
+                    .filter(c => c && c.id && c.id.user && !c.isGroup && !c.isEnterprise && (c.name || c.isMyContact))
+                    .map(c => ({
+                        id: c.id._serialized || `${c.id.user}@c.us`,
+                        phone: c.id.user,
+                        name: c.name || c.pushname || `Contato ${c.id.user.slice(-4)}`,
+                        isSaved: !!c.name,
+                    }))
+                    .filter(c => {
+                        if (seenPhones.has(c.phone)) return false;
+                        seenPhones.add(c.phone);
+                        return true;
+                    })
+                    .sort((a, b) => a.name.localeCompare(b.name));
+            } catch (e) {
+                console.warn('Aviso getContacts fallback:', e.message);
+            }
         }
 
         console.log(`✅ [Marketing] Encontrados ${contacts.length} contatos e ${groups.length} grupos no WhatsApp.`);
