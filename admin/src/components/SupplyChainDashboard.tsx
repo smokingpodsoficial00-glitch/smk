@@ -3,7 +3,7 @@ import {
   PackageSearch, Plus, Minus, Eye, EyeOff, Loader2, ImagePlus, Upload, 
   Trash2, Search, Filter, ArrowUpDown, MoreVertical, Copy, Edit3, DollarSign, 
   CheckCircle2, X, TrendingUp, PieChart, ChevronRight, ChevronDown, ChevronUp, 
-  Tag, Box, Camera, Download, FileText, BarChart3, Check, Share2, Smartphone, 
+  Tag, Box, Boxes, Zap, Camera, Download, FileText, BarChart3, Check, Share2, Smartphone, 
   Monitor, Store, ExternalLink, ListOrdered, Save, Star, ShoppingCart
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -12,6 +12,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { fetchCategories, fetchProductCategoryMappings, updateModelCategories, DEFAULT_CATEGORIES, type Category } from "../lib/categories";
 import { fetchProductCostsMap, updateProductCost } from "../lib/productCosts";
 import { ManualSaleModal } from "./ManualSaleModal";
+import { ReplenishmentPlannerModal } from "./ReplenishmentPlannerModal";
 
 // ─── Donut chart colors ───────────────────────────────────
 const DONUT_COLORS = ["#34d399", "#60a5fa", "#a78bfa", "#fbbf24", "#f87171", "#f472b6", "#38bdf8"];
@@ -27,6 +28,9 @@ export function SupplyChainDashboard() {
   const [topSelling, setTopSelling] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  // ─── Modal de Planejador de Reposição & Metas de Escala ──
+  const [showReplenishmentModal, setShowReplenishmentModal] = useState(false);
 
   // ─── Modal Flutuante Centralizado de Novo Produto ──────
   const [showNewProductModal, setShowNewProductModal] = useState(false);
@@ -1226,8 +1230,17 @@ export function SupplyChainDashboard() {
               </p>
             </div>
 
-            {/* Botões Superiores Direitos: Registrar Venda e Novo Produto */}
+            {/* Botões Superiores Direitos: Registrar Venda, Planejador de Recompra e Novo Produto */}
             <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowReplenishmentModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500/20 via-emerald-500/10 to-transparent hover:bg-emerald-500/25 text-emerald-300 text-xs font-extrabold transition-all border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)] cursor-pointer active:scale-[0.97]"
+              >
+                <Boxes className="size-4 text-emerald-400" />
+                <span>🚀 Planejador de Recompra</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -1235,7 +1248,7 @@ export function SupplyChainDashboard() {
                   setPreSelectedGroupForSale(null);
                   setIsManualSaleModalOpen(true);
                 }}
-                className="inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black text-xs font-extrabold transition-all shadow-[0_0_15px_rgba(245,158,11,0.35)] cursor-pointer active:scale-[0.97]"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black text-xs font-extrabold transition-all shadow-[0_0_15px_rgba(245,158,11,0.35)] cursor-pointer active:scale-[0.97]"
               >
                 <ShoppingCart className="size-4 text-black" />
                 <span>⚡ Registrar Venda</span>
@@ -1243,7 +1256,7 @@ export function SupplyChainDashboard() {
 
               <button
                 onClick={() => setShowNewProductModal(true)}
-                className="inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] cursor-pointer active:scale-[0.97]"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] cursor-pointer active:scale-[0.97]"
               >
                 <Plus className="size-4" />
                 <span>Novo Produto</span>
@@ -1328,6 +1341,37 @@ export function SupplyChainDashboard() {
             <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Última Entrada</span>
             <span className="text-xs font-bold text-muted-foreground">{lastEntryTime}</span>
           </div>
+        </div>
+
+        {/* ── BANNER INTELIGENTE DE REPOSIÇÃO & GATILHO R$ 1.000 ── */}
+        <div className="bg-gradient-to-r from-emerald-950/40 via-card to-amber-950/20 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-[0_0_20px_rgba(16,185,129,0.06)]">
+          <div className="flex items-center gap-3.5">
+            <div className="size-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 grid place-items-center shrink-0 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+              <Boxes className="size-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-extrabold text-white">
+                  Gatilho de Recompra: Lote Mínimo de R$ 1.000,00 (Remessa #2 SP)
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-extrabold">
+                  Frete R$ 2,94/pod
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Caixa atual em R$ 513,00 (51%) — Faltam apenas ~5 a 6 pods para acionar a compra sem queimar margem líquida!
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowReplenishmentModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)] shrink-0 cursor-pointer active:scale-[0.97]"
+          >
+            <span>Abrir Planejador & Metas</span>
+            <ChevronRight className="size-4" />
+          </button>
         </div>
 
         {/* ── GRÁFICOS: RANKING + DONUT ────────────────── */}
@@ -3001,6 +3045,16 @@ export function SupplyChainDashboard() {
         preSelectedFlavorId={preSelectedFlavorIdForSale}
         preSelectedGroup={preSelectedGroupForSale}
         companyId={company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5"}
+      />
+
+      {/* ━━━ MODAL DE PLANEJADOR DE REPOSIÇÃO & METAS ━━━━━━━━━━ */}
+      <ReplenishmentPlannerModal
+        isOpen={showReplenishmentModal}
+        onClose={() => setShowReplenishmentModal(false)}
+        currentCash={513}
+        stockRetailValue={totalStockValue || 1042.89}
+        stockCostValue={totalStockCost || 783}
+        totalPodsInStock={totalStockUnits || 12}
       />
     </div>
   );
