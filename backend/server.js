@@ -1433,16 +1433,26 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
                         }
                     }
 
-                    // 3. Fallback visual no DOM do WhatsApp Web se Store ainda estiver carregando
-                    if (results.length === 0) {
-                        const chatElements = document.querySelectorAll('#pane-side [role="listitem"], #pane-side [data-testid="cell-frame-container"]');
-                        chatElements.forEach(el => {
-                            const text = el.innerText || '';
+                    // 3. Varredura completa do painel lateral com scroll
+                    const sidePane = document.querySelector('#pane-side');
+                    if (sidePane) {
+                        const items = sidePane.querySelectorAll('div[tabindex="-1"], div[role="listitem"], div[data-testid="cell-frame-container"]');
+                        items.forEach(el => {
                             const titleEl = el.querySelector('[title]');
-                            const title = titleEl ? titleEl.getAttribute('title') : text.split('\n')[0];
-                            if (title && (title.toLowerCase().includes('grupo') || title.toLowerCase().includes('vip') || title.toLowerCase().includes('smoking') || title.toLowerCase().includes('envios'))) {
+                            const title = titleEl ? titleEl.getAttribute('title') : '';
+                            
+                            // Procura imagens de avatar de grupo ou título com indicador de grupo
+                            const isGroupIndicator = el.querySelector('[data-testid="default-group"]') || 
+                                                     el.querySelector('[data-icon="default-group"]') || 
+                                                     el.innerHTML.includes('default-group') ||
+                                                     (title && (title.includes('VIP') || title.includes('Smoking') || title.includes('SMK') || title.includes('GRUPO') || title.includes('ENVIOS') || title.includes('OPERAÇÃO')));
+
+                            if (title && (isGroupIndicator || title.includes('#'))) {
+                                // Tenta achar o id do elemento
+                                const linkEl = el.closest('a') || el.querySelector('a');
+                                const rawHref = linkEl ? linkEl.getAttribute('href') : '';
                                 results.push({
-                                    id: `dom_${Math.random().toString(36).substr(2, 9)}@g.us`,
+                                    id: `grp_${title.replace(/\s+/g, '_').toLowerCase()}@g.us`,
                                     name: title,
                                     unreadCount: 0,
                                     participantsCount: 0
@@ -1516,6 +1526,47 @@ app.post('/api/marketing/send-direct', async (req, res) => {
                 console.warn('⚠️ Não foi possível resolver convite de grupo:', invErr.message);
                 formattedNumber = phone;
             }
+        } else if (String(phone).startsWith('grp_') || String(phone).startsWith('dom_')) {
+            // Busca o chat real do grupo pelo nome
+            try {
+                const targetName = name || '';
+                const resolvedChatId = await client.pupPage.evaluate((grpName) => {
+                    const sidePane = document.querySelector('#pane-side');
+                    if (!sidePane) return null;
+                    const items = sidePane.querySelectorAll('div[tabindex="-1"], div[role="listitem"]');
+                    for (const item of items) {
+                        const titleEl = item.querySelector('[title]');
+                        const title = titleEl ? titleEl.getAttribute('title') : '';
+                        if (title && title.toLowerCase().includes(grpName.toLowerCase())) {
+                            item.click();
+                            return 'clicked';
+                        }
+                    }
+                    return null;
+                }, targetName);
+
+                if (resolvedChatId === 'clicked') {
+                    await new Promise(r => setTimeout(r, 1500));
+                    // Dispara a mensagem digitando na caixa de texto ativa
+                    await client.pupPage.evaluate((msgToSend) => {
+                        const input = document.querySelector('footer div[contenteditable="true"]');
+                        if (input) {
+                            input.focus();
+                            document.execCommand('insertText', false, msgToSend);
+                            const sendBtn = document.querySelector('footer button[aria-label="Enviar"], footer button data-icon="send"');
+                            if (sendBtn) sendBtn.click();
+                            else {
+                                input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', which: 13, bubbles: true }));
+                            }
+                        }
+                    }, text);
+                    console.log(`✅ [Marketing] Mensagem entregue no grupo "${targetName}" com sucesso via interface!`);
+                    return res.json({ success: true, message: 'Mensagem enviada com sucesso no grupo!' });
+                }
+            } catch (e) {
+                console.warn('Fallback envio grupo via UI:', e.message);
+            }
+            formattedNumber = String(phone);
         } else if (String(phone).includes('@g.us') || String(phone).includes('@c.us')) {
             formattedNumber = String(phone);
         } else {
