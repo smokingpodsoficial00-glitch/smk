@@ -295,7 +295,7 @@ export function ManualSaleModal({
         };
       });
 
-      // 3. Inserir Pedido PAGO e CONCLUIDO em smoking_orders (order_source = MANUAL)
+      // 3. Inserir Pedido PAGO e CONCLUIDO em smoking_orders
       let insertedOrderId: string | null = null;
       
       const payload: any = {
@@ -306,8 +306,7 @@ export function ManualSaleModal({
         total_amount: grandTotal,
         shipping_fee: numericShippingFee,
         payment_status: "PAGO",
-        delivery_status: "CONCLUIDO",
-        order_source: "MANUAL",
+        delivery_status: "ENTREGUE",
         payment_method: paymentMethod,
         company_id: companyId,
       };
@@ -318,10 +317,8 @@ export function ManualSaleModal({
         .select("id")
         .single();
 
-      if (orderErr && orderErr.message?.includes("smoking_orders_delivery_status_check")) {
-        // Fallback para constraint legada do Supabase
-        payload.delivery_status = "ENTREGUE";
-        delete payload.order_source;
+      if (orderErr && (orderErr.message?.includes("smoking_orders_delivery_status_check") || orderErr.message?.includes("delivery_status"))) {
+        payload.delivery_status = "CONCLUIDO";
         const fallbackRes = await supabase
           .from("smoking_orders")
           .insert(payload)
