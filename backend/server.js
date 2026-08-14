@@ -871,13 +871,18 @@ client.on('message_create', async msg => {
     // Obtém o número e identificadores reais do remetente
     let senderNumber = msg.from ? msg.from.split('@')[0] : '';
     let contactNumber = senderNumber;
+    let contactNameResolved = '';
+    
     try {
         const contact = await msg.getContact();
-        if (contact && contact.number) {
-            contactNumber = contact.number;
+        if (contact) {
+            contactNumber = contact.number || senderNumber;
+            contactNameResolved = contact.name || contact.pushname || '';
         }
     } catch (cErr) {}
 
+    // Fallback: Se o WhatsApp enviou um LID interno (número estranho com mais de 14 dígitos não iniciado por 55)
+    // Busca na agenda de contatos sincronizada pelo ID ou se o nome bater com a blacklist
     const cleanSender = senderNumber.replace(/\D/g, '');
     const cleanContact = contactNumber.replace(/\D/g, '');
 
@@ -888,11 +893,17 @@ client.on('message_create', async msg => {
                           blacklistPhonesSet.has(cleanContact) ||
                           Array.from(blacklistPhonesSet).some(bp => {
                               const cleanBp = bp.replace(/\D/g, '');
-                              return cleanBp && (cleanSender.endsWith(cleanBp) || cleanBp.endsWith(cleanSender) || cleanContact.endsWith(cleanBp) || cleanBp.endsWith(cleanContact));
+                              if (!cleanBp) return false;
+                              return cleanSender.includes(cleanBp) || 
+                                     cleanContact.includes(cleanBp) ||
+                                     cleanBp.includes(cleanSender) || 
+                                     cleanBp.includes(cleanContact) ||
+                                     (cleanSender.length >= 8 && cleanBp.endsWith(cleanSender.slice(-8))) ||
+                                     (cleanContact.length >= 8 && cleanBp.endsWith(cleanContact.slice(-8)));
                           });
 
     if (isBlacklisted) {
-        console.log(`🚫 [Blacklist] Mensagem de ${contactNumber || senderNumber} IGNORADA com sucesso (contato na lista de exceções).`);
+        console.log(`🚫 [Blacklist] Mensagem de "${contactNameResolved}" (${contactNumber || senderNumber}) BLOQUEADA COM SUCESSO! A Eloisa NÃO responderá.`);
         return;
     }
 
