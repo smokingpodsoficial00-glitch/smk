@@ -653,12 +653,18 @@ export function SupplyChainDashboard() {
     if (parsedPrice !== null) updatePayload.price = parsedPrice;
     if (parsedCost !== null) updatePayload.cost_price = parsedCost;
 
-    if (parsedCost !== null) {
+    if (parsedCost !== null && parsedCost > 0) {
       try {
+        await updateProductCost({
+          modelKey: editingGroup.groupKey,
+          productIds: ids,
+          costPrice: parsedCost,
+          companyId: targetCompanyId
+        });
         localStorage.setItem(`smk_cost_${editingGroup.groupKey}`, parsedCost.toString());
         ids.forEach((id: string) => localStorage.setItem(`smk_cost_${id}`, parsedCost.toString()));
       } catch (e) {
-        console.warn("Erro ao salvar no localStorage:", e);
+        console.warn("Erro ao salvar custo no Supabase DB / localStorage:", e);
       }
     }
 
@@ -729,7 +735,7 @@ export function SupplyChainDashboard() {
         return;
       }
     }
-    const finalCostVal = parsedCost !== null ? parsedCost : 35.00;
+    const finalCostVal = parsedCost !== null ? parsedCost : null;
 
     if (!editName.trim()) {
       alert("Por favor, informe o Modelo do produto.");
@@ -841,10 +847,22 @@ export function SupplyChainDashboard() {
     if (parsedPrice !== null) updatePayload.price = parsedPrice;
     if (parsedCost !== null) updatePayload.cost_price = parsedCost;
 
-    if (parsedCost !== null) {
+    if (parsedCost !== null && parsedCost > 0) {
       try {
+        const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+        const bName = selectedDrawerSKU.brand || 'Genérico';
+        const mName = selectedDrawerSKU.name || 'Pod';
+        const mKey = `${bName.trim().toLowerCase()}__${mName.trim().toLowerCase()}`;
+        await updateProductCost({
+          modelKey: mKey,
+          productIds: [skuId],
+          costPrice: parsedCost,
+          companyId: targetCompanyId
+        });
         localStorage.setItem(`smk_cost_${skuId}`, parsedCost.toString());
-      } catch (e) {}
+      } catch (e) {
+        console.warn("Erro ao salvar custo individual no Supabase DB / localStorage:", e);
+      }
     }
 
     try {
@@ -2489,12 +2507,14 @@ export function SupplyChainDashboard() {
                 </div>
                 <div className="bg-card border border-border rounded-xl p-3">
                   <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Custo</span>
-                  <span className="text-sm font-bold text-muted-foreground mt-1 block">{formatBRL(selectedDrawerSKU.cost_price || 35)}</span>
+                  <span className="text-sm font-bold text-muted-foreground mt-1 block">
+                    {selectedDrawerSKU.cost_price && selectedDrawerSKU.cost_price > 0 ? formatBRL(selectedDrawerSKU.cost_price) : "—"}
+                  </span>
                 </div>
                 <div className="bg-card border border-emerald-500/20 rounded-xl p-3">
                   <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Lucro</span>
                   <span className="text-sm font-bold text-emerald-400 mt-1 block">
-                    {formatBRL(selectedDrawerSKU.price - (selectedDrawerSKU.cost_price || 35))}
+                    {selectedDrawerSKU.cost_price && selectedDrawerSKU.cost_price > 0 ? formatBRL(selectedDrawerSKU.price - selectedDrawerSKU.cost_price) : "—"}
                   </span>
                 </div>
               </div>
@@ -2559,7 +2579,7 @@ export function SupplyChainDashboard() {
                   onClick={() => {
                     setIsEditingSingleSkuPrice(true);
                     setSingleSkuPriceInput(selectedDrawerSKU.price.toString());
-                    setSingleSkuCostInput((selectedDrawerSKU.cost_price || 35).toString());
+                    setSingleSkuCostInput(selectedDrawerSKU.cost_price && selectedDrawerSKU.cost_price > 0 ? selectedDrawerSKU.cost_price.toString() : "");
                   }}
                   className="w-full bg-elevated hover:bg-white/10 text-white text-xs font-semibold py-2.5 rounded-xl border border-border flex items-center justify-center gap-2 cursor-pointer transition-colors"
                 >
