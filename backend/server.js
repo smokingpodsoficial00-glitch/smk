@@ -1581,45 +1581,77 @@ app.post('/api/marketing/send-direct', async (req, res) => {
                 console.warn('⚠️ Não foi possível resolver convite de grupo:', invErr.message);
                 formattedNumber = phone;
             }
-        } else if (String(phone).startsWith('grp_') || String(phone).startsWith('dom_')) {
-            // Busca o chat real do grupo pelo nome
+        } else if (String(phone).startsWith('grp_') || String(phone).startsWith('dom_') || name) {
+            // Localiza e abre o grupo diretamente usando a barra de busca do WhatsApp Web
             try {
                 const targetName = name || '';
-                const resolvedChatId = await client.pupPage.evaluate((grpName) => {
-                    const sidePane = document.querySelector('#pane-side');
-                    if (!sidePane) return null;
-                    const items = sidePane.querySelectorAll('div[tabindex="-1"], div[role="listitem"]');
-                    for (const item of items) {
-                        const titleEl = item.querySelector('[title]');
-                        const title = titleEl ? titleEl.getAttribute('title') : '';
-                        if (title && title.toLowerCase().includes(grpName.toLowerCase())) {
-                            item.click();
-                            return 'clicked';
+                console.log(`🔍 [Marketing] Abrindo grupo "${targetName}" pelo campo de busca...`);
+                
+                const opened = await client.pupPage.evaluate(async (grpName) => {
+                    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+                    
+                    // 1. Procura o campo de pesquisa do WhatsApp Web
+                    const searchInput = document.querySelector('div[contenteditable="true"][data-tab="3"]') || 
+                                        document.querySelector('div[contenteditable="true"][role="textbox"]') ||
+                                        document.querySelector('#side [contenteditable="true"]');
+                    
+                    if (searchInput) {
+                        searchInput.focus();
+                        document.execCommand('selectAll', false, null);
+                        document.execCommand('delete', false, null);
+                        document.execCommand('insertText', false, grpName);
+                        await sleep(1200);
+
+                        // Clica no primeiro resultado de conversa encontrado
+                        const firstResult = document.querySelector('#pane-side [role="listitem"], #pane-side [data-testid="cell-frame-container"]');
+                        if (firstResult) {
+                            firstResult.click();
+                            await sleep(1000);
+                            return true;
                         }
                     }
-                    return null;
+
+                    // 2. Se não achou na busca, tenta clique direto no painel
+                    const items = document.querySelectorAll('#pane-side [role="listitem"], #pane-side [title]');
+                    for (const item of items) {
+                        const title = item.getAttribute('title') || item.innerText || '';
+                        if (title.toLowerCase().includes(grpName.toLowerCase())) {
+                            item.click();
+                            await sleep(1000);
+                            return true;
+                        }
+                    }
+                    return false;
                 }, targetName);
 
-                if (resolvedChatId === 'clicked') {
+                if (opened) {
                     await new Promise(r => setTimeout(r, 1500));
-                    // Dispara a mensagem digitando na caixa de texto ativa
-                    await client.pupPage.evaluate((msgToSend) => {
+                    // Digita e envia a mensagem na conversa aberta
+                    const sent = await client.pupPage.evaluate(async (msgToSend) => {
+                        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
                         const input = document.querySelector('footer div[contenteditable="true"]');
                         if (input) {
                             input.focus();
                             document.execCommand('insertText', false, msgToSend);
-                            const sendBtn = document.querySelector('footer button[aria-label="Enviar"], footer button data-icon="send"');
-                            if (sendBtn) sendBtn.click();
-                            else {
+                            await sleep(500);
+                            const sendBtn = document.querySelector('footer button[aria-label="Enviar"], footer span[data-icon="send"]');
+                            if (sendBtn) {
+                                sendBtn.click();
+                            } else {
                                 input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', which: 13, bubbles: true }));
                             }
+                            return true;
                         }
+                        return false;
                     }, text);
-                    console.log(`✅ [Marketing] Mensagem entregue no grupo "${targetName}" com sucesso via interface!`);
-                    return res.json({ success: true, message: 'Mensagem enviada com sucesso no grupo!' });
+
+                    if (sent) {
+                        console.log(`✅ [Marketing] Mensagem entregue no grupo "${targetName}" com sucesso!`);
+                        return res.json({ success: true, message: 'Mensagem enviada com sucesso no grupo!' });
+                    }
                 }
             } catch (e) {
-                console.warn('Fallback envio grupo via UI:', e.message);
+                console.warn('⚠️ Falha ao abrir e enviar no grupo via UI:', e.message);
             }
             formattedNumber = String(phone);
         } else if (String(phone).includes('@g.us') || String(phone).includes('@c.us')) {
