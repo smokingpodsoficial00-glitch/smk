@@ -84,11 +84,17 @@ client.on('loading_screen', (percent, message) => {
     console.log(`⏳ Carregando WhatsApp Web: ${percent}% - ${message}`);
 });
 
-client.on('ready', () => {
+client.on('ready', async () => {
     latestQr = null;
     latestQrDataUrl = null;
     isWhatsAppReady = true;
     console.log('✅ Inteligência Artificial conectada ao WhatsApp com sucesso!');
+    
+    // Mapeamento Proativo de Agenda e LIDs para resposta e blacklist instantâneas
+    try {
+        const contacts = await client.getContacts();
+        console.log(`📇 [Agenda] ${contacts.length} contatos indexados no cache do WhatsApp.`);
+    } catch (e) {}
 });
 
 app.get('/api/qr', (req, res) => {
@@ -868,23 +874,43 @@ client.on('message_create', async msg => {
         return;
     }
 
-    // 🔍 ARMADILHA & RESOLUÇÃO DE IDENTIDADE REAL (LID vs TELEFONE)
+    // 🔍 RESOLUÇÃO OFICIAL DE LID (WWebJS getContactLidAndPhone & getContactById)
     let senderNumber = msg.from ? msg.from.split('@')[0] : '';
     let contactNumber = senderNumber;
     let contactName = '';
-    let serializedContactId = msg.from || '';
+    let resolvedPhone = null;
 
+    // Se a mensagem vier com formato LID (ex: 206494142341307@lid ou msg.from LID)
+    if (msg.from && (msg.from.includes('@lid') || senderNumber.length > 13)) {
+        try {
+            // 1. Tenta método nativo oficial do WWebJS para resolver LID -> PN (Phone Number)
+            if (typeof client.getContactLidAndPhone === 'function') {
+                const lidInfos = await client.getContactLidAndPhone([msg.from]);
+                if (lidInfos && lidInfos.length > 0 && lidInfos[0].pn) {
+                    resolvedPhone = String(lidInfos[0].pn).replace(/\D/g, '');
+                    contactNumber = resolvedPhone;
+                    console.log(`🔗 [LID Oficial] ${msg.from} mapeado com sucesso para o Telefone: ${resolvedPhone}`);
+                }
+            }
+        } catch (lidErr) {
+            console.warn('⚠️ Aviso ao resolver LID via getContactLidAndPhone:', lidErr.message);
+        }
+    }
+
+    // 2. Tenta obter o objeto Contact completo
     try {
         const contact = await msg.getContact();
         if (contact) {
-            contactNumber = contact.number || (contact.id && contact.id.user) || senderNumber;
-            contactName = contact.name || contact.pushname || '';
-            serializedContactId = (contact.id && contact.id._serialized) || serializedContactId;
+            contactName = contact.name || contact.pushname || contact.shortName || '';
+            if (contact.number) {
+                contactNumber = contact.number;
+            }
         }
     } catch (cErr) {}
 
     const cleanSender = senderNumber.replace(/\D/g, '');
     const cleanContact = contactNumber.replace(/\D/g, '');
+    const cleanResolved = resolvedPhone ? resolvedPhone.replace(/\D/g, '') : '';
 
     // --- SEGURANÇA 3: BLACKLIST / CONTATOS IGNORADOS (TRAVA BLINDADA) ---
     let isBlacklisted = false;
@@ -893,7 +919,8 @@ client.on('message_create', async msg => {
     if (blacklistPhonesSet.has(senderNumber) || 
         blacklistPhonesSet.has(cleanSender) || 
         blacklistPhonesSet.has(contactNumber) || 
-        blacklistPhonesSet.has(cleanContact)) {
+        blacklistPhonesSet.has(cleanContact) ||
+        (cleanResolved && blacklistPhonesSet.has(cleanResolved))) {
         isBlacklisted = true;
     }
 
@@ -903,14 +930,15 @@ client.on('message_create', async msg => {
             const cleanBp = bp.replace(/\D/g, '');
             if (!cleanBp) continue;
 
-            // Se bater os últimos 8 dígitos (número do celular)
             const bpLast8 = cleanBp.slice(-8);
             const senderLast8 = cleanSender.slice(-8);
             const contactLast8 = cleanContact.slice(-8);
+            const resolvedLast8 = cleanResolved ? cleanResolved.slice(-8) : '';
 
-            if ((cleanBp.length >= 8 && (senderLast8 === bpLast8 || contactLast8 === bpLast8)) ||
+            if ((cleanBp.length >= 8 && (senderLast8 === bpLast8 || contactLast8 === bpLast8 || resolvedLast8 === bpLast8)) ||
                 cleanSender.includes(cleanBp) || cleanBp.includes(cleanSender) ||
-                cleanContact.includes(cleanBp) || cleanBp.includes(cleanContact)) {
+                cleanContact.includes(cleanBp) || cleanBp.includes(cleanContact) ||
+                (cleanResolved && (cleanResolved.includes(cleanBp) || cleanBp.includes(cleanResolved)))) {
                 isBlacklisted = true;
                 break;
             }
@@ -918,8 +946,8 @@ client.on('message_create', async msg => {
     }
 
     if (isBlacklisted) {
-        console.log(`🚫 [Blacklist Ativa] Mensagem de "${contactName}" (Tel: ${contactNumber} | ID: ${senderNumber}) BLOQUEADA COM SUCESSO! A Eloisa NÃO responderá.`);
-        return; // ABORTA IMEDIATAMENTE ANTES DE QUALQUER COISA
+        console.log(`🚫 [Blacklist Ativa] Mensagem de "${contactName}" (Tel: ${contactNumber} | LID: ${senderNumber}) BLOQUEADA COM SUCESSO! A Eloisa NÃO responderá.`);
+        return; // ABORTA IMEDIATAMENTE NA RAIZ
     }
 
     // --- SEGURANÇA 4: CHECAGEM DE SILENCIAMENTO ATIVO (Human Takeover) ---
