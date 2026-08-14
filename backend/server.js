@@ -761,7 +761,6 @@ async function syncWhatsAppOrderToKanbanAndDeductStock(senderNumber, contactName
         }
 
         return orderId;
->>>>>>> Stashed changes
     } catch (err) {
         console.error('❌ Erro no syncWhatsAppOrderToKanbanAndDeductStock:', err);
         return null;
@@ -1315,6 +1314,50 @@ app.post('/api/webhook/dispatch', async (req, res) => {
     } catch (error) {
         console.error('❌ Erro no webhook de despacho:', error);
         res.status(500).json({ error: 'Falha ao enviar mensagem.' });
+    }
+});
+
+// =============================================
+// MARKETING & DISPAROS EXCLUSIVOS SMOKING PODS
+// =============================================
+app.post('/api/marketing/send-direct', async (req, res) => {
+    try {
+        const { phone, name, text } = req.body;
+        
+        if (!phone || !text) {
+            return res.status(400).json({ error: 'Telefone e texto da mensagem são obrigatórios.' });
+        }
+
+        if (!isWhatsAppReady || !client) {
+            return res.status(503).json({ error: 'WhatsApp não está conectado no momento.' });
+        }
+
+        const rawPhone = String(phone).replace(/\D/g, '');
+        const cleanPhone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
+        const formattedNumber = `${cleanPhone}@c.us`;
+
+        console.log(`📢 [Marketing] Enviando mensagem personalizada para ${formattedNumber} (${name || 'Cliente'})...`);
+
+        try {
+            const chat = await client.getChatById(formattedNumber);
+            if (chat) {
+                await chat.sendStateTyping();
+                await new Promise(resolve => setTimeout(resolve, 2500));
+                await client.sendMessage(formattedNumber, text);
+                await chat.clearState();
+            } else {
+                await client.sendMessage(formattedNumber, text);
+            }
+        } catch (chatErr) {
+            // Fallback direto
+            await client.sendMessage(formattedNumber, text);
+        }
+
+        console.log(`✅ [Marketing] Mensagem entregue com sucesso para ${formattedNumber}`);
+        return res.json({ success: true, message: 'Mensagem de marketing enviada com sucesso!' });
+    } catch (error) {
+        console.error('❌ Erro no envio de marketing:', error);
+        return res.status(500).json({ error: error.message || 'Falha ao enviar mensagem de marketing.' });
     }
 });
 

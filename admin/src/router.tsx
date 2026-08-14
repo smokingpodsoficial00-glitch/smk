@@ -11,6 +11,7 @@ import { FinanceDashboard } from './components/FinanceDashboard';
 import { SupplyChainDashboard } from './components/SupplyChainDashboard';
 import { CRMDashboard } from './components/CRMDashboard';
 import { ChatbotPage } from './components/ChatbotPage';
+import { MarketingModule } from './components/MarketingModule';
 import { SettingsPage } from './components/SettingsPage';
 
 import { AdminLayout } from './layouts/AdminLayout';
@@ -78,6 +79,10 @@ export const router = createBrowserRouter([
       {
         path: 'chatbot',
         element: <ChatbotPage />,
+      },
+      {
+        path: 'marketing',
+        element: <MarketingModule />,
       },
       {
         path: 'configuracoes',
