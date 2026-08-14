@@ -1433,12 +1433,11 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
                         }
                     }
 
-                    // 3. Varredura completa do painel lateral com scroll em múltiplas passagens
+                    // 3. Varredura profunda com scroll assíncrono até o fim
                     const sidePane = document.querySelector('#pane-side');
                     if (sidePane) {
                         const seenTitles = new Set();
                         
-                        // Função auxiliar para extrair do estado atual
                         const extractVisible = () => {
                             const items = sidePane.querySelectorAll('div[tabindex="-1"], div[role="listitem"], div[data-testid="cell-frame-container"]');
                             items.forEach(el => {
@@ -1446,22 +1445,41 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
                                 const title = titleEl ? titleEl.getAttribute('title')?.trim() : '';
                                 if (!title || seenTitles.has(title)) return;
 
-                                // Verifica se é um grupo (ícone de grupo, ou padrão de nome de grupo)
+                                // Verifica se o item tem elementos de grupo no HTML ou palavras-chave
                                 const isGrp = el.querySelector('[data-testid="default-group"]') || 
                                               el.querySelector('[data-icon="default-group"]') || 
                                               el.innerHTML.includes('default-group') ||
                                               el.innerHTML.includes('community') ||
+                                              el.querySelector('span[data-icon="status-group"]') ||
                                               title.includes('SMK') || 
                                               title.includes('Smoking') || 
                                               title.includes('VIP') || 
                                               title.includes('Grupo') || 
                                               title.includes('GRUPO') || 
                                               title.includes('Promos') || 
+                                              title.includes('Promoções') || 
                                               title.includes('Operação') || 
+                                              title.includes('OPERAÇÃO') || 
                                               title.includes('Nia') || 
                                               title.includes('Noma') || 
                                               title.includes('Comprovantes') || 
                                               title.includes('Delivery') || 
+                                              title.includes('Banco') || 
+                                              title.includes('Trip') || 
+                                              title.includes('Milionários') || 
+                                              title.includes('Arthur') || 
+                                              title.includes('Founders') || 
+                                              title.includes('Network') || 
+                                              title.includes('Script') || 
+                                              title.includes('Instagram') || 
+                                              title.includes('Badai') || 
+                                              title.includes('Stock') || 
+                                              title.includes('Line') || 
+                                              title.includes('Continental') || 
+                                              title.includes('Plano') || 
+                                              title.includes('Rotina') || 
+                                              title.includes('Prompts') || 
+                                              title.includes('Dia') || 
                                               title.includes('#');
 
                                 if (isGrp) {
@@ -1476,19 +1494,14 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
                             });
                         };
 
-                        // Passagem 1: topo
-                        extractVisible();
-                        
-                        // Passagens seguintes com scroll
-                        sidePane.scrollTop = 400;
-                        extractVisible();
-                        sidePane.scrollTop = 1000;
-                        extractVisible();
-                        sidePane.scrollTop = 2000;
-                        extractVisible();
-                        sidePane.scrollTop = 3500;
-                        extractVisible();
-                        sidePane.scrollTop = 0; // Retorna ao topo
+                        // Executa varredura profunda com múltiplos saltos no scroll
+                        const totalHeight = sidePane.scrollHeight || 10000;
+                        const step = 450;
+                        for (let pos = 0; pos <= totalHeight; pos += step) {
+                            sidePane.scrollTop = pos;
+                            extractVisible();
+                        }
+                        sidePane.scrollTop = 0; // Volta para o topo
                     }
                 } catch (err) {
                     return [{ error: err.message }];
