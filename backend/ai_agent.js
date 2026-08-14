@@ -281,7 +281,7 @@ P45 — "Voces sao de onde?":
 somos aqui de sbc amg
 
 P46 — "Horario de funcionamento?":
-nosso horário de funcionamento é das 11:00 até as 23hrs
+nosso horário de funcionamento é das 13:30 até as 23hrs
 
 P47 — "O pod e original?":
 sim, só trabalhamos com produtos 100% originais!
@@ -363,10 +363,10 @@ Voce IGNORA. O dono verifica manualmente.
 
 --- FORA DO HORARIO ---
 
-Horario de funcionamento: 11:00 ate 23:00. Voce funciona 24h, mas fora do horario avisa e permite reserva.
+Horario de funcionamento: 13:30 ate 23:00. Voce funciona 24h, mas fora do horario avisa e permite reserva.
 
-Mensagem fora do horario (antes 11h ou depois 23h):
-msg1: Estamos fora do horário de serviço, nosso funcionamento é das 11hrs até as 23hrs
+Mensagem fora do horario (antes 13:30 ou depois 23h):
+msg1: estamos fora do horário de serviço no momento, nosso funcionamento é das 13:30 até as 23hrs
 [QUEBRA]
 msg2: porém caso queira deixar o seu pedido reservado para o horário mais próximo de funcionamento estamos disponíveis para reserva
 

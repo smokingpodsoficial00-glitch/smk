@@ -209,19 +209,24 @@ const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u
 // =============================================
 // HELPER: Get São Paulo time (UTC-3)
 // =============================================
-function getSaoPauloHour() {
+function getSaoPauloTime() {
     const now = new Date();
-    // Use Intl to get São Paulo hour reliably
     const spTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-    return spTime.getHours();
+    return {
+        hours: spTime.getHours(),
+        minutes: spTime.getMinutes(),
+        totalMinutes: spTime.getHours() * 60 + spTime.getMinutes()
+    };
 }
 
 // =============================================
-// CODE-008: Out-of-hours detection
+// CODE-008: Out-of-hours detection (13:30 até 23:00)
 // =============================================
 function isOutOfHours() {
-    const hour = getSaoPauloHour();
-    return hour < 11 || hour >= 23;
+    const { totalMinutes } = getSaoPauloTime();
+    const startMinutes = 13 * 60 + 30; // 13:30 = 810 min
+    const endMinutes = 23 * 60;        // 23:00 = 1380 min
+    return totalMinutes < startMinutes || totalMinutes >= endMinutes;
 }
 
 // =============================================
@@ -1212,7 +1217,7 @@ async function processMessage(msg, senderNumber, chatId, messageText, accumulate
         try {
             contact = await msg.getContact();
         } catch (e) {
-            console.warn('⚠️ msg.getContact indisponível (usando fallback seguro):', e.message);
+            console.warn('⚠️ msg.getContact indisponível:', e.message);
         }
         
         // --- SILÊNCIO PÓS-COMPROVANTE ---
@@ -1220,6 +1225,42 @@ async function processMessage(msg, senderNumber, chatId, messageText, accumulate
         if (silentChats.has(senderNumber)) {
             console.log(`🔕 [Silêncio Pós-Comprovante] Mensagem de ${senderNumber} ignorada pela IA pois o pedido já foi concluído.`);
             return;
+        }
+
+        // =============================================
+        // TRATAMENTO DE PERGUNTA DE HORÁRIO / ESTÃO ABERTOS
+        // =============================================
+        const isAskingAboutHours = /\b(est[aã]o abertos|t[aã]o abertos|abertos|t[aã]o atendendo|est[aã]o atendendo|que horas abrem|qual o hor[aá]rio|hor[aá]rio de funcionamento)\b/i.test(messageText);
+
+        if (isAskingAboutHours) {
+            if (!isOutOfHours()) {
+                // Dentro do horário comercial (13:30 às 23:00)
+                const openMessages = [
+                    'estamos abertos sim amg!',
+                    'nosso funcionamento é das 13:30 até as 23hrs, como posso te ajudar?'
+                ];
+                initConversation(senderNumber);
+                conversationHistory[senderNumber].push(
+                    { role: 'user', content: messageText },
+                    { role: 'assistant', content: openMessages.join('\n') }
+                );
+                await sendSequentialMessages(chat, msg, openMessages, chatId, isFirstMessage);
+                return;
+            } else {
+                // Fora do horário comercial
+                reservationMode.add(chatId);
+                const closedMessages = [
+                    'estamos fora do horário de serviço no momento, nosso funcionamento é das 13:30 até as 23hrs',
+                    'porém caso queira deixar o seu pedido reservado para o horário mais próximo de funcionamento estamos disponíveis para reserva'
+                ];
+                initConversation(senderNumber);
+                conversationHistory[senderNumber].push(
+                    { role: 'user', content: messageText },
+                    { role: 'assistant', content: closedMessages.join('\n') }
+                );
+                await sendSequentialMessages(chat, msg, closedMessages, chatId, isFirstMessage);
+                return;
+            }
         }
 
         // Check if this is the first message ever from this client
@@ -1232,7 +1273,7 @@ async function processMessage(msg, senderNumber, chatId, messageText, accumulate
             reservationMode.add(chatId);
 
             const outOfHoursMessages = [
-                'Estamos fora do horário de serviço, nosso funcionamento é das 11hrs até as 23hrs',
+                'estamos fora do horário de serviço no momento, nosso funcionamento é das 13:30 até as 23hrs',
                 'porém caso queira deixar o seu pedido reservado para o horário mais próximo de funcionamento estamos disponíveis para reserva'
             ];
 
