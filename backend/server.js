@@ -1392,51 +1392,17 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
             })
             .sort((a, b) => a.name.localeCompare(b.name));
 
-        // 2. Extração profunda de grupos via Puppeteer
+        // 2. Extração profunda de grupos via Puppeteer com scroll assíncrono real
         let groups = [];
         try {
-            const rawGroups = await client.pupPage.evaluate(() => {
+            const rawGroups = await client.pupPage.evaluate(async () => {
                 const results = [];
+                const seenTitles = new Set();
+                
                 try {
-                    // Varredura abrangente no objeto window
-                    const store = window.Store;
-                    if (store) {
-                        // 1. Tenta Chat.getModelsArray() ou Chat.models ou Chat._models
-                        const chatCollection = store.Chat;
-                        if (chatCollection) {
-                            const chatList = chatCollection.getModelsArray ? chatCollection.getModelsArray() : (chatCollection.models || chatCollection._models || []);
-                            chatList.forEach(c => {
-                                const idStr = c.id?._serialized || (typeof c.id === 'string' ? c.id : '') || `${c.id?.user}@g.us`;
-                                if (c.isGroup || idStr.endsWith('@g.us') || c.id?.server === 'g.us') {
-                                    results.push({
-                                        id: idStr,
-                                        name: c.name || c.formattedTitle || c.title || 'Grupo WhatsApp',
-                                        unreadCount: c.unreadCount || 0,
-                                        participantsCount: (c.groupMetadata?.participants?.length) || 0
-                                    });
-                                }
-                            });
-                        }
-
-                        // 2. Se vazio, tenta GroupMetadata
-                        if (results.length === 0 && store.GroupMetadata) {
-                            const metaList = store.GroupMetadata.getModelsArray ? store.GroupMetadata.getModelsArray() : (store.GroupMetadata.models || store.GroupMetadata._models || []);
-                            metaList.forEach(m => {
-                                const idStr = m.id?._serialized || (typeof m.id === 'string' ? m.id : '') || `${m.id?.user}@g.us`;
-                                results.push({
-                                    id: idStr,
-                                    name: m.subject || m.name || 'Grupo WhatsApp VIP',
-                                    unreadCount: 0,
-                                    participantsCount: m.participants?.length || 0
-                                });
-                            });
-                        }
-                    }
-
-                    // 3. Varredura profunda com scroll assíncrono até o fim
                     const sidePane = document.querySelector('#pane-side');
                     if (sidePane) {
-                        const seenTitles = new Set();
+                        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
                         
                         const extractVisible = () => {
                             const items = sidePane.querySelectorAll('div[tabindex="-1"], div[role="listitem"], div[data-testid="cell-frame-container"]');
@@ -1445,7 +1411,7 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
                                 const title = titleEl ? titleEl.getAttribute('title')?.trim() : '';
                                 if (!title || seenTitles.has(title)) return;
 
-                                // Verifica se o item tem elementos de grupo no HTML ou palavras-chave
+                                // Verifica se o item tem elementos de grupo ou palavras-chave conhecidas
                                 const isGrp = el.querySelector('[data-testid="default-group"]') || 
                                               el.querySelector('[data-icon="default-group"]') || 
                                               el.innerHTML.includes('default-group') ||
@@ -1494,14 +1460,15 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
                             });
                         };
 
-                        // Executa varredura profunda com múltiplos saltos no scroll
-                        const totalHeight = sidePane.scrollHeight || 10000;
-                        const step = 450;
-                        for (let pos = 0; pos <= totalHeight; pos += step) {
-                            sidePane.scrollTop = pos;
+                        // Realiza scroll gradual com delay de renderização
+                        extractVisible();
+                        const maxScroll = sidePane.scrollHeight || 8000;
+                        for (let top = 400; top <= maxScroll; top += 400) {
+                            sidePane.scrollTop = top;
+                            await sleep(80);
                             extractVisible();
                         }
-                        sidePane.scrollTop = 0; // Volta para o topo
+                        sidePane.scrollTop = 0; // Volta ao topo
                     }
                 } catch (err) {
                     return [{ error: err.message }];
@@ -1511,7 +1478,7 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
 
             if (Array.isArray(rawGroups)) {
                 rawGroups.forEach(g => {
-                    if (g && g.id && !g.error) {
+                    if (g && g.id && !g.error && !groups.some(existing => existing.name === g.name)) {
                         groups.push(g);
                     }
                 });
