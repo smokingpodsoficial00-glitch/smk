@@ -23,17 +23,21 @@ import {
   Layers,
   ChevronRight,
   Sliders,
-  CheckCircle2
+  CheckCircle2,
+  Plus,
+  Trash2,
+  Minus
 } from "lucide-react";
 
-interface ReplenishmentPlannerModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  currentCash?: number;
-  stockRetailValue?: number;
-  stockCostValue?: number;
-  totalPodsInStock?: number;
-  onGoalsUpdated?: (newGoals: FinancialGoals) => void;
+export interface OrderItem {
+  id: string;
+  brand: string;
+  model: string;
+  qty: number;
+  unitCost: number;
+  unitSell: number;
+  flavors: string;
+  badge?: string;
 }
 
 export interface FinancialGoals {
@@ -52,7 +56,20 @@ export const DEFAULT_GOALS: FinancialGoals = {
   annualRevenueGoal: 100000,
 };
 
+export const DEFAULT_ORDER_ITEMS: OrderItem[] = [
+  { id: "1", brand: "Elfbar", model: "BC15K", qty: 3, unitCost: 48, unitSell: 64.99, badge: "Alto Giro / Menor Custo", flavors: "Blue Razz Ice (2x), Strawberry Kiwi" },
+  { id: "2", brand: "Elfbar", model: "Ice King 40K", qty: 2, unitCost: 70, unitSell: 89.90, badge: "Campeão #1 de Vendas", flavors: "Green Apple Ice, Watermelon Ice" },
+  { id: "3", brand: "Lost Mary", model: "Dura 35K", qty: 3, unitCost: 65, unitSell: 79.90, badge: "Excelente Retenção", flavors: "Pom. Cherry Pineapple, Grape Ice" },
+  { id: "4", brand: "Oxbar", model: "50K", qty: 1, unitCost: 65, unitSell: 99.90, badge: "Maior Margem Líquida", flavors: "Pineapple Ice" },
+  { id: "5", brand: "Elfbar", model: "GH23K", qty: 1, unitCost: 65, unitSell: 86.90, badge: "Desejo de Catálogo", flavors: "Grape Ice" },
+  { id: "6", brand: "Ignite", model: "V500", qty: 1, unitCost: 80, unitSell: 108.90, badge: "Modelo Premium", flavors: "Strawberry Kiwi" },
+  { id: "7", brand: "Ignite", model: "V55 Ultra Thin", qty: 1, unitCost: 52, unitSell: 71.90, badge: "Entrada Acessível", flavors: "Strawberry Ice" },
+  { id: "8", brand: "Ignite", model: "V80 Ultra Slim", qty: 1, unitCost: 55, unitSell: 78.90, badge: "Margem & Variedade", flavors: "Passion Fruit Sour Kiwi" },
+  { id: "9", brand: "Geek Bar", model: "Pulse 15K", qty: 2, unitCost: 70, unitSell: 94.90, badge: "Marca Nova / Novidade", flavors: "Sabores Sortidos / Menta" },
+];
+
 export const LOCAL_STORAGE_GOALS_KEY = "smk_financial_goals_v1";
+export const LOCAL_STORAGE_ORDER_KEY = "smk_active_purchase_order_v2";
 
 export function loadSavedGoals(): FinancialGoals {
   try {
@@ -60,6 +77,24 @@ export function loadSavedGoals(): FinancialGoals {
     if (saved) return { ...DEFAULT_GOALS, ...JSON.parse(saved) };
   } catch (e) {}
   return DEFAULT_GOALS;
+}
+
+export function loadSavedOrderItems(): OrderItem[] {
+  try {
+    const saved = localStorage.getItem(LOCAL_STORAGE_ORDER_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch (e) {}
+  return DEFAULT_ORDER_ITEMS;
+}
+
+interface ReplenishmentPlannerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentCash?: number;
+  stockRetailValue?: number;
+  stockCostValue?: number;
+  totalPodsInStock?: number;
+  onGoalsUpdated?: (newGoals: FinancialGoals) => void;
 }
 
 export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps> = ({
@@ -71,29 +106,106 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
   totalPodsInStock = 12,
   onGoalsUpdated,
 }) => {
-  const [activeTab, setActiveTab] = useState<"goals" | "order" | "contingency">("goals");
+  const [activeTab, setActiveTab] = useState<"goals" | "order" | "contingency">("order");
 
   // Estado das Metas Editáveis
   const [goals, setGoals] = useState<FinancialGoals>(loadSavedGoals);
   const [isEditingGoals, setIsEditingGoals] = useState(false);
   const [tempGoals, setTempGoals] = useState<FinancialGoals>(goals);
-  const [copiedOrder, setCopiedOrder] = useState(false);
   const [savedSuccessAlert, setSavedSuccessAlert] = useState(false);
 
-  // Marca Nova Selecionada no Buffer
-  const [selectedNewBrand, setSelectedNewBrand] = useState("Geek Bar Pulse 15K");
-  const [customNewBrandCost, setCustomNewBrandCost] = useState("70");
+  // Estado dos Itens do Pedido (100% Maleável e Editável)
+  const [orderItems, setOrderItems] = useState<OrderItem[]>(loadSavedOrderItems);
+  const [supplierShippingFee, setSupplierShippingFee] = useState<number>(50);
+  const [copiedOrder, setCopiedOrder] = useState(false);
+
+  // Formulário para Adicionar Novo Pod ao Pedido
+  const [showAddPodForm, setShowAddPodForm] = useState(false);
+  const [newPodBrand, setNewPodBrand] = useState("");
+  const [newPodModel, setNewPodModel] = useState("");
+  const [newPodQty, setNewPodQty] = useState("1");
+  const [newPodCost, setNewPodCost] = useState("65");
+  const [newPodSell, setNewPodSell] = useState("89.90");
+  const [newPodFlavors, setNewPodFlavors] = useState("Sabores Sortidos");
 
   useEffect(() => {
     if (isOpen) {
-      const current = loadSavedGoals();
-      setGoals(current);
-      setTempGoals(current);
+      const curGoals = loadSavedGoals();
+      setGoals(curGoals);
+      setTempGoals(curGoals);
+      setOrderItems(loadSavedOrderItems());
       setIsEditingGoals(false);
+      setShowAddPodForm(false);
       setSavedSuccessAlert(false);
     }
   }, [isOpen]);
 
+  // Salvar itens do pedido no localStorage automaticamente
+  const saveOrderItemsToStorage = (items: OrderItem[]) => {
+    setOrderItems(items);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_ORDER_KEY, JSON.stringify(items));
+    } catch (e) {}
+  };
+
+  const handleUpdateItemQty = (id: string, delta: number) => {
+    const updated = orderItems.map(item => {
+      if (item.id === id) {
+        const newQ = Math.max(1, item.qty + delta);
+        return { ...item, qty: newQ };
+      }
+      return item;
+    });
+    saveOrderItemsToStorage(updated);
+  };
+
+  const handleUpdateItemField = (id: string, field: keyof OrderItem, val: any) => {
+    const updated = orderItems.map(item => {
+      if (item.id === id) {
+        return { ...item, [field]: val };
+      }
+      return item;
+    });
+    saveOrderItemsToStorage(updated);
+  };
+
+  const handleRemoveItem = (id: string) => {
+    const updated = orderItems.filter(item => item.id !== id);
+    saveOrderItemsToStorage(updated);
+  };
+
+  const handleAddPodToOrder = () => {
+    if (!newPodModel.trim()) return;
+
+    const newItem: OrderItem = {
+      id: Date.now().toString(),
+      brand: newPodBrand.trim() || "Pod",
+      model: newPodModel.trim(),
+      qty: Math.max(1, parseInt(newPodQty) || 1),
+      unitCost: parseFloat(newPodCost) || 65,
+      unitSell: parseFloat(newPodSell) || 89.90,
+      flavors: newPodFlavors.trim() || "Sabores Sortidos",
+      badge: "Novo Item Adicionado"
+    };
+
+    const updated = [...orderItems, newItem];
+    saveOrderItemsToStorage(updated);
+
+    // Reset Form
+    setNewPodBrand("");
+    setNewPodModel("");
+    setNewPodQty("1");
+    setNewPodCost("65");
+    setNewPodSell("89.90");
+    setNewPodFlavors("Sabores Sortidos");
+    setShowAddPodForm(false);
+  };
+
+  const handleResetOrderToDefault = () => {
+    saveOrderItemsToStorage(DEFAULT_ORDER_ITEMS);
+  };
+
+  // Salvar Metas
   const handleSaveGoals = () => {
     setGoals(tempGoals);
     setIsEditingGoals(false);
@@ -122,7 +234,16 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
     }
   };
 
-  // Cálculos de Progresso em Tempo Real
+  // Cálculos Financeiros Dinâmicos do Pedido
+  const totalUnitsInOrder = orderItems.reduce((acc, it) => acc + it.qty, 0);
+  const totalCostOfOrder = orderItems.reduce((acc, it) => acc + (it.qty * it.unitCost), 0);
+  const totalSellOfOrder = orderItems.reduce((acc, it) => acc + (it.qty * it.unitSell), 0);
+
+  const totalSpentWithShipping = totalCostOfOrder + supplierShippingFee;
+  const projectedNetProfit = totalSellOfOrder - totalSpentWithShipping;
+  const dilutedShippingPerPod = totalUnitsInOrder > 0 ? (supplierShippingFee / totalUnitsInOrder).toFixed(2) : "0.00";
+
+  // Cálculos de Metas em Tempo Real
   const activeReorderGoal = isEditingGoals ? tempGoals.reorderCashGoal : goals.reorderCashGoal;
   const activeParaguayGoal = isEditingGoals ? tempGoals.paraguayScaleGoal : goals.paraguayScaleGoal;
 
@@ -134,48 +255,20 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
   const podsNeededToSell = averagePodPrice > 0 ? Math.ceil(cashNeededForReorder / averagePodPrice) : 0;
   const paraguayProgressPct = activeParaguayGoal > 0 ? Math.min(100, Math.round((totalEquity / activeParaguayGoal) * 100)) : 100;
 
-  // Itens da Ordem de Compra Fixa
-  const fixedOrderItems = [
-    { brand: "Elfbar", model: "BC15K", qty: 3, unitCost: 48, unitSell: 64.99, badge: "Alto Giro / Menor Custo", flavors: "Blue Razz Ice (2x), Strawberry Kiwi" },
-    { brand: "Elfbar", model: "Ice King 40K", qty: 2, unitCost: 70, unitSell: 89.90, badge: "Campeão #1 de Vendas", flavors: "Green Apple Ice, Watermelon Ice" },
-    { brand: "Lost Mary", model: "Dura 35K", qty: 3, unitCost: 65, unitSell: 79.90, badge: "Excelente Retenção", flavors: "Pom. Cherry Pineapple, Grape Ice" },
-    { brand: "Oxbar", model: "50K", qty: 1, unitCost: 65, unitSell: 99.90, badge: "Maior Margem Líquida", flavors: "Pineapple Ice" },
-    { brand: "Elfbar", model: "GH23K", qty: 1, unitCost: 65, unitSell: 86.90, badge: "Desejo de Catálogo", flavors: "Grape Ice" },
-    { brand: "Ignite", model: "V500", qty: 1, unitCost: 80, unitSell: 108.90, badge: "Modelo Premium", flavors: "Strawberry Kiwi" },
-    { brand: "Ignite", model: "V55 Ultra Thin", qty: 1, unitCost: 52, unitSell: 71.90, badge: "Entrada Acessível", flavors: "Strawberry Ice" },
-    { brand: "Ignite", model: "V80 Ultra Slim", qty: 1, unitCost: 55, unitSell: 78.90, badge: "Margem & Variedade", flavors: "Passion Fruit Sour Kiwi" },
-  ];
-
-  const fixedCostTotal = fixedOrderItems.reduce((acc, item) => acc + (item.qty * item.unitCost), 0);
-  const fixedSellTotal = fixedOrderItems.reduce((acc, item) => acc + (item.qty * item.unitSell), 0);
-  const fixedUnitsTotal = fixedOrderItems.reduce((acc, item) => acc + item.qty, 0);
-
-  const newBrandCost = parseFloat(customNewBrandCost) || 70;
-  const newBrandSell = 94.90;
-  const totalOrderCostWithBuffer = fixedCostTotal + (2 * newBrandCost);
-  const totalOrderSellWithBuffer = fixedSellTotal + (2 * newBrandSell);
-  const totalOrderUnits = fixedUnitsTotal + 2;
-
-  const supplierShippingFee = 50;
-  const totalSpentWithShipping = totalOrderCostWithBuffer + supplierShippingFee;
-  const projectedNetProfit = totalOrderSellWithBuffer - totalSpentWithShipping;
-  const dilutedShippingPerPod = totalOrderUnits > 0 ? (supplierShippingFee / totalOrderUnits).toFixed(2) : "2.94";
-
-  // Gerador de Texto para WhatsApp do Fornecedor
+  // Gerador de Texto para WhatsApp do Fornecedor Baseado na Lista Real do Usuário
   const generatedWhatsAppMessage = useMemo(() => {
     return `📦 *PEDIDO DE REPOSIÇÃO — SMOKING PODS*
 📍 *Origem:* São Bernardo do Campo / SP
-💰 *Lote Fechado:* ~R$ ${goals.reorderCashGoal.toLocaleString("pt-BR")},00
+💰 *Lote Total:* R$ ${totalSpentWithShipping.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
 
 *LISTA DE MODELOS E QUANTIDADES:*
-${fixedOrderItems.map(item => `• ${item.qty}x ${item.brand} ${item.model} (${item.flavors})`).join("\n")}
-• 2x ${selectedNewBrand} (Marca Nova / Sabores Sortidos)
+${orderItems.map(item => `• ${item.qty}x ${item.brand} ${item.model} (${item.flavors})`).join("\n")}
 
-*Total de Peças:* ${totalOrderUnits} unidades
-*Frete Estimado:* R$ 50,00 (Diluído: R$ ${dilutedShippingPerPod}/pod)
+*Total de Peças:* ${totalUnitsInOrder} unidades
+*Frete Estimado:* R$ ${supplierShippingFee.toFixed(2)} (Diluído: R$ ${dilutedShippingPerPod}/pod)
 
 Por favor, me confirme a disponibilidade destes sabores e a chave Pix para faturarmos o pedido! 🚀`;
-  }, [fixedOrderItems, selectedNewBrand, totalOrderUnits, dilutedShippingPerPod, goals.reorderCashGoal]);
+  }, [orderItems, totalUnitsInOrder, totalSpentWithShipping, supplierShippingFee, dilutedShippingPerPod]);
 
   const handleCopyOrderText = () => {
     try {
@@ -190,26 +283,26 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-[#0f1216] border border-white/15 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-[#0f1216] border border-white/15 rounded-2xl w-full max-w-4xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden">
         
         {/* ─── HEADER MODAL ─── */}
         <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-emerald-950/40 via-transparent to-amber-950/20">
           <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+            <div className="size-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.2)] shrink-0">
               <Boxes className="size-5 text-emerald-400" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                  Planejador de Estoque & Metas de Escala
+                  Planejador de Estoque, Recompra & Metas
                 </h3>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-extrabold uppercase tracking-wider">
-                  Lote Ativo: R$ {goals.reorderCashGoal.toLocaleString("pt-BR")}
+                  {totalUnitsInOrder} Peças no Pedido
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Gatilhos automáticos 100% editáveis, diluição de frete e metas dinâmicas de patrimônio
+                Monte, adicione e personalize o pedido exato para envio ao fornecedor
               </p>
             </div>
           </div>
@@ -223,9 +316,22 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
           </button>
         </div>
 
-        {/* ─── NAVEGAÇÃO DE ABAS + BOTÃO GLOBAL DE EDITAR ─── */}
+        {/* ─── NAVEGAÇÃO DE ABAS ─── */}
         <div className="flex flex-wrap items-center justify-between border-b border-white/10 px-4 sm:px-6 bg-black/30 gap-2">
           <div className="flex">
+            <button
+              type="button"
+              onClick={() => setActiveTab("order")}
+              className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                activeTab === "order"
+                  ? "border-amber-400 text-amber-400 bg-amber-500/5"
+                  : "border-transparent text-muted-foreground hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <ShoppingCart className="size-3.5" />
+              <span>📦 Pedido Ativo & WhatsApp ({totalUnitsInOrder} pods)</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setActiveTab("goals")}
@@ -237,19 +343,6 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
             >
               <Target className="size-3.5" />
               <span>🎯 Metas & Termômetro de Caixa</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("order")}
-              className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-                activeTab === "order"
-                  ? "border-amber-400 text-amber-400 bg-amber-500/5"
-                  : "border-transparent text-muted-foreground hover:text-white hover:bg-white/5"
-              }`}
-            >
-              <ShoppingCart className="size-3.5" />
-              <span>📦 Pedido Ativo & WhatsApp</span>
             </button>
 
             <button
@@ -266,7 +359,29 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
             </button>
           </div>
 
-          {/* Botões de Ação de Metas no Topo */}
+          {/* Ações de Topo para Pedido e Metas */}
+          {activeTab === "order" && (
+            <div className="py-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleResetOrderToDefault}
+                className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-[11px] font-bold transition-colors cursor-pointer"
+                title="Voltar para a sugestão padrão de 15 peças da IA"
+              >
+                <RotateCcw className="size-3 inline mr-1" />
+                Restaurar Sugestão IA
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAddPodForm(!showAddPodForm)}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-black text-xs font-extrabold shadow-[0_0_15px_rgba(16,185,129,0.25)] transition-all cursor-pointer active:scale-95"
+              >
+                <Plus className="size-3.5 text-black" />
+                <span>Adicionar Pod ao Pedido</span>
+              </button>
+            </div>
+          )}
+
           {activeTab === "goals" && (
             <div className="py-2 flex items-center gap-2">
               {savedSuccessAlert && (
@@ -318,7 +433,311 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar">
 
           {/* ════════════════════════════════════════════════════════════
-              ABA 1: METAS & TERMÔMETRO DE CAIXA
+              ABA 1: PEDIDO ATIVO & WHATSAPP (100% DINÂMICO)
+          ════════════════════════════════════════════════════════════ */}
+          {activeTab === "order" && (
+            <div className="space-y-6">
+
+              {/* Formulário Retrátil para Adicionar Novo Pod ao Pedido */}
+              {showAddPodForm && (
+                <div className="bg-card border border-emerald-500/40 rounded-2xl p-4 sm:p-5 space-y-4 bg-gradient-to-b from-emerald-950/25 to-transparent shadow-[0_0_20px_rgba(16,185,129,0.1)] animate-in slide-in-from-top-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Plus className="size-4 text-emerald-400" />
+                      <h4 className="text-sm font-bold text-white">Adicionar Novo Modelo / Pod ao Pedido</h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddPodForm(false)}
+                      className="size-6 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white grid place-items-center"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-muted-foreground">Marca</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Elfbar, Ignite, Waka..."
+                        value={newPodBrand}
+                        onChange={(e) => setNewPodBrand(e.target.value)}
+                        className="w-full bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-400"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-muted-foreground">Modelo do Pod *</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: BC15K, Pulse 15K, V50..."
+                        value={newPodModel}
+                        onChange={(e) => setNewPodModel(e.target.value)}
+                        className="w-full bg-black/50 border border-emerald-500/50 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-400"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-muted-foreground">Quantidade</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={newPodQty}
+                        onChange={(e) => setNewPodQty(e.target.value)}
+                        className="w-full bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-400"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-muted-foreground">Custo Unitário (R$)</label>
+                      <input
+                        type="number"
+                        value={newPodCost}
+                        onChange={(e) => setNewPodCost(e.target.value)}
+                        className="w-full bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-emerald-400 focus:outline-none focus:border-emerald-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1 sm:col-span-2">
+                      <label className="text-[11px] font-semibold text-muted-foreground">Sabores Escolhidos</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Watermelon Ice, Blue Razz, Grape..."
+                        value={newPodFlavors}
+                        onChange={(e) => setNewPodFlavors(e.target.value)}
+                        className="w-full bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-400"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-muted-foreground">Preço de Venda Pretendido (R$)</label>
+                      <input
+                        type="number"
+                        value={newPodSell}
+                        onChange={(e) => setNewPodSell(e.target.value)}
+                        className="w-full bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-amber-300 focus:outline-none focus:border-emerald-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddPodForm(false)}
+                      className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddPodToOrder}
+                      disabled={!newPodModel.trim()}
+                      className="px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] disabled:opacity-50 cursor-pointer"
+                    >
+                      Confirmar e Inserir no Pedido
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tabela Interativa de Itens do Pedido */}
+              <div className="bg-card border border-white/10 rounded-2xl overflow-hidden shadow-lg">
+                <div className="p-4 bg-white/5 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Package className="size-4 text-emerald-400" />
+                    <span className="text-xs uppercase font-bold text-white tracking-wider">
+                      Itens do Pedido de Reposição ({totalUnitsInOrder} Peças • Custo Produtos: R$ {totalCostOfOrder.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    Edite quantidades (+ / -), custos ou remova itens
+                  </span>
+                </div>
+
+                <div className="divide-y divide-white/5">
+                  {orderItems.map((item) => (
+                    <div key={item.id} className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors">
+                      
+                      {/* Dados do Pod */}
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {/* Stepper de Quantidade */}
+                        <div className="flex items-center bg-black/40 border border-white/10 rounded-xl p-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateItemQty(item.id, -1)}
+                            className="size-6 rounded-lg bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors"
+                          >
+                            <Minus className="size-3" />
+                          </button>
+                          <span className="w-8 text-center text-xs font-extrabold text-emerald-400">
+                            {item.qty}x
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateItemQty(item.id, 1)}
+                            className="size-6 rounded-lg bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors"
+                          >
+                            <Plus className="size-3" />
+                          </button>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-bold text-white truncate">
+                              {item.brand} {item.model}
+                            </span>
+                            {item.badge && (
+                              <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-white/5 text-silver border border-white/10 shrink-0">
+                                {item.badge}
+                              </span>
+                            )}
+                          </div>
+                          
+                          {/* Edição Rápida de Sabores */}
+                          <div className="mt-1">
+                            <input
+                              type="text"
+                              value={item.flavors}
+                              onChange={(e) => handleUpdateItemField(item.id, "flavors", e.target.value)}
+                              className="w-full bg-transparent border-b border-transparent hover:border-white/20 focus:border-emerald-400 text-xs text-muted-foreground focus:text-white px-1 py-0.5 focus:outline-none transition-colors"
+                              placeholder="Sabores deste modelo..."
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Valores e Custo Unitário Editável */}
+                      <div className="flex items-center justify-between sm:justify-end gap-4 self-stretch sm:self-center shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-white/5">
+                        <div className="text-right">
+                          <span className="text-[10px] text-muted-foreground block">Custo Unit.</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-muted-foreground">R$</span>
+                            <input
+                              type="number"
+                              value={item.unitCost}
+                              onChange={(e) => handleUpdateItemField(item.id, "unitCost", parseFloat(e.target.value) || 0)}
+                              className="w-14 bg-black/30 border border-white/10 hover:border-white/25 focus:border-emerald-400 rounded px-1.5 py-0.5 text-xs font-bold text-white text-right focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-[10px] text-muted-foreground block">Custo Total</span>
+                          <span className="text-xs font-extrabold text-white">
+                            R$ {(item.qty * item.unitCost).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-[10px] text-muted-foreground block">Venda Est.</span>
+                          <span className="text-xs font-bold text-emerald-400">
+                            R$ {item.unitSell.toFixed(2)}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(item.id)}
+                          className="size-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 grid place-items-center cursor-pointer transition-colors ml-1"
+                          title="Remover do pedido"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+
+                    </div>
+                  ))}
+
+                  {orderItems.length === 0 && (
+                    <div className="p-8 text-center text-muted-foreground space-y-2">
+                      <Package className="size-8 mx-auto text-muted-foreground/50" />
+                      <p className="text-xs">Nenhum pod adicionado ao pedido.</p>
+                      <button
+                        type="button"
+                        onClick={handleResetOrderToDefault}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-500 text-black text-xs font-bold"
+                      >
+                        Carregar Sugestão da IA
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Totalizador Financeiro e Reconciliação em Tempo Real */}
+              <div className="bg-black/40 border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
+                
+                {/* Linha de Custo de Frete do Fornecedor */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="size-4 text-cyan-400" />
+                    <span className="text-xs font-bold text-white">Frete Estimado do Fornecedor de SP:</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">R$</span>
+                    <input
+                      type="number"
+                      value={supplierShippingFee}
+                      onChange={(e) => setSupplierShippingFee(parseFloat(e.target.value) || 0)}
+                      className="w-20 bg-black/60 border border-white/15 rounded-lg px-2 py-1 text-xs font-bold text-cyan-300 text-right focus:outline-none focus:border-cyan-400"
+                    />
+                    <span className="text-[11px] text-muted-foreground">
+                      (Diluído: <strong className="text-cyan-400">R$ {dilutedShippingPerPod}/pod</strong>)
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4 Cards de Métricas Consolidadas */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Total de Peças</span>
+                    <span className="text-xl font-extrabold text-white">{totalUnitsInOrder} un</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Total Investido</span>
+                    <span className="text-xl font-extrabold text-white">R$ {totalSpentWithShipping.toFixed(2)}</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Faturamento Previsto</span>
+                    <span className="text-xl font-bold text-amber-300">R$ {totalSellOfOrder.toFixed(2)}</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                    <span className="text-[10px] uppercase font-bold text-emerald-400 block">Lucro Líquido Limpo</span>
+                    <span className="text-xl font-extrabold text-emerald-400">R$ {projectedNetProfit.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Botão de Cópia para WhatsApp com a lista exata */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCopyOrderText}
+                    disabled={orderItems.length === 0}
+                    className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-black text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                  >
+                    {copiedOrder ? (
+                      <>
+                        <Check className="size-4 text-black" />
+                        <span>✅ Mensagem do Pedido Copiada para a Área de Transferência!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="size-4 text-black" />
+                        <span>📋 Copiar Pedido Formatado para o WhatsApp do Fornecedor ({totalUnitsInOrder} Peças)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════
+              ABA 2: METAS & TERMÔMETRO DE CAIXA
           ════════════════════════════════════════════════════════════ */}
           {activeTab === "goals" && (
             <div className="space-y-6">
@@ -358,7 +777,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                 </div>
               </div>
 
-              {/* 🎯 GATILHO #1: META DO LOTE DE COMPRA (100% EDITÁVEL) */}
+              {/* GATILHO #1: META DO LOTE DE COMPRA (100% EDITÁVEL) */}
               <div className="bg-card border border-emerald-500/30 rounded-2xl p-5 space-y-4 bg-gradient-to-b from-emerald-950/20 to-transparent shadow-[0_0_20px_rgba(16,185,129,0.05)]">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
@@ -445,7 +864,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                 </div>
               </div>
 
-              {/* 🎯 GATILHO #2: TRANSIÇÃO DE ESCALA / PARAGUAI (100% EDITÁVEL) */}
+              {/* GATILHO #2: TRANSIÇÃO DE ESCALA / PARAGUAI (100% EDITÁVEL) */}
               <div className="bg-card border border-white/10 rounded-2xl p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
@@ -502,7 +921,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                 </div>
               </div>
 
-              {/* 🎯 PAINEL DE METAS PERIÓDICAS (MENSAL, TRIMESTRAL, ANUAL) — 100% EDITÁVEIS */}
+              {/* PAINEL DE METAS PERIÓDICAS (MENSAL, TRIMESTRAL, ANUAL) — 100% EDITÁVEIS */}
               <div className="bg-card border border-white/10 rounded-2xl p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -514,7 +933,6 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Meta Mensal */}
                   <div className="border border-white/10 rounded-xl p-3.5 bg-black/20 space-y-1.5">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground">Meta Mensal (Faturamento)</span>
                     {isEditingGoals ? (
@@ -537,7 +955,6 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                     </span>
                   </div>
 
-                  {/* Meta Trimestral */}
                   <div className="border border-white/10 rounded-xl p-3.5 bg-black/20 space-y-1.5">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground">Meta Trimestral (Q1..Q4)</span>
                     {isEditingGoals ? (
@@ -558,7 +975,6 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                     <span className="text-[10px] text-muted-foreground block">Escala contínua</span>
                   </div>
 
-                  {/* Meta Anual */}
                   <div className="border border-white/10 rounded-xl p-3.5 bg-black/20 space-y-1.5">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground">Meta Anual (Consolidação)</span>
                     {isEditingGoals ? (
@@ -578,149 +994,6 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                     )}
                     <span className="text-[10px] text-muted-foreground block">Domínio do Grande ABC</span>
                   </div>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* ════════════════════════════════════════════════════════════
-              ABA 2: PEDIDO ATIVO & WHATSAPP
-          ════════════════════════════════════════════════════════════ */}
-          {activeTab === "order" && (
-            <div className="space-y-6">
-              
-              {/* Tabela do Núcleo Fixo do Pedido */}
-              <div className="bg-card border border-white/10 rounded-2xl overflow-hidden">
-                <div className="p-4 bg-white/5 border-b border-white/10 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Package className="size-4 text-emerald-400" />
-                    <span className="text-xs uppercase font-bold text-white tracking-wider">
-                      Núcleo Fixo de Reposição (13 Peças • R$ {fixedCostTotal.toFixed(2)})
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-muted-foreground">Baseado em velocidade de saída</span>
-                </div>
-
-                <div className="divide-y divide-white/5">
-                  {fixedOrderItems.map((item, idx) => (
-                    <div key={idx} className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-white/[0.02] transition-colors">
-                      <div className="flex items-center gap-3">
-                        <span className="size-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold grid place-items-center shrink-0">
-                          {item.qty}x
-                        </span>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-white">{item.brand} {item.model}</span>
-                            <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-white/5 text-silver border border-white/10">
-                              {item.badge}
-                            </span>
-                          </div>
-                          <span className="text-xs text-muted-foreground">Sabores: {item.flavors}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-4 text-right self-end sm:self-center">
-                        <div>
-                          <span className="text-[10px] text-muted-foreground block">Custo Total</span>
-                          <span className="text-xs font-bold text-white">R$ {(item.qty * item.unitCost).toFixed(2)}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-muted-foreground block">Preço Venda</span>
-                          <span className="text-xs font-bold text-emerald-400">R$ {item.unitSell.toFixed(2)}/un</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Buffer de Flexibilidade & Marca Nova */}
-              <div className="bg-card border border-amber-500/30 rounded-2xl p-5 space-y-4 bg-gradient-to-b from-amber-950/20 to-transparent">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <Sparkles className="size-4 text-amber-400" />
-                    <div>
-                      <h4 className="text-sm font-bold text-white">
-                        Buffer de Flexibilidade & Marca Nova (Saldo: R$ 180 a R$ 200)
-                      </h4>
-                      <p className="text-xs text-muted-foreground">
-                        Margem para inovação de catálogo e adaptação ao estoque do fornecedor no dia
-                      </p>
-                    </div>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-bold">
-                    +2 Unidades
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-muted-foreground">Marca Nova / Modelo Novidade</label>
-                    <select
-                      value={selectedNewBrand}
-                      onChange={(e) => setSelectedNewBrand(e.target.value)}
-                      className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-400"
-                    >
-                      <option value="Geek Bar Pulse 15K">Geek Bar Pulse 15K (~R$ 70 custo)</option>
-                      <option value="Waka soPro 20K">Waka soPro 20K (~R$ 70 custo)</option>
-                      <option value="Nikbar / Vozol">Nikbar / Vozol (~R$ 60 custo)</option>
-                      <option value="Maskking / Outro">Maskking / Outro Modelo Novidade</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-muted-foreground">Custo Unitário Estimado (R$)</label>
-                    <input
-                      type="number"
-                      value={customNewBrandCost}
-                      onChange={(e) => setCustomNewBrandCost(e.target.value)}
-                      className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Reconciliação Financeira do Lote Completo */}
-              <div className="bg-black/40 border border-white/10 rounded-2xl p-5 space-y-4">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Total de Pods</span>
-                    <span className="text-xl font-bold text-white">{totalOrderUnits} un</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Custo Total + Frete</span>
-                    <span className="text-xl font-bold text-white">R$ {totalSpentWithShipping.toFixed(2)}</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Frete Diluído</span>
-                    <span className="text-xl font-bold text-cyan-400">R$ {dilutedShippingPerPod}/pod</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Lucro Líquido Limpo</span>
-                    <span className="text-xl font-extrabold text-emerald-400">R$ {projectedNetProfit.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {/* Botão de Cópia para WhatsApp */}
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={handleCopyOrderText}
-                    className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-black text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] active:scale-[0.98] cursor-pointer"
-                  >
-                    {copiedOrder ? (
-                      <>
-                        <Check className="size-4 text-black" />
-                        <span>✅ Mensagem do Pedido Copiada para a Área de Transferência!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="size-4 text-black" />
-                        <span>📋 Copiar Pedido Formatado para o WhatsApp do Fornecedor</span>
-                      </>
-                    )}
-                  </button>
                 </div>
               </div>
 
