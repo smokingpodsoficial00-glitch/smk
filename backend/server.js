@@ -1392,59 +1392,88 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
             })
             .sort((a, b) => a.name.localeCompare(b.name));
 
-        // 2. Puxa grupos varrendo diretamente o Store do WhatsApp Web
+        // 2. Extração profunda de grupos via Puppeteer
         let groups = [];
         try {
             const rawGroups = await client.pupPage.evaluate(() => {
                 const results = [];
                 try {
-                    // Método 1: Busca em window.Store.Chat
-                    if (window.Store && window.Store.Chat) {
-                        const chats = window.Store.Chat.getModelsArray ? window.Store.Chat.getModelsArray() : (window.Store.Chat.models || []);
-                        chats.forEach(c => {
-                            const isGrp = c.isGroup || (c.id && (c.id._serialized?.endsWith('@g.us') || c.id.server === 'g.us'));
-                            if (isGrp) {
+                    // Varredura abrangente no objeto window
+                    const store = window.Store;
+                    if (store) {
+                        // 1. Tenta Chat.getModelsArray() ou Chat.models ou Chat._models
+                        const chatCollection = store.Chat;
+                        if (chatCollection) {
+                            const chatList = chatCollection.getModelsArray ? chatCollection.getModelsArray() : (chatCollection.models || chatCollection._models || []);
+                            chatList.forEach(c => {
+                                const idStr = c.id?._serialized || (typeof c.id === 'string' ? c.id : '') || `${c.id?.user}@g.us`;
+                                if (c.isGroup || idStr.endsWith('@g.us') || c.id?.server === 'g.us') {
+                                    results.push({
+                                        id: idStr,
+                                        name: c.name || c.formattedTitle || c.title || 'Grupo WhatsApp',
+                                        unreadCount: c.unreadCount || 0,
+                                        participantsCount: (c.groupMetadata?.participants?.length) || 0
+                                    });
+                                }
+                            });
+                        }
+
+                        // 2. Se vazio, tenta GroupMetadata
+                        if (results.length === 0 && store.GroupMetadata) {
+                            const metaList = store.GroupMetadata.getModelsArray ? store.GroupMetadata.getModelsArray() : (store.GroupMetadata.models || store.GroupMetadata._models || []);
+                            metaList.forEach(m => {
+                                const idStr = m.id?._serialized || (typeof m.id === 'string' ? m.id : '') || `${m.id?.user}@g.us`;
                                 results.push({
-                                    id: c.id._serialized || `${c.id.user}@g.us`,
-                                    name: c.name || c.formattedTitle || c.contact?.name || 'Grupo WhatsApp',
-                                    unreadCount: c.unreadCount || 0,
-                                    participantsCount: (c.groupMetadata && c.groupMetadata.participants) ? c.groupMetadata.participants.length : 0
+                                    id: idStr,
+                                    name: m.subject || m.name || 'Grupo WhatsApp VIP',
+                                    unreadCount: 0,
+                                    participantsCount: m.participants?.length || 0
+                                });
+                            });
+                        }
+                    }
+
+                    // 3. Fallback visual no DOM do WhatsApp Web se Store ainda estiver carregando
+                    if (results.length === 0) {
+                        const chatElements = document.querySelectorAll('#pane-side [role="listitem"], #pane-side [data-testid="cell-frame-container"]');
+                        chatElements.forEach(el => {
+                            const text = el.innerText || '';
+                            const titleEl = el.querySelector('[title]');
+                            const title = titleEl ? titleEl.getAttribute('title') : text.split('\n')[0];
+                            if (title && (title.toLowerCase().includes('grupo') || title.toLowerCase().includes('vip') || title.toLowerCase().includes('smoking') || title.toLowerCase().includes('envios'))) {
+                                results.push({
+                                    id: `dom_${Math.random().toString(36).substr(2, 9)}@g.us`,
+                                    name: title,
+                                    unreadCount: 0,
+                                    participantsCount: 0
                                 });
                             }
                         });
                     }
-
-                    // Método 2: Se vazio, busca em window.Store.GroupMetadata
-                    if (results.length === 0 && window.Store && window.Store.GroupMetadata) {
-                        const meta = window.Store.GroupMetadata.getModelsArray ? window.Store.GroupMetadata.getModelsArray() : (window.Store.GroupMetadata.models || []);
-                        meta.forEach(m => {
-                            results.push({
-                                id: m.id._serialized || `${m.id.user}@g.us`,
-                                name: m.subject || m.name || 'Grupo WhatsApp VIP',
-                                unreadCount: 0,
-                                participantsCount: m.participants ? m.participants.length : 0
-                            });
-                        });
-                    }
-                } catch (e) {}
+                } catch (err) {
+                    return [{ error: err.message }];
+                }
                 return results;
             });
 
-            if (Array.isArray(rawGroups) && rawGroups.length > 0) {
-                const seenGroups = new Set();
-                groups = rawGroups.filter(g => {
-                    if (seenGroups.has(g.id)) return false;
-                    seenGroups.add(g.id);
-                    return true;
-                }).sort((a, b) => a.name.localeCompare(b.name));
+            if (Array.isArray(rawGroups)) {
+                rawGroups.forEach(g => {
+                    if (g && g.id && !g.error) {
+                        groups.push(g);
+                    }
+                });
             }
         } catch (groupEvalErr) {
-            console.warn('⚠️ [Marketing] Falha na leitura direta de grupos:', groupEvalErr.message);
+            console.warn('⚠️ [Marketing] Falha na leitura de grupos:', groupEvalErr.message);
         }
 
         // Se ainda vazio, inclui grupos detectados por mensagens recebidas recentemente
-        if (groups.length === 0 && typeof detectedGroups !== 'undefined') {
-            groups = Object.values(detectedGroups);
+        if (typeof detectedGroups !== 'undefined') {
+            Object.values(detectedGroups).forEach(dg => {
+                if (!groups.some(g => g.id === dg.id)) {
+                    groups.push(dg);
+                }
+            });
         }
 
         console.log(`✅ [Marketing] Encontrados ${contacts.length} contatos e ${groups.length} grupos no WhatsApp.`);
