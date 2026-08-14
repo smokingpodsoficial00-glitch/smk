@@ -1227,6 +1227,9 @@ async function processMessage(msg, senderNumber, chatId, messageText, accumulate
             return;
         }
 
+        // Check if this is the first message ever from this client
+        const isFirstMessage = !conversationHistory[senderNumber];
+
         // =============================================
         // TRATAMENTO DE PERGUNTA DE HORÁRIO / ESTÃO ABERTOS
         // =============================================
@@ -1262,9 +1265,6 @@ async function processMessage(msg, senderNumber, chatId, messageText, accumulate
                 return;
             }
         }
-
-        // Check if this is the first message ever from this client
-        const isFirstMessage = !conversationHistory[senderNumber];
 
         // =============================================
         // CODE-008: OUT-OF-HOURS DETECTION
