@@ -298,7 +298,8 @@ export function FinanceDashboard() {
   const numericMarketingSpent = parseFloat(String(marketingSpent || "0").replace(",", ".")) || 0;
   const netCashAvailable = Math.max(0, (grossRevenue || 0) - (logisticsFee || 0) - numericMarketingSpent);
   const realNetProfitPostMarketing = (netProfit || 0) - numericMarketingSpent;
-  const totalCompanyEquity = (grossRevenue || 0) + (stockAssetCost || 0);
+  // Patrimônio Real Total da Loja = Caixa em Conta + Valor de Venda do Estoque (Custo dos Pods + Lucro Potencial)
+  const totalCompanyEquity = (grossRevenue || 0) + (stockAssetRetail || 0);
   const stockAssetProfit = (stockAssetRetail || 0) - (stockAssetCost || 0);
 
   if (loading) {
@@ -567,7 +568,7 @@ export function FinanceDashboard() {
               {formatBRL(totalCompanyEquity)}
             </div>
             <p className="text-xs text-emerald-200/80 font-medium">
-              Caixa em Conta ({formatBRL(grossRevenue)}) + Custo do Estoque ({formatBRL(stockAssetCost)})
+              Caixa em Conta ({formatBRL(grossRevenue)}) + Venda Total do Estoque ({formatBRL(stockAssetRetail)})
             </p>
           </div>
         </div>
