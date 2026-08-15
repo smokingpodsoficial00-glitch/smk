@@ -116,9 +116,15 @@ export function MarketingModule() {
   const [cardapioUrl, setCardapioUrl] = useState('https://smoking-pods.vercel.app');
   const [grupoVipUrl, setGrupoVipUrl] = useState('');
 
-  // Execução de Disparo
+  // Execução de Disparo & Controle de Pausa Real
   const [executingCampaignId, setExecutingCampaignId] = useState<string | null>(null);
   const [dispatchProgress, setDispatchProgress] = useState<{ current: number; total: number; status: string } | null>(null);
+  const isAbortingRef = React.useRef(false);
+
+  const handleStopCampaign = () => {
+    isAbortingRef.current = true;
+    setDispatchProgress(prev => prev ? { ...prev, status: 'Interrompendo disparos... aguarde o contato atual.' } : null);
+  };
 
   // Carrega Listas e Campanhas salvas no localStorage
   useEffect(() => {
@@ -452,14 +458,31 @@ export function MarketingModule() {
 
     if (!confirm(confirmText)) return;
 
+    isAbortingRef.current = false;
     setExecutingCampaignId(camp.id);
     setDispatchProgress({ current: 0, total: targetContacts.length || 1, status: 'Iniciando disparos com cadência Anti-Ban...' });
 
+    // Histórico de contatos já enviados para evitar repetição acidental
+    const sentHistoryKey = `SP_SENT_CAMPAIGN_${camp.id}`;
+    let alreadySentPhones: string[] = [];
+    try {
+      alreadySentPhones = JSON.parse(localStorage.getItem(sentHistoryKey) || '[]');
+    } catch {}
+
     try {
       if (camp.targetType === 'lists') {
-        let sentCount = 0;
+        let batchCounter = 0;
+
         for (let i = 0; i < targetContacts.length; i++) {
+          // Checa se o usuário clicou em Cancelar / Parar
+          if (isAbortingRef.current) {
+            alert(`Disparo interrompido pelo usuário. Foram enviados ${i} contatos de ${targetContacts.length}.`);
+            break;
+          }
+
           const contact = targetContacts[i];
+          const rawPhone = contact.cleanPhone || contact.phone;
+
           const formattedMsg = camp.message
             .replace(/\[Nome\]/gi, contact.name || 'Cliente')
             .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, cardapioUrl)
@@ -470,31 +493,47 @@ export function MarketingModule() {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                phone: contact.cleanPhone || contact.phone,
+                phone: rawPhone,
                 name: contact.name,
                 text: formattedMsg,
                 companyId: company?.id,
               })
             });
-            sentCount++;
+            alreadySentPhones.push(rawPhone);
+            localStorage.setItem(sentHistoryKey, JSON.stringify(alreadySentPhones));
           } catch (e) {}
 
+          batchCounter++;
           setDispatchProgress({
             current: i + 1,
             total: targetContacts.length,
-            status: `Enviando ${i + 1} de ${targetContacts.length} (${contact.name})...`
+            status: `Enviado ${i + 1} de ${targetContacts.length} para ${contact.name || rawPhone}...`
           });
 
-          // Delay individual seguro (6s)
-          await new Promise(r => setTimeout(r, 6000));
+          // Delay individual seguro entre mensagens (6 a 8 segundos aleatórios)
+          const randomDelay = Math.floor(Math.random() * 2000) + 6000;
+          await new Promise(r => setTimeout(r, randomDelay));
 
-          // Intervalo entre lotes
-          if ((i + 1) % camp.batchSize === 0 && i + 1 < targetContacts.length) {
-            setDispatchProgress(prev => ({
-              ...prev!,
-              status: `Lote concluído! Aguardando intervalo de segurança anti-ban (${camp.batchIntervalMinutes} min)...`
-            }));
-            await new Promise(r => setTimeout(r, 15000));
+          if (isAbortingRef.current) break;
+
+          // Se atingiu o tamanho do lote e ainda há contatos restantes
+          if (batchCounter >= camp.batchSize && (i + 1) < targetContacts.length) {
+            batchCounter = 0;
+            const totalPauseSeconds = (camp.batchIntervalMinutes || 25) * 60;
+
+            for (let remaining = totalPauseSeconds; remaining > 0; remaining--) {
+              if (isAbortingRef.current) break;
+
+              const mins = Math.floor(remaining / 60);
+              const secs = remaining % 60;
+              setDispatchProgress({
+                current: i + 1,
+                total: targetContacts.length,
+                status: `⏸️ Lote concluído! Pausa de segurança anti-ban: ${mins}m ${secs < 10 ? '0' : ''}${secs}s restantes...`
+              });
+
+              await new Promise(r => setTimeout(r, 1000));
+            }
           }
         }
       } else {
@@ -523,12 +562,15 @@ export function MarketingModule() {
         c.id === camp.id ? { ...c, lastRunDate: new Date().toLocaleDateString('pt-BR') } : c
       );
       saveCampaignsToStorage(updated);
-      alert('Disparo da campanha finalizado com sucesso!');
+      if (!isAbortingRef.current) {
+        alert('Disparo da campanha finalizado com sucesso!');
+      }
     } catch (err: any) {
       alert('Erro ao disparar campanha: ' + err.message);
     } finally {
       setExecutingCampaignId(null);
       setDispatchProgress(null);
+      isAbortingRef.current = false;
     }
   };
 
@@ -618,13 +660,22 @@ export function MarketingModule() {
           <div className="space-y-6">
             {/* Banner de Status de Execução Ativo */}
             {executingCampaignId && dispatchProgress && (
-              <div className="p-5 bg-[#0c140e] border border-emerald-500/30 rounded-2xl space-y-3 shadow-[0_0_30px_rgba(16,185,129,0.15)] animate-pulse">
-                <div className="flex justify-between items-center text-xs font-bold">
+              <div className="p-5 bg-[#0c140e] border border-emerald-500/30 rounded-2xl space-y-3 shadow-[0_0_30px_rgba(16,185,129,0.15)]">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs font-bold">
                   <span className="text-emerald-400 flex items-center gap-2">
-                    <RefreshCw className="size-4 animate-spin" />
+                    <RefreshCw className="size-4 animate-spin shrink-0" />
                     {dispatchProgress.status}
                   </span>
-                  <span className="text-white font-mono">{dispatchProgress.current} / {dispatchProgress.total}</span>
+                  <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                    <span className="text-white font-mono">{dispatchProgress.current} / {dispatchProgress.total}</span>
+                    <button
+                      type="button"
+                      onClick={handleStopCampaign}
+                      className="px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                    >
+                      <span>🛑 Parar Disparos</span>
+                    </button>
+                  </div>
                 </div>
                 <div className="h-2.5 w-full bg-black/60 rounded-full overflow-hidden border border-emerald-500/20">
                   <div 
