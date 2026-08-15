@@ -70,6 +70,12 @@ const OFFICIAL_TEMPLATES = [
     badge: 'Timing de Uso',
     text: `E aí [Nome]! Tudo certo? 💨\nPelo meu controle aqui, seu último pod já deve estar nas últimas puxadas hahaha!\n\nPra você não ficar na mão no meio da semana, quer que eu já separe um sabor novo pra você?\n\n📦 Cardápio completo no ar: [LINK_DO_CARDAPIO_VERCEL]\nMe avisa aqui qual sabor posso agilizar pro seu delivery!`,
   },
+  {
+    id: 'insta_grupo_vip',
+    title: 'Instagram & Bastidores (Grupo VIP)',
+    badge: 'Comunidade & Prova Social',
+    text: `📸 *BASTIDORES & COMUNICADOS OFICIAIS — SMOKING PODS* 🚀\n\nSalve turma do VIP! Passando um recado rápido pra quem ainda não acompanha nosso perfil oficial no Instagram:\n\nÉ por lá que a gente posta em tempo real:\n• 🛵 Saída dos motoboys e rotina de entregas no ABC;\n• 🎬 Vídeos e unboxing dos novos pods que chegam;\n• 📢 Avisos de horários de funcionamento e novidades da loja.\n\n📲 *Clica no link e segue a gente lá pra acompanhar tudo:*\n🔗 [LINK_DO_INSTAGRAM]\n\n*Tamo junto!*`,
+  },
 ];
 
 const LOCAL_STORAGE_LISTS = 'smoking_broadcast_lists_v1';
