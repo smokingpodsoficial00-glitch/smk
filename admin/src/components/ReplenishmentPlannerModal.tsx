@@ -191,6 +191,66 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
   const [newPodSell, setNewPodSell] = useState("89.90");
   const [newPodFlavors, setNewPodFlavors] = useState("Sabores Sortidos");
 
+  // Estado de Faturamento / Caixa Real da Empresa em Tempo Real (Mesma fonte do Financeiro)
+  const [liveAccumulatedRevenue, setLiveAccumulatedRevenue] = useState<number | null>(null);
+
+  // Carregar e Escutar Vendas em Tempo Real (Supabase Realtime)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const targetCompanyId = companyId || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+
+    const fetchRealSalesRevenue = async () => {
+      try {
+        const { data: rawOrders, error } = await supabase
+          .from("smoking_orders")
+          .select("id, total_amount, delivery_status, client_phone, client_name")
+          .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
+          .neq("delivery_status", "CANCELADO");
+
+        if (error) {
+          console.error("Erro ao buscar vendas para Metas em tempo real:", error);
+          return;
+        }
+
+        const validOrders = (rawOrders || []).filter(
+          (o) =>
+            o.client_phone !== "__SYSTEM_SMK_BEST_SELLERS__" &&
+            (!o.client_phone || !o.client_phone.startsWith("__SYSTEM_")) &&
+            (!o.client_name || !o.client_name.toLowerCase().includes("system config"))
+        );
+
+        let totalRev = 0;
+        for (const order of validOrders) {
+          totalRev += parseFloat(order.total_amount || 0);
+        }
+
+        setLiveAccumulatedRevenue(totalRev);
+      } catch (e) {
+        console.error("Erro ao recalcular metas em tempo real:", e);
+      }
+    };
+
+    fetchRealSalesRevenue();
+
+    // Inscrição Supabase Realtime no canal de smoking_orders para atualizar INSTANTANEAMENTE a tela de Metas
+    const channelName = `metas_realtime_orders_${targetCompanyId}`;
+    const subOrders = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "smoking_orders" },
+        () => {
+          fetchRealSalesRevenue();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subOrders);
+    };
+  }, [isOpen, companyId]);
+
   useEffect(() => {
     if (isOpen) {
       const curGoals = loadSavedGoals();
@@ -310,13 +370,17 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
   const projectedNetProfit = totalSellOfOrder - totalSpentWithShipping;
   const dilutedShippingPerPod = totalUnitsInOrder > 0 ? (supplierShippingFee / totalUnitsInOrder).toFixed(2) : "0.00";
 
-  // Cálculos de Metas em Tempo Real
+  // Usar faturamento acumulado em tempo real se disponível, fallback para prop currentCash
+  const activeCash = liveAccumulatedRevenue !== null ? liveAccumulatedRevenue : currentCash;
+
+  // Cálculos de Metas em Tempo Real (Integrado ao Supabase Realtime)
   const activeReorderGoal = isEditingGoals ? tempGoals.reorderCashGoal : goals.reorderCashGoal;
   const activeParaguayGoal = isEditingGoals ? tempGoals.paraguayScaleGoal : goals.paraguayScaleGoal;
 
-  const totalEquity = currentCash + stockRetailValue;
-  const cashNeededForReorder = Math.max(0, activeReorderGoal - currentCash);
-  const reorderProgressPct = activeReorderGoal > 0 ? Math.min(100, Math.round((currentCash / activeReorderGoal) * 100)) : 100;
+  const totalEquity = activeCash + stockRetailValue;
+  const cashNeededForReorder = Math.max(0, activeReorderGoal - activeCash);
+  const reorderProgressPct = activeReorderGoal > 0 ? Math.min(100, Math.round((activeCash / activeReorderGoal) * 100)) : 100;
+  const rawReorderProgressPct = activeReorderGoal > 0 ? Math.round((activeCash / activeReorderGoal) * 100) : 100;
 
   const averagePodPrice = totalPodsInStock > 0 ? stockRetailValue / totalPodsInStock : 86.9;
   const podsNeededToSell = averagePodPrice > 0 ? Math.ceil(cashNeededForReorder / averagePodPrice) : 0;
@@ -1000,7 +1064,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                     CAIXA EM MÃOS
                   </span>
                   <div className="text-xl font-bold text-emerald-400">
-                    R$ {currentCash.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    R$ {activeCash.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </div>
                   <span className="text-[10px] text-muted-foreground block">Disponível para compras</span>
                 </div>
@@ -1081,8 +1145,8 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                     />
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                    <span>R$ {currentCash.toFixed(2)} acumulados</span>
-                    <span>Meta: R$ {activeReorderGoal.toFixed(2)}</span>
+                    <span>R$ {activeCash.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} acumulados</span>
+                    <span>Meta: R$ {activeReorderGoal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
 
@@ -1091,7 +1155,10 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                     {cashNeededForReorder > 0 ? (
                       <>Faltam <strong className="text-emerald-400">R$ {cashNeededForReorder.toFixed(2)}</strong> em vendas (~{podsNeededToSell} pods) para acionar a compra.</>
                     ) : (
-                      <strong className="text-emerald-400">Saldo suficiente para o lote de R$ {activeReorderGoal.toLocaleString("pt-BR")}.</strong>
+                      <strong className="text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                        <CheckCircle2 className="size-3.5 text-emerald-400 inline" />
+                        META ATINGIDA — Saldo suficiente para o lote de R$ {activeReorderGoal.toLocaleString("pt-BR")}
+                      </strong>
                     )}
                   </span>
                   <button
