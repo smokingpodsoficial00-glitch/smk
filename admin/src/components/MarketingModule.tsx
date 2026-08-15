@@ -82,6 +82,12 @@ const OFFICIAL_TEMPLATES = [
     badge: 'Alcance Orgânico & Status',
     text: `📲 *AVISO VIP: SALVE NOSSO CONTATO NA SUA AGENDA!* ⚡\n\nFala pessoal do VIP! Passando um recado importante pra vocês:\n\nQuem tem o nosso número salvo nos contatos do celular consegue acompanhar nossos *Status diários no WhatsApp*!\n\nÉ por lá que a gente posta:\n• 💨 Ofertas relâmpago de última hora com desconto;\n• 📦 Chegada de modelos raros antes de irem pro cardápio;\n• 🛵 Avisos rápidos de saídas do motoboy no dia a dia.\n\n👉 *Salva aí no seu celular:* Smoking Pods Oficial\n\n*Assim você não perde nenhuma oportunidade da semana!* 🥇`,
   },
+  {
+    id: 'lembrete_pre_fds_vip',
+    title: 'Lembrete Pré-FDS / Reserva Semanal (Quarta 18:30)',
+    badge: 'Antecipação & Sem Fila',
+    text: `⏳ *LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!* 💨\n\nSalve galera do VIP! Passando pra avisar quem gosta de se planejar com calma:\n\nSexta e sábado a fila de despacho do Uber Direct costuma ser bem cheia. Se você já quiser garantir seu pod agora no meio da semana, seu pedido sai na hora e sem correria!\n\n📦 *Cardápio 100% atualizado com os novos lotes:*\n🔗 [LINK_DO_CARDAPIO_VERCEL]\n\n⚡ *Entregas em 25 a 35 min em SBC e região!*\n\n*Garanta seu sabor favorito antes da correria do fds!* 🥇`,
+  },
 ];
 
 const LOCAL_STORAGE_LISTS = 'smoking_broadcast_lists_v1';
