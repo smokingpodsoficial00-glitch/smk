@@ -716,7 +716,7 @@ export function MarketingModule() {
               </div>
             )}
 
-            {/* Lista de Campanhas */}
+            {/* Lista de Campanhas com Separação Visual por Tipo */}
             {campaigns.length === 0 ? (
               <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-12 text-center text-white/40 space-y-3">
                 <Megaphone className="size-10 text-white/20 mx-auto" />
@@ -732,108 +732,244 @@ export function MarketingModule() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {campaigns.map(camp => {
-                  const targetListNames = broadcastLists
-                    .filter(l => camp.selectedListIds?.includes(l.id))
-                    .map(l => l.name);
-
+              <div className="space-y-8">
+                {/* SEÇÃO 1: CAMPANHAS DE GRUPO VIP (AMARELO / DOURADO) */}
+                {(() => {
+                  const groupCamps = campaigns.filter(c => c.targetType === 'group');
+                  if (groupCamps.length === 0) return null;
                   return (
-                    <div 
-                      key={camp.id}
-                      className="bg-[#0a0a0a] border border-white/10 hover:border-white/20 rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all shadow-md group"
-                    >
-                      <div className="space-y-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <h3 className="text-base font-bold text-white group-hover:text-emerald-400 transition-colors">
-                            {camp.name}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-amber-500/20">
+                        <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                          <MessageSquare className="size-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-extrabold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                            Campanhas de Grupo (WhatsApp VIP)
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono">
+                              {groupCamps.length}
+                            </span>
                           </h3>
-                          <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
-                            camp.status === 'active' 
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                              : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                          }`}>
-                            {camp.status === 'active' ? 'Ativa' : 'Pausada'}
-                          </span>
+                          <p className="text-[11px] text-white/40">Disparos em canal e grupo oficial da loja</p>
                         </div>
-
-                        {/* Informações de Destino */}
-                        <div className="p-3 bg-[#050505] rounded-xl border border-white/5 space-y-1.5 text-xs">
-                          <div className="flex items-center justify-between text-white/60">
-                            <span>Destino:</span>
-                            <span className="font-semibold text-white">
-                              {camp.targetType === 'lists' ? `${targetListNames.length} Listas Selecionadas` : 'Grupo WhatsApp'}
-                            </span>
-                          </div>
-                          
-                          {camp.targetType === 'lists' ? (
-                            <div className="text-[11px] text-emerald-400 font-mono truncate">
-                              📁 {targetListNames.join(', ') || 'Nenhuma lista'}
-                            </div>
-                          ) : (
-                            <div className="text-[11px] text-amber-400 font-mono truncate">
-                              💬 {camp.targetGroupName || 'Grupo VIP'}
-                            </div>
-                          )}
-
-                          <div className="flex items-center justify-between text-white/60 pt-1 border-t border-white/5">
-                            <span>Frequência:</span>
-                            <span className="font-semibold text-white">
-                              {camp.frequencyDays === 0 
-                                ? 'Disparo Único' 
-                                : camp.scheduledWeekday 
-                                  ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()}${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}` 
-                                  : `A cada ${camp.frequencyDays} dias`}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Prévia da Mensagem */}
-                        <p className="text-xs text-white/40 line-clamp-3 font-mono bg-[#050505] p-2.5 rounded-lg border border-white/5">
-                          {camp.message}
-                        </p>
                       </div>
 
-                      {/* Ações da Campanha */}
-                      <div className="flex items-center justify-between pt-3 border-t border-white/5 gap-2">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => toggleCampaignStatus(camp.id)}
-                            title={camp.status === 'active' ? 'Pausar Campanha' : 'Ativar Campanha'}
-                            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {groupCamps.map(camp => (
+                          <div 
+                            key={camp.id}
+                            className="bg-[#0c0a06] border border-amber-500/25 hover:border-amber-500/50 rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all shadow-[0_4px_20px_rgba(245,158,11,0.05)] hover:shadow-[0_4px_25px_rgba(245,158,11,0.12)] group"
                           >
-                            {camp.status === 'active' ? <Pause className="size-3.5" /> : <Play className="size-3.5 text-emerald-400" />}
-                          </button>
+                            <div className="space-y-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <h3 className="text-base font-bold text-white group-hover:text-amber-400 transition-colors">
+                                  {camp.name}
+                                </h3>
+                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
+                                  camp.status === 'active' 
+                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' 
+                                    : 'bg-white/5 text-white/40 border-white/10'
+                                }`}>
+                                  {camp.status === 'active' ? 'Ativa' : 'Pausada'}
+                                </span>
+                              </div>
 
-                          <button
-                            onClick={() => handleOpenCampaignModal(camp)}
-                            title="Editar Configurações da Campanha"
-                            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
-                          >
-                            <Edit3 className="size-3.5" />
-                          </button>
+                              {/* Informações de Destino */}
+                              <div className="p-3 bg-[#050505] rounded-xl border border-amber-500/10 space-y-1.5 text-xs">
+                                <div className="flex items-center justify-between text-white/60">
+                                  <span>Destino:</span>
+                                  <span className="font-bold text-amber-400 flex items-center gap-1">
+                                    <MessageSquare className="size-3" /> Grupo VIP
+                                  </span>
+                                </div>
+                                
+                                <div className="text-[11px] text-amber-300/80 font-mono truncate">
+                                  💬 {camp.targetGroupName || 'Grupo VIP Oficial'}
+                                </div>
 
-                          <button
-                            onClick={() => handleDeleteCampaign(camp.id)}
-                            title="Excluir Campanha"
-                            className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all cursor-pointer"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        </div>
+                                <div className="flex items-center justify-between text-white/60 pt-1 border-t border-white/5">
+                                  <span>Frequência:</span>
+                                  <span className="font-semibold text-white">
+                                    {camp.frequencyDays === 0 
+                                      ? 'Disparo Único' 
+                                      : camp.scheduledWeekday 
+                                        ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()}${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}` 
+                                        : `A cada ${camp.frequencyDays} dias`}
+                                  </span>
+                                </div>
+                              </div>
 
-                        <button
-                          onClick={() => handleExecuteCampaign(camp)}
-                          disabled={executingCampaignId === camp.id}
-                          className="px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md disabled:opacity-50"
-                        >
-                          <Send className="size-3" />
-                          <span>Disparar Agora</span>
-                        </button>
+                              {/* Prévia da Mensagem */}
+                              <p className="text-xs text-white/50 line-clamp-3 font-mono bg-[#050505] p-2.5 rounded-lg border border-white/5">
+                                {camp.message}
+                              </p>
+                            </div>
+
+                            {/* Ações da Campanha */}
+                            <div className="flex items-center justify-between pt-3 border-t border-amber-500/10 gap-2">
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => toggleCampaignStatus(camp.id)}
+                                  title={camp.status === 'active' ? 'Pausar Campanha' : 'Ativar Campanha'}
+                                  className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
+                                >
+                                  {camp.status === 'active' ? <Pause className="size-3.5" /> : <Play className="size-3.5 text-amber-400" />}
+                                </button>
+
+                                <button
+                                  onClick={() => handleOpenCampaignModal(camp)}
+                                  title="Editar Configurações da Campanha"
+                                  className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
+                                >
+                                  <Edit3 className="size-3.5" />
+                                </button>
+
+                                <button
+                                  onClick={() => handleDeleteCampaign(camp.id)}
+                                  title="Excluir Campanha"
+                                  className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all cursor-pointer"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </button>
+                              </div>
+
+                              <button
+                                onClick={() => handleExecuteCampaign(camp)}
+                                disabled={executingCampaignId === camp.id}
+                                className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md disabled:opacity-50"
+                              >
+                                <Send className="size-3" />
+                                <span>Disparar Agora</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   );
-                })}
+                })()}
+
+                {/* SEÇÃO 2: CAMPANHAS DE LISTAS DE TRANSMISSÃO / 1 A 1 (ROXO) */}
+                {(() => {
+                  const listCamps = campaigns.filter(c => c.targetType === 'lists');
+                  if (listCamps.length === 0) return null;
+                  return (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-purple-500/20">
+                        <div className="p-1.5 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-400">
+                          <Users className="size-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-extrabold text-purple-400 uppercase tracking-wider flex items-center gap-2">
+                            Campanhas no Privado (1 a 1 / Listas de Transmissão)
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-mono">
+                              {listCamps.length}
+                            </span>
+                          </h3>
+                          <p className="text-[11px] text-white/40">Disparos diretos para o WhatsApp pessoal de cada cliente</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {listCamps.map(camp => {
+                          const targetListNames = broadcastLists
+                            .filter(l => camp.selectedListIds?.includes(l.id))
+                            .map(l => l.name);
+
+                          return (
+                            <div 
+                              key={camp.id}
+                              className="bg-[#0b0811] border border-purple-500/25 hover:border-purple-500/50 rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all shadow-[0_4px_20px_rgba(168,85,247,0.05)] hover:shadow-[0_4px_25px_rgba(168,85,247,0.12)] group"
+                            >
+                              <div className="space-y-3">
+                                <div className="flex items-start justify-between gap-2">
+                                  <h3 className="text-base font-bold text-white group-hover:text-purple-400 transition-colors">
+                                    {camp.name}
+                                  </h3>
+                                  <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
+                                    camp.status === 'active' 
+                                      ? 'bg-purple-500/15 text-purple-300 border-purple-500/30' 
+                                      : 'bg-white/5 text-white/40 border-white/10'
+                                  }`}>
+                                    {camp.status === 'active' ? 'Ativa' : 'Pausada'}
+                                  </span>
+                                </div>
+
+                                {/* Informações de Destino */}
+                                <div className="p-3 bg-[#050505] rounded-xl border border-purple-500/10 space-y-1.5 text-xs">
+                                  <div className="flex items-center justify-between text-white/60">
+                                    <span>Destino:</span>
+                                    <span className="font-bold text-purple-400 flex items-center gap-1">
+                                      <Users className="size-3" /> {targetListNames.length} Listas Selecionadas
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="text-[11px] text-purple-300/80 font-mono truncate">
+                                    📁 {targetListNames.join(', ') || 'Nenhuma lista'}
+                                  </div>
+
+                                  <div className="flex items-center justify-between text-white/60 pt-1 border-t border-white/5">
+                                    <span>Frequência:</span>
+                                    <span className="font-semibold text-white">
+                                      {camp.frequencyDays === 0 
+                                        ? 'Disparo Único' 
+                                        : camp.scheduledWeekday 
+                                          ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()}${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}` 
+                                          : `A cada ${camp.frequencyDays} dias`}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Prévia da Mensagem */}
+                                <p className="text-xs text-white/50 line-clamp-3 font-mono bg-[#050505] p-2.5 rounded-lg border border-white/5">
+                                  {camp.message}
+                                </p>
+                              </div>
+
+                              {/* Ações da Campanha */}
+                              <div className="flex items-center justify-between pt-3 border-t border-purple-500/10 gap-2">
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => toggleCampaignStatus(camp.id)}
+                                    title={camp.status === 'active' ? 'Pausar Campanha' : 'Ativar Campanha'}
+                                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
+                                  >
+                                    {camp.status === 'active' ? <Pause className="size-3.5" /> : <Play className="size-3.5 text-purple-400" />}
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleOpenCampaignModal(camp)}
+                                    title="Editar Configurações da Campanha"
+                                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
+                                  >
+                                    <Edit3 className="size-3.5" />
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleDeleteCampaign(camp.id)}
+                                    title="Excluir Campanha"
+                                    className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all cursor-pointer"
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </button>
+                                </div>
+
+                                <button
+                                  onClick={() => handleExecuteCampaign(camp)}
+                                  disabled={executingCampaignId === camp.id}
+                                  className="px-3.5 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md disabled:opacity-50"
+                                >
+                                  <Send className="size-3" />
+                                  <span>Disparar Agora</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
