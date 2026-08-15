@@ -148,6 +148,19 @@ export function ManualSaleModal({
     });
   }, [productsList, selectedModelKey]);
 
+  // Ao selecionar um modelo, auto-seleciona o primeiro sabor disponível e carrega o preço de venda imediatamente
+  useEffect(() => {
+    if (selectedModelKey && availableFlavors.length > 0) {
+      // Se ainda não tem sabor selecionado ou o sabor atual não pertence a este modelo
+      const currentValid = availableFlavors.some(f => f.id === selectedFlavorId);
+      if (!selectedFlavorId || !currentValid) {
+        const firstFlavor = availableFlavors[0];
+        setSelectedFlavorId(firstFlavor.id);
+        setCustomPrice(firstFlavor.price ? String(firstFlavor.price) : "");
+      }
+    }
+  }, [selectedModelKey, availableFlavors, selectedFlavorId]);
+
   // Preencher valor do produto ao selecionar o sabor
   useEffect(() => {
     if (selectedFlavorId) {
