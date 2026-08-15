@@ -1555,19 +1555,29 @@ export function MarketingModule() {
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
-                          🔄 Variações Alternadas de Mensagem ({campaignFormVariations.length})
+                          🔄 5 Variações Fixas Anti-Ban ({campaignFormVariations.length + 1} de 5 configuradas)
                         </span>
                         <p className="text-[10px] text-white/40 mt-0.5">
-                          O robô alternará automaticamente entre a mensagem principal e estas variações a cada contato disparado.
+                          Cada 1 dos 5 contatos do lote recebe uma mensagem exclusiva. Máximo estrito: 5 variações.
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setCampaignFormVariations([...campaignFormVariations, ''])}
-                        className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1 cursor-pointer"
-                      >
-                        <Plus className="size-3" /> Adicionar Variação
-                      </button>
+                      {campaignFormVariations.length < 4 ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (campaignFormVariations.length < 4) {
+                              setCampaignFormVariations([...campaignFormVariations, '']);
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="size-3" /> Adicionar Variação ({campaignFormVariations.length + 2}/5)
+                        </button>
+                      ) : (
+                        <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
+                          ✓ Limite Máximo de 5 Variações Atingido
+                        </span>
+                      )}
                     </div>
 
                     {campaignFormVariations.length === 0 ? (
