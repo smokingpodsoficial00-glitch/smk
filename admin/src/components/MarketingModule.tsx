@@ -35,6 +35,7 @@ export interface Campaign {
   targetGroupId?: string;
   targetGroupName?: string;
   frequencyDays: number; // 0 = Disparo Único, 7 = Semanal, 14 = Quinzenal, etc.
+  scheduledWeekday?: string; // 'QUARTA', 'SEXTA', 'SABADO', 'DOMINGO', etc.
   batchSize: number;
   batchIntervalMinutes: number;
   status: 'active' | 'paused' | 'completed';
@@ -111,6 +112,7 @@ export function MarketingModule() {
   const [campaignFormSelectedLists, setCampaignFormSelectedLists] = useState<Set<string>>(new Set());
   const [campaignFormTargetGroup, setCampaignFormTargetGroup] = useState<string>('');
   const [campaignFormFrequency, setCampaignFormFrequency] = useState<number>(7); // dias
+  const [campaignFormWeekday, setCampaignFormWeekday] = useState<string>('QUARTA');
   const [campaignFormBatchSize, setCampaignFormBatchSize] = useState<number>(20);
   const [campaignFormInterval, setCampaignFormInterval] = useState<number>(45);
   const [cardapioUrl, setCardapioUrl] = useState('https://smoking-pods.vercel.app');
@@ -335,6 +337,7 @@ export function MarketingModule() {
       setCampaignFormSelectedLists(new Set(campToEdit.selectedListIds || []));
       setCampaignFormTargetGroup(campToEdit.targetGroupId || '');
       setCampaignFormFrequency(campToEdit.frequencyDays);
+      setCampaignFormWeekday(campToEdit.scheduledWeekday || 'QUARTA');
       setCampaignFormBatchSize(campToEdit.batchSize || 20);
       setCampaignFormInterval(campToEdit.batchIntervalMinutes || 45);
     } else {
@@ -347,6 +350,7 @@ export function MarketingModule() {
       setCampaignFormSelectedLists(new Set(firstListId ? [firstListId] : []));
       setCampaignFormTargetGroup(whatsAppGroups.length > 0 ? whatsAppGroups[0].id : '');
       setCampaignFormFrequency(7);
+      setCampaignFormWeekday('QUARTA');
       setCampaignFormBatchSize(20);
       setCampaignFormInterval(45);
     }
@@ -391,6 +395,7 @@ export function MarketingModule() {
               targetGroupId: campaignFormTargetGroup,
               targetGroupName: selectedGroupName,
               frequencyDays: campaignFormFrequency,
+              scheduledWeekday: campaignFormWeekday,
               batchSize: campaignFormBatchSize,
               batchIntervalMinutes: campaignFormInterval,
               totalRecipients: totalCount,
@@ -408,6 +413,7 @@ export function MarketingModule() {
         targetGroupId: campaignFormTargetGroup,
         targetGroupName: selectedGroupName,
         frequencyDays: campaignFormFrequency,
+        scheduledWeekday: campaignFormWeekday,
         batchSize: campaignFormBatchSize,
         batchIntervalMinutes: campaignFormInterval,
         status: 'active',
@@ -749,7 +755,11 @@ export function MarketingModule() {
                           <div className="flex items-center justify-between text-white/60 pt-1 border-t border-white/5">
                             <span>Frequência:</span>
                             <span className="font-semibold text-white">
-                              {camp.frequencyDays === 0 ? 'Disparo Único' : `A cada ${camp.frequencyDays} dias`}
+                              {camp.frequencyDays === 0 
+                                ? 'Disparo Único' 
+                                : camp.scheduledWeekday 
+                                  ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()}` 
+                                  : `A cada ${camp.frequencyDays} dias`}
                             </span>
                           </div>
                         </div>
@@ -1236,24 +1246,43 @@ export function MarketingModule() {
               </div>
 
               {/* Frequência do Disparo e Cadência Anti-Ban */}
-              <div className={`grid gap-4 ${campaignFormTargetType === 'lists' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+              <div className={`grid gap-4 ${campaignFormTargetType === 'lists' ? 'grid-cols-1 md:grid-cols-2' : campaignFormFrequency > 0 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
                 <div>
-                  <label className="text-xs font-bold text-white/70 block mb-1">Recorrência / Intervalo de Dias</label>
+                  <label className="text-xs font-bold text-white/70 block mb-1">Recorrência / Intervalo</label>
                   <select
                     value={campaignFormFrequency}
                     onChange={(e) => setCampaignFormFrequency(Number(e.target.value))}
                     className="w-full bg-[#050505] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
                   >
                     <option value={0}>Disparo Único (Sem repetição)</option>
-                    <option value={7}>A cada 7 dias (Toda semana)</option>
-                    <option value={14}>A cada 14 dias (Quinzenal)</option>
+                    <option value={7}>Semanal (Escolher Dia da Semana)</option>
+                    <option value={14}>Quinzenal (A cada 14 dias)</option>
                     <option value={21}>A cada 21 dias (3 semanas)</option>
-                    <option value={30}>A cada 30 dias (Mensal)</option>
+                    <option value={30}>Mensal (A cada 30 dias)</option>
                   </select>
                 </div>
 
-                {campaignFormTargetType === 'lists' && (
+                {campaignFormFrequency > 0 && (
                   <div>
+                    <label className="text-xs font-bold text-white/70 block mb-1">Dia do Disparo na Semana</label>
+                    <select
+                      value={campaignFormWeekday}
+                      onChange={(e) => setCampaignFormWeekday(e.target.value)}
+                      className="w-full bg-[#050505] border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-400 font-bold focus:outline-none focus:border-emerald-400 cursor-pointer"
+                    >
+                      <option value="SEGUNDA">Toda Segunda-feira</option>
+                      <option value="TERCA">Toda Terça-feira</option>
+                      <option value="QUARTA">Toda Quarta-feira (Estoque / Reposição)</option>
+                      <option value="QUINTA">Toda Quinta-feira (Pré-FDS)</option>
+                      <option value="SEXTA">Toda Sexta-feira (Sextou / Rolê)</option>
+                      <option value="SABADO">Todo Sábado (Plantão FDS)</option>
+                      <option value="DOMINGO">Todo Domingo (Fechamento FDS)</option>
+                    </select>
+                  </div>
+                )}
+
+                {campaignFormTargetType === 'lists' && (
+                  <div className="col-span-full">
                     <label className="text-xs font-bold text-white/70 block mb-1">Cadência Anti-Ban</label>
                     <div className="flex gap-2">
                       <input
