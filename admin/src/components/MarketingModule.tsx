@@ -1272,11 +1272,11 @@ export function MarketingModule() {
                     >
                       <option value="SEGUNDA">Toda Segunda-feira</option>
                       <option value="TERCA">Toda Terça-feira</option>
-                      <option value="QUARTA">Toda Quarta-feira (Estoque / Reposição)</option>
-                      <option value="QUINTA">Toda Quinta-feira (Pré-FDS)</option>
-                      <option value="SEXTA">Toda Sexta-feira (Sextou / Rolê)</option>
-                      <option value="SABADO">Todo Sábado (Plantão FDS)</option>
-                      <option value="DOMINGO">Todo Domingo (Fechamento FDS)</option>
+                      <option value="QUARTA">Toda Quarta-feira</option>
+                      <option value="QUINTA">Toda Quinta-feira</option>
+                      <option value="SEXTA">Toda Sexta-feira</option>
+                      <option value="SABADO">Todo Sábado</option>
+                      <option value="DOMINGO">Todo Domingo</option>
                     </select>
                   </div>
                 )}
