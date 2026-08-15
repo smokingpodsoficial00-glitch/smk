@@ -88,6 +88,12 @@ const OFFICIAL_TEMPLATES = [
     badge: 'Antecipação & Sem Fila',
     text: `⏳ *LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!* 💨\n\nSalve galera do VIP! Passando pra avisar quem gosta de se planejar com calma:\n\nSexta e sábado a fila de despacho do Uber Direct costuma ser bem cheia. Se você já quiser garantir seu pod agora no meio da semana, seu pedido sai na hora e sem correria!\n\n📦 *Cardápio 100% atualizado com os novos lotes:*\n🔗 [LINK_DO_CARDAPIO_VERCEL]\n\n⚡ *Entregas em 25 a 35 min em SBC e região!*\n\n*Garanta seu sabor favorito antes da correria do fds!* 🥇`,
   },
+  {
+    id: 'mgm_indique_ganhe',
+    title: 'Programa Indique & Ganhe (1 Pod Grátis)',
+    badge: 'Multiplicação de Base',
+    text: `🎁 *GANHE 1 POD 100% GRÁTIS — PROGRAMA VIP SMOKING PODS!* 👑\n\nFala [Nome], beleza? Quer garantir seu próximo pod na faixa?\n\nComo funciona nosso programa de indicação:\n1️⃣ Indique *5 amigos* do rolê, da faculdade ou do trampo que comprem na Smoking Pods.\n2️⃣ Ao fazerem o pedido no WhatsApp, eles só precisam avisar: *"Fui indicado pelo [Nome]"*.\n3️⃣ Assim que os 5 pedidos forem confirmados, *você ganha 1 POD 100% GRÁTIS* (você só paga o frete do motoboy)!\n\n📲 *Manda o link do nosso Cardápio pra galera:*\n🔗 [LINK_DO_CARDAPIO_VERCEL]\n\n*Já avisa os parceiros e garante o seu pod na faixa!* 🚀`,
+  },
 ];
 
 const LOCAL_STORAGE_LISTS = 'smoking_broadcast_lists_v1';
