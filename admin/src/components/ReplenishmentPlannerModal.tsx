@@ -257,9 +257,9 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
 
   // Gerador de Texto para WhatsApp do Fornecedor Baseado na Lista Real do Usuário
   const generatedWhatsAppMessage = useMemo(() => {
-    return `📦 *PEDIDO DE REPOSIÇÃO — SMOKING PODS*
-📍 *Origem:* São Bernardo do Campo / SP
-💰 *Lote Total:* R$ ${totalSpentWithShipping.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+    return `*PEDIDO DE REPOSIÇÃO — SMOKING PODS*
+*Origem:* São Bernardo do Campo / SP
+*Lote Total:* R$ ${totalSpentWithShipping.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
 
 *LISTA DE MODELOS E QUANTIDADES:*
 ${orderItems.map(item => `• ${item.qty}x ${item.brand} ${item.model} (${item.flavors})`).join("\n")}
@@ -267,7 +267,7 @@ ${orderItems.map(item => `• ${item.qty}x ${item.brand} ${item.model} (${item.f
 *Total de Peças:* ${totalUnitsInOrder} unidades
 *Frete Estimado:* R$ ${supplierShippingFee.toFixed(2)} (Diluído: R$ ${dilutedShippingPerPod}/pod)
 
-Por favor, me confirme a disponibilidade destes sabores e a chave Pix para faturarmos o pedido! 🚀`;
+Por favor, me confirme a disponibilidade destes sabores e a chave Pix para faturarmos o pedido!`;
   }, [orderItems, totalUnitsInOrder, totalSpentWithShipping, supplierShippingFee, dilutedShippingPerPod]);
 
   const handleCopyOrderText = () => {
@@ -329,7 +329,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
               }`}
             >
               <ShoppingCart className="size-3.5" />
-              <span>Pedido Ativo & WhatsApp ({totalUnitsInOrder} pods)</span>
+              <span>Pedido Ativo & WhatsApp</span>
             </button>
 
             <button
@@ -364,20 +364,11 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
             <div className="py-2 flex items-center gap-2">
               <button
                 type="button"
-                onClick={handleResetOrderToDefault}
-                className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-muted-foreground hover:text-white text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1.5"
-                title="Voltar para a sugestão padrão de 15 peças da IA"
-              >
-                <RotateCcw className="size-3" />
-                <span>Restaurar Sugestão IA</span>
-              </button>
-              <button
-                type="button"
                 onClick={() => setShowAddPodForm(!showAddPodForm)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95"
               >
                 <Plus className="size-3.5 text-black" />
-                <span>Adicionar Pod ao Pedido</span>
+                <span>Adicionar Produto</span>
               </button>
             </div>
           )}
