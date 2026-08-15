@@ -30,6 +30,8 @@ export interface Campaign {
   id: string;
   name: string;
   message: string;
+  variations?: string[]; // Variações dinâmicas de texto para alternar automaticamente
+  useVariations?: boolean;
   targetType: 'lists' | 'group' | 'all';
   selectedListIds: string[]; // Suporte a múltiplas listas
   targetGroupId?: string;
@@ -133,14 +135,16 @@ export function MarketingModule() {
   // Formulário de Criação de Campanha
   const [campaignFormName, setCampaignFormName] = useState('');
   const [campaignFormMessage, setCampaignFormMessage] = useState(OFFICIAL_TEMPLATES[0].text);
+  const [campaignFormVariations, setCampaignFormVariations] = useState<string[]>([]);
+  const [campaignFormUseVariations, setCampaignFormUseVariations] = useState<boolean>(false);
   const [campaignFormTargetType, setCampaignFormTargetType] = useState<'lists' | 'group'>('lists');
   const [campaignFormSelectedLists, setCampaignFormSelectedLists] = useState<Set<string>>(new Set());
   const [campaignFormTargetGroup, setCampaignFormTargetGroup] = useState<string>('');
   const [campaignFormFrequency, setCampaignFormFrequency] = useState<number>(7); // dias
   const [campaignFormWeekday, setCampaignFormWeekday] = useState<string>('QUARTA');
   const [campaignFormTime, setCampaignFormTime] = useState<string>('15:00');
-  const [campaignFormBatchSize, setCampaignFormBatchSize] = useState<number>(20);
-  const [campaignFormInterval, setCampaignFormInterval] = useState<number>(45);
+  const [campaignFormBatchSize, setCampaignFormBatchSize] = useState<number>(10);
+  const [campaignFormInterval, setCampaignFormInterval] = useState<number>(25);
   const [cardapioUrl, setCardapioUrl] = useState('https://smoking-pods.vercel.app');
   const [grupoVipUrl, setGrupoVipUrl] = useState('');
 
@@ -359,28 +363,31 @@ export function MarketingModule() {
       setEditingCampaign(campToEdit);
       setCampaignFormName(campToEdit.name);
       setCampaignFormMessage(campToEdit.message);
+      setCampaignFormVariations(campToEdit.variations || []);
+      setCampaignFormUseVariations(!!campToEdit.useVariations);
       setCampaignFormTargetType(campToEdit.targetType === 'group' ? 'group' : 'lists');
       setCampaignFormSelectedLists(new Set(campToEdit.selectedListIds || []));
-      setCampaignFormTargetGroup(campToEdit.targetGroupId || '');
+      setCampaignFormTargetGroup(campToEdit.targetGroupId || (whatsAppGroups.length > 0 ? whatsAppGroups[0].id : ''));
       setCampaignFormFrequency(campToEdit.frequencyDays);
       setCampaignFormWeekday(campToEdit.scheduledWeekday || 'QUARTA');
       setCampaignFormTime(campToEdit.scheduledTime || '15:00');
-      setCampaignFormBatchSize(campToEdit.batchSize || 20);
-      setCampaignFormInterval(campToEdit.batchIntervalMinutes || 45);
+      setCampaignFormBatchSize(campToEdit.batchSize || 10);
+      setCampaignFormInterval(campToEdit.batchIntervalMinutes || 25);
     } else {
       setEditingCampaign(null);
       setCampaignFormName('');
       setCampaignFormMessage(OFFICIAL_TEMPLATES[0].text);
+      setCampaignFormVariations([]);
+      setCampaignFormUseVariations(false);
       setCampaignFormTargetType('lists');
-      // Seleciona a primeira lista por padrão
       const firstListId = broadcastLists.length > 0 ? broadcastLists[0].id : '';
       setCampaignFormSelectedLists(new Set(firstListId ? [firstListId] : []));
       setCampaignFormTargetGroup(whatsAppGroups.length > 0 ? whatsAppGroups[0].id : '');
       setCampaignFormFrequency(7);
       setCampaignFormWeekday('QUARTA');
       setCampaignFormTime('15:00');
-      setCampaignFormBatchSize(20);
-      setCampaignFormInterval(45);
+      setCampaignFormBatchSize(10);
+      setCampaignFormInterval(25);
     }
     setIsCampaignModalOpen(true);
   };
@@ -418,6 +425,8 @@ export function MarketingModule() {
               ...c,
               name: campaignFormName.trim(),
               message: campaignFormMessage,
+              variations: campaignFormVariations.filter(v => v.trim().length > 0),
+              useVariations: campaignFormUseVariations,
               targetType: campaignFormTargetType,
               selectedListIds: Array.from(campaignFormSelectedLists),
               targetGroupId: campaignFormTargetGroup,
@@ -437,6 +446,8 @@ export function MarketingModule() {
         id: `camp_${Date.now()}`,
         name: campaignFormName.trim(),
         message: campaignFormMessage,
+        variations: campaignFormVariations.filter(v => v.trim().length > 0),
+        useVariations: campaignFormUseVariations,
         targetType: campaignFormTargetType,
         selectedListIds: Array.from(campaignFormSelectedLists),
         targetGroupId: campaignFormTargetGroup,
@@ -519,7 +530,16 @@ export function MarketingModule() {
           const contact = targetContacts[i];
           const rawPhone = contact.cleanPhone || contact.phone;
 
-          const formattedMsg = camp.message
+          // Seleciona a mensagem base ou alterna entre as variações dinâmicas
+          let chosenText = camp.message;
+          if (camp.useVariations && camp.variations && camp.variations.length > 0) {
+            const allAvailableTexts = [camp.message, ...camp.variations.filter(v => v.trim().length > 0)];
+            // Alterna de forma circular e equilibrada entre as variações
+            const variationIndex = i % allAvailableTexts.length;
+            chosenText = allAvailableTexts[variationIndex];
+          }
+
+          const formattedMsg = chosenText
             .replace(/\[Nome\]/gi, contact.name || 'Cliente')
             .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, cardapioUrl)
             .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, grupoVipUrl || '[Link do Grupo]');
@@ -1483,11 +1503,27 @@ export function MarketingModule() {
                 )}
               </div>
 
-              {/* Modelos e Mensagem */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-white/70">Mensagem da Campanha</label>
-                  <span className="text-[10px] text-white/40 font-mono">Variável: [Nome]</span>
+              {/* Modelos e Mensagem com Suporte a Variações Dinâmicas */}
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-white">Mensagem Principal</label>
+                    <span className="text-[10px] text-white/40 font-mono">Variável: [Nome]</span>
+                  </div>
+
+                  {campaignFormTargetType === 'lists' && (
+                    <button
+                      type="button"
+                      onClick={() => setCampaignFormUseVariations(!campaignFormUseVariations)}
+                      className={`px-3 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        campaignFormUseVariations
+                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm'
+                          : 'bg-white/5 text-white/50 border-white/10 hover:text-white'
+                      }`}
+                    >
+                      <span>🔄 {campaignFormUseVariations ? 'Variações Anti-Ban Ativadas' : '+ Ativar Variações de Texto (Spintax)'}</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Modelos Prontos */}
@@ -1504,13 +1540,71 @@ export function MarketingModule() {
                   ))}
                 </div>
 
+                {/* Mensagem Base */}
                 <textarea
-                  rows={8}
+                  rows={6}
                   value={campaignFormMessage}
                   onChange={(e) => setCampaignFormMessage(e.target.value)}
                   className="w-full bg-[#050505] border border-white/10 rounded-xl p-3.5 text-xs text-white font-mono leading-relaxed focus:outline-none focus:border-emerald-500/50"
-                  placeholder="Escreva sua mensagem aqui..."
+                  placeholder="Escreva sua mensagem principal aqui..."
                 />
+
+                {/* Bloco de Variações Dinâmicas (Spintax) */}
+                {campaignFormTargetType === 'lists' && campaignFormUseVariations && (
+                  <div className="p-4 bg-purple-950/20 border border-purple-500/30 rounded-2xl space-y-3 shadow-inner">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                          🔄 Variações Alternadas de Mensagem ({campaignFormVariations.length})
+                        </span>
+                        <p className="text-[10px] text-white/40 mt-0.5">
+                          O robô alternará automaticamente entre a mensagem principal e estas variações a cada contato disparado.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCampaignFormVariations([...campaignFormVariations, ''])}
+                        className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="size-3" /> Adicionar Variação
+                      </button>
+                    </div>
+
+                    {campaignFormVariations.length === 0 ? (
+                      <div className="p-4 rounded-xl border border-dashed border-purple-500/20 text-center text-xs text-purple-300/40">
+                        Nenhuma variação adicionada ainda. Clique em <strong>+ Adicionar Variação</strong> acima para colocar textos alternativos com outras saudações e frases.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {campaignFormVariations.map((v, idx) => (
+                          <div key={idx} className="space-y-1.5 bg-black/40 p-3 rounded-xl border border-purple-500/20">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-purple-400 font-mono">Variação #{idx + 2}</span>
+                              <button
+                                type="button"
+                                onClick={() => setCampaignFormVariations(campaignFormVariations.filter((_, i) => i !== idx))}
+                                className="text-red-400/70 hover:text-red-300 text-[10px] font-bold"
+                              >
+                                ✕ Remover
+                              </button>
+                            </div>
+                            <textarea
+                              rows={4}
+                              value={v}
+                              onChange={(e) => {
+                                const copy = [...campaignFormVariations];
+                                copy[idx] = e.target.value;
+                                setCampaignFormVariations(copy);
+                              }}
+                              className="w-full bg-[#050505] border border-white/10 rounded-lg p-2.5 text-xs text-white font-mono leading-relaxed focus:outline-none focus:border-purple-500/50"
+                              placeholder={`Texto da variação #${idx + 2}...`}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
