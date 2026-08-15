@@ -76,6 +76,12 @@ const OFFICIAL_TEMPLATES = [
     badge: 'Comunidade & Prova Social',
     text: `📸 *BASTIDORES & COMUNICADOS OFICIAIS — SMOKING PODS* 🚀\n\nSalve turma do VIP! Passando um recado rápido pra quem ainda não acompanha nosso perfil oficial no Instagram:\n\nÉ por lá que a gente posta em tempo real:\n• 🛵 Saída dos motoboys e rotina de entregas no ABC;\n• 🎬 Vídeos e unboxing dos novos pods que chegam;\n• 📢 Avisos de horários de funcionamento e novidades da loja.\n\n📲 *Clica no link e segue a gente lá pra acompanhar tudo:*\n🔗 [LINK_DO_INSTAGRAM]\n\n*Tamo junto!*`,
   },
+  {
+    id: 'salvar_contato_vip',
+    title: 'Salvar Contato na Agenda (Status VIP)',
+    badge: 'Alcance Orgânico & Status',
+    text: `📲 *AVISO VIP: SALVE NOSSO CONTATO NA SUA AGENDA!* ⚡\n\nFala pessoal do VIP! Passando um recado importante pra vocês:\n\nQuem tem o nosso número salvo nos contatos do celular consegue acompanhar nossos *Status diários no WhatsApp*!\n\nÉ por lá que a gente posta:\n• 💨 Ofertas relâmpago de última hora com desconto;\n• 📦 Chegada de modelos raros antes de irem pro cardápio;\n• 🛵 Avisos rápidos de saídas do motoboy no dia a dia.\n\n👉 *Salva aí no seu celular:* Smoking Pods Oficial\n\n*Assim você não perde nenhuma oportunidade da semana!* 🥇`,
+  },
 ];
 
 const LOCAL_STORAGE_LISTS = 'smoking_broadcast_lists_v1';
