@@ -322,7 +322,7 @@ export function ManualSaleModal({
         total_amount: grandTotal,
         shipping_fee: numericShippingFee,
         payment_status: "PAGO",
-        delivery_status: "ENTREGUE",
+        delivery_status: "PREPARANDO",
         payment_method: safePaymentMethod,
         company_id: companyId,
       };
@@ -336,7 +336,7 @@ export function ManualSaleModal({
       if (orderErr) {
         // Se houver erro de delivery_status constraint
         if (orderErr.message?.includes("delivery_status")) {
-          payload.delivery_status = "ENTREGUE";
+          payload.delivery_status = "PREPARANDO";
         }
         // Se houver erro de payment_method constraint
         if (orderErr.message?.includes("payment_method")) {
@@ -358,13 +358,6 @@ export function ManualSaleModal({
 
       if (insertedData?.id) {
         insertedOrderId = insertedData.id;
-        try {
-          const completedIds = JSON.parse(localStorage.getItem('smoking_completed_order_ids') || '[]');
-          if (!completedIds.includes(insertedOrderId)) {
-            completedIds.push(insertedOrderId);
-            localStorage.setItem('smoking_completed_order_ids', JSON.stringify(completedIds));
-          }
-        } catch {}
       }
 
       // 4. A baixa de estoque em smoking_products é realizada automaticamente

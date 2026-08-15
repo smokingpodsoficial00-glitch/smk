@@ -3,10 +3,11 @@ import { formatBRL } from "@/lib/cart";
 import { 
   Clock, MapPin, ReceiptText, CheckCircle2, Truck, Bike, X, Loader2, 
   Search, Filter, MoreVertical, ChevronDown, ChevronUp, Copy, Printer, 
-  Trash2, RotateCcw, Package, DollarSign, Eye, EyeOff
+  Trash2, RotateCcw, Package, DollarSign, Eye, EyeOff, Plus
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+import { ManualSaleModal } from "./ManualSaleModal";
 // stockSync: trigger SQL trg_stock_on_order_delete cuida da devolução automática
 
 export interface AdminOrder {
@@ -47,6 +48,7 @@ export function KanbanBoard() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrderForDispatch, setSelectedOrderForDispatch] = useState<string | null>(null);
+  const [isManualSaleOpen, setIsManualSaleOpen] = useState(false);
 
   // Estados para o histórico ERP de Concluídos
   const [searchQuery, setSearchQuery] = useState("");
@@ -77,7 +79,7 @@ export function KanbanBoard() {
         const mapped: AdminOrder[] = data
           .filter(o => o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' && (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_')))
           .map(o => {
-          const isCompleted = completedIds.includes(o.id) || o.delivery_status === 'CONCLUIDO' || o.order_source === 'MANUAL' || (o.shipping_address && (o.shipping_address.includes('Balcão') || o.shipping_address.includes('Balcao')));
+          const isCompleted = completedIds.includes(o.id) || o.delivery_status === 'CONCLUIDO';
           return {
             id: o.id.substring(0, 8).toUpperCase(),
             realId: o.id,
@@ -95,7 +97,7 @@ export function KanbanBoard() {
             paymentMethod: o.payment_method,
             receiptUrl: o.receipt_url,
             paymentStatus: o.payment_status,
-            status: isCompleted ? 'CONCLUIDO' : (o.delivery_status || 'AGUARDANDO_PAGAMENTO'),
+            status: isCompleted ? 'CONCLUIDO' : (o.delivery_status || 'PREPARANDO'),
             time: new Date(o.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
             createdAt: o.created_at,
             requestedDiscount: !!o.requested_discount || o.receipt_url === 'SOLICITOU_DESCONTO'
@@ -329,53 +331,74 @@ export function KanbanBoard() {
           </div>
         </div>
 
-        {/* Abas Principais */}
-        <div className="flex items-center gap-1 bg-[#121212]/50 p-1 rounded-xl border border-white/5">
+        {/* Ações e Abas Principais */}
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setActiveTab('kanban')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'kanban' 
-                ? 'bg-white/5 text-emerald-400 font-bold border border-white/5' 
-                : 'text-white/40 hover:text-white'
-            }`}
+            onClick={() => setIsManualSaleOpen(true)}
+            className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] cursor-pointer"
           >
-            📦 Pedidos ({activeOrders.length})
+            <Plus className="size-3.5 stroke-[3]" />
+            <span>Registrar Venda</span>
           </button>
-          <button
-            onClick={() => setActiveTab('concluidos')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'concluidos' 
-                ? 'bg-white/5 text-emerald-400 font-bold border border-white/5' 
-                : 'text-white/40 hover:text-white'
-            }`}
-          >
-            <CheckCircle2 className="size-3.5" />
-            Concluídos ({allCompletedOrders.length})
-          </button>
+
+          <div className="flex items-center gap-1 bg-[#121212]/50 p-1 rounded-xl border border-white/5">
+            <button
+              onClick={() => setActiveTab('kanban')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'kanban' 
+                  ? 'bg-white/5 text-emerald-400 font-bold border border-white/5' 
+                  : 'text-white/40 hover:text-white'
+              }`}
+            >
+              📦 Pedidos ({activeOrders.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('concluidos')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'concluidos' 
+                  ? 'bg-white/5 text-emerald-400 font-bold border border-white/5' 
+                  : 'text-white/40 hover:text-white'
+              }`}
+            >
+              <CheckCircle2 className="size-3.5" />
+              Concluídos ({allCompletedOrders.length})
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Conteúdo da Aba: KANBAN EM ANDAMENTO */}
+      {/* Modal de Venda Manual Integrado */}
+      <ManualSaleModal 
+        isOpen={isManualSaleOpen} 
+        onClose={() => {
+          setIsManualSaleOpen(false);
+          fetchOrders();
+        }} 
+        onSaleSuccess={() => {
+          setIsManualSaleOpen(false);
+          fetchOrders();
+        }}
+      />
+
+      {/* Conteúdo da Aba: KANBAN EM ANDAMENTO (3 ETAPAS LOGÍSTICAS REAIS) */}
       {activeTab === 'kanban' && (
         <div className="flex-1 overflow-hidden p-6 flex flex-col gap-4 min-h-0 bg-[#070707]/30">
-          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 xl:gap-6 min-h-0">
-            {columns.map(col => {
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-5 xl:gap-7 min-h-0">
+            {columns.filter(c => c.status !== 'AGUARDANDO_PAGAMENTO').map(col => {
               const colOrders = orders.filter(o => o.status === col.status);
               return (
-                <div key={col.title} className="flex flex-col h-full max-h-full min-w-0 min-h-0 overflow-hidden">
-                  <div className="flex items-center justify-between px-1 shrink-0">
+                <div key={col.title} className="flex flex-col h-full max-h-full min-w-0 min-h-0 overflow-hidden bg-[#0a0a0a]/60 border border-white/5 rounded-2xl p-4">
+                  <div className="flex items-center justify-between px-1 shrink-0 pb-3 border-b border-white/5">
                     <div className="flex items-center gap-2">
-                      <div className={`size-2 rounded-full ${col.color}`} />
-                      <h3 className="font-bold text-white/70 text-[10px] tracking-wider uppercase truncate">{col.title}</h3>
+                      <div className={`size-2.5 rounded-full ${col.color}`} />
+                      <h3 className="font-bold text-white text-xs tracking-wider uppercase truncate">{col.title}</h3>
                     </div>
-                    <span className="text-[10px] font-bold text-white/30 font-mono shrink-0">
-                      {colOrders.length} {colOrders.length === 1 ? 'pedido' : 'pedidos'}
+                    <span className="text-[11px] font-bold text-white/50 font-mono shrink-0 px-2 py-0.5 rounded-full bg-white/5">
+                      {colOrders.length}
                     </span>
                   </div>
                   
-                  <div className="h-px bg-white/5 my-3 w-full shrink-0" />
-                  
-                  <div className="flex-1 flex flex-col gap-4 overflow-y-auto pb-12 pr-1.5 custom-scrollbar min-h-0">
+                  <div className="flex-1 flex flex-col gap-3.5 overflow-y-auto pt-3 pb-10 pr-1 custom-scrollbar min-h-0">
                     {colOrders.map(order => (
                       <OrderCard 
                         key={order.realId} 
@@ -388,8 +411,9 @@ export function KanbanBoard() {
                       />
                     ))}
                     {colOrders.length === 0 && (
-                      <div className="border border-dashed border-[#1f1f1f] rounded-2xl py-8 px-4 text-center text-xs text-white/20 font-medium">
-                        Nenhum pedido aqui
+                      <div className="border border-dashed border-white/10 rounded-2xl py-12 px-4 text-center text-xs text-white/20 font-medium flex flex-col items-center justify-center gap-2">
+                        <Package className="size-6 text-white/10" />
+                        <span>Nenhum pedido nesta etapa</span>
                       </div>
                     )}
                   </div>
