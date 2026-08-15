@@ -1217,12 +1217,12 @@ export function SupplyChainDashboard() {
   return (
     <div className="flex-1 overflow-y-auto bg-background custom-scrollbar relative">
 
-      {/* ━━━ STICKY HEADER COM APENAS O BOTÃO NOVO PRODUTO ━━━━━━━━━━━━━━ */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border">
-        <div className="px-4 md:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between gap-3">
+      {/* ━━━ STICKY HEADER COM AÇÕES PRINCIPAIS HIERARQUIZADAS ━━━━━━━━━━━━━━ */}
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-white/10">
+        <div className="px-4 md:px-6 lg:px-8 py-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
                 <PackageSearch className="size-5 text-emerald-400" />
                 Central de Gestão de Estoque
               </h2>
@@ -1231,17 +1231,19 @@ export function SupplyChainDashboard() {
               </p>
             </div>
 
-            {/* Botões Superiores Direitos: Registrar Venda, Planejador de Recompra e Novo Produto */}
-            <div className="flex items-center gap-2.5">
+            {/* Botões Superiores com Hierarquia Clara */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Botão Neutro Escuro com Borda Clara */}
               <button
                 type="button"
                 onClick={() => setShowReplenishmentModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500/20 via-emerald-500/10 to-transparent hover:bg-emerald-500/25 text-emerald-300 text-xs font-extrabold transition-all border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)] cursor-pointer active:scale-[0.97]"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#161b26] hover:bg-white/10 text-white text-xs font-semibold border border-white/20 transition-all cursor-pointer active:scale-[0.97]"
               >
-                <Boxes className="size-4 text-emerald-400" />
-                <span>🚀 Planejador de Recompra</span>
+                <Boxes className="size-3.5 text-white" />
+                <span>Planejador de Recompra</span>
               </button>
 
+              {/* Botão Ação Principal de Venda */}
               <button
                 type="button"
                 onClick={() => {
@@ -1249,17 +1251,18 @@ export function SupplyChainDashboard() {
                   setPreSelectedGroupForSale(null);
                   setIsManualSaleModalOpen(true);
                 }}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black text-xs font-extrabold transition-all shadow-[0_0_15px_rgba(245,158,11,0.35)] cursor-pointer active:scale-[0.97]"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] cursor-pointer active:scale-[0.97]"
               >
-                <ShoppingCart className="size-4 text-black" />
-                <span>⚡ Registrar Venda</span>
+                <ShoppingCart className="size-3.5 text-black" />
+                <span>Registrar Venda</span>
               </button>
 
+              {/* Botão Secundário Mais Discreto */}
               <button
                 onClick={() => setShowNewProductModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] cursor-pointer active:scale-[0.97]"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-medium border border-white/15 transition-all cursor-pointer active:scale-[0.97]"
               >
-                <Plus className="size-4" />
+                <Plus className="size-3.5" />
                 <span>Novo Produto</span>
               </button>
             </div>
@@ -1267,231 +1270,188 @@ export function SupplyChainDashboard() {
         </div>
       </div>
 
-      {/* ━━━ CONTEÚDO PRINCIPAL (FULL WIDTH) ━━━━━━━━━━━━━ */}
-      <div className="px-4 md:px-6 lg:px-8 py-6 space-y-6">
+      {/* ━━━ CONTEÚDO PRINCIPAL ━━━━━━━━━━━━━ */}
+      <div className="px-4 md:px-6 lg:px-8 py-5 space-y-5">
 
-        {/* ── KPIs GRUPO PRINCIPAL (4 cards grandes) ─────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Produtos */}
-          <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-3">
+        {/* ── KPIs GRUPO PRINCIPAL (4 CARDS MINIMALISTAS) ─────── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {/* 1. Produtos (Neutro) */}
+          <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 flex flex-col justify-between space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Produtos Cadastrados</span>
-              <div className="size-8 rounded-lg bg-emerald-500/10 grid place-items-center">
-                <Box className="size-4 text-emerald-400" />
+              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Produtos Cadastrados</span>
+              <div className="size-7 rounded bg-white/5 border border-white/10 grid place-items-center">
+                <Box className="size-3.5 text-muted-foreground" />
               </div>
             </div>
-            <div className="text-3xl font-bold text-white">{totalProducts}</div>
-            <span className="text-[10px] text-muted-foreground">modelos ativos no sistema</span>
+            <div>
+              <div className="text-2xl font-bold text-white">{totalProducts}</div>
+              <span className="text-[10px] text-muted-foreground block mt-0.5">modelos ativos no sistema</span>
+            </div>
           </div>
 
-          {/* Valor em Estoque */}
-          <div className="bg-card border border-emerald-500/20 rounded-2xl p-5 flex flex-col gap-3">
+          {/* 2. Valor de Venda do Estoque (Neutro) */}
+          <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 flex flex-col justify-between space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Valor de Venda do Estoque</span>
-              <div className="size-8 rounded-lg bg-emerald-500/10 grid place-items-center">
-                <DollarSign className="size-4 text-emerald-400" />
+              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Valor de Venda do Estoque</span>
+              <div className="size-7 rounded bg-white/5 border border-white/10 grid place-items-center">
+                <DollarSign className="size-3.5 text-muted-foreground" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-emerald-400">{formatBRL(totalStockValue)}</div>
-            <span className="text-[10px] text-emerald-400/60">valor bruto dos {totalStockUnits} pods na prateleira</span>
+            <div>
+              <div className="text-2xl font-bold text-white">{formatBRL(totalStockValue)}</div>
+              <span className="text-[10px] text-muted-foreground block mt-0.5">valor bruto dos {totalStockUnits} pods</span>
+            </div>
           </div>
 
-          {/* Custo dos Pods em Estoque */}
-          <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-3">
+          {/* 3. Custo dos Pods em Estoque (Neutro) */}
+          <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 flex flex-col justify-between space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Custo dos Pods em Estoque</span>
-              <div className="size-8 rounded-lg bg-white/5 grid place-items-center">
-                <Tag className="size-4 text-muted-foreground" />
+              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Custo dos Pods em Estoque</span>
+              <div className="size-7 rounded bg-white/5 border border-white/10 grid place-items-center">
+                <Tag className="size-3.5 text-muted-foreground" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-silver">{formatBRL(totalStockCost)}</div>
-            <span className="text-[10px] text-muted-foreground">custo pago nos {totalStockUnits} pods na prateleira</span>
+            <div>
+              <div className="text-2xl font-bold text-white">{formatBRL(totalStockCost)}</div>
+              <span className="text-[10px] text-muted-foreground block mt-0.5">custo pago nos {totalStockUnits} pods</span>
+            </div>
           </div>
 
-          {/* Lucro Potencial do Estoque */}
-          <div className="bg-card border border-emerald-500/20 rounded-2xl p-5 flex flex-col gap-3">
+          {/* 4. Lucro Potencial do Estoque (ÚNICO COM DESTAQUE VERDE) */}
+          <div className="bg-[#12161f] border border-emerald-500/30 rounded-xl p-4 flex flex-col justify-between space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Lucro Potencial do Estoque</span>
-              <div className="size-8 rounded-lg bg-emerald-500/10 grid place-items-center">
-                <TrendingUp className="size-4 text-emerald-400" />
+              <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Lucro Potencial do Estoque</span>
+              <div className="size-7 rounded bg-emerald-500/10 border border-emerald-500/20 grid place-items-center">
+                <TrendingUp className="size-3.5 text-emerald-400" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-emerald-400">{formatBRL(estimatedProfit)}</div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold">{profitMarginPct}%</span>
-              <span className="text-[10px] text-muted-foreground">se vender os {totalStockUnits} pods parados</span>
+            <div>
+              <div className="text-2xl font-bold text-emerald-400">{formatBRL(estimatedProfit)}</div>
+              <span className="text-[10px] text-emerald-400/80 block mt-0.5">
+                {profitMarginPct}% de margem sobre os {totalStockUnits} pods
+              </span>
             </div>
           </div>
         </div>
 
-        {/* ── KPIs GRUPO SECUNDÁRIO (4 cards menores) ──── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between">
-            <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Unidades</span>
-            <span className="text-base font-bold text-silver">{totalStockUnits} un</span>
+        {/* ── LINHA DE INDICADORES SECUNDÁRIOS DISCRETOS ──── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="bg-[#0e1218] border border-white/10 rounded-lg px-3.5 py-2 flex items-center justify-between">
+            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Unidades</span>
+            <span className="font-bold text-white">{totalStockUnits} un</span>
           </div>
-          <div className="bg-card border border-amber-500/20 rounded-xl px-4 py-3 flex items-center justify-between">
-            <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Estoque Baixo</span>
-            <span className="text-base font-bold text-amber-400">{lowStockCount}</span>
+          <div className="bg-[#0e1218] border border-amber-500/20 rounded-lg px-3.5 py-2 flex items-center justify-between">
+            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Estoque Baixo</span>
+            <span className="font-bold text-amber-400">{lowStockCount}</span>
           </div>
-          <div className="bg-card border border-red-500/20 rounded-xl px-4 py-3 flex items-center justify-between">
-            <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Sem Estoque</span>
-            <span className="text-base font-bold text-red-400">{outOfStockCount}</span>
+          <div className="bg-[#0e1218] border border-red-500/20 rounded-lg px-3.5 py-2 flex items-center justify-between">
+            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Sem Estoque</span>
+            <span className="font-bold text-red-400">{outOfStockCount}</span>
           </div>
-          <div className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between">
-            <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Última Entrada</span>
-            <span className="text-xs font-bold text-muted-foreground">{lastEntryTime}</span>
+          <div className="bg-[#0e1218] border border-white/10 rounded-lg px-3.5 py-2 flex items-center justify-between">
+            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Última Entrada</span>
+            <span className="font-medium text-muted-foreground">{lastEntryTime}</span>
           </div>
         </div>
 
-        {/* ── BANNER INTELIGENTE DE REPOSIÇÃO & GATILHO DINÂMICO ── */}
-        {(() => {
-          const reorderGoal = financialGoals?.reorderCashGoal || 1000;
-          const currentCashSim = 513;
-          const cashNeeded = Math.max(0, reorderGoal - currentCashSim);
-          const reorderPct = reorderGoal > 0 ? Math.min(100, Math.round((currentCashSim / reorderGoal) * 100)) : 100;
-          const avgPodPrice = totalStockUnits > 0 ? (totalStockValue / totalStockUnits) : 86.9;
-          const podsRemaining = avgPodPrice > 0 ? Math.ceil(cashNeeded / avgPodPrice) : 0;
-
-          return (
-            <div className="bg-gradient-to-r from-emerald-950/40 via-card to-amber-950/20 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-[0_0_20px_rgba(16,185,129,0.06)]">
-              <div className="flex items-center gap-3.5">
-                <div className="size-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 grid place-items-center shrink-0 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                  <Boxes className="size-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs sm:text-sm font-extrabold text-white">
-                      Gatilho de Recompra: Lote Mínimo de R$ {reorderGoal.toLocaleString("pt-BR")}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-extrabold">
-                      Frete R$ 2,94/pod
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Caixa em R$ {currentCashSim.toFixed(2)} ({reorderPct}%) — {cashNeeded > 0 ? `Faltam apenas ~${podsRemaining} pods vendidos para acionar a compra com frete diluído!` : "🎉 Meta de caixa atingida! Lote pronto para compra!"}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowReplenishmentModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)] shrink-0 cursor-pointer active:scale-[0.97]"
-              >
-                <span>Abrir Planejador & Metas</span>
-                <ChevronRight className="size-4" />
-              </button>
-            </div>
-          );
-        })()}
-
-        {/* ── GRÁFICOS: RANKING + DONUT ────────────────── */}
+        {/* ── GRÁFICOS: RANKING DE VENDAS + DONUT CHART ────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-          {/* Ranking Top Modelos de Pods (com Expansão de Sabores e Estoque) */}
-          <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+          {/* Ranking Top Modelos de Pods (Lista Limpa Sem Emojis) */}
+          <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <TrendingUp className="size-4 text-emerald-400" />
-                <span className="text-xs uppercase font-semibold text-silver tracking-wider">Ranking de Vendas por Modelo</span>
+                <span className="text-xs uppercase font-bold text-white tracking-wider">Ranking de Vendas por Modelo</span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowFullRankingModal(true)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-emerald-400 text-[11px] font-bold transition-all border border-emerald-500/20 cursor-pointer"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-[11px] font-medium transition-all cursor-pointer"
               >
-                <ListOrdered className="size-3.5" />
-                Ver mais modelos
+                <ListOrdered className="size-3" />
+                <span>Ver mais</span>
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {modelRankingList.slice(0, 5).map((modelItem, idx) => {
                 const maxSold = modelRankingList[0]?.totalSold || 1;
                 const pct = maxSold > 0 ? Math.round((modelItem.totalSold / maxSold) * 100) : 0;
-                const medal = MEDAL_STYLES[idx];
                 const isExpanded = expandedRankingModelKey === modelItem.groupKey;
-                const barColor = medal
-                  ? `bg-gradient-to-r ${medal.barFrom} ${medal.barTo}`
-                  : "bg-emerald-500/60";
 
                 return (
-                  <div key={modelItem.groupKey} className="border border-border/50 rounded-xl overflow-hidden bg-black/20">
+                  <div key={modelItem.groupKey} className="border border-white/5 rounded-lg overflow-hidden bg-black/30">
                     <div 
                       onClick={() => setExpandedRankingModelKey(isExpanded ? null : modelItem.groupKey)}
-                      className="p-3 flex items-center gap-3 cursor-pointer hover:bg-white/5 transition-colors"
+                      className="p-2.5 flex items-center gap-3 cursor-pointer hover:bg-white/5 transition-colors"
                     >
-                      <span className="text-base w-6 text-center shrink-0">
-                        {medal ? medal.emoji : `${idx + 1}º`}
+                      <span className="text-xs font-bold w-5 text-center text-muted-foreground shrink-0">
+                        #{idx + 1}
                       </span>
 
                       {modelItem.image_url ? (
-                        <img src={modelItem.image_url} alt={modelItem.modelDisplayName} className="size-8 object-cover rounded-lg border border-border shrink-0" />
+                        <img src={modelItem.image_url} alt={modelItem.modelDisplayName} className="size-7 object-cover rounded border border-white/10 shrink-0" />
                       ) : (
-                        <div className="size-8 rounded-lg bg-elevated border border-border flex items-center justify-center shrink-0">
-                          <Box className="size-4 text-muted-foreground" />
+                        <div className="size-7 rounded bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                          <Box className="size-3.5 text-muted-foreground" />
                         </div>
                       )}
 
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className={`text-xs font-bold truncate ${medal ? medal.text : "text-white"}`}>
+                        <div className="flex items-center justify-between mb-1 text-xs">
+                          <span className="font-bold text-white truncate">
                             {modelItem.modelDisplayName}
                           </span>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-xs font-semibold text-emerald-400">
+                          <div className="flex items-center gap-2 shrink-0 text-[11px]">
+                            <span className="font-semibold text-emerald-400">
                               {modelItem.totalSold} un vendidas
                             </span>
-                            <span className="text-[11px] text-muted-foreground">
-                              ({modelItem.totalStock} un em estoque)
+                            <span className="text-muted-foreground">
+                              ({modelItem.totalStock} em estoque)
                             </span>
                           </div>
                         </div>
-                        <div className="h-1.5 w-full bg-elevated rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full transition-all duration-700 ${barColor}`} style={{ width: `${pct || 5}%` }} />
+                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${pct || 5}%` }} />
                         </div>
                       </div>
 
                       <div className="text-muted-foreground hover:text-white shrink-0 ml-1">
-                        {isExpanded ? <ChevronUp className="size-4 text-emerald-400" /> : <ChevronDown className="size-4" />}
+                        {isExpanded ? <ChevronUp className="size-3.5 text-emerald-400" /> : <ChevronDown className="size-3.5" />}
                       </div>
                     </div>
 
                     {/* Detalhamento de Sabores do Modelo Selecionado */}
                     {isExpanded && (
-                      <div className="border-t border-border/40 bg-black/40 p-3 space-y-2 text-xs">
-                        <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
-                          <span>Desempenho de Sabores — {modelItem.modelDisplayName}</span>
-                          <span>Estoque Atual</span>
+                      <div className="border-t border-white/5 bg-black/50 p-2.5 space-y-1.5 text-xs">
+                        <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1 flex items-center justify-between">
+                          <span>Sabores — {modelItem.modelDisplayName}</span>
+                          <span>Estoque</span>
                         </div>
 
                         {modelItem.flavors.length > 0 ? (
-                          modelRankingList && modelItem.flavors.map((fItem) => {
+                          modelItem.flavors.map((fItem) => {
                             const flavorStock = fItem.stock;
-                            let stockBadgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-                            let stockLabel = `${flavorStock} un em estoque`;
+                            let stockBadgeClass = "text-emerald-400";
+                            let stockLabel = `${flavorStock} un`;
 
                             if (flavorStock === 0) {
-                              stockBadgeClass = "bg-red-500/10 text-red-400 border-red-500/20";
+                              stockBadgeClass = "text-red-400 font-bold";
                               stockLabel = "Sem estoque";
                             } else if (flavorStock < 5) {
-                              stockBadgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
-                              stockLabel = `${flavorStock} un restando`;
+                              stockBadgeClass = "text-amber-400 font-bold";
+                              stockLabel = `${flavorStock} un`;
                             }
 
                             return (
-                              <div key={fItem.id || fItem.flavor} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
-                                <div className="flex items-center gap-2">
-                                  <Tag className="size-3 text-emerald-400" />
-                                  <span className="font-medium text-white">{fItem.flavor}</span>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                  <span className="text-muted-foreground font-mono text-[11px]">
+                              <div key={fItem.id || fItem.flavor} className="flex items-center justify-between py-1 px-2 rounded bg-white/5">
+                                <span className="font-medium text-white text-xs">{fItem.flavor}</span>
+                                <div className="flex items-center gap-3 text-xs">
+                                  <span className="text-muted-foreground text-[11px]">
                                     {fItem.totalSold} vendidas
                                   </span>
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${stockBadgeClass}`}>
+                                  <span className={`font-semibold ${stockBadgeClass}`}>
                                     {stockLabel}
                                   </span>
                                 </div>
@@ -1499,7 +1459,7 @@ export function SupplyChainDashboard() {
                             );
                           })
                         ) : (
-                          <p className="text-[11px] text-muted-foreground py-1 italic">Nenhum sabor cadastrado para este modelo.</p>
+                          <p className="text-[11px] text-muted-foreground py-1 italic">Nenhum sabor cadastrado.</p>
                         )}
                       </div>
                     )}
@@ -1514,17 +1474,17 @@ export function SupplyChainDashboard() {
           </div>
 
           {/* Donut Chart — Distribuição por Marca */}
-          <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+          <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 space-y-3">
             <div className="flex items-center gap-2">
-              <PieChart className="size-4 text-blue-400" />
-              <span className="text-xs uppercase font-semibold text-silver tracking-wider">Distribuição por Marca</span>
+              <PieChart className="size-4 text-white" />
+              <span className="text-xs uppercase font-bold text-white tracking-wider">Distribuição por Marca</span>
             </div>
 
             <div className="flex items-center gap-6">
               {/* Donut visual */}
               <div className="relative size-28 shrink-0">
                 <div className="size-full rounded-full" style={{ background: conicGradient }} />
-                <div className="absolute inset-[18%] rounded-full bg-card" />
+                <div className="absolute inset-[18%] rounded-full bg-[#12161f]" />
                 <div className="absolute inset-0 flex items-center justify-center flex-col">
                   <span className="text-sm font-bold text-white">{totalStockUnits}</span>
                   <span className="text-[9px] text-muted-foreground">unidades</span>
@@ -1532,13 +1492,13 @@ export function SupplyChainDashboard() {
               </div>
 
               {/* Legenda */}
-              <div className="flex-1 space-y-2.5">
+              <div className="flex-1 space-y-2">
                 {donutSegments.map((seg) => (
-                  <div key={seg.brandName} className="flex items-center gap-2.5">
-                    <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
+                  <div key={seg.brandName} className="flex items-center gap-2">
+                    <div className="size-2 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
                     <div className="flex-1 flex items-center justify-between min-w-0">
-                      <span className="text-xs font-medium text-silver truncate">{seg.brandName}</span>
-                      <span className="text-[11px] text-muted-foreground ml-2 shrink-0 font-medium">
+                      <span className="text-xs font-medium text-white truncate">{seg.brandName}</span>
+                      <span className="text-[11px] text-muted-foreground ml-2 shrink-0">
                         {seg.count} un ({seg.pct}%)
                       </span>
                     </div>
@@ -1552,67 +1512,69 @@ export function SupplyChainDashboard() {
           </div>
         </div>
 
-        {/* ── PESQUISA + FILTROS DE ESTOQUE SIMPLIFICADOS ───────────────────────── */}
-        <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
-          {/* Campo de Busca Destacado */}
+        {/* ── PESQUISA + FILTROS DE ESTOQUE COMPACTOS SAAS ───────────────────────── */}
+        <div className="bg-[#12161f] border border-white/10 rounded-xl p-3.5 space-y-3">
+          {/* Campo de Busca */}
           <div className="relative w-full">
-            <Search className="size-5 absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input 
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Pesquisar por marca, modelo ou sabor..."
-              className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl pl-11 pr-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+              className="w-full bg-[#090c10] border border-white/10 rounded-lg pl-10 pr-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-white/30 transition-all"
             />
           </div>
 
-          {/* Filtros por Marca */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 custom-scrollbar">
-            <button
-              onClick={() => setSelectedBrand(null)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                !selectedBrand
-                  ? "bg-white text-black shadow"
-                  : "bg-elevated/40 text-muted-foreground hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              Todas as Marcas
-            </button>
-            {availableBrands.map(b => (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-white/5 pt-2">
+            {/* Filtros por Marca */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 custom-scrollbar">
               <button
-                key={b}
-                onClick={() => setSelectedBrand(selectedBrand === b ? null : b)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  selectedBrand === b
-                    ? "bg-white text-black shadow"
-                    : "bg-elevated/40 text-muted-foreground hover:bg-white/10 hover:text-white"
+                onClick={() => setSelectedBrand(null)}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
+                  !selectedBrand
+                    ? "bg-white text-black font-bold"
+                    : "bg-white/5 text-muted-foreground hover:text-white"
                 }`}
               >
-                {b}
+                Todas as Marcas
               </button>
-            ))}
-          </div>
+              {availableBrands.map(b => (
+                <button
+                  key={b}
+                  onClick={() => setSelectedBrand(selectedBrand === b ? null : b)}
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
+                    selectedBrand === b
+                      ? "bg-white text-black font-bold"
+                      : "bg-white/5 text-muted-foreground hover:text-white"
+                  }`}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
 
-          {/* Filtros de Status de Estoque Estritamente Solicitados (4 Opções Limpas) */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 custom-scrollbar text-xs">
-            {[
-              { id: "TODOS", label: "Todos" },
-              { id: "EM_ESTOQUE", label: "🟢 Em estoque" },
-              { id: "BAIXO_ESTOQUE", label: "🟡 Baixo estoque" },
-              { id: "SEM_ESTOQUE", label: "🔴 Sem estoque" },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setFilterTab(tab.id as any)}
-                className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  filterTab === tab.id
-                    ? "bg-emerald-500 text-black shadow-[0_0_12px_rgba(16,185,129,0.3)]"
-                    : "bg-elevated/40 text-muted-foreground hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            {/* Filtros de Status de Estoque (4 Opções Limpas Sem Emojis) */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 custom-scrollbar text-xs">
+              {[
+                { id: "TODOS", label: "Todos" },
+                { id: "EM_ESTOQUE", label: "Em estoque" },
+                { id: "BAIXO_ESTOQUE", label: "Baixo estoque" },
+                { id: "SEM_ESTOQUE", label: "Sem estoque" },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setFilterTab(tab.id as any)}
+                  className={`px-2.5 py-1 rounded font-medium transition-all whitespace-nowrap cursor-pointer ${
+                    filterTab === tab.id
+                      ? "bg-white text-black font-bold"
+                      : "bg-white/5 text-muted-foreground hover:text-white"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
