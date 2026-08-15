@@ -1237,7 +1237,7 @@ export function SupplyChainDashboard() {
               <button
                 type="button"
                 onClick={() => setShowReplenishmentModal(true)}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#161b26] hover:bg-white/10 text-white text-xs font-semibold border border-white/20 transition-all cursor-pointer active:scale-[0.97]"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#1c1c1c] hover:bg-white/10 text-white text-xs font-semibold border border-white/20 transition-all cursor-pointer active:scale-[0.97]"
               >
                 <Boxes className="size-3.5 text-white" />
                 <span>Planejador de Recompra</span>
@@ -1276,7 +1276,7 @@ export function SupplyChainDashboard() {
         {/* ── KPIs GRUPO PRINCIPAL (4 CARDS MINIMALISTAS) ─────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* 1. Produtos (Neutro) */}
-          <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 flex flex-col justify-between space-y-2">
+          <div className="bg-[#141414] border border-white/10 rounded-xl p-4 flex flex-col justify-between space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Produtos Cadastrados</span>
               <div className="size-7 rounded bg-white/5 border border-white/10 grid place-items-center">
@@ -1290,7 +1290,7 @@ export function SupplyChainDashboard() {
           </div>
 
           {/* 2. Valor de Venda do Estoque (Neutro) */}
-          <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 flex flex-col justify-between space-y-2">
+          <div className="bg-[#141414] border border-white/10 rounded-xl p-4 flex flex-col justify-between space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Valor de Venda do Estoque</span>
               <div className="size-7 rounded bg-white/5 border border-white/10 grid place-items-center">
@@ -1304,7 +1304,7 @@ export function SupplyChainDashboard() {
           </div>
 
           {/* 3. Custo dos Pods em Estoque (Neutro) */}
-          <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 flex flex-col justify-between space-y-2">
+          <div className="bg-[#141414] border border-white/10 rounded-xl p-4 flex flex-col justify-between space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Custo dos Pods em Estoque</span>
               <div className="size-7 rounded bg-white/5 border border-white/10 grid place-items-center">
@@ -1318,7 +1318,7 @@ export function SupplyChainDashboard() {
           </div>
 
           {/* 4. Lucro Potencial do Estoque (ÚNICO COM DESTAQUE VERDE) */}
-          <div className="bg-[#12161f] border border-emerald-500/30 rounded-xl p-4 flex flex-col justify-between space-y-2">
+          <div className="bg-[#141414] border border-emerald-500/30 rounded-xl p-4 flex flex-col justify-between space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Lucro Potencial do Estoque</span>
               <div className="size-7 rounded bg-emerald-500/10 border border-emerald-500/20 grid place-items-center">
@@ -1336,19 +1336,19 @@ export function SupplyChainDashboard() {
 
         {/* ── LINHA DE INDICADORES SECUNDÁRIOS DISCRETOS ──── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div className="bg-[#0e1218] border border-white/10 rounded-lg px-3.5 py-2 flex items-center justify-between">
+          <div className="bg-[#101010] border border-white/10 rounded-lg px-3.5 py-2 flex items-center justify-between">
             <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Unidades</span>
             <span className="font-bold text-white">{totalStockUnits} un</span>
           </div>
-          <div className="bg-[#0e1218] border border-amber-500/20 rounded-lg px-3.5 py-2 flex items-center justify-between">
+          <div className="bg-[#101010] border border-amber-500/20 rounded-lg px-3.5 py-2 flex items-center justify-between">
             <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Estoque Baixo</span>
             <span className="font-bold text-amber-400">{lowStockCount}</span>
           </div>
-          <div className="bg-[#0e1218] border border-red-500/20 rounded-lg px-3.5 py-2 flex items-center justify-between">
+          <div className="bg-[#101010] border border-red-500/20 rounded-lg px-3.5 py-2 flex items-center justify-between">
             <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Sem Estoque</span>
             <span className="font-bold text-red-400">{outOfStockCount}</span>
           </div>
-          <div className="bg-[#0e1218] border border-white/10 rounded-lg px-3.5 py-2 flex items-center justify-between">
+          <div className="bg-[#101010] border border-white/10 rounded-lg px-3.5 py-2 flex items-center justify-between">
             <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Última Entrada</span>
             <span className="font-medium text-muted-foreground">{lastEntryTime}</span>
           </div>
@@ -1358,7 +1358,7 @@ export function SupplyChainDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
           {/* Ranking Top Modelos de Pods (Lista Limpa Sem Emojis) */}
-          <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 space-y-3">
+          <div className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <TrendingUp className="size-4 text-emerald-400" />
@@ -1474,7 +1474,7 @@ export function SupplyChainDashboard() {
           </div>
 
           {/* Donut Chart — Distribuição por Marca */}
-          <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 space-y-3">
+          <div className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-3">
             <div className="flex items-center gap-2">
               <PieChart className="size-4 text-white" />
               <span className="text-xs uppercase font-bold text-white tracking-wider">Distribuição por Marca</span>
@@ -1484,7 +1484,7 @@ export function SupplyChainDashboard() {
               {/* Donut visual */}
               <div className="relative size-28 shrink-0">
                 <div className="size-full rounded-full" style={{ background: conicGradient }} />
-                <div className="absolute inset-[18%] rounded-full bg-[#12161f]" />
+                <div className="absolute inset-[18%] rounded-full bg-[#141414]" />
                 <div className="absolute inset-0 flex items-center justify-center flex-col">
                   <span className="text-sm font-bold text-white">{totalStockUnits}</span>
                   <span className="text-[9px] text-muted-foreground">unidades</span>
@@ -1513,7 +1513,7 @@ export function SupplyChainDashboard() {
         </div>
 
         {/* ── PESQUISA + FILTROS DE ESTOQUE COMPACTOS SAAS ───────────────────────── */}
-        <div className="bg-[#12161f] border border-white/10 rounded-xl p-3.5 space-y-3">
+        <div className="bg-[#141414] border border-white/10 rounded-xl p-3.5 space-y-3">
           {/* Campo de Busca */}
           <div className="relative w-full">
             <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -1522,7 +1522,7 @@ export function SupplyChainDashboard() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Pesquisar por marca, modelo ou sabor..."
-              className="w-full bg-[#090c10] border border-white/10 rounded-lg pl-10 pr-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-white/30 transition-all"
+              className="w-full bg-[#0d0d0d] border border-white/10 rounded-lg pl-10 pr-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-white/30 transition-all"
             />
           </div>
 

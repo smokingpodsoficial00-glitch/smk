@@ -284,10 +284,10 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
-      <div className="bg-[#0c0f14] border border-white/10 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-[#09090b] border border-white/10 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         
         {/* ─── HEADER MODAL ─── */}
-        <div className="px-5 py-3.5 border-b border-white/10 bg-[#11151c] flex items-center justify-between">
+        <div className="px-5 py-3.5 border-b border-white/10 bg-[#121212] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="size-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
               <Boxes className="size-4 text-emerald-400" />
@@ -317,7 +317,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
         </div>
 
         {/* ─── NAVEGAÇÃO DE ABAS ─── */}
-        <div className="flex flex-wrap items-center justify-between border-b border-white/10 px-5 bg-[#0e1218] gap-2">
+        <div className="flex flex-wrap items-center justify-between border-b border-white/10 px-5 bg-[#0d0d0d] gap-2">
           <div className="flex items-center gap-1">
             <button
               type="button"
@@ -440,7 +440,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
 
               {/* Formulário Retrátil para Adicionar Novo Pod ao Pedido */}
               {showAddPodForm && (
-                <div className="bg-[#12161f] border border-emerald-500/30 rounded-xl p-4 space-y-3 animate-in slide-in-from-top-2">
+                <div className="bg-[#141414] border border-emerald-500/30 rounded-xl p-4 space-y-3 animate-in slide-in-from-top-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Plus className="size-4 text-emerald-400" />
@@ -544,10 +544,10 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
               )}
 
               {/* Tabela de Itens em Formato Horizontal Moderno */}
-              <div className="bg-[#12161f] border border-white/10 rounded-xl overflow-hidden">
+              <div className="bg-[#141414] border border-white/10 rounded-xl overflow-hidden">
                 
                 {/* Header da Tabela */}
-                <div className="px-4 py-2.5 bg-[#161b26] border-b border-white/10 hidden sm:grid grid-cols-12 gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider items-center">
+                <div className="px-4 py-2.5 bg-[#1c1c1c] border-b border-white/10 hidden sm:grid grid-cols-12 gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider items-center">
                   <div className="col-span-2">Qtd</div>
                   <div className="col-span-4">Produto / Sabores</div>
                   <div className="col-span-2 text-right">Custo Unit.</div>
@@ -671,7 +671,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
               </div>
 
               {/* Resumo Financeiro Compacto & Frete Integrado */}
-              <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 space-y-4">
+              <div className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-4">
                 
                 {/* Linha Compacta de Frete */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/10 text-xs">
@@ -745,7 +745,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
 
               {/* Banner de Saldo e Patrimônio Total */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-[#12161f] border border-white/10 rounded-xl p-3.5 space-y-1">
+                <div className="bg-[#141414] border border-white/10 rounded-xl p-3.5 space-y-1">
                   <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                     CAIXA EM MÃOS
                   </span>
@@ -755,7 +755,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                   <span className="text-[10px] text-muted-foreground block">Disponível para compras</span>
                 </div>
 
-                <div className="bg-[#12161f] border border-white/10 rounded-xl p-3.5 space-y-1">
+                <div className="bg-[#141414] border border-white/10 rounded-xl p-3.5 space-y-1">
                   <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                     ESTOQUE EM PRATELEIRA
                   </span>
@@ -767,7 +767,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                   </span>
                 </div>
 
-                <div className="bg-[#12161f] border border-white/10 rounded-xl p-3.5 space-y-1">
+                <div className="bg-[#141414] border border-white/10 rounded-xl p-3.5 space-y-1">
                   <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                     PATRIMÔNIO LÍQUIDO TOTAL
                   </span>
@@ -779,7 +779,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
               </div>
 
               {/* GATILHO #1: META DO LOTE DE COMPRA (COMPACTO) */}
-              <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 space-y-3">
+              <div className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <Zap className="size-4 text-emerald-400 shrink-0" />
@@ -855,7 +855,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
               </div>
 
               {/* GATILHO #2: TRANSIÇÃO DE ESCALA / PARAGUAI */}
-              <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 space-y-3">
+              <div className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <Target className="size-4 text-white shrink-0" />
@@ -908,7 +908,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
               </div>
 
               {/* PAINEL DE METAS PERIÓDICAS (MENSAL, TRIMESTRAL, ANUAL) */}
-              <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 space-y-3">
+              <div className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="size-4 text-emerald-400" />
                   <h4 className="text-xs font-bold text-white uppercase tracking-wider">
@@ -989,7 +989,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
           ════════════════════════════════════════════════════════════ */}
           {activeTab === "contingency" && (
             <div className="space-y-4">
-              <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 space-y-4">
+              <div className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-4">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="size-4 text-emerald-400 shrink-0" />
                   <div>
@@ -1050,7 +1050,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
         </div>
 
         {/* ─── FOOTER MODAL ─── */}
-        <div className="px-5 py-3 border-t border-white/10 bg-[#0e1218] flex items-center justify-between text-xs text-muted-foreground">
+        <div className="px-5 py-3 border-t border-white/10 bg-[#0d0d0d] flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <ShieldCheck className="size-3.5 text-emerald-400" />
             <span className="text-[11px]">Diretriz Salva no Obsidian: Cérebro Smoking Pods</span>
