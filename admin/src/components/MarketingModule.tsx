@@ -36,6 +36,7 @@ export interface Campaign {
   targetGroupName?: string;
   frequencyDays: number; // 0 = Disparo Único, 7 = Semanal, 14 = Quinzenal, etc.
   scheduledWeekday?: string; // 'QUARTA', 'SEXTA', 'SABADO', 'DOMINGO', etc.
+  scheduledTime?: string; // Ex: '15:00', '18:30', etc.
   batchSize: number;
   batchIntervalMinutes: number;
   status: 'active' | 'paused' | 'completed';
@@ -113,6 +114,7 @@ export function MarketingModule() {
   const [campaignFormTargetGroup, setCampaignFormTargetGroup] = useState<string>('');
   const [campaignFormFrequency, setCampaignFormFrequency] = useState<number>(7); // dias
   const [campaignFormWeekday, setCampaignFormWeekday] = useState<string>('QUARTA');
+  const [campaignFormTime, setCampaignFormTime] = useState<string>('15:00');
   const [campaignFormBatchSize, setCampaignFormBatchSize] = useState<number>(20);
   const [campaignFormInterval, setCampaignFormInterval] = useState<number>(45);
   const [cardapioUrl, setCardapioUrl] = useState('https://smoking-pods.vercel.app');
@@ -338,6 +340,7 @@ export function MarketingModule() {
       setCampaignFormTargetGroup(campToEdit.targetGroupId || '');
       setCampaignFormFrequency(campToEdit.frequencyDays);
       setCampaignFormWeekday(campToEdit.scheduledWeekday || 'QUARTA');
+      setCampaignFormTime(campToEdit.scheduledTime || '15:00');
       setCampaignFormBatchSize(campToEdit.batchSize || 20);
       setCampaignFormInterval(campToEdit.batchIntervalMinutes || 45);
     } else {
@@ -351,6 +354,7 @@ export function MarketingModule() {
       setCampaignFormTargetGroup(whatsAppGroups.length > 0 ? whatsAppGroups[0].id : '');
       setCampaignFormFrequency(7);
       setCampaignFormWeekday('QUARTA');
+      setCampaignFormTime('15:00');
       setCampaignFormBatchSize(20);
       setCampaignFormInterval(45);
     }
@@ -396,6 +400,7 @@ export function MarketingModule() {
               targetGroupName: selectedGroupName,
               frequencyDays: campaignFormFrequency,
               scheduledWeekday: campaignFormWeekday,
+              scheduledTime: campaignFormTime,
               batchSize: campaignFormBatchSize,
               batchIntervalMinutes: campaignFormInterval,
               totalRecipients: totalCount,
@@ -414,6 +419,7 @@ export function MarketingModule() {
         targetGroupName: selectedGroupName,
         frequencyDays: campaignFormFrequency,
         scheduledWeekday: campaignFormWeekday,
+        scheduledTime: campaignFormTime,
         batchSize: campaignFormBatchSize,
         batchIntervalMinutes: campaignFormInterval,
         status: 'active',
@@ -758,7 +764,7 @@ export function MarketingModule() {
                               {camp.frequencyDays === 0 
                                 ? 'Disparo Único' 
                                 : camp.scheduledWeekday 
-                                  ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()}` 
+                                  ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()}${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}` 
                                   : `A cada ${camp.frequencyDays} dias`}
                             </span>
                           </div>
@@ -1245,8 +1251,8 @@ export function MarketingModule() {
                 )}
               </div>
 
-              {/* Frequência do Disparo e Cadência Anti-Ban */}
-              <div className={`grid gap-4 ${campaignFormTargetType === 'lists' ? 'grid-cols-1 md:grid-cols-2' : campaignFormFrequency > 0 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+              {/* Frequência do Disparo e Horário */}
+              <div className={`grid gap-4 ${campaignFormTargetType === 'lists' ? 'grid-cols-1 md:grid-cols-3' : campaignFormFrequency > 0 ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'}`}>
                 <div>
                   <label className="text-xs font-bold text-white/70 block mb-1">Recorrência / Intervalo</label>
                   <select
@@ -1263,22 +1269,34 @@ export function MarketingModule() {
                 </div>
 
                 {campaignFormFrequency > 0 && (
-                  <div>
-                    <label className="text-xs font-bold text-white/70 block mb-1">Dia do Disparo na Semana</label>
-                    <select
-                      value={campaignFormWeekday}
-                      onChange={(e) => setCampaignFormWeekday(e.target.value)}
-                      className="w-full bg-[#050505] border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-400 font-bold focus:outline-none focus:border-emerald-400 cursor-pointer"
-                    >
-                      <option value="SEGUNDA">Toda Segunda-feira</option>
-                      <option value="TERCA">Toda Terça-feira</option>
-                      <option value="QUARTA">Toda Quarta-feira</option>
-                      <option value="QUINTA">Toda Quinta-feira</option>
-                      <option value="SEXTA">Toda Sexta-feira</option>
-                      <option value="SABADO">Todo Sábado</option>
-                      <option value="DOMINGO">Todo Domingo</option>
-                    </select>
-                  </div>
+                  <>
+                    <div>
+                      <label className="text-xs font-bold text-white/70 block mb-1">Dia da Semana</label>
+                      <select
+                        value={campaignFormWeekday}
+                        onChange={(e) => setCampaignFormWeekday(e.target.value)}
+                        className="w-full bg-[#050505] border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-400 font-bold focus:outline-none focus:border-emerald-400 cursor-pointer"
+                      >
+                        <option value="SEGUNDA">Toda Segunda-feira</option>
+                        <option value="TERCA">Toda Terça-feira</option>
+                        <option value="QUARTA">Toda Quarta-feira</option>
+                        <option value="QUINTA">Toda Quinta-feira</option>
+                        <option value="SEXTA">Toda Sexta-feira</option>
+                        <option value="SABADO">Todo Sábado</option>
+                        <option value="DOMINGO">Todo Domingo</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-white/70 block mb-1">Horário do Disparo</label>
+                      <input
+                        type="time"
+                        value={campaignFormTime}
+                        onChange={(e) => setCampaignFormTime(e.target.value)}
+                        className="w-full bg-[#050505] border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-400"
+                      />
+                    </div>
+                  </>
                 )}
 
                 {campaignFormTargetType === 'lists' && (
