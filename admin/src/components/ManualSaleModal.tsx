@@ -311,6 +311,9 @@ export function ManualSaleModal({
       // 3. Inserir Pedido PAGO e CONCLUIDO em smoking_orders
       let insertedOrderId: string | null = null;
       
+      // Mapear método de pagamento para a constraint do Supabase ('PIX' | 'CREDITO_LINK')
+      const safePaymentMethod = paymentMethod === "CARTAO" ? "CREDITO_LINK" : "PIX";
+
       const payload: any = {
         client_name: clientName.trim(),
         client_phone: formattedPhone,
@@ -320,7 +323,7 @@ export function ManualSaleModal({
         shipping_fee: numericShippingFee,
         payment_status: "PAGO",
         delivery_status: "ENTREGUE",
-        payment_method: paymentMethod,
+        payment_method: safePaymentMethod,
         company_id: companyId,
       };
 
@@ -330,15 +333,23 @@ export function ManualSaleModal({
         .select("id")
         .single();
 
-      if (orderErr && (orderErr.message?.includes("smoking_orders_delivery_status_check") || orderErr.message?.includes("delivery_status"))) {
-        payload.delivery_status = "CONCLUIDO";
-        const fallbackRes = await supabase
+      if (orderErr) {
+        // Se houver erro de delivery_status constraint
+        if (orderErr.message?.includes("delivery_status")) {
+          payload.delivery_status = "ENTREGUE";
+        }
+        // Se houver erro de payment_method constraint
+        if (orderErr.message?.includes("payment_method")) {
+          payload.payment_method = "PIX";
+        }
+
+        const retryRes = await supabase
           .from("smoking_orders")
           .insert(payload)
           .select("id")
           .single();
-        orderErr = fallbackRes.error;
-        insertedData = fallbackRes.data;
+        orderErr = retryRes.error;
+        insertedData = retryRes.data;
       }
 
       if (orderErr) {
