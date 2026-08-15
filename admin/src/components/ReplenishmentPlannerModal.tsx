@@ -283,25 +283,25 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-[#0f1216] border border-white/15 rounded-2xl w-full max-w-4xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+      <div className="bg-[#0c0f14] border border-white/10 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         
         {/* ─── HEADER MODAL ─── */}
-        <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-emerald-950/40 via-transparent to-amber-950/20">
+        <div className="px-5 py-3.5 border-b border-white/10 bg-[#11151c] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.2)] shrink-0">
-              <Boxes className="size-5 text-emerald-400" />
+            <div className="size-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+              <Boxes className="size-4 text-emerald-400" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                  Planejador de Estoque, Recompra & Metas
+                <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
+                  Planejador de Estoque, Reposição & Metas
                 </h3>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-extrabold uppercase tracking-wider">
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
                   {totalUnitsInOrder} Peças no Pedido
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground">
                 Monte, adicione e personalize o pedido exato para envio ao fornecedor
               </p>
             </div>
@@ -310,52 +310,52 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
           <button
             type="button"
             onClick={onClose}
-            className="size-8 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="size-7 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="size-4" />
           </button>
         </div>
 
         {/* ─── NAVEGAÇÃO DE ABAS ─── */}
-        <div className="flex flex-wrap items-center justify-between border-b border-white/10 px-4 sm:px-6 bg-black/30 gap-2">
-          <div className="flex">
+        <div className="flex flex-wrap items-center justify-between border-b border-white/10 px-5 bg-[#0e1218] gap-2">
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => setActiveTab("order")}
-              className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+              className={`flex items-center gap-2 py-3 px-3.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                 activeTab === "order"
-                  ? "border-amber-400 text-amber-400 bg-amber-500/5"
-                  : "border-transparent text-muted-foreground hover:text-white hover:bg-white/5"
+                  ? "border-emerald-400 text-emerald-400"
+                  : "border-transparent text-muted-foreground hover:text-white"
               }`}
             >
               <ShoppingCart className="size-3.5" />
-              <span>📦 Pedido Ativo & WhatsApp ({totalUnitsInOrder} pods)</span>
+              <span>Pedido Ativo & WhatsApp ({totalUnitsInOrder} pods)</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab("goals")}
-              className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+              className={`flex items-center gap-2 py-3 px-3.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                 activeTab === "goals"
-                  ? "border-emerald-400 text-emerald-400 bg-emerald-500/5"
-                  : "border-transparent text-muted-foreground hover:text-white hover:bg-white/5"
+                  ? "border-emerald-400 text-emerald-400"
+                  : "border-transparent text-muted-foreground hover:text-white"
               }`}
             >
               <Target className="size-3.5" />
-              <span>🎯 Metas & Termômetro de Caixa</span>
+              <span>Metas & Termômetro de Caixa</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab("contingency")}
-              className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+              className={`flex items-center gap-2 py-3 px-3.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
                 activeTab === "contingency"
-                  ? "border-cyan-400 text-cyan-400 bg-cyan-500/5"
-                  : "border-transparent text-muted-foreground hover:text-white hover:bg-white/5"
+                  ? "border-emerald-400 text-emerald-400"
+                  : "border-transparent text-muted-foreground hover:text-white"
               }`}
             >
               <ShieldCheck className="size-3.5" />
-              <span>🔄 Matriz de Substitutos</span>
+              <span>Matriz de Substitutos</span>
             </button>
           </div>
 
@@ -365,16 +365,16 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
               <button
                 type="button"
                 onClick={handleResetOrderToDefault}
-                className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-[11px] font-bold transition-colors cursor-pointer"
+                className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-muted-foreground hover:text-white text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1.5"
                 title="Voltar para a sugestão padrão de 15 peças da IA"
               >
-                <RotateCcw className="size-3 inline mr-1" />
-                Restaurar Sugestão IA
+                <RotateCcw className="size-3" />
+                <span>Restaurar Sugestão IA</span>
               </button>
               <button
                 type="button"
                 onClick={() => setShowAddPodForm(!showAddPodForm)}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-black text-xs font-extrabold shadow-[0_0_15px_rgba(16,185,129,0.25)] transition-all cursor-pointer active:scale-95"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95"
               >
                 <Plus className="size-3.5 text-black" />
                 <span>Adicionar Pod ao Pedido</span>
@@ -385,7 +385,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
           {activeTab === "goals" && (
             <div className="py-2 flex items-center gap-2">
               {savedSuccessAlert && (
-                <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20 animate-in fade-in">
+                <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 animate-in fade-in">
                   <CheckCircle2 className="size-3.5" /> Metas salvas!
                 </span>
               )}
@@ -393,7 +393,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                 <button
                   type="button"
                   onClick={() => setIsEditingGoals(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black text-xs font-extrabold shadow-[0_0_15px_rgba(245,158,11,0.25)] transition-all cursor-pointer active:scale-95"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95"
                 >
                   <Edit3 className="size-3.5 text-black" />
                   <span>Editar Todos os Gatilhos & Metas</span>
@@ -403,7 +403,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                   <button
                     type="button"
                     onClick={handleResetGoals}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold border border-red-500/20 transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium border border-red-500/20 transition-colors cursor-pointer"
                   >
                     <RotateCcw className="size-3" />
                     <span>Padrão</span>
@@ -411,14 +411,14 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                   <button
                     type="button"
                     onClick={() => setIsEditingGoals(false)}
-                    className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-medium transition-colors cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     type="button"
                     onClick={handleSaveGoals}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold transition-all shadow-[0_0_15px_rgba(16,185,129,0.35)] cursor-pointer active:scale-95"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95"
                   >
                     <Save className="size-3.5 text-black" />
                     <span>Salvar Alterações</span>
@@ -430,95 +430,95 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
         </div>
 
         {/* ─── CONTEÚDO PRINCIPAL (SCROLLÁVEL) ─── */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 custom-scrollbar">
 
           {/* ════════════════════════════════════════════════════════════
-              ABA 1: PEDIDO ATIVO & WHATSAPP (100% DINÂMICO)
+              ABA 1: PEDIDO ATIVO & WHATSAPP (ESTRUTURA HORIZONTAL LIMPA)
           ════════════════════════════════════════════════════════════ */}
           {activeTab === "order" && (
-            <div className="space-y-6">
+            <div className="space-y-4">
 
               {/* Formulário Retrátil para Adicionar Novo Pod ao Pedido */}
               {showAddPodForm && (
-                <div className="bg-card border border-emerald-500/40 rounded-2xl p-4 sm:p-5 space-y-4 bg-gradient-to-b from-emerald-950/25 to-transparent shadow-[0_0_20px_rgba(16,185,129,0.1)] animate-in slide-in-from-top-2">
+                <div className="bg-[#12161f] border border-emerald-500/30 rounded-xl p-4 space-y-3 animate-in slide-in-from-top-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Plus className="size-4 text-emerald-400" />
-                      <h4 className="text-sm font-bold text-white">Adicionar Novo Modelo / Pod ao Pedido</h4>
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Adicionar Modelo / Pod ao Pedido</h4>
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowAddPodForm(false)}
-                      className="size-6 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white grid place-items-center"
+                      className="size-5 rounded bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white grid place-items-center"
                     >
-                      <X className="size-3.5" />
+                      <X className="size-3" />
                     </button>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-muted-foreground">Marca</label>
+                      <label className="text-[10px] font-semibold uppercase text-muted-foreground">Marca</label>
                       <input
                         type="text"
                         placeholder="Ex: Elfbar, Ignite, Waka..."
                         value={newPodBrand}
                         onChange={(e) => setNewPodBrand(e.target.value)}
-                        className="w-full bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-400"
+                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-muted-foreground">Modelo do Pod *</label>
+                      <label className="text-[10px] font-semibold uppercase text-muted-foreground">Modelo do Pod *</label>
                       <input
                         type="text"
-                        placeholder="Ex: BC15K, Pulse 15K, V50..."
+                        placeholder="Ex: BC15K, Pulse 15K..."
                         value={newPodModel}
                         onChange={(e) => setNewPodModel(e.target.value)}
-                        className="w-full bg-black/50 border border-emerald-500/50 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-400"
+                        className="w-full bg-black/50 border border-emerald-500/40 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white focus:outline-none focus:border-emerald-400"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-muted-foreground">Quantidade</label>
+                      <label className="text-[10px] font-semibold uppercase text-muted-foreground">Quantidade</label>
                       <input
                         type="number"
                         min="1"
                         value={newPodQty}
                         onChange={(e) => setNewPodQty(e.target.value)}
-                        className="w-full bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-400"
+                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-muted-foreground">Custo Unitário (R$)</label>
+                      <label className="text-[10px] font-semibold uppercase text-muted-foreground">Custo Unitário (R$)</label>
                       <input
                         type="number"
                         value={newPodCost}
                         onChange={(e) => setNewPodCost(e.target.value)}
-                        className="w-full bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-emerald-400 focus:outline-none focus:border-emerald-400"
+                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-emerald-400 focus:outline-none focus:border-emerald-400"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-1 sm:col-span-2">
-                      <label className="text-[11px] font-semibold text-muted-foreground">Sabores Escolhidos</label>
+                      <label className="text-[10px] font-semibold uppercase text-muted-foreground">Sabores Escolhidos</label>
                       <input
                         type="text"
-                        placeholder="Ex: Watermelon Ice, Blue Razz, Grape..."
+                        placeholder="Ex: Watermelon Ice, Blue Razz..."
                         value={newPodFlavors}
                         onChange={(e) => setNewPodFlavors(e.target.value)}
-                        className="w-full bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-400"
+                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-muted-foreground">Preço de Venda Pretendido (R$)</label>
+                      <label className="text-[10px] font-semibold uppercase text-muted-foreground">Preço Venda Pretendido (R$)</label>
                       <input
                         type="number"
                         value={newPodSell}
                         onChange={(e) => setNewPodSell(e.target.value)}
-                        className="w-full bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-amber-300 focus:outline-none focus:border-emerald-400"
+                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
                       />
                     </div>
                   </div>
@@ -527,7 +527,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                     <button
                       type="button"
                       onClick={() => setShowAddPodForm(false)}
-                      className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                      className="px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-xs transition-colors cursor-pointer"
                     >
                       Cancelar
                     </button>
@@ -535,114 +535,117 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                       type="button"
                       onClick={handleAddPodToOrder}
                       disabled={!newPodModel.trim()}
-                      className="px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] disabled:opacity-50 cursor-pointer"
+                      className="px-3.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
                     >
-                      Confirmar e Inserir no Pedido
+                      Inserir no Pedido
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Tabela Interativa de Itens do Pedido */}
-              <div className="bg-card border border-white/10 rounded-2xl overflow-hidden shadow-lg">
-                <div className="p-4 bg-white/5 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Package className="size-4 text-emerald-400" />
-                    <span className="text-xs uppercase font-bold text-white tracking-wider">
-                      Itens do Pedido de Reposição ({totalUnitsInOrder} Peças • Custo Produtos: R$ {totalCostOfOrder.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-muted-foreground">
-                    Edite quantidades (+ / -), custos ou remova itens
-                  </span>
+              {/* Tabela de Itens em Formato Horizontal Moderno */}
+              <div className="bg-[#12161f] border border-white/10 rounded-xl overflow-hidden">
+                
+                {/* Header da Tabela */}
+                <div className="px-4 py-2.5 bg-[#161b26] border-b border-white/10 hidden sm:grid grid-cols-12 gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider items-center">
+                  <div className="col-span-2">Qtd</div>
+                  <div className="col-span-4">Produto / Sabores</div>
+                  <div className="col-span-2 text-right">Custo Unit.</div>
+                  <div className="col-span-2 text-right">Custo Total</div>
+                  <div className="col-span-1 text-right">Venda Est.</div>
+                  <div className="col-span-1 text-center">Ações</div>
                 </div>
 
+                {/* Linhas dos Produtos */}
                 <div className="divide-y divide-white/5">
                   {orderItems.map((item) => (
-                    <div key={item.id} className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors">
+                    <div key={item.id} className="px-4 py-2.5 flex flex-col sm:grid sm:grid-cols-12 gap-2 items-center hover:bg-white/[0.02] transition-colors">
                       
-                      {/* Dados do Pod */}
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {/* Stepper de Quantidade */}
-                        <div className="flex items-center bg-black/40 border border-white/10 rounded-xl p-1 shrink-0">
+                      {/* Qtd Stepper */}
+                      <div className="col-span-2 flex items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-start">
+                        <div className="flex items-center bg-black/50 border border-white/10 rounded-lg p-0.5">
                           <button
                             type="button"
                             onClick={() => handleUpdateItemQty(item.id, -1)}
-                            className="size-6 rounded-lg bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors"
+                            className="size-5 rounded bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors"
                           >
                             <Minus className="size-3" />
                           </button>
-                          <span className="w-8 text-center text-xs font-extrabold text-emerald-400">
+                          <span className="w-7 text-center text-xs font-bold text-emerald-400">
                             {item.qty}x
                           </span>
                           <button
                             type="button"
                             onClick={() => handleUpdateItemQty(item.id, 1)}
-                            className="size-6 rounded-lg bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors"
+                            className="size-5 rounded bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors"
                           >
                             <Plus className="size-3" />
                           </button>
                         </div>
+                        <span className="sm:hidden text-xs font-bold text-white">
+                          {item.brand} {item.model}
+                        </span>
+                      </div>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-bold text-white truncate">
-                              {item.brand} {item.model}
+                      {/* Produto & Sabores */}
+                      <div className="col-span-4 min-w-0 w-full">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-white truncate hidden sm:inline">
+                            {item.brand} {item.model}
+                          </span>
+                          {item.badge && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-white/5 text-muted-foreground border border-white/10">
+                              {item.badge}
                             </span>
-                            {item.badge && (
-                              <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-white/5 text-silver border border-white/10 shrink-0">
-                                {item.badge}
-                              </span>
-                            )}
-                          </div>
-                          
-                          {/* Edição Rápida de Sabores */}
-                          <div className="mt-1">
-                            <input
-                              type="text"
-                              value={item.flavors}
-                              onChange={(e) => handleUpdateItemField(item.id, "flavors", e.target.value)}
-                              className="w-full bg-transparent border-b border-transparent hover:border-white/20 focus:border-emerald-400 text-xs text-muted-foreground focus:text-white px-1 py-0.5 focus:outline-none transition-colors"
-                              placeholder="Sabores deste modelo..."
-                            />
-                          </div>
+                          )}
+                        </div>
+                        
+                        <input
+                          type="text"
+                          value={item.flavors}
+                          onChange={(e) => handleUpdateItemField(item.id, "flavors", e.target.value)}
+                          className="w-full bg-transparent border-b border-transparent hover:border-white/20 focus:border-emerald-400 text-[11px] text-muted-foreground focus:text-white px-0.5 py-0 focus:outline-none transition-colors"
+                          placeholder="Sabores..."
+                        />
+                      </div>
+
+                      {/* Custo Unitário */}
+                      <div className="col-span-2 text-right w-full sm:w-auto flex sm:block justify-between items-center">
+                        <span className="sm:hidden text-[10px] text-muted-foreground uppercase">Custo Unit:</span>
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-[11px] text-muted-foreground">R$</span>
+                          <input
+                            type="number"
+                            value={item.unitCost}
+                            onChange={(e) => handleUpdateItemField(item.id, "unitCost", parseFloat(e.target.value) || 0)}
+                            className="w-14 bg-black/40 border border-white/10 hover:border-white/25 focus:border-emerald-400 rounded px-1.5 py-0.5 text-xs font-bold text-white text-right focus:outline-none"
+                          />
                         </div>
                       </div>
 
-                      {/* Valores e Custo Unitário Editável */}
-                      <div className="flex items-center justify-between sm:justify-end gap-4 self-stretch sm:self-center shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-white/5">
-                        <div className="text-right">
-                          <span className="text-[10px] text-muted-foreground block">Custo Unit.</span>
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-muted-foreground">R$</span>
-                            <input
-                              type="number"
-                              value={item.unitCost}
-                              onChange={(e) => handleUpdateItemField(item.id, "unitCost", parseFloat(e.target.value) || 0)}
-                              className="w-14 bg-black/30 border border-white/10 hover:border-white/25 focus:border-emerald-400 rounded px-1.5 py-0.5 text-xs font-bold text-white text-right focus:outline-none"
-                            />
-                          </div>
-                        </div>
+                      {/* Custo Total */}
+                      <div className="col-span-2 text-right w-full sm:w-auto flex sm:block justify-between items-center">
+                        <span className="sm:hidden text-[10px] text-muted-foreground uppercase">Custo Total:</span>
+                        <span className="text-xs font-bold text-white">
+                          R$ {(item.qty * item.unitCost).toFixed(2)}
+                        </span>
+                      </div>
 
-                        <div className="text-right">
-                          <span className="text-[10px] text-muted-foreground block">Custo Total</span>
-                          <span className="text-xs font-extrabold text-white">
-                            R$ {(item.qty * item.unitCost).toFixed(2)}
-                          </span>
-                        </div>
+                      {/* Venda Pretendida */}
+                      <div className="col-span-1 text-right w-full sm:w-auto flex sm:block justify-between items-center">
+                        <span className="sm:hidden text-[10px] text-muted-foreground uppercase">Venda Est:</span>
+                        <span className="text-xs font-semibold text-emerald-400">
+                          R$ {item.unitSell.toFixed(2)}
+                        </span>
+                      </div>
 
-                        <div className="text-right">
-                          <span className="text-[10px] text-muted-foreground block">Venda Est.</span>
-                          <span className="text-xs font-bold text-emerald-400">
-                            R$ {item.unitSell.toFixed(2)}
-                          </span>
-                        </div>
-
+                      {/* Ações */}
+                      <div className="col-span-1 text-center flex justify-end sm:justify-center w-full sm:w-auto">
                         <button
                           type="button"
                           onClick={() => handleRemoveItem(item.id)}
-                          className="size-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 grid place-items-center cursor-pointer transition-colors ml-1"
-                          title="Remover do pedido"
+                          className="size-6 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 grid place-items-center cursor-pointer transition-colors"
+                          title="Remover item"
                         >
                           <Trash2 className="size-3.5" />
                         </button>
@@ -653,170 +656,164 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
 
                   {orderItems.length === 0 && (
                     <div className="p-8 text-center text-muted-foreground space-y-2">
-                      <Package className="size-8 mx-auto text-muted-foreground/50" />
+                      <Package className="size-6 mx-auto text-muted-foreground/40" />
                       <p className="text-xs">Nenhum pod adicionado ao pedido.</p>
                       <button
                         type="button"
                         onClick={handleResetOrderToDefault}
                         className="px-3 py-1.5 rounded-lg bg-emerald-500 text-black text-xs font-bold"
                       >
-                        Carregar Sugestão da IA
+                        Restaurar Sugestão IA
                       </button>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Totalizador Financeiro e Reconciliação em Tempo Real */}
-              <div className="bg-black/40 border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
+              {/* Resumo Financeiro Compacto & Frete Integrado */}
+              <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 space-y-4">
                 
-                {/* Linha de Custo de Frete do Fornecedor */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/10">
+                {/* Linha Compacta de Frete */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/10 text-xs">
                   <div className="flex items-center gap-2">
-                    <DollarSign className="size-4 text-cyan-400" />
-                    <span className="text-xs font-bold text-white">Frete Estimado do Fornecedor de SP:</span>
+                    <DollarSign className="size-3.5 text-muted-foreground" />
+                    <span className="font-semibold text-white">Frete Estimado do Fornecedor (SP):</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">R$</span>
+                    <span className="text-muted-foreground">R$</span>
                     <input
                       type="number"
                       value={supplierShippingFee}
                       onChange={(e) => setSupplierShippingFee(parseFloat(e.target.value) || 0)}
-                      className="w-20 bg-black/60 border border-white/15 rounded-lg px-2 py-1 text-xs font-bold text-cyan-300 text-right focus:outline-none focus:border-cyan-400"
+                      className="w-16 bg-black/50 border border-white/15 rounded px-2 py-0.5 text-xs font-bold text-white text-right focus:outline-none focus:border-emerald-400"
                     />
                     <span className="text-[11px] text-muted-foreground">
-                      (Diluído: <strong className="text-cyan-400">R$ {dilutedShippingPerPod}/pod</strong>)
+                      (Diluído: <strong className="text-emerald-400">R$ {dilutedShippingPerPod}/pod</strong>)
                     </span>
                   </div>
                 </div>
 
-                {/* 4 Cards de Métricas Consolidadas */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Total de Peças</span>
-                    <span className="text-xl font-extrabold text-white">{totalUnitsInOrder} un</span>
+                {/* 4 Cards de Métricas Compactas */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-lg bg-black/30 border border-white/5">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">TOTAL DE PEÇAS</span>
+                    <span className="text-lg font-bold text-white">{totalUnitsInOrder} un</span>
                   </div>
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Total Investido</span>
-                    <span className="text-xl font-extrabold text-white">R$ {totalSpentWithShipping.toFixed(2)}</span>
+                  <div className="p-3 rounded-lg bg-black/30 border border-white/5">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">TOTAL INVESTIDO</span>
+                    <span className="text-lg font-bold text-white">R$ {totalSpentWithShipping.toFixed(2)}</span>
                   </div>
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Faturamento Previsto</span>
-                    <span className="text-xl font-bold text-amber-300">R$ {totalSellOfOrder.toFixed(2)}</span>
+                  <div className="p-3 rounded-lg bg-black/30 border border-white/5">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">FATURAMENTO PREVISTO</span>
+                    <span className="text-lg font-bold text-white">R$ {totalSellOfOrder.toFixed(2)}</span>
                   </div>
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                    <span className="text-[10px] uppercase font-bold text-emerald-400 block">Lucro Líquido Limpo</span>
-                    <span className="text-xl font-extrabold text-emerald-400">R$ {projectedNetProfit.toFixed(2)}</span>
+                  <div className="p-3 rounded-lg bg-black/30 border border-white/5">
+                    <span className="text-[10px] uppercase font-bold text-emerald-400 block">LUCRO LÍQUIDO</span>
+                    <span className="text-lg font-bold text-emerald-400">R$ {projectedNetProfit.toFixed(2)}</span>
                   </div>
                 </div>
 
-                {/* Botão de Cópia para WhatsApp com a lista exata */}
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={handleCopyOrderText}
-                    disabled={orderItems.length === 0}
-                    className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-black text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-                  >
-                    {copiedOrder ? (
-                      <>
-                        <Check className="size-4 text-black" />
-                        <span>✅ Mensagem do Pedido Copiada para a Área de Transferência!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="size-4 text-black" />
-                        <span>📋 Copiar Pedido Formatado para o WhatsApp do Fornecedor ({totalUnitsInOrder} Peças)</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                {/* Botão de Cópia para WhatsApp Formatado (Sem Emojis) */}
+                <button
+                  type="button"
+                  onClick={handleCopyOrderText}
+                  disabled={orderItems.length === 0}
+                  className="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {copiedOrder ? (
+                    <>
+                      <Check className="size-4 text-black" />
+                      <span>Mensagem do Pedido Copiada para a Área de Transferência</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="size-4 text-black" />
+                      <span>Copiar Pedido Formatado para o WhatsApp do Fornecedor ({totalUnitsInOrder} Peças)</span>
+                    </>
+                  )}
+                </button>
               </div>
 
             </div>
           )}
 
           {/* ════════════════════════════════════════════════════════════
-              ABA 2: METAS & TERMÔMETRO DE CAIXA
+              ABA 2: METAS & TERMÔMETRO DE CAIXA (ESTILO MINIMALISTA)
           ════════════════════════════════════════════════════════════ */}
           {activeTab === "goals" && (
-            <div className="space-y-6">
+            <div className="space-y-4">
 
               {/* Banner de Saldo e Patrimônio Total */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-card border border-white/10 rounded-xl p-4 flex flex-col gap-1">
+                <div className="bg-[#12161f] border border-white/10 rounded-xl p-3.5 space-y-1">
                   <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
-                    Caixa em Mãos
+                    CAIXA EM MÃOS
                   </span>
-                  <div className="text-2xl font-extrabold text-emerald-400">
+                  <div className="text-xl font-bold text-emerald-400">
                     R$ {currentCash.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </div>
-                  <span className="text-[11px] text-muted-foreground">Disponível para compras</span>
+                  <span className="text-[10px] text-muted-foreground block">Disponível para compras</span>
                 </div>
 
-                <div className="bg-card border border-white/10 rounded-xl p-4 flex flex-col gap-1">
+                <div className="bg-[#12161f] border border-white/10 rounded-xl p-3.5 space-y-1">
                   <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
-                    Estoque em Prateleira
+                    ESTOQUE EM PRATELEIRA
                   </span>
-                  <div className="text-2xl font-extrabold text-white">
+                  <div className="text-xl font-bold text-white">
                     R$ {stockRetailValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </div>
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-[10px] text-muted-foreground block">
                     {totalPodsInStock} pods a preço de venda
                   </span>
                 </div>
 
-                <div className="bg-card border border-white/10 rounded-xl p-4 flex flex-col gap-1 bg-gradient-to-br from-white/[0.04] to-transparent">
-                  <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
-                    Patrimônio Líquido Total
+                <div className="bg-[#12161f] border border-white/10 rounded-xl p-3.5 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                    PATRIMÔNIO LÍQUIDO TOTAL
                   </span>
-                  <div className="text-2xl font-extrabold text-amber-300">
+                  <div className="text-xl font-bold text-white">
                     R$ {totalEquity.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </div>
-                  <span className="text-[11px] text-muted-foreground">Caixa + Valor dos Pods</span>
+                  <span className="text-[10px] text-muted-foreground block">Caixa + Valor dos Pods</span>
                 </div>
               </div>
 
-              {/* GATILHO #1: META DO LOTE DE COMPRA (100% EDITÁVEL) */}
-              <div className="bg-card border border-emerald-500/30 rounded-2xl p-5 space-y-4 bg-gradient-to-b from-emerald-950/20 to-transparent shadow-[0_0_20px_rgba(16,185,129,0.05)]">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="size-8 rounded-lg bg-emerald-500/20 text-emerald-400 grid place-items-center shrink-0">
-                      <Zap className="size-4" />
-                    </div>
+              {/* GATILHO #1: META DO LOTE DE COMPRA (COMPACTO) */}
+              <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Zap className="size-4 text-emerald-400 shrink-0" />
                     <div>
                       <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-bold text-white">
+                        <h4 className="text-xs font-bold text-white">
                           Gatilho de Recompra: Lote Mínimo de R$ {activeReorderGoal.toLocaleString("pt-BR")}
                         </h4>
                         {!isEditingGoals && (
                           <button
                             type="button"
                             onClick={() => setIsEditingGoals(true)}
-                            className="text-[10px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-0.5 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 cursor-pointer"
-                            title="Editar valor deste gatilho"
+                            className="text-[10px] font-semibold text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer"
                           >
-                            <Edit3 className="size-3" />
-                            <span>Ajustar Gatilho</span>
+                            <Edit3 className="size-2.5" />
+                            <span>Ajustar</span>
                           </button>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Diluição de frete de SP para ~R$ 2,94/pod — Protege a margem e cresce junto com o caixa
+                      <p className="text-[11px] text-muted-foreground">
+                        Diluição de frete de SP para ~R$ 2,94/pod
                       </p>
                     </div>
                   </div>
 
                   <div className="text-right flex items-center gap-3 self-end sm:self-center">
                     {isEditingGoals && (
-                      <div className="flex items-center gap-1.5 bg-black/60 border border-emerald-400/50 rounded-xl px-2.5 py-1">
+                      <div className="flex items-center gap-1 bg-black/60 border border-emerald-500/40 rounded px-2 py-0.5">
                         <span className="text-xs font-bold text-emerald-400">R$</span>
                         <input
                           type="number"
                           value={tempGoals.reorderCashGoal}
                           onChange={(e) => setTempGoals({ ...tempGoals, reorderCashGoal: Number(e.target.value) || 0 })}
-                          className="w-24 bg-transparent text-sm font-extrabold text-white focus:outline-none"
-                          placeholder="1000"
+                          className="w-20 bg-transparent text-xs font-bold text-white focus:outline-none"
                         />
                       </div>
                     )}
@@ -826,127 +823,114 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                   </div>
                 </div>
 
-                {/* Barra de Progresso */}
-                <div className="space-y-1.5">
-                  <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden border border-white/10 p-0.5">
+                <div className="space-y-1">
+                  <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
                     <div
-                      className="h-full bg-gradient-to-r from-emerald-500 to-emerald-300 rounded-full transition-all duration-500"
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-300"
                       style={{ width: `${reorderProgressPct}%` }}
                     />
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                     <span>R$ {currentCash.toFixed(2)} acumulados</span>
-                    <span className="font-semibold text-white">Meta do Lote: R$ {activeReorderGoal.toFixed(2)}</span>
+                    <span>Meta: R$ {activeReorderGoal.toFixed(2)}</span>
                   </div>
                 </div>
 
-                {/* Diagnóstico de Vendas Restantes */}
-                <div className="bg-black/30 border border-white/5 rounded-xl p-3.5 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <Flame className="size-4 text-amber-400 shrink-0" />
-                    <span className="text-xs text-silver">
-                      {cashNeededForReorder > 0 ? (
-                        <>Faltam apenas <strong className="text-emerald-400">R$ {cashNeededForReorder.toFixed(2)}</strong> em vendas (<strong className="text-amber-300">~{podsNeededToSell} pods</strong> vendidos) para acionar a compra!</>
-                      ) : (
-                        <strong className="text-emerald-400">🎉 META ALCANÇADA! O caixa já tem saldo suficiente para o lote de R$ {activeReorderGoal.toLocaleString("pt-BR")}!</strong>
-                      )}
-                    </span>
-                  </div>
-
+                <div className="bg-black/30 border border-white/5 rounded-lg p-2.5 flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">
+                    {cashNeededForReorder > 0 ? (
+                      <>Faltam <strong className="text-emerald-400">R$ {cashNeededForReorder.toFixed(2)}</strong> em vendas (~{podsNeededToSell} pods) para acionar a compra.</>
+                    ) : (
+                      <strong className="text-emerald-400">Saldo suficiente para o lote de R$ {activeReorderGoal.toLocaleString("pt-BR")}.</strong>
+                    )}
+                  </span>
                   <button
                     type="button"
                     onClick={() => setActiveTab("order")}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shrink-0 cursor-pointer"
+                    className="px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-semibold border border-emerald-500/20 transition-colors shrink-0 cursor-pointer"
                   >
-                    <span>Ver Pedido</span>
-                    <ChevronRight className="size-3.5" />
+                    Ver Pedido
                   </button>
                 </div>
               </div>
 
-              {/* GATILHO #2: TRANSIÇÃO DE ESCALA / PARAGUAI (100% EDITÁVEL) */}
-              <div className="bg-card border border-white/10 rounded-2xl p-5 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="size-8 rounded-lg bg-cyan-500/20 text-cyan-400 grid place-items-center shrink-0">
-                      <Target className="size-4" />
-                    </div>
+              {/* GATILHO #2: TRANSIÇÃO DE ESCALA / PARAGUAI */}
+              <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Target className="size-4 text-white shrink-0" />
                     <div>
                       <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-bold text-white">
+                        <h4 className="text-xs font-bold text-white">
                           Meta de Transição / Escala: R$ {activeParaguayGoal.toLocaleString("pt-BR")}
                         </h4>
                         {!isEditingGoals && (
                           <button
                             type="button"
                             onClick={() => setIsEditingGoals(true)}
-                            className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-0.5 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20 cursor-pointer"
-                            title="Editar valor desta meta de escala"
+                            className="text-[10px] font-semibold text-muted-foreground hover:text-white flex items-center gap-0.5 cursor-pointer"
                           >
-                            <Edit3 className="size-3" />
-                            <span>Ajustar Escala</span>
+                            <Edit3 className="size-2.5" />
+                            <span>Ajustar</span>
                           </button>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Destrava compras diretas no Paraguai / Foz (+30% a +40% de margem líquida com freteiro)
+                      <p className="text-[11px] text-muted-foreground">
+                        Destrava compras diretas (+30% a +40% de margem líquida com freteiro)
                       </p>
                     </div>
                   </div>
 
                   <div className="text-right flex items-center gap-3 self-end sm:self-center">
                     {isEditingGoals && (
-                      <div className="flex items-center gap-1.5 bg-black/60 border border-cyan-400/50 rounded-xl px-2.5 py-1">
-                        <span className="text-xs font-bold text-cyan-400">R$</span>
+                      <div className="flex items-center gap-1 bg-black/60 border border-white/20 rounded px-2 py-0.5">
+                        <span className="text-xs font-bold text-white">R$</span>
                         <input
                           type="number"
                           value={tempGoals.paraguayScaleGoal}
                           onChange={(e) => setTempGoals({ ...tempGoals, paraguayScaleGoal: Number(e.target.value) || 0 })}
-                          className="w-24 bg-transparent text-sm font-extrabold text-white focus:outline-none"
-                          placeholder="5000"
+                          className="w-20 bg-transparent text-xs font-bold text-white focus:outline-none"
                         />
                       </div>
                     )}
-                    <span className="text-xs font-bold text-cyan-400">
-                      {paraguayProgressPct}% Concluído (Patrimônio R$ {totalEquity.toFixed(0)})
+                    <span className="text-xs font-semibold text-white">
+                      {paraguayProgressPct}% Concluído
                     </span>
                   </div>
                 </div>
 
                 <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
                   <div
-                    className="h-full bg-gradient-to-r from-cyan-500 to-blue-400 rounded-full transition-all duration-500"
+                    className="h-full bg-white/40 rounded-full transition-all duration-300"
                     style={{ width: `${paraguayProgressPct}%` }}
                   />
                 </div>
               </div>
 
-              {/* PAINEL DE METAS PERIÓDICAS (MENSAL, TRIMESTRAL, ANUAL) — 100% EDITÁVEIS */}
-              <div className="bg-card border border-white/10 rounded-2xl p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="size-4 text-amber-400" />
-                    <h4 className="text-xs uppercase font-bold text-silver tracking-wider">
-                      Metas Estratégicas Periódicas (Faturamento & Patrimônio)
-                    </h4>
-                  </div>
+              {/* PAINEL DE METAS PERIÓDICAS (MENSAL, TRIMESTRAL, ANUAL) */}
+              <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="size-4 text-emerald-400" />
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                    Metas Estratégicas Periódicas
+                  </h4>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="border border-white/10 rounded-xl p-3.5 bg-black/20 space-y-1.5">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground">Meta Mensal (Faturamento)</span>
+                  <div className="border border-white/10 rounded-lg p-3 bg-black/30 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">META MENSAL</span>
                     {isEditingGoals ? (
-                      <div className="flex items-center gap-1 bg-black/50 border border-amber-400/50 rounded-lg px-2 py-1">
-                        <span className="text-xs font-bold text-amber-400">R$</span>
+                      <div className="flex items-center gap-1 bg-black/50 border border-white/20 rounded px-2 py-0.5">
+                        <span className="text-xs font-bold text-white">R$</span>
                         <input
                           type="number"
                           value={tempGoals.monthlyRevenueGoal}
                           onChange={(e) => setTempGoals({ ...tempGoals, monthlyRevenueGoal: Number(e.target.value) || 0 })}
-                          className="w-full bg-transparent text-sm font-bold text-amber-300 focus:outline-none"
+                          className="w-full bg-transparent text-xs font-bold text-white focus:outline-none"
                         />
                       </div>
                     ) : (
-                      <div className="text-lg font-bold text-white">
+                      <div className="text-base font-bold text-white">
                         R$ {goals.monthlyRevenueGoal.toLocaleString("pt-BR")}
                       </div>
                     )}
@@ -955,44 +939,44 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                     </span>
                   </div>
 
-                  <div className="border border-white/10 rounded-xl p-3.5 bg-black/20 space-y-1.5">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground">Meta Trimestral (Q1..Q4)</span>
+                  <div className="border border-white/10 rounded-lg p-3 bg-black/30 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">META TRIMESTRAL</span>
                     {isEditingGoals ? (
-                      <div className="flex items-center gap-1 bg-black/50 border border-amber-400/50 rounded-lg px-2 py-1">
-                        <span className="text-xs font-bold text-amber-400">R$</span>
+                      <div className="flex items-center gap-1 bg-black/50 border border-white/20 rounded px-2 py-0.5">
+                        <span className="text-xs font-bold text-white">R$</span>
                         <input
                           type="number"
                           value={tempGoals.quarterlyRevenueGoal}
                           onChange={(e) => setTempGoals({ ...tempGoals, quarterlyRevenueGoal: Number(e.target.value) || 0 })}
-                          className="w-full bg-transparent text-sm font-bold text-amber-300 focus:outline-none"
+                          className="w-full bg-transparent text-xs font-bold text-white focus:outline-none"
                         />
                       </div>
                     ) : (
-                      <div className="text-lg font-bold text-white">
+                      <div className="text-base font-bold text-white">
                         R$ {goals.quarterlyRevenueGoal.toLocaleString("pt-BR")}
                       </div>
                     )}
                     <span className="text-[10px] text-muted-foreground block">Escala contínua</span>
                   </div>
 
-                  <div className="border border-white/10 rounded-xl p-3.5 bg-black/20 space-y-1.5">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground">Meta Anual (Consolidação)</span>
+                  <div className="border border-white/10 rounded-lg p-3 bg-black/30 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-emerald-400 block">META ANUAL</span>
                     {isEditingGoals ? (
-                      <div className="flex items-center gap-1 bg-black/50 border border-emerald-400/50 rounded-lg px-2 py-1">
+                      <div className="flex items-center gap-1 bg-black/50 border border-emerald-500/40 rounded px-2 py-0.5">
                         <span className="text-xs font-bold text-emerald-400">R$</span>
                         <input
                           type="number"
                           value={tempGoals.annualRevenueGoal}
                           onChange={(e) => setTempGoals({ ...tempGoals, annualRevenueGoal: Number(e.target.value) || 0 })}
-                          className="w-full bg-transparent text-sm font-bold text-emerald-300 focus:outline-none"
+                          className="w-full bg-transparent text-xs font-bold text-emerald-400 focus:outline-none"
                         />
                       </div>
                     ) : (
-                      <div className="text-lg font-bold text-emerald-400">
+                      <div className="text-base font-bold text-emerald-400">
                         R$ {goals.annualRevenueGoal.toLocaleString("pt-BR")}
                       </div>
                     )}
-                    <span className="text-[10px] text-muted-foreground block">Domínio do Grande ABC</span>
+                    <span className="text-[10px] text-muted-foreground block">Consolidação de mercado</span>
                   </div>
                 </div>
               </div>
@@ -1001,61 +985,61 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
           )}
 
           {/* ════════════════════════════════════════════════════════════
-              ABA 3: MATRIZ DE SUBSTITUTOS DE FORNECEDOR
+              ABA 3: MATRIZ DE SUBSTITUTOS DE FORNECEDOR (LIMPA)
           ════════════════════════════════════════════════════════════ */}
           {activeTab === "contingency" && (
             <div className="space-y-4">
-              <div className="bg-card border border-white/10 rounded-2xl p-5 space-y-4">
-                <div className="flex items-center gap-2.5">
-                  <ShieldCheck className="size-5 text-cyan-400" />
+              <div className="bg-[#12161f] border border-white/10 rounded-xl p-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="size-4 text-emerald-400 shrink-0" />
                   <div>
-                    <h4 className="text-sm font-bold text-white">
-                      Guia de Contingência: O que fazer se o fornecedor não tiver o produto?
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                      Guia de Contingência: Substituição de Produtos
                     </h4>
-                    <p className="text-xs text-muted-foreground">
-                      Regras práticas para não travar a compra caso faltem sabores ou modelos no dia
+                    <p className="text-[11px] text-muted-foreground">
+                      Regras práticas caso faltem modelos ou sabores com o fornecedor
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                  <div className="border border-white/10 rounded-xl p-4 bg-black/20 space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="border border-white/10 rounded-lg p-3.5 bg-black/30 space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-red-400" />
+                      <span className="size-2 rounded-full bg-red-400 shrink-0" />
                       <h5 className="text-xs font-bold text-white">Se faltar Elfbar BC15K</h5>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Substituir imediatamente por <strong>Ignite V55 Ultra Thin</strong> (R$ 52), <strong>Lost Mary OS5000</strong> ou <strong>Elfbar BC5000</strong> para manter o ticket baixo e alto giro.
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Substituir imediatamente por <strong className="text-white">Ignite V55 Ultra Thin</strong> (R$ 52), <strong className="text-white">Lost Mary OS5000</strong> ou <strong className="text-white">Elfbar BC5000</strong> para manter o ticket baixo e alto giro.
                     </p>
                   </div>
 
-                  <div className="border border-white/10 rounded-xl p-4 bg-black/20 space-y-2">
+                  <div className="border border-white/10 rounded-lg p-3.5 bg-black/30 space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-cyan-400" />
+                      <span className="size-2 rounded-full bg-cyan-400 shrink-0" />
                       <h5 className="text-xs font-bold text-white">Se faltar Elfbar Ice King 40K</h5>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Substituir por <strong>Elfbar TE30K</strong> (R$ 65), <strong>Lost Mary 30K</strong> ou <strong>Oxbar Magic Maze 30K</strong> para manter o apelo de alta contagem de puffs e tela.
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Substituir por <strong className="text-white">Elfbar TE30K</strong> (R$ 65), <strong className="text-white">Lost Mary 30K</strong> ou <strong className="text-white">Oxbar Magic Maze 30K</strong> para manter o apelo de alta contagem de puffs e tela.
                     </p>
                   </div>
 
-                  <div className="border border-white/10 rounded-xl p-4 bg-black/20 space-y-2">
+                  <div className="border border-white/10 rounded-lg p-3.5 bg-black/30 space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-amber-400" />
+                      <span className="size-2 rounded-full bg-amber-400 shrink-0" />
                       <h5 className="text-xs font-bold text-white">Se faltar Ignite V500 ou V80</h5>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Substituir por <strong>Ignite V50 clássico</strong> (R$ 65) ou <strong>Ignite V250</strong> (R$ 68), garantindo que a marca Ignite tenha sempre opções ativas no cardápio.
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Substituir por <strong className="text-white">Ignite V50 clássico</strong> (R$ 65) ou <strong className="text-white">Ignite V250</strong> (R$ 68), garantindo que a marca Ignite tenha sempre opções ativas no cardápio.
                     </p>
                   </div>
 
-                  <div className="border border-white/10 rounded-xl p-4 bg-black/20 space-y-2">
+                  <div className="border border-white/10 rounded-lg p-3.5 bg-black/30 space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-emerald-400" />
+                      <span className="size-2 rounded-full bg-emerald-400 shrink-0" />
                       <h5 className="text-xs font-bold text-white">Regra de Ouro dos Sabores</h5>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Priorizar sempre a grade Ice: <em>Watermelon Ice, Blueberry Ice, Grape Ice, Menthol/Spearmint, Strawberry Kiwi e Miami Mint</em> (Zero Encalhe).
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Priorizar sempre a grade Ice: <em className="text-white font-medium">Watermelon Ice, Blueberry Ice, Grape Ice, Menthol/Spearmint, Strawberry Kiwi e Miami Mint</em> (Zero Encalhe).
                     </p>
                   </div>
                 </div>
@@ -1066,15 +1050,15 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
         </div>
 
         {/* ─── FOOTER MODAL ─── */}
-        <div className="p-4 border-t border-white/10 bg-black/40 flex items-center justify-between text-xs text-muted-foreground">
+        <div className="px-5 py-3 border-t border-white/10 bg-[#0e1218] flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <ShieldCheck className="size-3.5 text-emerald-400" />
-            <span>Diretriz Salva no Obsidian: Cerebro Smoking Pods</span>
+            <span className="text-[11px]">Diretriz Salva no Obsidian: Cérebro Smoking Pods</span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white font-bold transition-colors cursor-pointer"
+            className="px-4 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white font-semibold transition-colors cursor-pointer text-xs"
           >
             Fechar
           </button>
