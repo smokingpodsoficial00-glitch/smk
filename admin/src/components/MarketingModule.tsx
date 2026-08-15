@@ -1235,14 +1235,14 @@ export function MarketingModule() {
                 )}
               </div>
 
-              {/* Frequência do Disparo */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Frequência do Disparo e Cadência Anti-Ban */}
+              <div className={`grid gap-4 ${campaignFormTargetType === 'lists' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
                 <div>
                   <label className="text-xs font-bold text-white/70 block mb-1">Recorrência / Intervalo de Dias</label>
                   <select
                     value={campaignFormFrequency}
                     onChange={(e) => setCampaignFormFrequency(Number(e.target.value))}
-                    className="w-full bg-[#050505] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/50"
+                    className="w-full bg-[#050505] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
                   >
                     <option value={0}>Disparo Único (Sem repetição)</option>
                     <option value={7}>A cada 7 dias (Toda semana)</option>
@@ -1252,26 +1252,28 @@ export function MarketingModule() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="text-xs font-bold text-white/70 block mb-1">Cadência Anti-Ban</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      value={campaignFormBatchSize}
-                      onChange={(e) => setCampaignFormBatchSize(Number(e.target.value))}
-                      className="w-1/2 bg-[#050505] border border-white/10 rounded-xl p-2.5 text-xs text-white font-mono"
-                      placeholder="Lote (ex: 20)"
-                    />
-                    <input
-                      type="number"
-                      value={campaignFormInterval}
-                      onChange={(e) => setCampaignFormInterval(Number(e.target.value))}
-                      className="w-1/2 bg-[#050505] border border-white/10 rounded-xl p-2.5 text-xs text-white font-mono"
-                      placeholder="Min (ex: 45)"
-                    />
+                {campaignFormTargetType === 'lists' && (
+                  <div>
+                    <label className="text-xs font-bold text-white/70 block mb-1">Cadência Anti-Ban</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        value={campaignFormBatchSize}
+                        onChange={(e) => setCampaignFormBatchSize(Number(e.target.value))}
+                        className="w-1/2 bg-[#050505] border border-white/10 rounded-xl p-2.5 text-xs text-white font-mono"
+                        placeholder="Lote (ex: 20)"
+                      />
+                      <input
+                        type="number"
+                        value={campaignFormInterval}
+                        onChange={(e) => setCampaignFormInterval(Number(e.target.value))}
+                        className="w-1/2 bg-[#050505] border border-white/10 rounded-xl p-2.5 text-xs text-white font-mono"
+                        placeholder="Min (ex: 45)"
+                      />
+                    </div>
+                    <span className="text-[10px] text-white/40 mt-1 block">Lote de contatos e intervalo em minutos</span>
                   </div>
-                  <span className="text-[10px] text-white/40 mt-1 block">Lote de contatos e intervalo em minutos</span>
-                </div>
+                )}
               </div>
 
               {/* Modelos e Mensagem */}
