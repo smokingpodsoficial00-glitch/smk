@@ -3029,7 +3029,9 @@ export function SupplyChainDashboard() {
         stockRetailValue={totalStockValue || 1042.89}
         stockCostValue={totalStockCost || 783}
         totalPodsInStock={totalStockUnits || 12}
+        companyId={company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5"}
         onGoalsUpdated={(newGoals) => setFinancialGoals(newGoals)}
+        onStockUpdated={fetchData}
       />
     </div>
   );

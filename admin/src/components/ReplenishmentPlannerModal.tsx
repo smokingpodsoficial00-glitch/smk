@@ -26,8 +26,12 @@ import {
   CheckCircle2,
   Plus,
   Trash2,
-  Minus
+  Minus,
+  Loader2,
+  PackageCheck
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { updateProductCost } from "../lib/productCosts";
 
 export interface OrderItem {
   id: string;
@@ -87,6 +91,49 @@ export function loadSavedOrderItems(): OrderItem[] {
   return DEFAULT_ORDER_ITEMS;
 }
 
+export function extractPuffsFromModel(modelName: string): number {
+  const str = modelName.toUpperCase();
+  const kMatch = str.match(/(\d+)\s*K/i);
+  if (kMatch) {
+    return parseInt(kMatch[1]) * 1000;
+  }
+  const numMatch = str.match(/(\d{4,6})/);
+  if (numMatch) {
+    return parseInt(numMatch[1]);
+  }
+  return 5000;
+}
+
+export function parseFlavorsString(flavorsStr: string, totalQty: number): { flavor: string; qty: number }[] {
+  const trimmed = (flavorsStr || "").trim();
+  if (!trimmed) return [{ flavor: "Padrão", qty: totalQty }];
+
+  const parts = trimmed.split(/,\s*/);
+  if (parts.length <= 1) {
+    return [{ flavor: trimmed, qty: totalQty }];
+  }
+
+  const result: { flavor: string; qty: number }[] = [];
+  let allocated = 0;
+
+  parts.forEach((part, index) => {
+    const match = part.match(/\((\d+)\s*x\)/i) || part.match(/^(\d+)\s*x\s+/i);
+    let q = 1;
+    let cleanFlavor = part.replace(/\(\d+\s*x\)/gi, "").replace(/^\d+\s*x\s+/gi, "").trim();
+
+    if (match) {
+      q = parseInt(match[1]) || 1;
+    } else if (index === parts.length - 1 && totalQty > allocated) {
+      q = totalQty - allocated;
+    }
+
+    allocated += q;
+    result.push({ flavor: cleanFlavor || "Padrão", qty: Math.max(1, q) });
+  });
+
+  return result;
+}
+
 interface ReplenishmentPlannerModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -94,7 +141,9 @@ interface ReplenishmentPlannerModalProps {
   stockRetailValue?: number;
   stockCostValue?: number;
   totalPodsInStock?: number;
+  companyId?: string;
   onGoalsUpdated?: (newGoals: FinancialGoals) => void;
+  onStockUpdated?: () => void;
 }
 
 export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps> = ({
@@ -104,7 +153,9 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
   stockRetailValue = 1042.89,
   stockCostValue = 783,
   totalPodsInStock = 12,
+  companyId,
   onGoalsUpdated,
+  onStockUpdated,
 }) => {
   const [activeTab, setActiveTab] = useState<"goals" | "order" | "contingency">("order");
 
@@ -118,6 +169,18 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
   const [orderItems, setOrderItems] = useState<OrderItem[]>(loadSavedOrderItems);
   const [supplierShippingFee, setSupplierShippingFee] = useState<number>(50);
   const [copiedOrder, setCopiedOrder] = useState(false);
+
+  // Estado de Entrada Automática de Estoque
+  const [showConfirmStockEntryModal, setShowConfirmStockEntryModal] = useState(false);
+  const [isProcessingStockEntry, setIsProcessingStockEntry] = useState(false);
+  const [stockEntryCompleted, setStockEntryCompleted] = useState(false);
+  const [stockEntryResult, setStockEntryResult] = useState<{
+    processedUnits: number;
+    existingUpdatedCount: number;
+    newProductsCreatedCount: number;
+    variationsUpdatedCount: number;
+    totalInvested: number;
+  } | null>(null);
 
   // Formulário para Adicionar Novo Pod ao Pedido
   const [showAddPodForm, setShowAddPodForm] = useState(false);
@@ -137,6 +200,10 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
       setIsEditingGoals(false);
       setShowAddPodForm(false);
       setSavedSuccessAlert(false);
+      setShowConfirmStockEntryModal(false);
+      setIsProcessingStockEntry(false);
+      setStockEntryCompleted(false);
+      setStockEntryResult(null);
     }
   }, [isOpen]);
 
@@ -277,6 +344,168 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
       setTimeout(() => setCopiedOrder(false), 3000);
     } catch (e) {
       console.warn("Erro ao copiar:", e);
+    }
+  };
+
+  // Execução da Entrada de Estoque Automática (Isolada por company_id)
+  const handleExecuteStockEntry = async () => {
+    if (isProcessingStockEntry || stockEntryCompleted || orderItems.length === 0) return;
+
+    setIsProcessingStockEntry(true);
+    setShowConfirmStockEntryModal(false);
+
+    const targetCompanyId = companyId || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+
+    let processedUnits = 0;
+    let existingUpdatedCount = 0;
+    let newProductsCreatedCount = 0;
+    let variationsUpdatedCount = 0;
+
+    try {
+      // 1. Buscar todos os produtos existentes no Supabase DB para a empresa
+      const { data: dbProducts, error: fetchErr } = await supabase
+        .from("smoking_products")
+        .select("*")
+        .or(`company_id.eq.${targetCompanyId},company_id.is.null`);
+
+      if (fetchErr) {
+        console.error("Erro ao buscar produtos existentes para entrada de estoque:", fetchErr);
+        alert("Erro de conexão ao acessar o banco de dados. Tente novamente.");
+        setIsProcessingStockEntry(false);
+        return;
+      }
+
+      const currentDbProducts = dbProducts || [];
+
+      // 2. Processar cada item da lista de compras
+      for (const item of orderItems) {
+        const itemBrand = item.brand.trim();
+        const itemModel = item.model.trim();
+        const itemQty = Math.max(1, item.qty);
+        const itemCost = item.unitCost;
+        const itemSell = item.unitSell;
+
+        // Processar os sabores especificados no item
+        const flavorBreakdown = parseFlavorsString(item.flavors, itemQty);
+
+        for (const subItem of flavorBreakdown) {
+          const subFlavor = subItem.flavor;
+          const subQty = subItem.qty;
+
+          const normBrand = itemBrand.toLowerCase();
+          const normModel = itemModel.toLowerCase();
+          const normFlavor = subFlavor.toLowerCase();
+
+          // Tentar encontrar produto/variação idêntica já existente no Supabase
+          const match = currentDbProducts.find(p => {
+            const pBrand = (p.brand || "").toLowerCase().trim();
+            const pModel = (p.name || "").toLowerCase().trim();
+            const pFlavor = (p.flavor || "").toLowerCase().trim();
+            return pBrand === normBrand && pModel === normModel && (pFlavor === normFlavor || normFlavor === "padrao");
+          });
+
+          if (match) {
+            // PRODUTO JÁ EXISTE NO ESTOQUE: REGRA DE OURO - UPDATE PARCIAL SOMENTE EM ESTOQUE
+            const currentStock = match.stock || 0;
+            const newStock = currentStock + subQty;
+
+            const { error: updateErr } = await supabase
+              .from("smoking_products")
+              .update({ stock: newStock })
+              .eq("id", match.id)
+              .eq("company_id", targetCompanyId);
+
+            if (!updateErr) {
+              match.stock = newStock; // Atualiza a referência em memória local
+              existingUpdatedCount++;
+              variationsUpdatedCount++;
+              processedUnits += subQty;
+            } else {
+              console.error("Erro ao atualizar estoque do produto existente:", updateErr);
+            }
+          } else {
+            // PRODUTO NOVO: CADASTRAR AUTOMATICAMENTE SEM FOTO E COM DADOS DA LISTA
+            const extractedPuffs = extractPuffsFromModel(itemModel);
+
+            const newPayload = {
+              company_id: targetCompanyId,
+              brand: itemBrand,
+              name: itemModel,
+              flavor: subFlavor,
+              puffs: extractedPuffs,
+              price: itemSell,
+              stock: subQty,
+              image_url: "", // Foto vazia conforme especificação
+              is_active: true
+            };
+
+            const { data: inserted, error: insertErr } = await supabase
+              .from("smoking_products")
+              .insert(newPayload)
+              .select();
+
+            if (!insertErr && inserted && inserted.length > 0) {
+              const createdId = inserted[0].id;
+              currentDbProducts.push(inserted[0]);
+
+              // Salvar o Custo Oficial do Novo Produto no Supabase DB
+              if (itemCost > 0) {
+                const groupKey = `${normBrand}__${normModel}`;
+                await updateProductCost({
+                  modelKey: groupKey,
+                  productIds: [createdId],
+                  costPrice: itemCost,
+                  companyId: targetCompanyId
+                });
+              }
+
+              newProductsCreatedCount++;
+              variationsUpdatedCount++;
+              processedUnits += subQty;
+            } else {
+              console.error("Erro ao cadastrar novo produto da lista:", insertErr);
+            }
+          }
+        }
+      }
+
+      // 3. Registrar a Operação no Histórico do Supabase DB
+      await supabase.from("smoking_orders").insert({
+        client_phone: "__SYSTEM_STOCK_ENTRY__",
+        client_name: "Entrada de Estoque - Lista de Compras",
+        shipping_address: "ENTRADA DE ESTOQUE AUTOMÁTICA",
+        items: orderItems.map(i => ({
+          id: i.id,
+          brand: i.brand,
+          model: i.model,
+          qty: i.qty,
+          unitCost: i.unitCost,
+          unitSell: i.unitSell,
+          flavors: i.flavors,
+          entry_date: new Date().toISOString()
+        })),
+        total_amount: totalSpentWithShipping,
+        company_id: targetCompanyId
+      });
+
+      // 4. Conclusão e Resumo
+      setStockEntryCompleted(true);
+      setStockEntryResult({
+        processedUnits,
+        existingUpdatedCount,
+        newProductsCreatedCount,
+        variationsUpdatedCount,
+        totalInvested: totalSpentWithShipping
+      });
+
+      if (onStockUpdated) {
+        onStockUpdated();
+      }
+    } catch (err) {
+      console.error("Erro inesperado durante entrada de estoque:", err);
+      alert("Ocorreu um erro ao processar a entrada de estoque. Tente novamente.");
+    } finally {
+      setIsProcessingStockEntry(false);
     }
   };
 
@@ -704,25 +933,55 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                   </div>
                 </div>
 
-                {/* Botão de Cópia para WhatsApp Formatado (Sem Emojis) */}
-                <button
-                  type="button"
-                  onClick={handleCopyOrderText}
-                  disabled={orderItems.length === 0}
-                  className="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
-                >
-                  {copiedOrder ? (
-                    <>
-                      <Check className="size-4 text-black" />
-                      <span>Mensagem do Pedido Copiada para a Área de Transferência</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="size-4 text-black" />
-                      <span>Copiar Pedido Formatado para o WhatsApp do Fornecedor ({totalUnitsInOrder} Peças)</span>
-                    </>
-                  )}
-                </button>
+                {/* Botões de Ação para o Pedido: WhatsApp + Entrada Automática de Estoque */}
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleCopyOrderText}
+                    disabled={orderItems.length === 0}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {copiedOrder ? (
+                      <>
+                        <Check className="size-4 text-black" />
+                        <span>Mensagem Copiada para a Área de Transferência</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="size-4 text-black" />
+                        <span>Copiar Pedido Formatado para WhatsApp ({totalUnitsInOrder} Peças)</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmStockEntryModal(true)}
+                    disabled={orderItems.length === 0 || isProcessingStockEntry || stockEntryCompleted}
+                    className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      stockEntryCompleted
+                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 cursor-default"
+                        : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 active:scale-95 disabled:opacity-50"
+                    }`}
+                  >
+                    {isProcessingStockEntry ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin text-white" />
+                        <span>Adicionando produtos ao estoque...</span>
+                      </>
+                    ) : stockEntryCompleted ? (
+                      <>
+                        <CheckCircle2 className="size-4 text-emerald-400" />
+                        <span>✓ Estoque Atualizado</span>
+                      </>
+                    ) : (
+                      <>
+                        <PackageCheck className="size-4 text-white" />
+                        <span>Adicionar ao Estoque</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
             </div>
@@ -1054,6 +1313,97 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
             Fechar
           </button>
         </div>
+
+        {/* ─── MODAL DE CONFIRMAÇÃO DE ENTRADA NO ESTOQUE ─── */}
+        {showConfirmStockEntryModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="bg-[#121212] border border-blue-500/30 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center shrink-0">
+                  <PackageCheck className="size-5 text-blue-400" />
+                </div>
+                <div>
+                  <h4 className="text-base font-bold text-white">Adicionar produtos ao estoque?</h4>
+                  <p className="text-xs text-muted-foreground">Confirmação de recebimento do pedido</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-silver leading-relaxed bg-black/40 border border-white/5 p-3 rounded-xl">
+                Você está prestes a adicionar <strong className="text-white">{totalUnitsInOrder} unidades</strong> ao estoque. Essa operação atualizará o estoque dos produtos existentes e cadastrará automaticamente os novos produtos encontrados na lista.
+              </p>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmStockEntryModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-semibold border border-white/10 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteStockEntry}
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-lg shadow-blue-600/30 cursor-pointer active:scale-95"
+                >
+                  Confirmar Entrada no Estoque
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── MODAL DE RESUMO DE CONCLUSÃO DA ENTRADA DE ESTOQUE ─── */}
+        {stockEntryResult && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="bg-[#121212] border border-emerald-500/40 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl border-l-4 border-l-emerald-500">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="size-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-white uppercase tracking-wider">ENTRADA CONCLUÍDA</h4>
+                    <p className="text-xs font-semibold text-emerald-400">{stockEntryResult.processedUnits} unidades processadas</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStockEntryResult(null)}
+                  className="size-7 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white grid place-items-center cursor-pointer"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+
+              <div className="space-y-2 bg-black/50 border border-white/10 rounded-xl p-3 text-xs">
+                <div className="flex justify-between py-1 border-b border-white/5">
+                  <span className="text-muted-foreground">Produtos existentes atualizados:</span>
+                  <strong className="text-white">{stockEntryResult.existingUpdatedCount}</strong>
+                </div>
+                <div className="flex justify-between py-1 border-b border-white/5">
+                  <span className="text-muted-foreground">Produtos novos cadastrados:</span>
+                  <strong className="text-emerald-400">{stockEntryResult.newProductsCreatedCount}</strong>
+                </div>
+                <div className="flex justify-between py-1 border-b border-white/5">
+                  <span className="text-muted-foreground">Variações atualizadas:</span>
+                  <strong className="text-white">{stockEntryResult.variationsUpdatedCount}</strong>
+                </div>
+                <div className="flex justify-between py-1 pt-2 text-sm font-bold">
+                  <span className="text-white">Total investido:</span>
+                  <span className="text-emerald-400">R$ {stockEntryResult.totalInvested.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setStockEntryResult(null)}
+                className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95"
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
