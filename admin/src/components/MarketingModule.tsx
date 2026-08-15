@@ -1198,38 +1198,39 @@ export function MarketingModule() {
 
                 {/* Seleção do Grupo */}
                 {campaignFormTargetType === 'group' && (
-                  <div className="p-3.5 bg-[#050505] border border-white/10 rounded-xl space-y-2">
-                    <span className="text-xs font-bold text-white block">Selecione o Grupo do WhatsApp:</span>
-                    <div className="space-y-3">
-                      {whatsAppGroups.length > 0 ? (
-                        <select
-                          value={campaignFormTargetGroup}
-                          onChange={(e) => setCampaignFormTargetGroup(e.target.value)}
-                          className="w-full bg-black border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500/50 font-sans"
-                        >
-                          <option value="">-- Selecione o grupo sincronizado --</option>
-                          {whatsAppGroups.map(g => (
-                            <option key={g.id} value={g.id}>
-                              {g.name} {g.participantsCount > 0 ? `(${g.participantsCount} membros)` : ''}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div className="text-center py-2 bg-white/5 rounded-xl border border-white/5 p-3 space-y-2">
-                          <p className="text-xs text-white/50">Nenhum grupo listado automaticamente.</p>
-                          <button
-                            type="button"
-                            onClick={syncWhatsAppContactsAndGroups}
-                            disabled={loadingSync}
-                            className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                          >
-                            <RefreshCw className={`size-3.5 ${loadingSync ? 'animate-spin' : ''}`} />
-                            <span>{loadingSync ? 'Buscando no WhatsApp...' : 'Tentar Sincronizar Grupos Novamente'}</span>
-                          </button>
-                        </div>
-                      )}
-
+                  <div className="p-3.5 bg-[#050505] border border-white/10 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white block">Grupo de Destino do WhatsApp:</span>
+                      <span className="text-[10px] text-amber-400 font-mono">Editável a qualquer momento</span>
                     </div>
+
+                    {whatsAppGroups.length > 0 ? (
+                      <select
+                        value={campaignFormTargetGroup}
+                        onChange={(e) => setCampaignFormTargetGroup(e.target.value)}
+                        className="w-full bg-black border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500/50 font-sans"
+                      >
+                        <option value="">-- Selecione o grupo sincronizado --</option>
+                        {whatsAppGroups.map(g => (
+                          <option key={g.id} value={g.id}>
+                            {g.name} {g.participantsCount > 0 ? `(${g.participantsCount} membros)` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={campaignFormTargetGroup || 'Grupo VIP Oficial (Conectar WhatsApp para vincular)'}
+                          onChange={(e) => setCampaignFormTargetGroup(e.target.value)}
+                          placeholder="Ex: Grupo VIP Oficial SBC"
+                          className="w-full bg-black border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-300 font-semibold focus:outline-none focus:border-amber-400"
+                        />
+                        <p className="text-[11px] text-white/50 leading-relaxed">
+                          💡 <strong>WhatsApp em repouso:</strong> Você pode salvar a campanha agora normalmente. Quando o WhatsApp for reconectado, basta clicar em <strong>Editar</strong> nesta campanha para selecionar o grupo oficial da lista!
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
