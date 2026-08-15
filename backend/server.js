@@ -1842,6 +1842,47 @@ app.post('/api/chat/reset-history', (req, res) => {
         res.status(500).json({ error: 'Falha ao zerar histórico da IA.' });
     }
 });
+app.post('/api/crm/update-client', async (req, res) => {
+    try {
+        const { phone, name, address, flavorProfile, favoriteBrand, inVipGroup, prospectingStatus, customNotes, companyId } = req.body;
+        if (!phone) {
+            return res.status(400).json({ error: 'Número de telefone é obrigatório.' });
+        }
+
+        const cleanPhone = String(phone).replace(/\D/g, '');
+        const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+
+        const payload = {
+            phone: formattedPhone,
+            updated_at: new Date().toISOString()
+        };
+
+        if (name !== undefined) payload.name = name;
+        if (address !== undefined) payload.address = address;
+        if (flavorProfile !== undefined) payload.flavor_profile = flavorProfile;
+        if (favoriteBrand !== undefined) payload.favorite_brand = favoriteBrand;
+        if (inVipGroup !== undefined) payload.in_vip_group = inVipGroup;
+        if (prospectingStatus !== undefined) payload.prospecting_status = prospectingStatus;
+        if (customNotes !== undefined) payload.custom_notes = customNotes;
+        if (companyId) payload.company_id = companyId;
+
+        const { data, error } = await supabase
+            .from('smoking_clients')
+            .upsert(payload, { onConflict: 'phone' })
+            .select();
+
+        if (error) {
+            console.warn('⚠️ [CRM API] Aviso ao atualizar smoking_clients:', error.message);
+            return res.status(500).json({ error: error.message });
+        }
+
+        console.log(`✅ [CRM API] Metadados de CRM atualizados para ${formattedPhone}`);
+        return res.json({ success: true, data });
+    } catch (err) {
+        console.error('❌ Erro no update do CRM:', err);
+        return res.status(500).json({ error: err.message });
+    }
+});
 
 app.listen(port, () => {
     console.log(`🚀 Servidor backend rodando na porta ${port}`);

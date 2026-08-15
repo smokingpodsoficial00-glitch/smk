@@ -115,7 +115,14 @@ export function CRMDashboard() {
         {/* Modal 360 do Cliente */}
         {selectedClient && (
           <CRMErrorBoundary>
-            <ClientProfileModal client={selectedClient} onClose={() => setSelectedClient(null)} />
+            <ClientProfileModal 
+              client={selectedClient} 
+              onClose={() => setSelectedClient(null)} 
+              onClientUpdated={() => {
+                // Ao salvar, fecha ou atualiza
+                setSelectedClient(null);
+              }}
+            />
           </CRMErrorBoundary>
         )}
       </div>

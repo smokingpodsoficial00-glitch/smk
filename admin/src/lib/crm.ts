@@ -1,5 +1,8 @@
 import { supabase } from "@/lib/supabase";
 
+export type FlavorProfileType = 'ice' | 'fruity' | 'tobacco' | 'dessert' | 'other';
+export type ProspectingStatusType = 'base_antiga' | 'contatado' | 'reativado' | 'vip_recorrente';
+
 export type RealClient = {
   id: string;
   phone: string;
@@ -19,15 +22,93 @@ export type RealClient = {
   whatsappMessage: string;
   whatsappUrl: string;
   segment: 'champion' | 'loyal' | 'new' | 'at_risk';
+  flavorProfile: FlavorProfileType;
+  flavorProfileLabel: string;
+  favoriteBrand: string;
+  inVipGroup: boolean;
+  prospectingStatus: ProspectingStatusType;
+  prospectingStatusLabel: string;
+  customNotes: string;
+  urgencyLevel: 'urgent' | 'warning' | 'ok';
+  nextReplenishmentDate: string;
   orders: any[];
 };
 
-// Exportacao de tempo de execucao para evitar qualquer erro no Vite
+// Exportação de tempo de execução para compatibilidade
 export const RealClient = {};
+
+// Helper para detectar perfil de sabor a partir do nome/sabor
+export function detectFlavorProfile(text: string = ''): { type: FlavorProfileType; label: string } {
+  const lower = text.toLowerCase();
+  if (/(ice|menthol|mint|menta|polar|cold|cool|frozen|spearmint|chill)/i.test(lower)) {
+    return { type: 'ice', label: 'Mentolado / Ice ❄️' };
+  }
+  if (/(tobacco|tabaco|cigar|charuto|coffee|caf[eé]|latte|cuban)/i.test(lower)) {
+    return { type: 'tobacco', label: 'Atabacado / Intenso 🍂' };
+  }
+  if (/(vanilla|baunilha|custard|caramel|cookie|biscuit|cake|bolo|pie|torta|cream|creme)/i.test(lower)) {
+    return { type: 'dessert', label: 'Sobremesa / Doce 🍰' };
+  }
+  if (/(grape|uva|watermelon|melancia|strawberry|morango|mango|manga|peach|p[eê]ssego|banana|apple|ma[çc][aã]|lemon|lim[aã]o|cherry|cereja|passion|maracuj[aá]|berry|blueberry|abacaxi|pineapple|orange|laranja|guava|goiaba|kiwi|fruit|mel[aã]o|melon)/i.test(lower)) {
+    return { type: 'fruity', label: 'Frutado / Doce 🍓' };
+  }
+  return { type: 'fruity', label: 'Frutado / Doce 🍓' };
+}
+
+// Helper para salvar edições de CRM do cliente no Supabase
+export async function updateClientCrmProfile(
+  phone: string, 
+  updates: {
+    name?: string;
+    flavorProfile?: FlavorProfileType;
+    favoriteBrand?: string;
+    inVipGroup?: boolean;
+    prospectingStatus?: ProspectingStatusType;
+    customNotes?: string;
+    address?: string;
+  },
+  companyId?: string
+): Promise<boolean> {
+  try {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+
+    const dbPayload: any = {
+      phone: formattedPhone,
+      updated_at: new Date().toISOString()
+    };
+
+    if (updates.name !== undefined) dbPayload.name = updates.name;
+    if (updates.address !== undefined) dbPayload.address = updates.address;
+    if (updates.flavorProfile !== undefined) dbPayload.flavor_profile = updates.flavorProfile;
+    if (updates.favoriteBrand !== undefined) dbPayload.favorite_brand = updates.favoriteBrand;
+    if (updates.inVipGroup !== undefined) dbPayload.in_vip_group = updates.inVipGroup;
+    if (updates.prospectingStatus !== undefined) dbPayload.prospecting_status = updates.prospectingStatus;
+    if (updates.customNotes !== undefined) dbPayload.custom_notes = updates.customNotes;
+    if (companyId) dbPayload.company_id = companyId;
+
+    const { error } = await supabase
+      .from('smoking_clients')
+      .upsert(dbPayload, { onConflict: 'phone' });
+
+    if (error) {
+      console.warn("Aviso ao salvar em smoking_clients:", error.message);
+      // Fallback para smoking_customers se existir
+      try {
+        await supabase.from('smoking_customers').upsert(dbPayload, { onConflict: 'phone' });
+      } catch (e) {}
+    }
+    return true;
+  } catch (err) {
+    console.error("Erro ao atualizar perfil do CRM:", err);
+    return false;
+  }
+}
 
 export async function fetchLiveClients(companyId?: string): Promise<RealClient[]> {
   if (!companyId) return [];
   try {
+    // 1. Buscar Pedidos
     const { data: rawOrders, error: ordersErr } = await supabase
       .from('smoking_orders')
       .select('*')
@@ -35,32 +116,34 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
 
-    const orders = (rawOrders || []).filter(o => o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' && (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_')));
+    const orders = (rawOrders || []).filter(
+      o => o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' && (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_'))
+    );
 
     if (ordersErr) {
       console.error("Erro ao buscar smoking_orders:", ordersErr);
     }
 
-    // 2. Buscar cadastro de clientes (se houver)
-    const { data: customers } = await supabase
-      .from('smoking_customers')
-      .select('*');
+    // 2. Buscar Cadastro Mestre de Clientes
+    let clientsMap = new Map<string, any>();
+    try {
+      const { data: clientsData } = await supabase
+        .from('smoking_clients')
+        .select('*');
 
-    const customerMap = new Map<string, any>();
-    if (customers && Array.isArray(customers)) {
-      for (const c of customers) {
-        if (c && c.phone) {
-          const clean = String(c.phone).replace(/\D/g, '');
-          if (clean) customerMap.set(clean, c);
+      if (clientsData && Array.isArray(clientsData)) {
+        for (const c of clientsData) {
+          if (c && c.phone) {
+            const clean = String(c.phone).replace(/\D/g, '');
+            if (clean) clientsMap.set(clean, c);
+          }
         }
       }
+    } catch (e) {
+      console.warn("Aviso ao consultar smoking_clients:", e);
     }
 
-    if (!orders || !Array.isArray(orders) || orders.length === 0) {
-      return [];
-    }
-
-    // Agrupar pedidos por cliente por número de WhatsApp único
+    // Agrupar pedidos por cliente (chave: número WhatsApp limpo)
     const clientGroups = new Map<string, any[]>();
 
     for (const order of orders) {
@@ -69,8 +152,6 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       const phoneClean = phoneRaw.replace(/\D/g, '') || '5511999999999';
       const clientName = String(order.client_name || order.customer_name || '').trim().toLowerCase();
 
-      // Se for número de teste genérico do emulador (ex: 11988887777 ou 5511999999999),
-      // agrupa pelo NOME para diferenciar clientes fictícios de teste
       const isTestPhone = phoneClean === '11988887777' || phoneClean === '5511999999999' || phoneClean === '5511988887777';
       const groupKey = (isTestPhone && clientName) ? `test_${clientName}` : phoneClean;
 
@@ -86,16 +167,14 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
     for (const [phoneKey, clientOrders] of clientGroups.entries()) {
       if (!clientOrders || clientOrders.length === 0) continue;
 
-      // Ordenar por data (mais recente primeiro)
       clientOrders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
 
       const latestOrder = clientOrders[0] || {};
-      const registeredCustomer = customerMap.get(phoneKey);
+      const registeredClient = clientsMap.get(phoneKey) || clientsMap.get(phoneKey.replace(/^55/, '')) || {};
 
       const rawPhone = latestOrder.client_phone || latestOrder.customer_phone || phoneKey || '';
       let cleanPhone = String(rawPhone).replace(/\D/g, '');
 
-      // Se cleanPhone for um ID de LID do WhatsApp (>13 dígitos), tenta ajustar
       if (cleanPhone.length > 13) {
         const foundPhoneOrder = clientOrders.find(o => o.client_phone && o.client_phone.includes('('));
         if (foundPhoneOrder) {
@@ -103,7 +182,6 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
         }
       }
 
-      // Formatação bonita para exibição na interface
       let displayPhone = rawPhone;
       if (cleanPhone.length === 11) {
         displayPhone = `(${cleanPhone.substring(0, 2)}) ${cleanPhone.substring(2, 7)}-${cleanPhone.substring(7)}`;
@@ -113,20 +191,19 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
         displayPhone = `+55 (11) 95174-1181`;
       }
 
-      const nameRaw = registeredCustomer?.name || latestOrder.client_name || latestOrder.customer_name || `Cliente ${cleanPhone.slice(-4)}`;
+      const nameRaw = registeredClient?.name || latestOrder.client_name || latestOrder.customer_name || `Cliente ${cleanPhone.slice(-4)}`;
       let name = String(nameRaw).trim();
       if (/^[\d\s+\-()]+$/.test(name)) {
         name = 'Eduardo';
       }
 
-      const address = registeredCustomer?.address || latestOrder.shipping_address || latestOrder.delivery_address || 'Endereço não informado';
+      const address = registeredClient?.address || latestOrder.shipping_address || latestOrder.delivery_address || 'Endereço não informado';
 
-      // Calcular Gasto Total (LTV) - Considera TODOS os pedidos válidos não cancelados
       const validOrders = clientOrders.filter(o => o && o.delivery_status !== 'CANCELADO');
 
       const spent = validOrders.reduce((sum, o) => {
         const total = parseFloat(o.total_amount || 0);
-        return sum + total;
+        return sum + (isNaN(total) ? 0 : total);
       }, 0);
 
       const ordersCount = clientOrders.length;
@@ -135,45 +212,84 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       const lastOrderTimestamp = latestOrder.created_at ? new Date(latestOrder.created_at).getTime() : now;
       const daysSinceLastOrder = Math.max(0, Math.floor((now - lastOrderTimestamp) / (1000 * 60 * 60 * 24)));
 
-      // Extrair último pod comprado
+      // Extrair último produto, modelo, sabor e marca
       const itemsList = Array.isArray(latestOrder.items) ? latestOrder.items : [];
       const firstItem = itemsList.length > 0 ? itemsList[0] : null;
       const lastProduct = firstItem ? `${firstItem.name || 'Pod'} ${firstItem.flavor || ''}` : 'Ignite V50';
       const lastFlavor = firstItem?.flavor || 'Frutado';
-      const lastPuffs = firstItem?.puffs || 5000;
+      const lastPuffs = Number(firstItem?.puffs) || 5000;
+      const favoriteBrand = registeredClient?.favorite_brand || firstItem?.brand || 'Ignite';
 
-      // Estimar ciclo de duração do pod
+      // Detectar perfil de sabor dominante
+      const detectedFlavor = detectFlavorProfile(`${lastProduct} ${lastFlavor}`);
+      const flavorProfile: FlavorProfileType = registeredClient?.flavor_profile || detectedFlavor.type;
+      const flavorProfileLabel = registeredClient?.flavor_profile 
+        ? (flavorProfile === 'ice' ? 'Mentolado / Ice ❄️' : flavorProfile === 'tobacco' ? 'Atabacado / Intenso 🍂' : flavorProfile === 'dessert' ? 'Sobremesa / Doce 🍰' : 'Frutado / Doce 🍓')
+        : detectedFlavor.label;
+
+      // Estimar ciclo de consumo por capacidade de puffs
       let expectedCycleDays = 14;
-      if (lastPuffs >= 15000) {
-        expectedCycleDays = 30;
+      if (lastPuffs >= 25000) {
+        expectedCycleDays = 50;
+      } else if (lastPuffs >= 20000) {
+        expectedCycleDays = 42;
+      } else if (lastPuffs >= 15000) {
+        expectedCycleDays = 32;
       } else if (lastPuffs >= 10000) {
         expectedCycleDays = 22;
       } else if (lastPuffs >= 8000) {
         expectedCycleDays = 18;
       } else {
-        expectedCycleDays = 12;
+        expectedCycleDays = 14;
       }
 
       const estimatedDaysLeft = Math.max(0, expectedCycleDays - daysSinceLastOrder);
       const isEndingSoon = estimatedDaysLeft <= 4 || daysSinceLastOrder >= expectedCycleDays;
 
+      // Nível de criticidade para recompra
+      let urgencyLevel: 'urgent' | 'warning' | 'ok' = 'ok';
+      if (daysSinceLastOrder >= expectedCycleDays) {
+        urgencyLevel = 'urgent'; // Pod secou / atrasado
+      } else if (estimatedDaysLeft <= 4) {
+        urgencyLevel = 'warning'; // Faltam poucos dias
+      }
+
+      // Cálculo da data prevista de reposição
+      const nextReplenishTimestamp = lastOrderTimestamp + (expectedCycleDays * 24 * 60 * 60 * 1000);
+      const nextReplenishmentDate = new Date(nextReplenishTimestamp).toLocaleDateString('pt-BR');
+
+      // Status no Grupo VIP
+      const inVipGroup = Boolean(registeredClient?.in_vip_group);
+
+      // Classificação RFV
+      let segment: 'champion' | 'loyal' | 'new' | 'at_risk' = 'new';
+      if (ordersCount >= 3 || spent >= 280 || (ordersCount >= 2 && daysSinceLastOrder <= 15)) {
+        segment = 'champion'; // 🥇 VIP Champion
+      } else if (ordersCount >= 2 && daysSinceLastOrder <= 35) {
+        segment = 'loyal'; // 🔄 Recorrente
+      } else if (daysSinceLastOrder > 35) {
+        segment = 'at_risk'; // ⚠️ Em Risco
+      } else {
+        segment = 'new'; // 🌱 1ª Compra
+      }
+
+      // Status de Prospecção
+      let prospectingStatus: ProspectingStatusType = registeredClient?.prospecting_status || 'base_antiga';
+      if (!registeredClient?.prospecting_status) {
+        if (segment === 'champion') prospectingStatus = 'vip_recorrente';
+        else if (segment === 'loyal' || segment === 'new') prospectingStatus = 'reativado';
+        else prospectingStatus = 'base_antiga';
+      }
+
+      const prospectingStatusLabel = 
+        prospectingStatus === 'vip_recorrente' ? '🏆 VIP Recorrente' :
+        prospectingStatus === 'reativado' ? '🌱 Reativado (Ativo)' :
+        prospectingStatus === 'contatado' ? '💬 Em Negociação' : '🎯 Base Antiga';
+
       // Mensagem personalizada de recompra no WhatsApp
       const waNumber = cleanPhone.length > 13 ? '5511951741181' : (cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone);
-      const whatsappMessage = `E aí ${name}! Tudo certo? 💨 Vi que já faz um tempinho desde a sua última compra do ${lastProduct}. Seu pod já tá na final? Já quer ir garantindo o próximo para não ficar na mão? Me avisa aqui!`;
+      const whatsappMessage = `E aí ${name}! Tudo certo? 💨 Vi que já faz um tempinho desde o seu ${lastProduct}. Seu pod já tá nas últimas tragadas? Já quer garantir o próximo sabor pra não ficar na mão no fds? Me dá um toque por aqui!`;
       const whatsappUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}`;
-
-      // Calcular Categorização de Fidelidade conforme as regras da loja:
-      // - VIPs: compram pelo menos 1x a cada 15 dias (duas semanas)
-      // - Recorrentes: compram pelo menos 1x por mês (15 a 30 dias)
-      // - Em Risco: compraram 1 vez e não compraram mais (mais de 30 dias sem compra)
-      let segment: 'champion' | 'loyal' | 'new' | 'at_risk' = 'new';
-      if (daysSinceLastOrder <= 15) {
-        segment = 'champion'; // VIP
-      } else if (daysSinceLastOrder <= 30) {
-        segment = 'loyal'; // Recorrente (1x por mês)
-      } else {
-        segment = 'at_risk'; // Em Risco (mais de 30 dias sem comprar)
-      }
 
       result.push({
         id: phoneKey,
@@ -194,6 +310,15 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
         whatsappMessage,
         whatsappUrl,
         segment,
+        flavorProfile,
+        flavorProfileLabel,
+        favoriteBrand: String(favoriteBrand),
+        inVipGroup,
+        prospectingStatus,
+        prospectingStatusLabel,
+        customNotes: registeredClient?.custom_notes || '',
+        urgencyLevel,
+        nextReplenishmentDate,
         orders: clientOrders,
       });
     }
@@ -204,3 +329,4 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
     return [];
   }
 }
+
