@@ -530,13 +530,13 @@ export function MarketingModule() {
           const contact = targetContacts[i];
           const rawPhone = contact.cleanPhone || contact.phone;
 
-          // Seleciona a mensagem base ou alterna entre as variações dinâmicas
+          // Seleciona a mensagem base ou alterna aleatoriamente entre as variações cadastradas (Anti-Fingerprinting)
           let chosenText = camp.message;
           if (camp.useVariations && camp.variations && camp.variations.length > 0) {
             const allAvailableTexts = [camp.message, ...camp.variations.filter(v => v.trim().length > 0)];
-            // Alterna de forma circular e equilibrada entre as variações
-            const variationIndex = i % allAvailableTexts.length;
-            chosenText = allAvailableTexts[variationIndex];
+            // Sorteio aleatório imprevisível para o algoritmo do WhatsApp não detectar padrão sequencial fixo
+            const randomIndex = Math.floor(Math.random() * allAvailableTexts.length);
+            chosenText = allAvailableTexts[randomIndex];
           }
 
           const formattedMsg = chosenText
