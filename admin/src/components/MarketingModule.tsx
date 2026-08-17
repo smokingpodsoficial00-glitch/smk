@@ -1620,7 +1620,6 @@ export function MarketingModule() {
                     />
                   </div>
                 )}
-              </div>
 
                 {campaignFormTargetType === 'lists' && (
                   <div className="col-span-full">
