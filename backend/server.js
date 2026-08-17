@@ -1786,7 +1786,9 @@ app.post('/api/marketing/send-direct', async (req, res) => {
             const chat = await client.getChatById(formattedNumber);
             if (chat) {
                 await chat.sendStateTyping();
-                await new Promise(resolve => setTimeout(resolve, 2500));
+                // Simulação humana ultra realista: Digitando... entre 10 e 15 segundos
+                const typingDurationMs = Math.floor(Math.random() * 5000) + 10000;
+                await new Promise(resolve => setTimeout(resolve, typingDurationMs));
                 await client.sendMessage(formattedNumber, text);
                 await chat.clearState();
             } else {
