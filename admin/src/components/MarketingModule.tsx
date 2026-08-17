@@ -541,14 +541,20 @@ export function MarketingModule() {
 
     isAbortingRef.current = false;
     setExecutingCampaignId(camp.id);
-    setDispatchProgress({ current: 0, total: targetContacts.length || 1, status: 'Iniciando disparos com cadência Anti-Ban...' });
-
-    // Histórico de contatos já enviados para evitar repetição acidental
+    // Histórico de contatos já enviados para evitar repetição acidental (Retomada Inteligente)
     const sentHistoryKey = `SP_SENT_CAMPAIGN_${camp.id}`;
     let alreadySentPhones: string[] = [];
     try {
       alreadySentPhones = JSON.parse(localStorage.getItem(sentHistoryKey) || '[]');
     } catch {}
+
+    setDispatchProgress({ 
+      current: alreadySentPhones.length, 
+      total: targetContacts.length || 1, 
+      status: alreadySentPhones.length > 0 
+        ? `Retomando disparos... (${alreadySentPhones.length} já enviados)` 
+        : 'Iniciando disparos com cadência Anti-Ban...' 
+    });
 
     try {
       if (camp.targetType === 'lists') {
