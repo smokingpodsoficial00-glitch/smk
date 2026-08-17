@@ -1004,7 +1004,7 @@ export function MarketingModule() {
                                       ? 'bg-purple-500/15 text-purple-300 border-purple-500/30' 
                                       : 'bg-white/5 text-white/40 border-white/10'
                                   }`}>
-                                    {camp.status === 'active' ? 'Ativa' : 'Pausada'}
+                                    {camp.status === 'active' ? '🟢 Ativa' : '⚪ Off'}
                                   </span>
                                 </div>
 
@@ -1026,9 +1026,9 @@ export function MarketingModule() {
                                     <span className="font-semibold text-white">
                                       {camp.frequencyDays === 0 
                                         ? 'Disparo Único' 
-                                        : camp.scheduledWeekday 
+                                        : camp.frequencyDays === 7 && camp.scheduledWeekday
                                           ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()}${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}` 
-                                          : `A cada ${camp.frequencyDays} dias`}
+                                          : `A cada ${camp.frequencyDays} dias${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}`}
                                     </span>
                                   </div>
                                 </div>
@@ -1040,41 +1040,72 @@ export function MarketingModule() {
                               </div>
 
                               {/* Ações da Campanha */}
-                              <div className="flex items-center justify-between pt-3 border-t border-purple-500/10 gap-2">
-                                <div className="flex items-center gap-1.5">
-                                  <button
+                              <div className="flex flex-col gap-3 pt-3 border-t border-purple-500/10">
+                                {camp.frequencyDays > 0 ? (
+                                  /* Switch Toggle para Campanhas Recorrentes (ex: 21 dias ou Semanal) */
+                                  <div 
+                                    className="flex items-center justify-between cursor-pointer group/toggle"
                                     onClick={() => toggleCampaignStatus(camp.id)}
-                                    title={camp.status === 'active' ? 'Pausar Campanha' : 'Ativar Campanha'}
-                                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
                                   >
-                                    {camp.status === 'active' ? <Pause className="size-3.5" /> : <Play className="size-3.5 text-purple-400" />}
-                                  </button>
+                                    <div className="flex items-center gap-2">
+                                      {camp.status === 'active' ? (
+                                        <ToggleRight className="size-7 text-purple-400 transition-all" />
+                                      ) : (
+                                        <ToggleLeft className="size-7 text-white/30 transition-all" />
+                                      )}
+                                      <div className="flex flex-col">
+                                        <span className={`text-[11px] font-bold uppercase tracking-wider ${
+                                          camp.status === 'active' ? 'text-purple-400' : 'text-white/40'
+                                        }`}>
+                                          {camp.status === 'active' ? '🟢 Automação Ligada' : '⚪ Desligada'}
+                                        </span>
+                                        {camp.status === 'active' && (
+                                          <span className="text-[10px] text-white/40 font-mono">
+                                            {camp.frequencyDays === 7 && camp.scheduledWeekday
+                                              ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()} às ${camp.scheduledTime || '15:00'}`
+                                              : `A cada ${camp.frequencyDays} dias às ${camp.scheduledTime || '15:00'}`}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  /* Indicador de Disparo Único */
+                                  <div className="flex items-center gap-1.5 text-[11px] text-white/40 font-mono">
+                                    <Clock className="size-3.5 text-purple-400" />
+                                    <span>Disparo manual avulso</span>
+                                  </div>
+                                )}
+
+                                {/* Botões de Ação */}
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      onClick={() => handleOpenCampaignModal(camp)}
+                                      title="Editar Configurações da Campanha"
+                                      className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
+                                    >
+                                      <Edit3 className="size-3.5" />
+                                    </button>
+
+                                    <button
+                                      onClick={() => handleDeleteCampaign(camp.id)}
+                                      title="Excluir Campanha"
+                                      className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all cursor-pointer"
+                                    >
+                                      <Trash2 className="size-3.5" />
+                                    </button>
+                                  </div>
 
                                   <button
-                                    onClick={() => handleOpenCampaignModal(camp)}
-                                    title="Editar Configurações da Campanha"
-                                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
+                                    onClick={() => handleExecuteCampaign(camp)}
+                                    disabled={executingCampaignId === camp.id}
+                                    className="px-3.5 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md disabled:opacity-50"
                                   >
-                                    <Edit3 className="size-3.5" />
-                                  </button>
-
-                                  <button
-                                    onClick={() => handleDeleteCampaign(camp.id)}
-                                    title="Excluir Campanha"
-                                    className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all cursor-pointer"
-                                  >
-                                    <Trash2 className="size-3.5" />
+                                    <Send className="size-3" />
+                                    <span>{camp.frequencyDays > 0 ? 'Disparar Lote Agora' : 'Disparar Agora'}</span>
                                   </button>
                                 </div>
-
-                                <button
-                                  onClick={() => handleExecuteCampaign(camp)}
-                                  disabled={executingCampaignId === camp.id}
-                                  className="px-3.5 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md disabled:opacity-50"
-                                >
-                                  <Send className="size-3" />
-                                  <span>Disparar Agora</span>
-                                </button>
                               </div>
                             </div>
                           );
