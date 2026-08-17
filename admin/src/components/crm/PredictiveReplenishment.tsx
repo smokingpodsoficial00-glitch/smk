@@ -57,31 +57,30 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
     <div className="flex flex-col gap-6">
       
       {/* Banner Explicativo com Estatísticas */}
-      <div className="bg-card border border-border p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg">
+      <div className="bg-[#0a0a0a] border border-white/5 p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-start gap-4">
-          <div className="bg-emerald-500/10 border border-emerald-500/20 p-3.5 rounded-xl text-emerald-400 shrink-0 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
-            <Clock className="size-6 text-emerald-400" />
+          <div className="bg-[#141414] border border-white/5 p-3.5 rounded-xl text-emerald-400 shrink-0">
+            <Clock className="size-5 text-emerald-400" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              Radar Preditivo de Recompra (Ciclo por Puffs)
+            <h3 className="text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider">
+              Radar Preditivo de Recompra
               <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-bold uppercase font-mono">
-                IA Preditiva Ativa
+                IA Ativa
               </span>
             </h3>
             <p className="text-xs text-muted-foreground mt-1 max-w-2xl leading-relaxed">
-              O sistema monitora a capacidade do pod comprado (5k, 10k, 15k, 20k puffs) e estima a data de esgotamento. 
-              Dispare antes do final de semana ou antes que o cliente compre na concorrência!
+              Monitora a capacidade do pod e estima a data de esgotamento. Dispare antes que o cliente compre na concorrência.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <span className="px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold font-mono">
-            🔴 {urgentClients.length} Pods Secos
+          <span className="px-3 py-1.5 rounded-xl bg-[#141414] border border-red-500/20 text-red-400 text-[11px] font-bold uppercase tracking-wider">
+            {urgentClients.length} Pods Secos
           </span>
-          <span className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold font-mono">
-            🟡 {warningClients.length} Secando
+          <span className="px-3 py-1.5 rounded-xl bg-[#141414] border border-amber-500/20 text-amber-400 text-[11px] font-bold uppercase tracking-wider">
+            {warningClients.length} Secando
           </span>
         </div>
       </div>
@@ -90,52 +89,52 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => setUrgencyFilter('all')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`px-4 py-2 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer ${
             urgencyFilter === 'all'
-              ? 'bg-white/10 text-white border border-white/20 shadow-sm'
+              ? 'bg-[#141414] text-white border border-white/10'
               : 'text-muted-foreground hover:bg-white/5 border border-transparent'
           }`}
         >
-          Todos os Clientes ({clients.length})
+          Todos ({clients.length})
         </button>
 
         <button
           onClick={() => setUrgencyFilter('urgent')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+          className={`px-4 py-2 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
             urgencyFilter === 'urgent'
-              ? 'bg-red-500/20 text-red-300 border border-red-500/40 shadow-sm'
+              ? 'bg-red-500/10 text-red-400 border border-red-500/20'
               : 'text-muted-foreground hover:bg-white/5 border border-transparent'
           }`}
         >
-          <span className="size-2 rounded-full bg-red-500 animate-ping" />
-          🔴 Disparo Urgente Hoje ({urgentClients.length})
+          <span className="size-1.5 rounded-full bg-red-500 animate-pulse" />
+          Disparo Urgente ({urgentClients.length})
         </button>
 
         <button
           onClick={() => setUrgencyFilter('warning')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+          className={`px-4 py-2 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
             urgencyFilter === 'warning'
-              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
               : 'text-muted-foreground hover:bg-white/5 border border-transparent'
           }`}
         >
-          🟡 Fim Próximo (1 a 4 dias) ({warningClients.length})
+          Fim Próximo ({warningClients.length})
         </button>
 
         <button
           onClick={() => setUrgencyFilter('ok')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`px-4 py-2 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer ${
             urgencyFilter === 'ok'
-              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
               : 'text-muted-foreground hover:bg-white/5 border border-transparent'
           }`}
         >
-          🟢 Pod Novo em Uso ({okClients.length})
+          Pod em Uso ({okClients.length})
         </button>
       </div>
 
       {filteredClients.length === 0 ? (
-        <div className="bg-card border border-border rounded-2xl p-12 text-center text-muted-foreground">
+        <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl p-12 text-center text-muted-foreground">
           <p className="text-sm">Nenhum cliente com compras nessa categoria de urgência.</p>
         </div>
       ) : (
@@ -152,62 +151,62 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
             return (
               <div 
                 key={item.id} 
-                className={`border rounded-2xl p-5 flex flex-col md:flex-row gap-6 md:items-center justify-between transition-all ${
+                className={`bg-[#0a0a0a] border rounded-2xl p-5 flex flex-col md:flex-row gap-6 md:items-center justify-between transition-colors ${
                   isOverdue 
-                    ? 'bg-[#120808] border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.1)]' 
+                    ? 'border-red-500/30 hover:border-red-500/50' 
                     : isNearEnd
-                    ? 'bg-[#120f08] border-amber-500/40 shadow-[0_0_20px_rgba(245,158,11,0.1)]'
-                    : 'bg-card border-border hover:border-white/20'
+                    ? 'border-amber-500/30 hover:border-amber-500/50'
+                    : 'border-white/5 hover:border-white/10'
                 }`}
               >
                 <div 
                   className="flex items-center gap-4 cursor-pointer min-w-[280px]" 
                   onClick={() => onSelectClient(item)}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center font-bold text-white border border-white/20 shrink-0 text-base">
+                  <div className="size-10 rounded-full bg-[#141414] flex items-center justify-center font-bold text-white border border-white/5 shrink-0 text-sm">
                     {item.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <h4 className="font-bold text-white text-base hover:text-emerald-400 transition-colors flex items-center gap-2">
+                    <h4 className="font-bold text-white text-sm hover:text-emerald-400 transition-colors flex items-center gap-2">
                       {item.name}
                       {isOverdue ? (
-                        <span className="text-[10px] bg-red-500/15 text-red-400 border border-red-500/30 px-2.5 py-0.5 rounded-full font-extrabold uppercase">
-                          🔴 Pod Secou
+                        <span className="text-[9px] bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded uppercase font-bold tracking-wider">
+                          Pod Secou
                         </span>
                       ) : isNearEnd ? (
-                        <span className="text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-extrabold uppercase">
-                          🟡 Faltam ~{item.estimatedDaysLeft}d
+                        <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded uppercase font-bold tracking-wider">
+                          Faltam ~{item.estimatedDaysLeft}d
                         </span>
                       ) : (
-                        <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-extrabold uppercase">
-                          🟢 Pod Novo
+                        <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded uppercase font-bold tracking-wider">
+                          Pod Novo
                         </span>
                       )}
                     </h4>
-                    <div className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-1.5">
-                      <span>Último: <strong className="text-white font-medium">{item.lastProduct}</strong> ({item.lastPuffs} puffs)</span>
+                    <div className="text-[11px] text-muted-foreground mt-1 flex flex-wrap items-center gap-1.5">
+                      <span>Último: <strong className="text-white/80 font-medium">{item.lastProduct}</strong> ({item.lastPuffs} puffs)</span>
                       <span>•</span>
-                      <span className="text-white/70 font-mono">compra em {item.lastOrderDate}</span>
+                      <span className="text-white/50">compra em {item.lastOrderDate}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Barra de Progresso do Ciclo */}
                 <div className="flex-1 max-w-sm">
-                  <div className="flex justify-between text-xs mb-1.5 font-bold">
+                  <div className="flex justify-between text-[11px] mb-2 font-semibold">
                     <span className="text-muted-foreground flex items-center gap-1">
-                      <Calendar className="size-3 text-muted-foreground" />
+                      <Calendar className="size-3 text-muted-foreground/70" />
                       Reposição: {item.nextReplenishmentDate}
                     </span>
-                    <span className={isOverdue ? 'text-red-400 font-mono' : isNearEnd ? 'text-amber-400 font-mono' : 'text-emerald-400 font-mono'}>
+                    <span className={isOverdue ? 'text-red-400' : isNearEnd ? 'text-amber-400' : 'text-emerald-400'}>
                       {isOverdue ? `Atrasado há ${item.daysSinceLastOrder - item.expectedCycleDays}d` : `${progress.toFixed(0)}% do ciclo`}
                     </span>
                   </div>
-                  <div className="h-2.5 w-full bg-[#141414] rounded-full overflow-hidden border border-white/5">
+                  <div className="h-2 w-full bg-[#141414] rounded-full overflow-hidden border border-white/5">
                     <div 
                       className={`h-full rounded-full transition-all duration-500 ${
-                        isOverdue ? 'bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)]' : 
-                        isNearEnd ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' : 'bg-emerald-500'
+                        isOverdue ? 'bg-red-500' : 
+                        isNearEnd ? 'bg-amber-500' : 'bg-emerald-500'
                       }`} 
                       style={{ width: `${progress}%` }}
                     />
@@ -220,16 +219,10 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
                     href={waUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                      isOverdue 
-                        ? 'bg-red-500 hover:bg-red-400 text-white shadow-[0_0_15px_rgba(239,68,68,0.3)]'
-                        : isNearEnd
-                        ? 'bg-amber-500 hover:bg-amber-400 text-black shadow-[0_0_15px_rgba(245,158,11,0.3)]'
-                        : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_15px_rgba(16,185,129,0.2)]'
-                    }`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[11px] font-bold transition-all cursor-pointer uppercase tracking-wider"
                   >
                     <MessageCircle className="size-3.5" />
-                    <span>Lembrete Recompra</span>
+                    <span>Recompra</span>
                   </a>
                 </div>
               </div>

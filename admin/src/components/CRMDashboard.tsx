@@ -63,24 +63,24 @@ export function CRMDashboard() {
 
   return (
     <CRMErrorBoundary>
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-background">
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-black text-white">
         {/* Header do CRM */}
-        <header className="px-6 py-5 border-b border-border shrink-0 bg-[#0a0a0a]">
+        <header className="px-6 py-5 border-b border-white/10 shrink-0 bg-[#0a0a0a]">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-2xl font-semibold text-silver flex items-center gap-2">
-                <Users className="size-6 text-primary" />
-                Gestão de Clientes (CRM WhatsApp)
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <Users className="size-5 text-emerald-400" />
+                Gestão de Clientes
               </h2>
-              <p className="text-sm text-muted-foreground mt-1 tracking-wide">
-                Ranking de clientes leais, histórico de compras e previsão de término de pods para recompra.
+              <p className="text-xs text-muted-foreground mt-1">
+                CRM WhatsApp, Ranking de Fidelidade e Avisos de Recompra.
               </p>
             </div>
             
             <div className="flex items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <div className="size-2 rounded-full bg-emerald-400 animate-ping" />
-                Base de Clientes Reais Conectada
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wide">
+                <div className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                Base Conectada
               </span>
             </div>
           </div>
@@ -91,13 +91,13 @@ export function CRMDashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeSubTab === tab.id 
-                    ? 'bg-white/10 text-white border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.1)]' 
-                    : 'text-muted-foreground hover:bg-white/5 border border-transparent'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                    : 'text-muted-foreground hover:text-white bg-[#141414] border border-white/5 hover:border-white/20'
                 }`}
               >
-                {tab.icon}
+                {/* Oculta os ícones coloridos pesados antigos que vêm na const tabs */}
                 {tab.label}
               </button>
             ))}

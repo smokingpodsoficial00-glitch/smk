@@ -41,18 +41,18 @@ export const RealClient = {};
 export function detectFlavorProfile(text: string = ''): { type: FlavorProfileType; label: string } {
   const lower = text.toLowerCase();
   if (/(ice|menthol|mint|menta|polar|cold|cool|frozen|spearmint|chill)/i.test(lower)) {
-    return { type: 'ice', label: 'Mentolado / Ice ❄️' };
+    return { type: 'ice', label: 'Mentolado / Ice' };
   }
   if (/(tobacco|tabaco|cigar|charuto|coffee|caf[eé]|latte|cuban)/i.test(lower)) {
-    return { type: 'tobacco', label: 'Atabacado / Intenso 🍂' };
+    return { type: 'tobacco', label: 'Atabacado / Intenso' };
   }
   if (/(vanilla|baunilha|custard|caramel|cookie|biscuit|cake|bolo|pie|torta|cream|creme)/i.test(lower)) {
-    return { type: 'dessert', label: 'Sobremesa / Doce 🍰' };
+    return { type: 'dessert', label: 'Sobremesa / Doce' };
   }
   if (/(grape|uva|watermelon|melancia|strawberry|morango|mango|manga|peach|p[eê]ssego|banana|apple|ma[çc][aã]|lemon|lim[aã]o|cherry|cereja|passion|maracuj[aá]|berry|blueberry|abacaxi|pineapple|orange|laranja|guava|goiaba|kiwi|fruit|mel[aã]o|melon)/i.test(lower)) {
-    return { type: 'fruity', label: 'Frutado / Doce 🍓' };
+    return { type: 'fruity', label: 'Frutado / Doce' };
   }
-  return { type: 'fruity', label: 'Frutado / Doce 🍓' };
+  return { type: 'fruity', label: 'Frutado / Doce' };
 }
 
 // Helper para salvar edições de CRM do cliente no Supabase
@@ -143,6 +143,27 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       console.warn("Aviso ao consultar smoking_clients:", e);
     }
 
+    // 3. Buscar Cadastro Mestre de Produtos (Estoque) para pegar Puffs exatos
+    let productsMap = new Map<string, any>();
+    try {
+      const { data: productsData } = await supabase
+        .from('smoking_products')
+        .select('id, name, flavor, brand, puffs');
+
+      if (productsData && Array.isArray(productsData)) {
+        for (const p of productsData) {
+          if (p.id) productsMap.set(String(p.id), p);
+          // Opcional: tentar cruzar por nome + sabor se n tiver ID no pedido
+          if (p.name && p.flavor) {
+             const key = `${String(p.name).toLowerCase()}_${String(p.flavor).toLowerCase()}`;
+             productsMap.set(key, p);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Aviso ao consultar smoking_products:", e);
+    }
+
     // Agrupar pedidos por cliente (chave: número WhatsApp limpo)
     const clientGroups = new Map<string, any[]>();
 
@@ -215,32 +236,69 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       // Extrair último produto, modelo, sabor e marca
       const itemsList = Array.isArray(latestOrder.items) ? latestOrder.items : [];
       const firstItem = itemsList.length > 0 ? itemsList[0] : null;
-      const lastProduct = firstItem ? `${firstItem.name || 'Pod'} ${firstItem.flavor || ''}` : 'Ignite V50';
-      const lastFlavor = firstItem?.flavor || 'Frutado';
-      const lastPuffs = Number(firstItem?.puffs) || 5000;
-      const favoriteBrand = registeredClient?.favorite_brand || firstItem?.brand || 'Ignite';
+      
+      let lastProduct = firstItem ? `${firstItem.name || 'Pod'} ${firstItem.flavor || ''}` : 'Ignite V50';
+      let lastFlavor = firstItem?.flavor || 'Frutado';
+      let lastPuffs = Number(firstItem?.puffs) || 5000;
+      let favoriteBrand = registeredClient?.favorite_brand || firstItem?.brand || 'Ignite';
+
+      // Cruza com o estoque (smoking_products) para puxar exatamente como está lá
+      if (firstItem) {
+        let matchedProduct = null;
+        if (firstItem.id && productsMap.has(String(firstItem.id))) {
+           matchedProduct = productsMap.get(String(firstItem.id));
+        } else if (firstItem.product_id && productsMap.has(String(firstItem.product_id))) {
+           matchedProduct = productsMap.get(String(firstItem.product_id));
+        } else {
+           const nameFlavorKey = `${String(firstItem.name || '').toLowerCase()}_${String(firstItem.flavor || '').toLowerCase()}`;
+           if (productsMap.has(nameFlavorKey)) {
+             matchedProduct = productsMap.get(nameFlavorKey);
+           }
+        }
+
+        if (matchedProduct) {
+           if (matchedProduct.puffs) lastPuffs = Number(matchedProduct.puffs);
+           if (matchedProduct.brand && !registeredClient?.favorite_brand) favoriteBrand = matchedProduct.brand;
+           // Não sobrescreve o lastProduct se já houver para não perder formatação de nome que pode estar certa no pedido,
+           // mas garante que os PUFFS e BRAND estão corretos!
+        } else if (!firstItem.puffs && firstItem.name) {
+           // Fallback regex se não achou no estoque e não tinha no pedido
+           const match = firstItem.name.match(/(\d+)k?/i);
+           if (match) {
+             const num = parseInt(match[1], 10);
+             if (num >= 1000) lastPuffs = num;
+             else if (num === 50) lastPuffs = 5000;
+             else if (num === 80) lastPuffs = 8000;
+             else if (num === 10) lastPuffs = 10000;
+           }
+        }
+      }
 
       // Detectar perfil de sabor dominante
       const detectedFlavor = detectFlavorProfile(`${lastProduct} ${lastFlavor}`);
       const flavorProfile: FlavorProfileType = registeredClient?.flavor_profile || detectedFlavor.type;
       const flavorProfileLabel = registeredClient?.flavor_profile 
-        ? (flavorProfile === 'ice' ? 'Mentolado / Ice ❄️' : flavorProfile === 'tobacco' ? 'Atabacado / Intenso 🍂' : flavorProfile === 'dessert' ? 'Sobremesa / Doce 🍰' : 'Frutado / Doce 🍓')
+        ? (flavorProfile === 'ice' ? 'Mentolado / Ice' : flavorProfile === 'tobacco' ? 'Atabacado / Intenso' : flavorProfile === 'dessert' ? 'Sobremesa / Doce' : 'Frutado / Doce')
         : detectedFlavor.label;
 
       // Estimar ciclo de consumo por capacidade de puffs
-      let expectedCycleDays = 14;
-      if (lastPuffs >= 25000) {
-        expectedCycleDays = 50;
+      let expectedCycleDays = 5;
+      if (lastPuffs > 50000) {
+        expectedCycleDays = 30;
+      } else if (lastPuffs >= 30000) {
+        expectedCycleDays = 27;
+      } else if (lastPuffs >= 25000) {
+        expectedCycleDays = 23;
       } else if (lastPuffs >= 20000) {
-        expectedCycleDays = 42;
+        expectedCycleDays = 20;
       } else if (lastPuffs >= 15000) {
-        expectedCycleDays = 32;
+        expectedCycleDays = 17;
       } else if (lastPuffs >= 10000) {
-        expectedCycleDays = 22;
-      } else if (lastPuffs >= 8000) {
-        expectedCycleDays = 18;
+        expectedCycleDays = 10;
+      } else if (lastPuffs >= 6000) {
+        expectedCycleDays = 7;
       } else {
-        expectedCycleDays = 14;
+        expectedCycleDays = 5;
       }
 
       const estimatedDaysLeft = Math.max(0, expectedCycleDays - daysSinceLastOrder);
@@ -264,13 +322,13 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       // Classificação RFV
       let segment: 'champion' | 'loyal' | 'new' | 'at_risk' = 'new';
       if (ordersCount >= 3 || spent >= 280 || (ordersCount >= 2 && daysSinceLastOrder <= 15)) {
-        segment = 'champion'; // 🥇 VIP Champion
+        segment = 'champion'; // VIP Champion
       } else if (ordersCount >= 2 && daysSinceLastOrder <= 35) {
-        segment = 'loyal'; // 🔄 Recorrente
+        segment = 'loyal'; // Recorrente
       } else if (daysSinceLastOrder > 35) {
-        segment = 'at_risk'; // ⚠️ Em Risco
+        segment = 'at_risk'; // Em Risco
       } else {
-        segment = 'new'; // 🌱 1ª Compra
+        segment = 'new'; // 1ª Compra
       }
 
       // Status de Prospecção
@@ -282,9 +340,9 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       }
 
       const prospectingStatusLabel = 
-        prospectingStatus === 'vip_recorrente' ? '🏆 VIP Recorrente' :
-        prospectingStatus === 'reativado' ? '🌱 Reativado (Ativo)' :
-        prospectingStatus === 'contatado' ? '💬 Em Negociação' : '🎯 Base Antiga';
+        prospectingStatus === 'vip_recorrente' ? 'VIP Recorrente' :
+        prospectingStatus === 'reativado' ? 'Reativado (Ativo)' :
+        prospectingStatus === 'contatado' ? 'Em Negociação' : 'Base Antiga';
 
       // Mensagem personalizada de recompra no WhatsApp
       const waNumber = cleanPhone.length > 13 ? '5511951741181' : (cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone);
