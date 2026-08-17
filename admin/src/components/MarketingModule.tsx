@@ -553,24 +553,28 @@ export function MarketingModule() {
     try {
       if (camp.targetType === 'lists') {
         let batchCounter = 0;
+        let sentInThisSession = 0;
 
         for (let i = 0; i < targetContacts.length; i++) {
           // Checa se o usuário clicou em Cancelar / Parar
           if (isAbortingRef.current) {
-            alert(`Disparo interrompido pelo usuário. Foram enviados ${i} contatos de ${targetContacts.length}.`);
+            alert(`Disparo pausado. Foram enviados ${sentInThisSession} contatos nesta sessão.`);
             break;
           }
 
           const contact = targetContacts[i];
           const rawPhone = contact.cleanPhone || contact.phone;
 
-          // Seleciona a mensagem base ou alterna aleatoriamente entre as variações cadastradas (Anti-Fingerprinting)
+          // Pula contatos que já receberam esta campanha anteriormente (retomada inteligente)
+          if (alreadySentPhones.includes(rawPhone)) {
+            continue;
+          }
+
+          // Seleciona a variação na ordem sequencial exata: 1º contato = var 1, 2º = var 2, ..., 5º = var 5
           let chosenText = camp.message;
           if (camp.useVariations && camp.variations && camp.variations.length > 0) {
             const allAvailableTexts = [camp.message, ...camp.variations.filter(v => v.trim().length > 0)];
-            // Sorteio aleatório imprevisível para o algoritmo do WhatsApp não detectar padrão sequencial fixo
-            const randomIndex = Math.floor(Math.random() * allAvailableTexts.length);
-            chosenText = allAvailableTexts[randomIndex];
+            chosenText = allAvailableTexts[batchCounter % allAvailableTexts.length];
           }
 
           const formattedMsg = chosenText
@@ -591,25 +595,27 @@ export function MarketingModule() {
             });
             alreadySentPhones.push(rawPhone);
             localStorage.setItem(sentHistoryKey, JSON.stringify(alreadySentPhones));
+            sentInThisSession++;
           } catch (e) {}
 
           batchCounter++;
           setDispatchProgress({
-            current: i + 1,
+            current: alreadySentPhones.length,
             total: targetContacts.length,
-            status: `Enviado ${i + 1} de ${targetContacts.length} para ${contact.name || rawPhone}...`
+            status: `Enviado ${alreadySentPhones.length} de ${targetContacts.length} para ${contact.name || rawPhone}...`
           });
 
-          // Delay individual seguro entre mensagens (6 a 8 segundos aleatórios)
-          const randomDelay = Math.floor(Math.random() * 2000) + 6000;
+          // Delay individual seguro e humanizado entre mensagens (10 a 20 segundos aleatórios)
+          const randomDelay = Math.floor(Math.random() * 10000) + 10000;
           await new Promise(r => setTimeout(r, randomDelay));
 
           if (isAbortingRef.current) break;
 
-          // Se atingiu o tamanho do lote e ainda há contatos restantes
-          if (batchCounter >= camp.batchSize && (i + 1) < targetContacts.length) {
+          // Ao completar o lote de contatos (ex: 5) e ainda restarem contatos na lista
+          const remainingContacts = targetContacts.filter(c => !alreadySentPhones.includes(c.cleanPhone || c.phone));
+          if (batchCounter >= (camp.batchSize || 5) && remainingContacts.length > 0) {
             batchCounter = 0;
-            const totalPauseSeconds = (camp.batchIntervalMinutes || 25) * 60;
+            const totalPauseSeconds = (camp.batchIntervalMinutes || 35) * 60;
 
             for (let remaining = totalPauseSeconds; remaining > 0; remaining--) {
               if (isAbortingRef.current) break;
@@ -617,9 +623,9 @@ export function MarketingModule() {
               const mins = Math.floor(remaining / 60);
               const secs = remaining % 60;
               setDispatchProgress({
-                current: i + 1,
+                current: alreadySentPhones.length,
                 total: targetContacts.length,
-                status: `⏸️ Lote concluído! Pausa de segurança anti-ban: ${mins}m ${secs < 10 ? '0' : ''}${secs}s restantes...`
+                status: `⏸️ Lote de ${camp.batchSize || 5} concluído! Pausa de segurança anti-ban: ${mins}m ${secs < 10 ? '0' : ''}${secs}s restantes...`
               });
 
               await new Promise(r => setTimeout(r, 1000));
