@@ -40,6 +40,7 @@ export interface Campaign {
   frequencyDays: number; // 0 = Disparo Único, 7 = Semanal, 14 = Quinzenal, etc.
   scheduledWeekday?: string; // 'QUARTA', 'SEXTA', 'SABADO', 'DOMINGO', etc.
   scheduledTime?: string; // Ex: '15:00', '18:30', etc.
+  startDate?: string; // Ex: '2026-08-17' (Data de Início da Campanha)
   batchSize: number;
   batchIntervalMinutes: number;
   status: 'active' | 'paused' | 'completed';
@@ -144,6 +145,7 @@ export function MarketingModule() {
   const [campaignFormFrequency, setCampaignFormFrequency] = useState<number>(7); // dias
   const [campaignFormWeekday, setCampaignFormWeekday] = useState<string>('QUARTA');
   const [campaignFormTime, setCampaignFormTime] = useState<string>('15:00');
+  const [campaignFormStartDate, setCampaignFormStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [campaignFormBatchSize, setCampaignFormBatchSize] = useState<number>(10);
   const [campaignFormInterval, setCampaignFormInterval] = useState<number>(25);
   const [cardapioUrl, setCardapioUrl] = useState('https://smoking-pods.vercel.app');
@@ -241,10 +243,16 @@ export function MarketingModule() {
     }
   }, []);
 
-  // Salva no localStorage quando mudar
+  // Salva no localStorage e sincroniza com backend
   const saveListsToStorage = (lists: BroadcastList[]) => {
     setBroadcastLists(lists);
     localStorage.setItem(LOCAL_STORAGE_LISTS, JSON.stringify(lists));
+    // Sincroniza listas com backend para o scheduler autônomo
+    fetch('http://localhost:3006/api/marketing/lists', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lists })
+    }).catch(err => console.warn('⚠️ Falha ao sincronizar listas com backend:', err.message));
   };
 
   const saveCampaignsToStorage = (camps: Campaign[]) => {
@@ -405,6 +413,7 @@ export function MarketingModule() {
       setCampaignFormFrequency(campToEdit.frequencyDays);
       setCampaignFormWeekday(campToEdit.scheduledWeekday || 'QUARTA');
       setCampaignFormTime(campToEdit.scheduledTime || '15:00');
+      setCampaignFormStartDate(campToEdit.startDate || new Date().toISOString().split('T')[0]);
       setCampaignFormBatchSize(campToEdit.batchSize || 10);
       setCampaignFormInterval(campToEdit.batchIntervalMinutes || 25);
     } else {
@@ -420,6 +429,7 @@ export function MarketingModule() {
       setCampaignFormFrequency(7);
       setCampaignFormWeekday('QUARTA');
       setCampaignFormTime('15:00');
+      setCampaignFormStartDate(new Date().toISOString().split('T')[0]);
       setCampaignFormBatchSize(10);
       setCampaignFormInterval(25);
     }
@@ -468,6 +478,7 @@ export function MarketingModule() {
               frequencyDays: campaignFormFrequency,
               scheduledWeekday: campaignFormWeekday,
               scheduledTime: campaignFormTime,
+              startDate: campaignFormStartDate,
               batchSize: campaignFormBatchSize,
               batchIntervalMinutes: campaignFormInterval,
               totalRecipients: totalCount,
@@ -489,6 +500,7 @@ export function MarketingModule() {
         frequencyDays: campaignFormFrequency,
         scheduledWeekday: campaignFormWeekday,
         scheduledTime: campaignFormTime,
+        startDate: campaignFormStartDate,
         batchSize: campaignFormBatchSize,
         batchIntervalMinutes: campaignFormInterval,
         status: 'active',
@@ -1549,8 +1561,8 @@ export function MarketingModule() {
                 )}
               </div>
 
-              {/* Frequência do Disparo e Horário */}
-              <div className={`grid gap-4 ${campaignFormTargetType === 'lists' ? 'grid-cols-1 md:grid-cols-3' : campaignFormFrequency > 0 ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'}`}>
+              {/* Frequência do Disparo, Data de Início e Horário */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs font-bold text-white/70 block mb-1">Recorrência / Intervalo</label>
                   <select
@@ -1587,7 +1599,19 @@ export function MarketingModule() {
 
                 {campaignFormFrequency > 0 && (
                   <div>
-                    <label className="text-xs font-bold text-white/70 block mb-1">Horário do Disparo</label>
+                    <label className="text-xs font-bold text-white/70 block mb-1">📅 Data de Início</label>
+                    <input
+                      type="date"
+                      value={campaignFormStartDate}
+                      onChange={(e) => setCampaignFormStartDate(e.target.value)}
+                      className="w-full bg-[#050505] border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-400 cursor-pointer"
+                    />
+                  </div>
+                )}
+
+                {campaignFormFrequency > 0 && (
+                  <div>
+                    <label className="text-xs font-bold text-white/70 block mb-1">⏰ Horário do Disparo</label>
                     <input
                       type="time"
                       value={campaignFormTime}
@@ -1596,6 +1620,7 @@ export function MarketingModule() {
                     />
                   </div>
                 )}
+              </div>
 
                 {campaignFormTargetType === 'lists' && (
                   <div className="col-span-full">

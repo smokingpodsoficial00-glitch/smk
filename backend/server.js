@@ -1947,6 +1947,35 @@ app.post('/api/marketing/campaigns', (req, res) => {
     }
 });
 
+// GET /api/marketing/lists — Retorna listas salvas
+app.get('/api/marketing/lists', (req, res) => {
+    try {
+        const config = loadMarketingConfig();
+        return res.json({ success: true, lists: config.lists || [] });
+    } catch (err) {
+        console.error('❌ [Marketing] Erro ao ler listas:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/marketing/lists — Salva/atualiza listas
+app.post('/api/marketing/lists', (req, res) => {
+    try {
+        const { lists: newLists } = req.body;
+        if (!Array.isArray(newLists)) {
+            return res.status(400).json({ error: 'O campo "lists" deve ser um array.' });
+        }
+        const config = loadMarketingConfig();
+        config.lists = newLists;
+        saveMarketingConfig(config);
+        console.log(`✅ [Marketing] ${newLists.length} lista(s) de transmissão salvas no backend.`);
+        return res.json({ success: true, saved: newLists.length });
+    } catch (err) {
+        console.error('❌ [Marketing] Erro ao salvar listas:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // POST /api/marketing/test-dispatch — Disparo de teste imediato (sem afetar scheduler)
 app.post('/api/marketing/test-dispatch', async (req, res) => {
     try {
@@ -2053,6 +2082,9 @@ function cleanOldIdempotencyKeys(config) {
     }
 }
 
+// Set para controlar quais campanhas 1 a 1 estão rodando em background
+const runningListCampaigns = new Set();
+
 // Função principal do scheduler que verifica e dispara campanhas
 async function marketingSchedulerTick() {
     try {
@@ -2069,98 +2101,208 @@ async function marketingSchedulerTick() {
         const currentHour = nowSP.getHours();
         const currentMinute = nowSP.getMinutes();
         const currentTimeStr = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
+        const todayStr = nowSP.toISOString().split('T')[0];
 
-        // Limpa chaves antigas periodicamente (1x por tick é barato)
+        // Limpa chaves antigas periodicamente
         cleanOldIdempotencyKeys(config);
 
         const activeCampaigns = config.campaigns.filter(c => 
             c.status === 'active' && 
-            c.targetType === 'group' && 
-            c.scheduledTime &&
-            c.targetGroupId
+            c.scheduledTime
         );
 
         if (activeCampaigns.length === 0) return;
 
         for (const camp of activeCampaigns) {
-            // Verifica horário HH:MM
+            // 1. Verifica horário HH:MM exato
             if (camp.scheduledTime !== currentTimeStr) continue;
 
-            const freq = Number(camp.frequencyDays) || 7;
+            // 2. Verifica Data de Início (startDate)
+            if (camp.startDate) {
+                const [sy, sm, sd] = camp.startDate.split('-').map(Number);
+                const startMidnight = new Date(sy, sm - 1, sd, 0, 0, 0);
+                const nowMidnight = new Date(nowSP.getFullYear(), nowSP.getMonth(), nowSP.getDate(), 0, 0, 0);
+                if (nowMidnight < startMidnight) continue; // Data de início ainda não chegou
+            }
 
+            const freq = Number(camp.frequencyDays) || 0;
+
+            // 3. Verifica Frequência
             if (freq === 7) {
-                // Modo semanal com dia da semana fixo
+                // Semanal com dia da semana fixo
                 if (!camp.scheduledWeekday) continue;
                 const expectedWeekday = WEEKDAY_MAP[camp.scheduledWeekday.toUpperCase()];
                 if (expectedWeekday === undefined || expectedWeekday !== currentWeekday) continue;
-            } else if (freq > 7) {
-                // Modo intervalo em dias (ex: 14, 21, 30 dias a partir do último envio)
+            } else if (freq > 0) {
+                // Intervalo em dias (ex: 14, 21, 30 dias a partir do último envio)
                 if (camp.lastRunDate) {
-                    const [d, m, y] = camp.lastRunDate.split('/');
-                    const lastDate = new Date(Number(y), Number(m) - 1, Number(d));
+                    const [d, m, y] = camp.lastRunDate.split('/').map(Number);
+                    const lastDate = new Date(y, m - 1, d, 0, 0, 0);
                     const diffDays = Math.floor((nowSP.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-                    if (diffDays < freq) continue; // Ainda não passou o intervalo de dias
+                    if (diffDays < freq) continue; // Ainda não se passaram os N dias necessários
                 }
             }
 
-            // Verifica idempotência: já disparou esta campanha hoje nesta data?
-            const todayStr = nowSP.toISOString().split('T')[0];
+            // 4. Verifica Idempotência
             const idempKey = `${camp.id}_${todayStr}_${currentTimeStr}`;
             const alreadyFired = (config.idempotencyKeys || []).some(entry => entry.key === idempKey);
             if (alreadyFired) continue;
 
-            // === DISPARAR CAMPANHA ===
-            console.log(`\n🚀 [Scheduler] Disparando campanha automática: "${camp.name}" (${camp.scheduledWeekday} às ${camp.scheduledTime})`);
+            // ============================================================
+            // CASO A: DISPARO PARA GRUPO VIP (1 Mensagem)
+            // ============================================================
+            if (camp.targetType === 'group' && camp.targetGroupId) {
+                console.log(`\n🚀 [Scheduler Grupo] Disparando campanha: "${camp.name}" (${camp.scheduledWeekday || 'Recorrente'} às ${camp.scheduledTime})`);
 
-            try {
-                // Para grupos próprios, utiliza a mensagem oficial exata cadastrada
-                const formattedMsg = camp.message
-                    .replace(/\[Nome\]/gi, 'Pessoal')
-                    .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app')
-                    .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
-
-                // Resolve o ID do grupo
-                let groupChatId = camp.targetGroupId;
-                if (String(groupChatId).includes('chat.whatsapp.com/')) {
-                    try {
-                        const inviteCode = String(groupChatId).split('chat.whatsapp.com/')[1].trim().split('?')[0];
-                        const resolved = await client.acceptInvite(inviteCode);
-                        groupChatId = resolved || `${inviteCode}@g.us`;
-                    } catch (invErr) {
-                        console.warn('⚠️ [Scheduler] Não resolveu convite:', invErr.message);
-                    }
-                }
-
-                // Simula digitação e envia
                 try {
-                    const chat = await client.getChatById(groupChatId);
-                    if (chat) {
-                        await chat.sendStateTyping();
-                        await new Promise(resolve => setTimeout(resolve, 2500));
-                        await client.sendMessage(groupChatId, formattedMsg);
-                        await chat.clearState();
-                    } else {
+                    const formattedMsg = camp.message
+                        .replace(/\[Nome\]/gi, 'Pessoal')
+                        .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app')
+                        .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
+
+                    let groupChatId = camp.targetGroupId;
+                    if (String(groupChatId).includes('chat.whatsapp.com/')) {
+                        try {
+                            const inviteCode = String(groupChatId).split('chat.whatsapp.com/')[1].trim().split('?')[0];
+                            const resolved = await client.acceptInvite(inviteCode);
+                            groupChatId = resolved || `${inviteCode}@g.us`;
+                        } catch (invErr) {
+                            console.warn('⚠️ [Scheduler] Não resolveu convite:', invErr.message);
+                        }
+                    }
+
+                    try {
+                        const chat = await client.getChatById(groupChatId);
+                        if (chat) {
+                            await chat.sendStateTyping();
+                            await new Promise(resolve => setTimeout(resolve, 2500));
+                            await client.sendMessage(groupChatId, formattedMsg);
+                            await chat.clearState();
+                        } else {
+                            await client.sendMessage(groupChatId, formattedMsg);
+                        }
+                    } catch (chatErr) {
                         await client.sendMessage(groupChatId, formattedMsg);
                     }
-                } catch (chatErr) {
-                    await client.sendMessage(groupChatId, formattedMsg);
-                }
 
-                // Registra chave de idempotência
+                    if (!config.idempotencyKeys) config.idempotencyKeys = [];
+                    config.idempotencyKeys.push({ key: idempKey, timestamp: new Date().toISOString(), campaignName: camp.name });
+
+                    const campIndex = config.campaigns.findIndex(c => c.id === camp.id);
+                    if (campIndex !== -1) {
+                        config.campaigns[campIndex].lastRunDate = nowSP.toLocaleDateString('pt-BR');
+                    }
+
+                    saveMarketingConfig(config);
+                    console.log(`✅ [Scheduler Grupo] Campanha "${camp.name}" disparada com sucesso!`);
+                } catch (dispatchErr) {
+                    console.error(`❌ [Scheduler Grupo] Erro ao disparar "${camp.name}":`, dispatchErr.message);
+                }
+            }
+
+            // ============================================================
+            // CASO B: DISPARO PARA LISTAS DE TRANSMISSÃO (1 a 1 Autônomo)
+            // ============================================================
+            if (camp.targetType === 'lists' && !runningListCampaigns.has(camp.id)) {
                 if (!config.idempotencyKeys) config.idempotencyKeys = [];
                 config.idempotencyKeys.push({ key: idempKey, timestamp: new Date().toISOString(), campaignName: camp.name });
-
-                // Atualiza lastRunDate na campanha
-                const campIndex = config.campaigns.findIndex(c => c.id === camp.id);
-                if (campIndex !== -1) {
-                    config.campaigns[campIndex].lastRunDate = nowSP.toLocaleDateString('pt-BR');
-                }
-
                 saveMarketingConfig(config);
-                console.log(`✅ [Scheduler] Campanha "${camp.name}" disparada com sucesso! Chave: ${idempKey}`);
 
-            } catch (dispatchErr) {
-                console.error(`❌ [Scheduler] Erro ao disparar campanha "${camp.name}":`, dispatchErr.message);
+                runningListCampaigns.add(camp.id);
+
+                // Disparo em background com cadência Anti-Ban
+                (async () => {
+                    try {
+                        console.log(`\n🚀 [Scheduler 1-a-1] Iniciando esteira autônoma da campanha: "${camp.name}"`);
+                        const lists = config.lists || [];
+                        const targetLists = lists.filter(l => (camp.selectedListIds || []).includes(l.id));
+                        const contactMap = new Map();
+                        targetLists.forEach(l => (l.contacts || []).forEach(c => contactMap.set(c.id || c.phone, c)));
+                        const targetContacts = Array.from(contactMap.values());
+
+                        if (targetContacts.length === 0) {
+                            console.warn(`⚠️ [Scheduler 1-a-1] Nenhum contato encontrado para a campanha "${camp.name}".`);
+                            return;
+                        }
+
+                        const effectiveBatchSize = (camp.batchSize && camp.batchSize <= 5) ? camp.batchSize : 5;
+                        const effectiveBatchInterval = (camp.batchIntervalMinutes && camp.batchIntervalMinutes >= 35) ? camp.batchIntervalMinutes : 35;
+                        let batchCounter = 0;
+
+                        for (let i = 0; i < targetContacts.length; i++) {
+                            // Verifica se a campanha foi pausada no painel
+                            const currentConfig = loadMarketingConfig();
+                            const currentCamp = (currentConfig.campaigns || []).find(c => c.id === camp.id);
+                            if (!currentCamp || currentCamp.status !== 'active') {
+                                console.log(`🛑 [Scheduler 1-a-1] Campanha "${camp.name}" foi pausada durante a execução.`);
+                                break;
+                            }
+
+                            const contact = targetContacts[i];
+                            const rawPhone = contact.cleanPhone || contact.phone;
+
+                            // Rotação sequencial exata das variações
+                            let chosenText = camp.message;
+                            if (camp.useVariations && camp.variations && camp.variations.length > 0) {
+                                const allTexts = [camp.message, ...camp.variations.filter(v => v && v.trim().length > 0)];
+                                chosenText = allTexts[batchCounter % allTexts.length];
+                            }
+
+                            const formattedMsg = chosenText
+                                .replace(/\[Nome\]/gi, contact.name || 'Cliente')
+                                .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app')
+                                .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
+
+                            const cleanDigits = String(rawPhone).replace(/\D/g, '');
+                            const formattedPhone = cleanDigits.startsWith('55') ? cleanDigits : `55${cleanDigits}`;
+                            const formattedNumber = `${formattedPhone}@c.us`;
+
+                            console.log(`📢 [Scheduler 1-a-1] Enviando (${i + 1}/${targetContacts.length}) para ${formattedNumber}...`);
+
+                            try {
+                                const chat = await client.getChatById(formattedNumber);
+                                if (chat) {
+                                    await chat.sendStateTyping();
+                                    const typingMs = Math.floor(Math.random() * 5000) + 10000;
+                                    await new Promise(r => setTimeout(r, typingMs));
+                                    await client.sendMessage(formattedNumber, formattedMsg);
+                                    await chat.clearState();
+                                } else {
+                                    await client.sendMessage(formattedNumber, formattedMsg);
+                                }
+                            } catch (sendErr) {
+                                await client.sendMessage(formattedNumber, formattedMsg).catch(() => {});
+                            }
+
+                            batchCounter++;
+
+                            // Delay individual (10 a 20 segundos)
+                            const randomDelay = Math.floor(Math.random() * 10000) + 10000;
+                            await new Promise(r => setTimeout(r, randomDelay));
+
+                            // Pausa de 35 minutos ao bater o lote de 5 contatos
+                            if (batchCounter >= effectiveBatchSize && (i + 1) < targetContacts.length) {
+                                batchCounter = 0;
+                                console.log(`⏸️ [Scheduler 1-a-1] Lote de ${effectiveBatchSize} concluído! Pausa anti-ban de ${effectiveBatchInterval} min...`);
+                                await new Promise(r => setTimeout(r, effectiveBatchInterval * 60 * 1000));
+                            }
+                        }
+
+                        // Atualiza lastRunDate
+                        const finalConfig = loadMarketingConfig();
+                        const cIdx = (finalConfig.campaigns || []).findIndex(c => c.id === camp.id);
+                        if (cIdx !== -1) {
+                            finalConfig.campaigns[cIdx].lastRunDate = nowSP.toLocaleDateString('pt-BR');
+                            saveMarketingConfig(finalConfig);
+                        }
+
+                        console.log(`✅ [Scheduler 1-a-1] Campanha "${camp.name}" finalizada com sucesso!`);
+                    } catch (err) {
+                        console.error(`❌ [Scheduler 1-a-1] Erro na esteira de "${camp.name}":`, err.message);
+                    } finally {
+                        runningListCampaigns.delete(camp.id);
+                    }
+                })();
             }
         }
     } catch (err) {
