@@ -1967,14 +1967,7 @@ app.post('/api/marketing/test-dispatch', async (req, res) => {
             return res.status(400).json({ error: 'Teste imediato só disponível para campanhas de grupo.' });
         }
 
-        // Seleciona mensagem (com variação aleatória se habilitado)
-        let chosenText = camp.message;
-        if (camp.useVariations && camp.variations && camp.variations.length > 0) {
-            const allTexts = [camp.message, ...camp.variations.filter(v => v && v.trim().length > 0)];
-            chosenText = allTexts[Math.floor(Math.random() * allTexts.length)];
-        }
-
-        const formattedMsg = chosenText
+        const formattedMsg = camp.message
             .replace(/\[Nome\]/gi, 'Pessoal')
             .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app')
             .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
@@ -2105,14 +2098,8 @@ async function marketingSchedulerTick() {
             console.log(`\n🚀 [Scheduler] Disparando campanha automática: "${camp.name}" (${camp.scheduledWeekday} às ${camp.scheduledTime})`);
 
             try {
-                // Seleciona mensagem (com variação aleatória se habilitado)
-                let chosenText = camp.message;
-                if (camp.useVariations && camp.variations && camp.variations.length > 0) {
-                    const allTexts = [camp.message, ...camp.variations.filter(v => v && v.trim().length > 0)];
-                    chosenText = allTexts[Math.floor(Math.random() * allTexts.length)];
-                }
-
-                const formattedMsg = chosenText
+                // Para grupos próprios, utiliza a mensagem oficial exata cadastrada
+                const formattedMsg = camp.message
                     .replace(/\[Nome\]/gi, 'Pessoal')
                     .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app')
                     .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
