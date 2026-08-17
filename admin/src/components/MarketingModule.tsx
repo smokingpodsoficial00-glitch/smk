@@ -3,7 +3,8 @@ import {
   Megaphone, Send, Users, ShieldAlert, Sparkles, Clock, CheckCircle2, 
   AlertTriangle, RefreshCw, MessageSquare, Play, Pause, ExternalLink,
   Flame, Lock, Copy, Check, Plus, Trash2, Edit3, ArrowRight, CheckSquare,
-  Square, Calendar, Layers, ShieldCheck, HelpCircle, ChevronRight
+  Square, Calendar, Layers, ShieldCheck, HelpCircle, ChevronRight,
+  ToggleLeft, ToggleRight, Zap
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchLiveClients, type RealClient } from '@/lib/crm';
@@ -158,7 +159,7 @@ export function MarketingModule() {
     setDispatchProgress(prev => prev ? { ...prev, status: 'Interrompendo disparos... aguarde o contato atual.' } : null);
   };
 
-  // Carrega Listas e Campanhas salvas no localStorage
+  // Carrega Listas e Campanhas salvas (localStorage + backend)
   useEffect(() => {
     try {
       const savedLists = localStorage.getItem(LOCAL_STORAGE_LISTS);
@@ -188,9 +189,12 @@ export function MarketingModule() {
         localStorage.setItem(LOCAL_STORAGE_LISTS, JSON.stringify(initialLists));
       }
 
+      // Carrega campanhas do localStorage primeiro (carregamento instantâneo)
       const savedCampaigns = localStorage.getItem(LOCAL_STORAGE_CAMPAIGNS);
+      let localCampaigns: Campaign[] = [];
       if (savedCampaigns) {
-        setCampaigns(JSON.parse(savedCampaigns));
+        localCampaigns = JSON.parse(savedCampaigns);
+        setCampaigns(localCampaigns);
       } else {
         const initialCampaign: Campaign = {
           id: 'camp_reativacao_fds',
@@ -205,9 +209,33 @@ export function MarketingModule() {
           totalRecipients: 0,
           createdAt: new Date().toISOString(),
         };
-        setCampaigns([initialCampaign]);
-        localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify([initialCampaign]));
+        localCampaigns = [initialCampaign];
+        setCampaigns(localCampaigns);
+        localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(localCampaigns));
       }
+
+      // Tenta buscar do backend (sync bidirecional)
+      fetch('http://localhost:3006/api/marketing/campaigns')
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.campaigns) && data.campaigns.length > 0) {
+            // Backend tem campanhas: usa elas (fonte de verdade do scheduler)
+            setCampaigns(data.campaigns);
+            localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(data.campaigns));
+          } else if (localCampaigns.length > 0) {
+            // Backend vazio mas localStorage tem: sincroniza para o backend
+            fetch('http://localhost:3006/api/marketing/campaigns', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ campaigns: localCampaigns })
+            }).catch(() => {});
+          }
+        })
+        .catch(() => {
+          // Backend offline: usa localStorage normalmente
+          console.warn('⚠️ Backend offline, usando campanhas do localStorage.');
+        });
+
     } catch (e) {
       console.warn('Erro ao carregar storage local de marketing:', e);
     }
@@ -222,6 +250,12 @@ export function MarketingModule() {
   const saveCampaignsToStorage = (camps: Campaign[]) => {
     setCampaigns(camps);
     localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(camps));
+    // Sincroniza com backend para persistência do scheduler
+    fetch('http://localhost:3006/api/marketing/campaigns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaigns: camps })
+    }).catch(err => console.warn('⚠️ Falha ao sincronizar campanhas com backend:', err.message));
   };
 
   // Sincroniza Contatos e Grupos do WhatsApp via backend
@@ -793,10 +827,10 @@ export function MarketingModule() {
                                 </h3>
                                 <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
                                   camp.status === 'active' 
-                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' 
+                                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' 
                                     : 'bg-white/5 text-white/40 border-white/10'
                                 }`}>
-                                  {camp.status === 'active' ? 'Ativa' : 'Pausada'}
+                                  {camp.status === 'active' ? '🟢 Ativa' : '⚪ Off'}
                                 </span>
                               </div>
 
@@ -832,41 +866,62 @@ export function MarketingModule() {
                             </div>
 
                             {/* Ações da Campanha */}
-                            <div className="flex items-center justify-between pt-3 border-t border-amber-500/10 gap-2">
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  onClick={() => toggleCampaignStatus(camp.id)}
-                                  title={camp.status === 'active' ? 'Pausar Campanha' : 'Ativar Campanha'}
-                                  className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
-                                >
-                                  {camp.status === 'active' ? <Pause className="size-3.5" /> : <Play className="size-3.5 text-amber-400" />}
-                                </button>
-
-                                <button
-                                  onClick={() => handleOpenCampaignModal(camp)}
-                                  title="Editar Configurações da Campanha"
-                                  className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
-                                >
-                                  <Edit3 className="size-3.5" />
-                                </button>
-
-                                <button
-                                  onClick={() => handleDeleteCampaign(camp.id)}
-                                  title="Excluir Campanha"
-                                  className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all cursor-pointer"
-                                >
-                                  <Trash2 className="size-3.5" />
-                                </button>
+                            <div className="flex flex-col gap-3 pt-3 border-t border-amber-500/10">
+                              {/* Switch Toggle de Automação Semanal */}
+                              <div 
+                                className="flex items-center justify-between cursor-pointer group/toggle"
+                                onClick={() => toggleCampaignStatus(camp.id)}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {camp.status === 'active' ? (
+                                    <ToggleRight className="size-7 text-emerald-400 transition-all" />
+                                  ) : (
+                                    <ToggleLeft className="size-7 text-white/30 transition-all" />
+                                  )}
+                                  <div className="flex flex-col">
+                                    <span className={`text-[11px] font-bold uppercase tracking-wider ${
+                                      camp.status === 'active' ? 'text-emerald-400' : 'text-white/40'
+                                    }`}>
+                                      {camp.status === 'active' ? '🟢 Automação Ligada' : '⚪ Desligada'}
+                                    </span>
+                                    {camp.status === 'active' && camp.scheduledWeekday && camp.scheduledTime && (
+                                      <span className="text-[10px] text-white/40 font-mono">
+                                        Toda {camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()} às {camp.scheduledTime}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
 
-                              <button
-                                onClick={() => handleExecuteCampaign(camp)}
-                                disabled={executingCampaignId === camp.id}
-                                className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md disabled:opacity-50"
-                              >
-                                <Send className="size-3" />
-                                <span>Disparar Agora</span>
-                              </button>
+                              {/* Botões de Ação */}
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => handleOpenCampaignModal(camp)}
+                                    title="Editar Configurações da Campanha"
+                                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
+                                  >
+                                    <Edit3 className="size-3.5" />
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleDeleteCampaign(camp.id)}
+                                    title="Excluir Campanha"
+                                    className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all cursor-pointer"
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </button>
+                                </div>
+
+                                <button
+                                  onClick={() => handleExecuteCampaign(camp)}
+                                  disabled={executingCampaignId === camp.id}
+                                  className="px-3.5 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md disabled:opacity-50"
+                                >
+                                  <Zap className="size-3" />
+                                  <span>🧪 Testar Agora</span>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))}

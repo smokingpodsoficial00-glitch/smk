@@ -1884,6 +1884,295 @@ app.post('/api/crm/update-client', async (req, res) => {
     }
 });
 
+// ============================================================
+// MARKETING AUTOMATION: PERSISTÊNCIA DE CAMPANHAS + SCHEDULER
+// ============================================================
+
+const MARKETING_CONFIG_PATH = path.join(__dirname, 'data', 'marketing_config.json');
+
+// Helper: Carrega configuração de marketing do arquivo JSON
+function loadMarketingConfig() {
+    try {
+        if (!fs.existsSync(MARKETING_CONFIG_PATH)) {
+            const defaultConfig = { campaigns: [], idempotencyKeys: [], lastUpdated: null };
+            fs.writeFileSync(MARKETING_CONFIG_PATH, JSON.stringify(defaultConfig, null, 2), 'utf-8');
+            return defaultConfig;
+        }
+        const raw = fs.readFileSync(MARKETING_CONFIG_PATH, 'utf-8');
+        return JSON.parse(raw);
+    } catch (err) {
+        console.error('❌ [Marketing] Erro ao carregar config:', err.message);
+        return { campaigns: [], idempotencyKeys: [], lastUpdated: null };
+    }
+}
+
+// Helper: Salva configuração de marketing no arquivo JSON
+function saveMarketingConfig(config) {
+    try {
+        config.lastUpdated = new Date().toISOString();
+        fs.writeFileSync(MARKETING_CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+    } catch (err) {
+        console.error('❌ [Marketing] Erro ao salvar config:', err.message);
+    }
+}
+
+// GET /api/marketing/campaigns — Retorna campanhas salvas
+app.get('/api/marketing/campaigns', (req, res) => {
+    try {
+        const config = loadMarketingConfig();
+        return res.json({ success: true, campaigns: config.campaigns });
+    } catch (err) {
+        console.error('❌ [Marketing] Erro ao ler campanhas:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/marketing/campaigns — Salva/atualiza campanhas
+app.post('/api/marketing/campaigns', (req, res) => {
+    try {
+        const { campaigns: newCampaigns } = req.body;
+        if (!Array.isArray(newCampaigns)) {
+            return res.status(400).json({ error: 'O campo "campaigns" deve ser um array.' });
+        }
+        const config = loadMarketingConfig();
+        config.campaigns = newCampaigns;
+        saveMarketingConfig(config);
+        console.log(`✅ [Marketing] ${newCampaigns.length} campanha(s) salvas no backend.`);
+        return res.json({ success: true, saved: newCampaigns.length });
+    } catch (err) {
+        console.error('❌ [Marketing] Erro ao salvar campanhas:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/marketing/test-dispatch — Disparo de teste imediato (sem afetar scheduler)
+app.post('/api/marketing/test-dispatch', async (req, res) => {
+    try {
+        const { campaignId } = req.body;
+        if (!campaignId) {
+            return res.status(400).json({ error: 'campaignId é obrigatório.' });
+        }
+
+        const config = loadMarketingConfig();
+        const camp = config.campaigns.find(c => c.id === campaignId);
+        if (!camp) {
+            return res.status(404).json({ error: 'Campanha não encontrada.' });
+        }
+
+        if (!isWhatsAppReady || !client) {
+            return res.status(503).json({ error: 'WhatsApp não está conectado.' });
+        }
+
+        if (camp.targetType !== 'group' || !camp.targetGroupId) {
+            return res.status(400).json({ error: 'Teste imediato só disponível para campanhas de grupo.' });
+        }
+
+        // Seleciona mensagem (com variação aleatória se habilitado)
+        let chosenText = camp.message;
+        if (camp.useVariations && camp.variations && camp.variations.length > 0) {
+            const allTexts = [camp.message, ...camp.variations.filter(v => v && v.trim().length > 0)];
+            chosenText = allTexts[Math.floor(Math.random() * allTexts.length)];
+        }
+
+        const formattedMsg = chosenText
+            .replace(/\[Nome\]/gi, 'Pessoal')
+            .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app')
+            .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
+
+        // Resolve o ID do grupo
+        let groupChatId = camp.targetGroupId;
+        if (String(groupChatId).includes('chat.whatsapp.com/')) {
+            try {
+                const inviteCode = String(groupChatId).split('chat.whatsapp.com/')[1].trim().split('?')[0];
+                const resolved = await client.acceptInvite(inviteCode);
+                groupChatId = resolved || `${inviteCode}@g.us`;
+            } catch (invErr) {
+                console.warn('⚠️ [Test] Não resolveu convite:', invErr.message);
+            }
+        }
+
+        console.log(`🧪 [Marketing Test] Disparando teste da campanha "${camp.name}" para ${groupChatId}...`);
+
+        try {
+            const chat = await client.getChatById(groupChatId);
+            if (chat) {
+                await chat.sendStateTyping();
+                await new Promise(resolve => setTimeout(resolve, 2500));
+                await client.sendMessage(groupChatId, formattedMsg);
+                await chat.clearState();
+            } else {
+                await client.sendMessage(groupChatId, formattedMsg);
+            }
+        } catch (chatErr) {
+            await client.sendMessage(groupChatId, formattedMsg);
+        }
+
+        console.log(`✅ [Marketing Test] Teste disparado com sucesso para "${camp.name}".`);
+        return res.json({ success: true, message: `Teste disparado com sucesso para "${camp.name}"!` });
+    } catch (err) {
+        console.error('❌ [Marketing Test] Erro:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================================
+// MOTOR SCHEDULER DE MARKETING (setInterval 60s)
+// ============================================================
+
+// Mapa de dias da semana PT-BR → JavaScript getDay() (0=Domingo)
+const WEEKDAY_MAP = {
+    'DOMINGO': 0,
+    'SEGUNDA': 1,
+    'TERCA': 2,
+    'TERÇA': 2,
+    'QUARTA': 3,
+    'QUINTA': 4,
+    'SEXTA': 5,
+    'SABADO': 6,
+    'SÁBADO': 6,
+};
+
+// Helper: Gera chave de idempotência semanal para evitar duplicação
+function getIdempotencyKey(campId, date) {
+    const year = date.getFullYear();
+    // ISO week number
+    const janFirst = new Date(year, 0, 1);
+    const dayOfYear = Math.ceil((date - janFirst) / 86400000);
+    const weekNum = Math.ceil((dayOfYear + janFirst.getDay()) / 7);
+    const weekday = date.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' }).toUpperCase();
+    return `${campId}_${year}_W${String(weekNum).padStart(2, '0')}_${weekday}`;
+}
+
+// Limpa chaves de idempotência antigas (mais de 14 dias)
+function cleanOldIdempotencyKeys(config) {
+    const twoWeeksAgo = Date.now() - (14 * 24 * 60 * 60 * 1000);
+    if (config.idempotencyKeys && config.idempotencyKeys.length > 0) {
+        const before = config.idempotencyKeys.length;
+        config.idempotencyKeys = config.idempotencyKeys.filter(entry => {
+            const ts = new Date(entry.timestamp).getTime();
+            return ts > twoWeeksAgo;
+        });
+        if (config.idempotencyKeys.length < before) {
+            console.log(`🧹 [Scheduler] Limpou ${before - config.idempotencyKeys.length} chave(s) de idempotência antigas.`);
+        }
+    }
+}
+
+// Função principal do scheduler que verifica e dispara campanhas
+async function marketingSchedulerTick() {
+    try {
+        if (!isWhatsAppReady || !client) {
+            return; // WhatsApp não conectado, pula silenciosamente
+        }
+
+        const config = loadMarketingConfig();
+        if (!config.campaigns || config.campaigns.length === 0) return;
+
+        // Data/hora atual no timezone de São Paulo
+        const nowSP = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+        const currentWeekday = nowSP.getDay(); // 0-6
+        const currentHour = nowSP.getHours();
+        const currentMinute = nowSP.getMinutes();
+        const currentTimeStr = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
+
+        // Limpa chaves antigas periodicamente (1x por tick é barato)
+        cleanOldIdempotencyKeys(config);
+
+        const activeCampaigns = config.campaigns.filter(c => 
+            c.status === 'active' && 
+            c.targetType === 'group' && 
+            c.scheduledWeekday && 
+            c.scheduledTime &&
+            c.targetGroupId
+        );
+
+        if (activeCampaigns.length === 0) return;
+
+        for (const camp of activeCampaigns) {
+            // Verifica se o dia da semana corresponde
+            const expectedWeekday = WEEKDAY_MAP[camp.scheduledWeekday.toUpperCase()];
+            if (expectedWeekday === undefined || expectedWeekday !== currentWeekday) continue;
+
+            // Verifica se o horário corresponde (comparação HH:MM exata)
+            if (camp.scheduledTime !== currentTimeStr) continue;
+
+            // Verifica idempotência: já disparou esta campanha nesta semana/dia?
+            const idempKey = getIdempotencyKey(camp.id, nowSP);
+            const alreadyFired = (config.idempotencyKeys || []).some(entry => entry.key === idempKey);
+            if (alreadyFired) continue;
+
+            // === DISPARAR CAMPANHA ===
+            console.log(`\n🚀 [Scheduler] Disparando campanha automática: "${camp.name}" (${camp.scheduledWeekday} às ${camp.scheduledTime})`);
+
+            try {
+                // Seleciona mensagem (com variação aleatória se habilitado)
+                let chosenText = camp.message;
+                if (camp.useVariations && camp.variations && camp.variations.length > 0) {
+                    const allTexts = [camp.message, ...camp.variations.filter(v => v && v.trim().length > 0)];
+                    chosenText = allTexts[Math.floor(Math.random() * allTexts.length)];
+                }
+
+                const formattedMsg = chosenText
+                    .replace(/\[Nome\]/gi, 'Pessoal')
+                    .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app')
+                    .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
+
+                // Resolve o ID do grupo
+                let groupChatId = camp.targetGroupId;
+                if (String(groupChatId).includes('chat.whatsapp.com/')) {
+                    try {
+                        const inviteCode = String(groupChatId).split('chat.whatsapp.com/')[1].trim().split('?')[0];
+                        const resolved = await client.acceptInvite(inviteCode);
+                        groupChatId = resolved || `${inviteCode}@g.us`;
+                    } catch (invErr) {
+                        console.warn('⚠️ [Scheduler] Não resolveu convite:', invErr.message);
+                    }
+                }
+
+                // Simula digitação e envia
+                try {
+                    const chat = await client.getChatById(groupChatId);
+                    if (chat) {
+                        await chat.sendStateTyping();
+                        await new Promise(resolve => setTimeout(resolve, 2500));
+                        await client.sendMessage(groupChatId, formattedMsg);
+                        await chat.clearState();
+                    } else {
+                        await client.sendMessage(groupChatId, formattedMsg);
+                    }
+                } catch (chatErr) {
+                    await client.sendMessage(groupChatId, formattedMsg);
+                }
+
+                // Registra chave de idempotência
+                if (!config.idempotencyKeys) config.idempotencyKeys = [];
+                config.idempotencyKeys.push({ key: idempKey, timestamp: new Date().toISOString(), campaignName: camp.name });
+
+                // Atualiza lastRunDate na campanha
+                const campIndex = config.campaigns.findIndex(c => c.id === camp.id);
+                if (campIndex !== -1) {
+                    config.campaigns[campIndex].lastRunDate = nowSP.toLocaleDateString('pt-BR');
+                }
+
+                saveMarketingConfig(config);
+                console.log(`✅ [Scheduler] Campanha "${camp.name}" disparada com sucesso! Chave: ${idempKey}`);
+
+            } catch (dispatchErr) {
+                console.error(`❌ [Scheduler] Erro ao disparar campanha "${camp.name}":`, dispatchErr.message);
+            }
+        }
+    } catch (err) {
+        console.error('❌ [Scheduler] Erro geral no tick:', err.message);
+    }
+}
+
+// Inicia o scheduler (a cada 60 segundos)
+const SCHEDULER_INTERVAL_MS = 60 * 1000; // 60 segundos
+setInterval(marketingSchedulerTick, SCHEDULER_INTERVAL_MS);
+console.log('🕐 [Marketing Scheduler] Motor de agendamento iniciado (verificação a cada 60 segundos, TZ: America/Sao_Paulo).');
+
+// ============================================================
+
 app.listen(port, () => {
     console.log(`🚀 Servidor backend rodando na porta ${port}`);
     console.log(`⏳ Iniciando o motor do WhatsApp... aguarde o QR Code.`);
