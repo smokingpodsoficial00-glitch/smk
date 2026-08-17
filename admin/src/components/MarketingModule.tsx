@@ -554,23 +554,25 @@ export function MarketingModule() {
       if (camp.targetType === 'lists') {
         let batchCounter = 0;
         let sentInThisSession = 0;
+        const effectiveBatchSize = (camp.batchSize && camp.batchSize <= 5) ? camp.batchSize : 5;
+        const effectiveBatchIntervalMinutes = (camp.batchIntervalMinutes && camp.batchIntervalMinutes >= 35) ? camp.batchIntervalMinutes : 35;
 
         for (let i = 0; i < targetContacts.length; i++) {
-          // Checa se o usuário clicou em Cancelar / Parar
+          // Trava 1: Checa se o usuário clicou em Parar ANTES de qualquer ação
           if (isAbortingRef.current) {
-            alert(`Disparo pausado. Foram enviados ${sentInThisSession} contatos nesta sessão.`);
+            alert(`🛑 Disparo interrompido instantaneamente. Foram enviados ${sentInThisSession} contatos nesta sessão.`);
             break;
           }
 
           const contact = targetContacts[i];
           const rawPhone = contact.cleanPhone || contact.phone;
 
-          // Pula contatos que já receberam esta campanha anteriormente (retomada inteligente)
+          // Pula contatos que já receberam esta campanha anteriormente
           if (alreadySentPhones.includes(rawPhone)) {
             continue;
           }
 
-          // Seleciona a variação na ordem sequencial exata: 1º contato = var 1, 2º = var 2, ..., 5º = var 5
+          // Trava 2: Seleciona a variação na ordem sequencial exata (1 a 5)
           let chosenText = camp.message;
           if (camp.useVariations && camp.variations && camp.variations.length > 0) {
             const allAvailableTexts = [camp.message, ...camp.variations.filter(v => v.trim().length > 0)];
@@ -581,6 +583,9 @@ export function MarketingModule() {
             .replace(/\[Nome\]/gi, contact.name || 'Cliente')
             .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, cardapioUrl)
             .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, grupoVipUrl || '[Link do Grupo]');
+
+          // Trava 3: Checa abort imediatamente antes do POST
+          if (isAbortingRef.current) break;
 
           try {
             await fetch('http://localhost:3006/api/marketing/send-direct', {
@@ -605,17 +610,23 @@ export function MarketingModule() {
             status: `Enviado ${alreadySentPhones.length} de ${targetContacts.length} para ${contact.name || rawPhone}...`
           });
 
-          // Delay individual seguro e humanizado entre mensagens (10 a 20 segundos aleatórios)
+          // Trava 4: Delay individual com cancelamento instantâneo a cada 250ms (10 a 20s aleatórios)
           const randomDelay = Math.floor(Math.random() * 10000) + 10000;
-          await new Promise(r => setTimeout(r, randomDelay));
+          for (let elapsed = 0; elapsed < randomDelay; elapsed += 250) {
+            if (isAbortingRef.current) break;
+            await new Promise(r => setTimeout(r, 250));
+          }
 
-          if (isAbortingRef.current) break;
+          if (isAbortingRef.current) {
+            alert(`🛑 Disparo interrompido instantaneamente. Foram enviados ${sentInThisSession} contatos nesta sessão.`);
+            break;
+          }
 
-          // Ao completar o lote de contatos (ex: 5) e ainda restarem contatos na lista
+          // Trava 5: TRAVA RÍGIDA DE LOTE (Exatamente 5 contatos)
           const remainingContacts = targetContacts.filter(c => !alreadySentPhones.includes(c.cleanPhone || c.phone));
-          if (batchCounter >= (camp.batchSize || 5) && remainingContacts.length > 0) {
+          if (batchCounter >= effectiveBatchSize && remainingContacts.length > 0) {
             batchCounter = 0;
-            const totalPauseSeconds = (camp.batchIntervalMinutes || 35) * 60;
+            const totalPauseSeconds = effectiveBatchIntervalMinutes * 60;
 
             for (let remaining = totalPauseSeconds; remaining > 0; remaining--) {
               if (isAbortingRef.current) break;
@@ -625,10 +636,19 @@ export function MarketingModule() {
               setDispatchProgress({
                 current: alreadySentPhones.length,
                 total: targetContacts.length,
-                status: `⏸️ Lote de ${camp.batchSize || 5} concluído! Pausa de segurança anti-ban: ${mins}m ${secs < 10 ? '0' : ''}${secs}s restantes...`
+                status: `⏸️ Lote de ${effectiveBatchSize} concluído! Pausa de segurança anti-ban: ${mins}m ${secs < 10 ? '0' : ''}${secs}s restantes...`
               });
 
-              await new Promise(r => setTimeout(r, 1000));
+              // Intervalo de 1s dividido em 4 cheques de 250ms para parada instantânea se o usuário clicar
+              for (let sub = 0; sub < 1000; sub += 250) {
+                if (isAbortingRef.current) break;
+                await new Promise(r => setTimeout(r, 250));
+              }
+            }
+
+            if (isAbortingRef.current) {
+              alert(`🛑 Disparo interrompido durante a pausa do lote.`);
+              break;
             }
           }
         }
