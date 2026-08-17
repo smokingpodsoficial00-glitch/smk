@@ -2076,7 +2076,6 @@ async function marketingSchedulerTick() {
         const activeCampaigns = config.campaigns.filter(c => 
             c.status === 'active' && 
             c.targetType === 'group' && 
-            c.scheduledWeekday && 
             c.scheduledTime &&
             c.targetGroupId
         );
@@ -2084,15 +2083,29 @@ async function marketingSchedulerTick() {
         if (activeCampaigns.length === 0) return;
 
         for (const camp of activeCampaigns) {
-            // Verifica se o dia da semana corresponde
-            const expectedWeekday = WEEKDAY_MAP[camp.scheduledWeekday.toUpperCase()];
-            if (expectedWeekday === undefined || expectedWeekday !== currentWeekday) continue;
-
-            // Verifica se o horário corresponde (comparação HH:MM exata)
+            // Verifica horário HH:MM
             if (camp.scheduledTime !== currentTimeStr) continue;
 
-            // Verifica idempotência: já disparou esta campanha nesta semana/dia?
-            const idempKey = getIdempotencyKey(camp.id, nowSP);
+            const freq = Number(camp.frequencyDays) || 7;
+
+            if (freq === 7) {
+                // Modo semanal com dia da semana fixo
+                if (!camp.scheduledWeekday) continue;
+                const expectedWeekday = WEEKDAY_MAP[camp.scheduledWeekday.toUpperCase()];
+                if (expectedWeekday === undefined || expectedWeekday !== currentWeekday) continue;
+            } else if (freq > 7) {
+                // Modo intervalo em dias (ex: 14, 21, 30 dias a partir do último envio)
+                if (camp.lastRunDate) {
+                    const [d, m, y] = camp.lastRunDate.split('/');
+                    const lastDate = new Date(Number(y), Number(m) - 1, Number(d));
+                    const diffDays = Math.floor((nowSP.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diffDays < freq) continue; // Ainda não passou o intervalo de dias
+                }
+            }
+
+            // Verifica idempotência: já disparou esta campanha hoje nesta data?
+            const todayStr = nowSP.toISOString().split('T')[0];
+            const idempKey = `${camp.id}_${todayStr}_${currentTimeStr}`;
             const alreadyFired = (config.idempotencyKeys || []).some(entry => entry.key === idempKey);
             if (alreadyFired) continue;
 

@@ -1535,35 +1535,35 @@ export function MarketingModule() {
                   </select>
                 </div>
 
-                {campaignFormFrequency > 0 && (
-                  <>
-                    <div>
-                      <label className="text-xs font-bold text-white/70 block mb-1">Dia da Semana</label>
-                      <select
-                        value={campaignFormWeekday}
-                        onChange={(e) => setCampaignFormWeekday(e.target.value)}
-                        className="w-full bg-[#050505] border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-400 font-bold focus:outline-none focus:border-emerald-400 cursor-pointer"
-                      >
-                        <option value="SEGUNDA">Toda Segunda-feira</option>
-                        <option value="TERCA">Toda Terça-feira</option>
-                        <option value="QUARTA">Toda Quarta-feira</option>
-                        <option value="QUINTA">Toda Quinta-feira</option>
-                        <option value="SEXTA">Toda Sexta-feira</option>
-                        <option value="SABADO">Todo Sábado</option>
-                        <option value="DOMINGO">Todo Domingo</option>
-                      </select>
-                    </div>
+                {campaignFormFrequency === 7 && (
+                  <div>
+                    <label className="text-xs font-bold text-white/70 block mb-1">Dia da Semana</label>
+                    <select
+                      value={campaignFormWeekday}
+                      onChange={(e) => setCampaignFormWeekday(e.target.value)}
+                      className="w-full bg-[#050505] border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-400 font-bold focus:outline-none focus:border-emerald-400 cursor-pointer"
+                    >
+                      <option value="SEGUNDA">Toda Segunda-feira</option>
+                      <option value="TERCA">Toda Terça-feira</option>
+                      <option value="QUARTA">Toda Quarta-feira</option>
+                      <option value="QUINTA">Toda Quinta-feira</option>
+                      <option value="SEXTA">Toda Sexta-feira</option>
+                      <option value="SABADO">Todo Sábado</option>
+                      <option value="DOMINGO">Todo Domingo</option>
+                    </select>
+                  </div>
+                )}
 
-                    <div>
-                      <label className="text-xs font-bold text-white/70 block mb-1">Horário do Disparo</label>
-                      <input
-                        type="time"
-                        value={campaignFormTime}
-                        onChange={(e) => setCampaignFormTime(e.target.value)}
-                        className="w-full bg-[#050505] border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-400"
-                      />
-                    </div>
-                  </>
+                {campaignFormFrequency > 0 && (
+                  <div>
+                    <label className="text-xs font-bold text-white/70 block mb-1">Horário do Disparo</label>
+                    <input
+                      type="time"
+                      value={campaignFormTime}
+                      onChange={(e) => setCampaignFormTime(e.target.value)}
+                      className="w-full bg-[#050505] border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-400"
+                    />
+                  </div>
                 )}
 
                 {campaignFormTargetType === 'lists' && (
