@@ -5,6 +5,7 @@ import type { RealClient } from "@/lib/crm";
 // Componentes do CRM
 import { RFMMatrix } from "./crm/RFMMatrix";
 import { PredictiveReplenishment } from "./crm/PredictiveReplenishment";
+import { FollowUpsTab } from "./crm/FollowUpsTab";
 import { ClientProfileModal } from "./crm/ClientProfileModal";
 
 interface ErrorBoundaryProps {
@@ -53,12 +54,13 @@ class CRMErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
 }
 
 export function CRMDashboard() {
-  const [activeSubTab, setActiveSubTab] = useState<'rfm' | 'replenishment'>('rfm');
+  const [activeSubTab, setActiveSubTab] = useState<'rfm' | 'replenishment' | 'followups'>('rfm');
   const [selectedClient, setSelectedClient] = useState<RealClient | null>(null);
 
   const tabs = [
     { id: 'rfm', label: 'Ranking & Fidelidade', icon: <Crown className="size-4 text-amber-400" /> },
     { id: 'replenishment', label: 'Aviso de Fim de Pod & Recompra', icon: <RefreshCw className="size-4 text-emerald-400" /> },
+    { id: 'followups', label: '🎯 Follow-ups de Vendas & Salário', icon: null },
   ] as const;
 
   return (
@@ -70,10 +72,10 @@ export function CRMDashboard() {
             <div>
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <Users className="size-5 text-emerald-400" />
-                Gestão de Clientes
+                Gestão de Clientes & CRM
               </h2>
               <p className="text-xs text-muted-foreground mt-1">
-                CRM WhatsApp, Ranking de Fidelidade e Avisos de Recompra.
+                Ranking de Fidelidade, Previsão de Recompra e Follow-ups Estratégicos com Data Marcada.
               </p>
             </div>
             
@@ -90,14 +92,13 @@ export function CRMDashboard() {
             {tabs.map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment')}
+                onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment' | 'followups')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeSubTab === tab.id 
-                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                    ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]' 
                     : 'text-muted-foreground hover:text-white bg-[#141414] border border-white/5 hover:border-white/20'
                 }`}
               >
-                {/* Oculta os ícones coloridos pesados antigos que vêm na const tabs */}
                 {tab.label}
               </button>
             ))}
@@ -109,6 +110,7 @@ export function CRMDashboard() {
           <CRMErrorBoundary>
             {activeSubTab === 'rfm' && <RFMMatrix onSelectClient={setSelectedClient} />}
             {activeSubTab === 'replenishment' && <PredictiveReplenishment onSelectClient={setSelectedClient} />}
+            {activeSubTab === 'followups' && <FollowUpsTab />}
           </CRMErrorBoundary>
         </div>
 

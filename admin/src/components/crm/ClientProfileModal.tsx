@@ -7,6 +7,7 @@ import {
 import { formatBRL } from "@/lib/cart";
 import { type RealClient, type FlavorProfileType, type ProspectingStatusType, updateClientCrmProfile } from "@/lib/crm";
 import { useAuth } from "../../contexts/AuthContext";
+import { NewFollowUpModal } from "./NewFollowUpModal";
 
 export function ClientProfileModal({ 
   client, 
@@ -27,6 +28,7 @@ export function ClientProfileModal({
   const [customNotes, setCustomNotes] = useState<string>(client.customNotes || '');
   const [isSaving, setIsSaving] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
 
   const phoneClean = client.cleanPhone || client.phone.replace(/\D/g, '');
   const waNumber = phoneClean.startsWith('55') ? phoneClean : `55${phoneClean}`;
@@ -247,12 +249,23 @@ export function ClientProfileModal({
             </p>
           </div>
 
-          {/* Ações Rápidas de Disparo 1-a-1 */}
+          {/* Ações Rápidas de Disparo 1-a-1 & Agendamento */}
           <div className="space-y-2.5">
-            <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Send className="size-3 text-emerald-400" />
-              Disparo Direto com Copys Oficiais
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Send className="size-3 text-emerald-400" />
+                Disparo Direto & Follow-up
+              </h3>
+
+              <button
+                type="button"
+                onClick={() => setIsFollowUpModalOpen(true)}
+                className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+              >
+                <Calendar className="size-3" />
+                <span>+ Agendar Follow-up</span>
+              </button>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
               <a
@@ -352,6 +365,23 @@ export function ClientProfileModal({
           </a>
         </footer>
       </div>
+
+      {/* Modal de Follow-up com dados pré-preenchidos */}
+      <NewFollowUpModal
+        isOpen={isFollowUpModalOpen}
+        onClose={() => setIsFollowUpModalOpen(false)}
+        onFollowUpCreated={() => {
+          setIsFollowUpModalOpen(false);
+          if (onClientUpdated) onClientUpdated();
+        }}
+        initialClient={{
+          name: client.name,
+          phone: client.phone,
+          product: client.lastProduct,
+          flavor: client.lastFlavor,
+          puffs: client.lastPuffs
+        }}
+      />
     </div>
   );
 }
