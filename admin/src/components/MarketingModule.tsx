@@ -640,28 +640,27 @@ export function MarketingModule() {
             break;
           }
 
-          // Trava 5: TRAVA RÍGIDA DE LOTE (Exatamente 5 contatos)
+          // Trava 5: TRAVA RÍGIDA DE LOTE (Exatamente 5 contatos) com Relógio Real do Sistema (Date.now)
           const remainingContacts = targetContacts.filter(c => !alreadySentPhones.includes(c.cleanPhone || c.phone));
           if (batchCounter >= effectiveBatchSize && remainingContacts.length > 0) {
             batchCounter = 0;
-            const totalPauseSeconds = effectiveBatchIntervalMinutes * 60;
+            const pauseDurationMs = effectiveBatchIntervalMinutes * 60 * 1000;
+            const targetEndTime = Date.now() + pauseDurationMs;
 
-            for (let remaining = totalPauseSeconds; remaining > 0; remaining--) {
+            while (Date.now() < targetEndTime) {
               if (isAbortingRef.current) break;
 
-              const mins = Math.floor(remaining / 60);
-              const secs = remaining % 60;
+              const remainingSeconds = Math.max(0, Math.ceil((targetEndTime - Date.now()) / 1000));
+              const mins = Math.floor(remainingSeconds / 60);
+              const secs = remainingSeconds % 60;
+
               setDispatchProgress({
                 current: alreadySentPhones.length,
                 total: targetContacts.length,
                 status: `⏸️ Lote de ${effectiveBatchSize} concluído! Pausa de segurança anti-ban: ${mins}m ${secs < 10 ? '0' : ''}${secs}s restantes...`
               });
 
-              // Intervalo de 1s dividido em 4 cheques de 250ms para parada instantânea se o usuário clicar
-              for (let sub = 0; sub < 1000; sub += 250) {
-                if (isAbortingRef.current) break;
-                await new Promise(r => setTimeout(r, 250));
-              }
+              await new Promise(r => setTimeout(r, 500));
             }
 
             if (isAbortingRef.current) {
@@ -1053,41 +1052,40 @@ export function MarketingModule() {
 
                               {/* Ações da Campanha */}
                               <div className="flex flex-col gap-3 pt-3 border-t border-purple-500/10">
-                                {camp.frequencyDays > 0 ? (
-                                  /* Switch Toggle para Campanhas Recorrentes (ex: 21 dias ou Semanal) */
-                                  <div 
-                                    className="flex items-center justify-between cursor-pointer group/toggle"
-                                    onClick={() => toggleCampaignStatus(camp.id)}
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      {camp.status === 'active' ? (
-                                        <ToggleRight className="size-7 text-purple-400 transition-all" />
-                                      ) : (
-                                        <ToggleLeft className="size-7 text-white/30 transition-all" />
-                                      )}
-                                      <div className="flex flex-col">
-                                        <span className={`text-[11px] font-bold uppercase tracking-wider ${
-                                          camp.status === 'active' ? 'text-purple-400' : 'text-white/40'
-                                        }`}>
-                                          {camp.status === 'active' ? '🟢 Automação Ligada' : '⚪ Desligada'}
+                                {/* Switch Toggle Universal Liga/Desliga */}
+                                <div 
+                                  className="flex items-center justify-between cursor-pointer group/toggle"
+                                  onClick={() => toggleCampaignStatus(camp.id)}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {camp.status === 'active' ? (
+                                      <ToggleRight className="size-7 text-purple-400 transition-all" />
+                                    ) : (
+                                      <ToggleLeft className="size-7 text-white/30 transition-all" />
+                                    )}
+                                    <div className="flex flex-col">
+                                      <span className={`text-[11px] font-bold uppercase tracking-wider ${
+                                        camp.status === 'active' ? 'text-purple-400' : 'text-white/40'
+                                      }`}>
+                                        {camp.status === 'active' 
+                                          ? (camp.frequencyDays > 0 ? '🟢 Automação Ligada' : '🟢 Campanha Ativa') 
+                                          : '⚪ Desligada / Pausada'}
+                                      </span>
+                                      {camp.status === 'active' && camp.frequencyDays > 0 && (
+                                        <span className="text-[10px] text-white/40 font-mono">
+                                          {camp.frequencyDays === 7 && camp.scheduledWeekday
+                                            ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()} às ${camp.scheduledTime || '15:00'}`
+                                            : `A cada ${camp.frequencyDays} dias às ${camp.scheduledTime || '15:00'}`}
                                         </span>
-                                        {camp.status === 'active' && (
-                                          <span className="text-[10px] text-white/40 font-mono">
-                                            {camp.frequencyDays === 7 && camp.scheduledWeekday
-                                              ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()} às ${camp.scheduledTime || '15:00'}`
-                                              : `A cada ${camp.frequencyDays} dias às ${camp.scheduledTime || '15:00'}`}
-                                          </span>
-                                        )}
-                                      </div>
+                                      )}
+                                      {camp.frequencyDays === 0 && (
+                                        <span className="text-[10px] text-white/40 font-mono">
+                                          Disparo manual avulso
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
-                                ) : (
-                                  /* Indicador de Disparo Único */
-                                  <div className="flex items-center gap-1.5 text-[11px] text-white/40 font-mono">
-                                    <Clock className="size-3.5 text-purple-400" />
-                                    <span>Disparo manual avulso</span>
-                                  </div>
-                                )}
+                                </div>
 
                                 {/* Botões de Ação */}
                                 <div className="flex items-center justify-between gap-2">
@@ -1109,14 +1107,22 @@ export function MarketingModule() {
                                     </button>
                                   </div>
 
-                                  <button
-                                    onClick={() => handleExecuteCampaign(camp)}
-                                    disabled={executingCampaignId === camp.id}
-                                    className="px-3.5 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md disabled:opacity-50"
-                                  >
-                                    <Send className="size-3" />
-                                    <span>{camp.frequencyDays > 0 ? 'Disparar Lote Agora' : 'Disparar Agora'}</span>
-                                  </button>
+                                  {executingCampaignId === camp.id ? (
+                                    <button
+                                      onClick={handleStopCampaign}
+                                      className="px-3.5 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md animate-pulse"
+                                    >
+                                      <span>🛑 Parar Disparos</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleExecuteCampaign(camp)}
+                                      className="px-3.5 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md"
+                                    >
+                                      <Send className="size-3" />
+                                      <span>{camp.frequencyDays > 0 ? 'Disparar Lote Agora' : 'Disparar Agora'}</span>
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>
