@@ -1,4 +1,4 @@
-﻿import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 export interface SaleItem {
   name: string;
@@ -63,41 +63,19 @@ export interface SalesMacroMetrics {
 }
 
 export async function fetchSalesHistory(companyId?: string): Promise<{ sales: DetailedSale[]; metrics: SalesMacroMetrics }> {
-  if (!companyId) {
-    return {
-      sales: [],
-      metrics: {
-        totalRevenue: 0,
-        totalOrders: 0,
-        averageTicket: 0,
-        uniqueClientsCount: 0,
-        repurchaseRate: 0,
-        revenueAnnual: 0,
-        ordersAnnual: 0,
-        ltvAnnual: 0,
-        revenueSemiannual: 0,
-        ordersSemiannual: 0,
-        ltvSemiannual: 0,
-        revenueQuarterly: 0,
-        ordersQuarterly: 0,
-        ltvQuarterly: 0,
-        revenueMonthly: 0,
-        ordersMonthly: 0,
-        topFlavors: [],
-        topProducts: [],
-        topPuffs: [],
-      }
-    };
-  }
-
   try {
-    // 1. Buscar Todas as Transações / Pedidos
-    const { data: rawOrders, error: ordersErr } = await supabase
+    // 1. Buscar Todas as Transações / Pedidos com suporte a company_id e orders legadas (company_id is null)
+    let query = supabase
       .from('smoking_orders')
       .select('*')
       .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
-      .eq('company_id', companyId)
       .order('created_at', { ascending: false });
+
+    if (companyId) {
+      query = query.or(`company_id.eq.${companyId},company_id.is.null`);
+    }
+
+    const { data: rawOrders, error: ordersErr } = await query;
 
     if (ordersErr) {
       console.error("Erro ao buscar smoking_orders para histórico:", ordersErr);
@@ -107,7 +85,7 @@ export async function fetchSalesHistory(companyId?: string): Promise<{ sales: De
       (o: any) => o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' && (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_'))
     );
 
-    // 2. Buscar Clientes Mestre para LTV e status VIP
+    // 2. Buscar Clientes Mestre para dados cadastrais, LTV e status VIP
     let clientsMap = new Map<string, any>();
     try {
       const { data: clientsData } = await supabase.from('smoking_clients').select('*');
@@ -119,7 +97,9 @@ export async function fetchSalesHistory(companyId?: string): Promise<{ sales: De
           }
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("Erro ao buscar smoking_clients:", e);
+    }
 
     // 3. Processar Cada Venda e Janelas Temporais
     const now = new Date().getTime();
@@ -201,17 +181,21 @@ export async function fetchSalesHistory(companyId?: string): Promise<{ sales: De
         clientAggregates.set(cleanPhone, currentAgg);
 
         // Itens
-        const itemsArr: SaleItem[] = Array.isArray(o.items) ? o.items : [];
+        const itemsArr: any[] = Array.isArray(o.items) ? o.items : [];
         itemsArr.forEach(item => {
           const qty = item.quantity || 1;
-          if (item.flavor) {
-            flavorCounts.set(item.flavor, (flavorCounts.get(item.flavor) || 0) + qty);
+          const flavorName = item.flavor || '';
+          const prodName = item.name || item.model || '';
+          const puffsVal = item.puffs;
+
+          if (flavorName) {
+            flavorCounts.set(flavorName, (flavorCounts.get(flavorName) || 0) + qty);
           }
-          if (item.name) {
-            productCounts.set(item.name, (productCounts.get(item.name) || 0) + qty);
+          if (prodName) {
+            productCounts.set(prodName, (productCounts.get(prodName) || 0) + qty);
           }
-          if (item.puffs) {
-            const pKey = `${item.puffs} puffs`;
+          if (puffsVal) {
+            const pKey = `${puffsVal} puffs`;
             puffsCounts.set(pKey, (puffsCounts.get(pKey) || 0) + qty);
           }
         });
@@ -221,18 +205,39 @@ export async function fetchSalesHistory(companyId?: string): Promise<{ sales: De
       const agg = clientAggregates.get(cleanPhone);
       const shortId = (o.id || `venda_${idx}`).slice(0, 8).toUpperCase();
 
+      // Mapeamento minucioso do endereço (shipping_address, address, clientInfo.address)
+      const resolvedAddress = (
+        o.shipping_address || 
+        o.address || 
+        o.destination_address || 
+        o.delivery_address || 
+        clientInfo?.address || 
+        'Endereço não informado'
+      ).trim();
+
+      // Mapeamento dos itens do pedido
+      const mappedItems: SaleItem[] = Array.isArray(o.items) ? o.items.map((i: any) => ({
+        name: i.name || i.model || 'Pod Descartável',
+        flavor: i.flavor || '',
+        brand: i.brand || '',
+        puffs: i.puffs,
+        quantity: i.quantity || 1,
+        price: i.price ? parseFloat(i.price) : (i.unit_price ? parseFloat(i.unit_price) : 0),
+        cost: i.cost_price || i.cost || 0
+      })) : [];
+
       return {
         id: o.id,
         order_code: `#SMK-${shortId}`,
         company_id: o.company_id,
-        client_name: o.client_name || clientInfo?.name || 'Cliente',
-        client_phone: o.client_phone || '',
+        client_name: o.client_name || clientInfo?.name || 'Cliente Sem Nome',
+        client_phone: o.client_phone || clientInfo?.phone || '',
         clean_phone: cleanPhone,
-        address: o.address || clientInfo?.address || 'Endereço não informado',
+        address: resolvedAddress,
         total_amount: orderAmount,
         subtotal: o.subtotal ? parseFloat(o.subtotal) : orderAmount,
-        delivery_fee: o.delivery_fee ? parseFloat(o.delivery_fee) : 0,
-        items: Array.isArray(o.items) ? o.items : [],
+        delivery_fee: o.shipping_fee ? parseFloat(o.shipping_fee) : (o.delivery_fee ? parseFloat(o.delivery_fee) : 0),
+        items: mappedItems,
         delivery_status: o.delivery_status || 'CONCLUIDO',
         payment_status: o.payment_status || 'PAGO',
         payment_method: o.payment_method || 'PIX',
@@ -320,8 +325,8 @@ export async function fetchSalesHistory(companyId?: string): Promise<{ sales: De
         topPuffs,
       }
     };
-  } catch (err) {
-    console.error("Erro no processamento de vendas macro:", err);
+  } catch (error) {
+    console.error("Erro geral em fetchSalesHistory:", error);
     return {
       sales: [],
       metrics: {
