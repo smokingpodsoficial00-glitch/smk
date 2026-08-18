@@ -6,6 +6,7 @@ import type { RealClient } from "@/lib/crm";
 import { RFMMatrix } from "./crm/RFMMatrix";
 import { PredictiveReplenishment } from "./crm/PredictiveReplenishment";
 import { FollowUpsTab } from "./crm/FollowUpsTab";
+import { SalesHistoryTab } from "./crm/SalesHistoryTab";
 import { ClientProfileModal } from "./crm/ClientProfileModal";
 
 interface ErrorBoundaryProps {
@@ -54,13 +55,14 @@ class CRMErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
 }
 
 export function CRMDashboard() {
-  const [activeSubTab, setActiveSubTab] = useState<'rfm' | 'replenishment' | 'followups'>('rfm');
+  const [activeSubTab, setActiveSubTab] = useState<'rfm' | 'replenishment' | 'followups' | 'sales_history'>('rfm');
   const [selectedClient, setSelectedClient] = useState<RealClient | null>(null);
 
   const tabs = [
     { id: 'rfm', label: 'Ranking & Fidelidade', icon: <Crown className="size-4 text-amber-400" /> },
     { id: 'replenishment', label: 'Aviso de Fim de Pod & Recompra', icon: <RefreshCw className="size-4 text-emerald-400" /> },
     { id: 'followups', label: '🎯 Follow-ups de Vendas & Salário', icon: null },
+    { id: 'sales_history', label: '📜 Histórico & Mural de Vendas', icon: null },
   ] as const;
 
   return (
@@ -75,7 +77,7 @@ export function CRMDashboard() {
                 Gestão de Clientes & CRM
               </h2>
               <p className="text-xs text-muted-foreground mt-1">
-                Ranking de Fidelidade, Previsão de Recompra e Follow-ups Estratégicos com Data Marcada.
+                Ranking de Fidelidade, Previsão de Recompra, Follow-ups e Histórico Técnico de Vendas.
               </p>
             </div>
             
@@ -88,11 +90,11 @@ export function CRMDashboard() {
           </div>
 
           {/* Navegação Secundária */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {tabs.map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment' | 'followups')}
+                onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment' | 'followups' | 'sales_history')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeSubTab === tab.id 
                     ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]' 
@@ -111,6 +113,7 @@ export function CRMDashboard() {
             {activeSubTab === 'rfm' && <RFMMatrix onSelectClient={setSelectedClient} />}
             {activeSubTab === 'replenishment' && <PredictiveReplenishment onSelectClient={setSelectedClient} />}
             {activeSubTab === 'followups' && <FollowUpsTab />}
+            {activeSubTab === 'sales_history' && <SalesHistoryTab />}
           </CRMErrorBoundary>
         </div>
 
