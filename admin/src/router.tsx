@@ -12,6 +12,7 @@ import { SupplyChainDashboard } from './components/SupplyChainDashboard';
 import { CRMDashboard } from './components/CRMDashboard';
 import { ChatbotPage } from './components/ChatbotPage';
 import { MarketingModule } from './components/MarketingModule';
+import { PartnersDashboard } from './components/PartnersDashboard';
 import { SettingsPage } from './components/SettingsPage';
 
 import { AdminLayout } from './layouts/AdminLayout';
@@ -83,6 +84,10 @@ export const router = createBrowserRouter([
       {
         path: 'marketing',
         element: <MarketingModule />,
+      },
+      {
+        path: 'socios',
+        element: <PartnersDashboard />,
       },
       {
         path: 'configuracoes',

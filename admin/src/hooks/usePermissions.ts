@@ -2,10 +2,10 @@ import { useAuth } from '../contexts/AuthContext';
 import type { UserRole } from '../contexts/AuthContext';
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
-  admin:      ['pedidos', 'financeiro', 'estoque', 'clientes', 'chatbot', 'configuracoes', 'usuarios'],
+  admin:      ['pedidos', 'financeiro', 'estoque', 'clientes', 'chatbot', 'marketing', 'socios', 'configuracoes', 'usuarios'],
   gerente:    ['pedidos', 'estoque', 'clientes'],
   atendente:  ['pedidos'],
-  financeiro: ['financeiro'],
+  financeiro: ['financeiro', 'socios'],
   estoquista: ['estoque'],
 };
 

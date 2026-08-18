@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   LayoutDashboard, PackageSearch, Users, Settings, CircleDollarSign,
-  MoreHorizontal, Store, ChevronRight, PanelLeftOpen, Bot
+  MoreHorizontal, Store, ChevronRight, PanelLeftOpen, Bot, Megaphone, Scale
 } from "lucide-react";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { FinanceDashboard } from "@/components/FinanceDashboard";
@@ -9,6 +9,8 @@ import { SupplyChainDashboard } from "@/components/SupplyChainDashboard";
 import { CRMDashboard } from "@/components/CRMDashboard";
 import { SettingsPage } from "@/components/SettingsPage";
 import { ChatbotPage } from "@/components/ChatbotPage";
+import { MarketingModule } from "@/components/MarketingModule";
+import { PartnersDashboard } from "@/components/PartnersDashboard";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 
 export default function App() {
@@ -169,6 +171,58 @@ export default function App() {
               </span>
             )}
           </button>
+
+          {/* Aba Marketing */}
+          <button 
+            onClick={(e) => {
+              if (sidebarCollapsed) e.stopPropagation();
+              setActiveTab("marketing");
+            }}
+            title={sidebarCollapsed ? "Marketing & Disparos" : undefined}
+            className={`flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
+              sidebarCollapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
+            } ${
+              activeTab === 'marketing' 
+                ? 'bg-white/5 text-emerald-400 font-bold border-l-2 border-emerald-500 pl-3.5' 
+                : 'text-muted-foreground hover:bg-white/5 hover:text-white border-l-2 border-transparent pl-4'
+            }`}
+          >
+            <Megaphone className="size-4 shrink-0 text-emerald-400" />
+            {!sidebarCollapsed && (
+              <span className="truncate flex items-center gap-2">
+                Marketing
+                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold">
+                  VIP
+                </span>
+              </span>
+            )}
+          </button>
+
+          {/* Aba Sócios */}
+          <button 
+            onClick={(e) => {
+              if (sidebarCollapsed) e.stopPropagation();
+              setActiveTab("socios");
+            }}
+            title={sidebarCollapsed ? "Sócios & Equity" : undefined}
+            className={`flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
+              sidebarCollapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
+            } ${
+              activeTab === 'socios' 
+                ? 'bg-white/5 text-emerald-400 font-bold border-l-2 border-emerald-500 pl-3.5' 
+                : 'text-muted-foreground hover:bg-white/5 hover:text-white border-l-2 border-transparent pl-4'
+            }`}
+          >
+            <Scale className="size-4 shrink-0 text-emerald-400" />
+            {!sidebarCollapsed && (
+              <span className="truncate flex items-center gap-2">
+                Sócios
+                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold">
+                  EQUITY
+                </span>
+              </span>
+            )}
+          </button>
         </nav>
 
         {/* Botão de Toggle do Menu Lateral */}
@@ -220,6 +274,8 @@ export default function App() {
         {activeTab === 'estoque' && <SupplyChainDashboard />}
         {activeTab === 'clientes' && <CRMDashboard />}
         {activeTab === 'chatbot' && <ChatbotPage />}
+        {activeTab === 'marketing' && <MarketingModule />}
+        {activeTab === 'socios' && <PartnersDashboard />}
         {activeTab === 'configuracoes' && <SettingsPage />}
       </main>
     </div>
