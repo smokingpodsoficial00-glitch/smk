@@ -4,7 +4,7 @@ import {
   TrendingUp, Users, RefreshCw, Eye, ArrowUpRight, 
   ChevronRight, Phone, MapPin, Tag, Download, Sparkles,
   CheckCircle2, Clock, AlertTriangle, X, Receipt, CreditCard,
-  Flame, Layers, Box
+  Flame, Layers, Box, Compass
 } from 'lucide-react';
 import { formatBRL } from '@/lib/cart';
 import { 
@@ -84,8 +84,8 @@ export function SalesHistoryTab() {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchId = (sale.order_code || '').toLowerCase().includes(q) || sale.id.toLowerCase().includes(q);
-      const matchName = sale.client_name.toLowerCase().includes(q);
-      const matchPhone = sale.clean_phone.includes(q) || sale.client_phone.includes(q);
+      const matchName = (sale.client_name || '').toLowerCase().includes(q);
+      const matchPhone = (sale.clean_phone || '').includes(q) || (sale.client_phone || '').includes(q);
       const matchAddr = (sale.address || '').toLowerCase().includes(q);
       const matchItems = sale.items.some(i => 
         (i.name || '').toLowerCase().includes(q) || 
@@ -134,158 +134,191 @@ export function SalesHistoryTab() {
       {/* ━━━ 1. MURAL MACRO: FATURAMENTO ANUAL, SEMESTRAL, TRIMESTRAL E MENSAL ━━━ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* Card 1: Faturamento Anual (12M) */}
-        <div className="bg-[#0e0e10] border border-white/10 hover:border-amber-500/30 p-5 rounded-2xl shadow-lg transition-all space-y-3 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                <TrendingUp className="size-3.5" />
-                Faturamento Anual (12M)
-              </span>
-              <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-bold">
-                12 Meses
-              </span>
-            </div>
-            <div className="text-2xl font-extrabold text-white font-mono tracking-tight">
-              {formatBRL(metrics?.revenueAnnual || 0)}
+        {/* 1. Faturamento Anual (12M) */}
+        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
+              Faturamento Anual (12M)
+            </span>
+            <div className="size-9 rounded-xl bg-white/5 border border-white/15 flex items-center justify-center text-amber-400">
+              <TrendingUp className="size-5" />
             </div>
           </div>
-          <div className="text-[11px] text-white/50 flex items-center justify-between border-t border-white/5 pt-2">
-            <span>{metrics?.ordersAnnual || 0} vendas</span>
+
+          <div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
+              {formatBRL(metrics?.revenueAnnual || 0)}
+            </div>
+            <p className="text-xs font-medium text-white/60 mt-1 flex items-center gap-1.5">
+              <ShoppingBag className="size-3.5 text-white/60" />
+              <span>{metrics?.ordersAnnual || 0} pedidos no período</span>
+            </p>
+          </div>
+
+          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-white/50">
+            <span>Janela de 12 Meses</span>
             <span className="text-amber-400 font-mono font-bold">LTV: {formatBRL(metrics?.ltvAnnual || 0)}</span>
           </div>
         </div>
 
-        {/* Card 2: Faturamento Semestral (6M) */}
-        <div className="bg-[#0e0e10] border border-white/10 hover:border-blue-500/30 p-5 rounded-2xl shadow-lg transition-all space-y-3 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
-                <Sparkles className="size-3.5" />
-                Faturamento Semestral (6M)
-              </span>
-              <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 font-bold">
-                6 Meses
-              </span>
-            </div>
-            <div className="text-2xl font-extrabold text-white font-mono tracking-tight">
-              {formatBRL(metrics?.revenueSemiannual || 0)}
+        {/* 2. Faturamento Semestral (6M) */}
+        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
+              Faturamento Semestral (6M)
+            </span>
+            <div className="size-9 rounded-xl bg-white/5 border border-white/15 flex items-center justify-center text-blue-400">
+              <Sparkles className="size-5" />
             </div>
           </div>
-          <div className="text-[11px] text-white/50 flex items-center justify-between border-t border-white/5 pt-2">
-            <span>{metrics?.ordersSemiannual || 0} vendas</span>
+
+          <div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
+              {formatBRL(metrics?.revenueSemiannual || 0)}
+            </div>
+            <p className="text-xs font-medium text-white/60 mt-1 flex items-center gap-1.5">
+              <ShoppingBag className="size-3.5 text-white/60" />
+              <span>{metrics?.ordersSemiannual || 0} pedidos no período</span>
+            </p>
+          </div>
+
+          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-white/50">
+            <span>Janela de 6 Meses</span>
             <span className="text-blue-400 font-mono font-bold">LTV: {formatBRL(metrics?.ltvSemiannual || 0)}</span>
           </div>
         </div>
 
-        {/* Card 3: Faturamento Trimestral (3M) */}
-        <div className="bg-[#0e0e10] border border-white/10 hover:border-purple-500/30 p-5 rounded-2xl shadow-lg transition-all space-y-3 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
-                <Calendar className="size-3.5" />
-                Faturamento Trimestral (3M)
-              </span>
-              <span className="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20 font-bold">
-                3 Meses
-              </span>
-            </div>
-            <div className="text-2xl font-extrabold text-white font-mono tracking-tight">
-              {formatBRL(metrics?.revenueQuarterly || 0)}
+        {/* 3. Faturamento Trimestral (3M) */}
+        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
+              Faturamento Trimestral (3M)
+            </span>
+            <div className="size-9 rounded-xl bg-white/5 border border-white/15 flex items-center justify-center text-purple-400">
+              <Calendar className="size-5" />
             </div>
           </div>
-          <div className="text-[11px] text-white/50 flex items-center justify-between border-t border-white/5 pt-2">
-            <span>{metrics?.ordersQuarterly || 0} vendas</span>
+
+          <div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
+              {formatBRL(metrics?.revenueQuarterly || 0)}
+            </div>
+            <p className="text-xs font-medium text-white/60 mt-1 flex items-center gap-1.5">
+              <ShoppingBag className="size-3.5 text-white/60" />
+              <span>{metrics?.ordersQuarterly || 0} pedidos no período</span>
+            </p>
+          </div>
+
+          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-white/50">
+            <span>Janela de 3 Meses</span>
             <span className="text-purple-400 font-mono font-bold">LTV: {formatBRL(metrics?.ltvQuarterly || 0)}</span>
           </div>
         </div>
 
-        {/* Card 4: Faturamento Mensal & Ticket Médio */}
-        <div className="bg-[#0e0e10] border border-emerald-500/20 hover:border-emerald-500/40 p-5 rounded-2xl shadow-lg transition-all space-y-3 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                <ShoppingBag className="size-3.5" />
-                Faturamento do Mês (30D)
-              </span>
-              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-bold">
-                30 Dias
-              </span>
-            </div>
-            <div className="text-2xl font-extrabold text-emerald-400 font-mono tracking-tight">
-              {formatBRL(metrics?.revenueMonthly || 0)}
+        {/* 4. Faturamento Mensal (30D) - Destaque Esmeralda */}
+        <div className="bg-[#0e0e10] border border-emerald-500/40 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-xl bg-gradient-to-b from-emerald-500/5 to-transparent hover:border-emerald-400 transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider">
+              Faturamento do Mês (30D)
+            </span>
+            <div className="size-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-300">
+              <ShoppingBag className="size-5" />
             </div>
           </div>
-          <div className="text-[11px] text-white/50 flex items-center justify-between border-t border-white/5 pt-2">
-            <span>{metrics?.ordersMonthly || 0} vendas</span>
-            <span className="text-emerald-400 font-mono font-bold">Ticket: {formatBRL(metrics?.averageTicket || 0)}</span>
+
+          <div>
+            <div className="text-2xl sm:text-3xl font-black text-emerald-300 font-mono tracking-tight">
+              {formatBRL(metrics?.revenueMonthly || 0)}
+            </div>
+            <p className="text-xs font-extrabold text-emerald-400 mt-1 flex items-center gap-1.5">
+              <span>{metrics?.ordersMonthly || 0} pedidos nos últimos 30 dias</span>
+            </p>
+          </div>
+
+          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-white/50">
+            <span>Ticket Médio: <strong className="text-emerald-400 font-mono">{formatBRL(metrics?.averageTicket || 0)}</strong></span>
+            <span className="text-emerald-400/80 font-mono font-bold">Ativo</span>
           </div>
         </div>
 
       </div>
 
-      {/* ━━━ 2. TOP SABORES & PUFFS MAIS PEDIDOS (ESTRUTURA REORGANIZADA) ━━━ */}
+      {/* ━━━ 2. TOP SABORES & PUFFS MAIS PEDIDOS (CONTAINER ESTRUTURADO) ━━━ */}
       {metrics && (metrics.topFlavors.length > 0 || metrics.topPuffs.length > 0) && (
-        <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-5 shadow-lg space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            
-            {/* Bloco 1: Sabores Campeões */}
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2">
-                <Flame className="size-4 text-amber-400" />
-                <span className="text-xs font-bold uppercase tracking-wider text-white">
-                  Sabores Campeões de Venda
-                </span>
+        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 sm:p-6 space-y-4 shadow-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="size-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                <Flame className="size-5" />
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  Sabores Campeões de Venda & Modelos em Destaque
+                </h3>
+                <p className="text-xs text-white/40 mt-0.5">
+                  Giro de sabores e capacidade de puffs com maior recorrência de pedidos.
+                </p>
+              </div>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#16161a] border border-white/10 text-white/80 self-start sm:self-auto">
+              <Sparkles className="size-3.5 text-amber-400" />
+              <span>Alta Demanda</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-1">
+            {/* Sabores Campeões */}
+            <div className="bg-[#141418] border border-white/5 rounded-xl p-4 space-y-2.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
+                <Flame className="size-3.5 text-amber-400" />
+                Sabores Mais Vendidos
+              </span>
+              <div className="flex flex-wrap gap-2 pt-1">
                 {metrics.topFlavors.length === 0 ? (
-                  <span className="text-xs text-white/40">Sem dados de sabores suficientes.</span>
+                  <span className="text-xs text-white/40">Nenhum sabor registrado ainda.</span>
                 ) : (
                   metrics.topFlavors.map((item, idx) => (
-                    <span 
+                    <div
                       key={idx}
-                      className="inline-flex items-center gap-2 bg-[#141416] border border-white/10 text-white text-xs px-3 py-1.5 rounded-xl font-medium shadow-sm hover:border-amber-500/30 transition-all"
+                      className="inline-flex items-center gap-2 bg-[#1c1c22] border border-white/10 text-white text-xs px-3 py-1.5 rounded-xl font-medium shadow-sm hover:border-white/20 transition-all"
                     >
                       <span className="size-1.5 rounded-full bg-amber-400 shrink-0" />
-                      <span className="truncate">{item.flavor}</span>
-                      <strong className="text-amber-400 font-mono text-[11px] shrink-0">({item.count} un)</strong>
-                    </span>
+                      <span>{item.flavor}</span>
+                      <span className="text-amber-400 font-mono font-bold text-[11px]">({item.count} un)</span>
+                    </div>
                   ))
                 )}
               </div>
             </div>
 
-            {/* Bloco 2: Modelos & Puffs */}
-            <div className="space-y-2.5 lg:border-l lg:border-white/10 lg:pl-4">
-              <div className="flex items-center gap-2">
-                <Box className="size-4 text-emerald-400" />
-                <span className="text-xs font-bold uppercase tracking-wider text-white">
-                  Modelos / Capacidade de Puffs
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
+            {/* Modelos / Puffs */}
+            <div className="bg-[#141418] border border-white/5 rounded-xl p-4 space-y-2.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
+                <Box className="size-3.5 text-emerald-400" />
+                Capacidade & Puffs Mais Populares
+              </span>
+              <div className="flex flex-wrap gap-2 pt-1">
                 {metrics.topPuffs.length === 0 ? (
-                  <span className="text-xs text-white/40">Sem dados de modelos suficientes.</span>
+                  <span className="text-xs text-white/40">Nenhum modelo registrado ainda.</span>
                 ) : (
                   metrics.topPuffs.map((item, idx) => (
-                    <span 
+                    <div
                       key={idx}
-                      className="inline-flex items-center gap-1.5 bg-[#141416] border border-white/10 text-white text-xs px-3 py-1.5 rounded-xl font-mono font-bold hover:border-emerald-500/30 transition-all"
+                      className="inline-flex items-center gap-2 bg-[#1c1c22] border border-white/10 text-emerald-400 text-xs px-3 py-1.5 rounded-xl font-mono font-bold shadow-sm hover:border-emerald-500/30 transition-all"
                     >
-                      <span className="text-emerald-400">{item.puffs}</span>
-                      <span className="text-white/40 text-[11px] font-normal font-mono">({item.count} un)</span>
-                    </span>
+                      <span>{item.puffs}</span>
+                      <span className="text-white/40 text-[11px] font-normal">({item.count} un)</span>
+                    </div>
                   ))
                 )}
               </div>
             </div>
-
           </div>
         </div>
       )}
 
       {/* ━━━ 3. BARRA DE CONTROLES: Busca, Período, Status & Exportação ━━━ */}
-      <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-lg">
+      <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-lg">
         
         {/* Campo de Busca por Venda */}
         <div className="relative flex-1 min-w-0">
@@ -295,7 +328,7 @@ export function SalesHistoryTab() {
             placeholder="Buscar por código #SMK, cliente, sabor, WhatsApp ou endereço..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#161618] border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-white/40 focus:outline-none focus:border-white/30 transition-all"
+            className="w-full bg-[#141418] border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-white/40 focus:outline-none focus:border-white/30 transition-all font-sans"
           />
         </div>
 
@@ -305,7 +338,7 @@ export function SalesHistoryTab() {
           <select
             value={periodFilter}
             onChange={(e) => setPeriodFilter(e.target.value as any)}
-            className="bg-[#161618] border border-white/10 text-white text-xs rounded-xl px-3.5 py-2.5 cursor-pointer focus:outline-none focus:border-white/30 font-medium transition-all"
+            className="bg-[#141418] border border-white/10 text-white text-xs rounded-xl px-3.5 py-2.5 cursor-pointer focus:outline-none focus:border-white/30 font-medium transition-all"
           >
             <option value="all">Todas as Vendas</option>
             <option value="today">Vendas de Hoje</option>
@@ -319,7 +352,7 @@ export function SalesHistoryTab() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-[#161618] border border-white/10 text-white text-xs rounded-xl px-3.5 py-2.5 cursor-pointer focus:outline-none focus:border-white/30 font-medium transition-all"
+            className="bg-[#141418] border border-white/10 text-white text-xs rounded-xl px-3.5 py-2.5 cursor-pointer focus:outline-none focus:border-white/30 font-medium transition-all"
           >
             <option value="all">Todos os Status</option>
             <option value="CONCLUIDO">Concluído / Entregue</option>
@@ -345,7 +378,7 @@ export function SalesHistoryTab() {
       {loading ? (
         <div className="p-12 text-center text-white/50 text-xs font-mono">Carregando histórico de vendas...</div>
       ) : filteredSales.length === 0 ? (
-        <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-12 text-center text-white/40 space-y-3">
+        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-12 text-center text-white/40 space-y-3">
           <Receipt className="size-10 text-white/20 mx-auto" />
           <p className="text-sm font-semibold text-white">Nenhuma venda encontrada para os filtros selecionados.</p>
           <p className="text-xs max-w-md mx-auto text-muted-foreground">
@@ -362,11 +395,11 @@ export function SalesHistoryTab() {
               <div
                 key={sale.id}
                 onClick={() => setSelectedSale(sale)}
-                className="bg-[#0e0e10] hover:bg-[#141416] border border-white/10 hover:border-white/25 rounded-2xl p-4 sm:p-5 transition-all shadow-md flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 cursor-pointer group"
+                className="bg-[#0e0e10] hover:bg-[#141418] border border-white/15 hover:border-white/30 rounded-2xl p-4 sm:p-5 transition-all shadow-md flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 cursor-pointer group"
               >
                 {/* Bloco 1: Identificação da Venda & Horário */}
                 <div className="flex items-start gap-3.5 min-w-[200px] shrink-0">
-                  <div className="size-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                  <div className="size-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
                     <Receipt className="size-5" />
                   </div>
                   <div>
@@ -374,11 +407,11 @@ export function SalesHistoryTab() {
                       <span className="text-xs font-mono font-bold text-white group-hover:text-emerald-400 transition-colors">
                         {sale.order_code || `#${sale.id.slice(0, 8)}`}
                       </span>
-                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase bg-white/5 text-white/70 border border-white/10">
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase bg-white/5 text-white/70 border border-white/10">
                         {sale.source || 'WhatsApp'}
                       </span>
                     </div>
-                    <div className="text-[11px] text-white/50 flex items-center gap-1.5 mt-1 font-mono">
+                    <div className="text-xs text-white/50 flex items-center gap-1.5 mt-1 font-mono">
                       <Calendar className="size-3 text-white/40" />
                       <span>{orderDate} às {orderTime}</span>
                     </div>
@@ -391,7 +424,7 @@ export function SalesHistoryTab() {
                     {sale.items.map((item, idx) => (
                       <span 
                         key={idx}
-                        className="inline-flex items-center gap-1.5 bg-[#141416] border border-white/10 text-xs px-2.5 py-1 rounded-xl text-white font-medium shadow-sm"
+                        className="inline-flex items-center gap-1.5 bg-[#18181c] border border-white/10 text-xs px-3 py-1 rounded-xl text-white font-medium shadow-sm"
                       >
                         <strong className="text-emerald-400 font-mono">{item.quantity}x</strong>
                         <span>{item.name || 'Pod'}</span>
@@ -409,16 +442,16 @@ export function SalesHistoryTab() {
                     ))}
                   </div>
 
-                  <div className="text-[11px] text-white/40 flex items-center gap-1.5 mt-2">
-                    <MapPin className="size-3 text-white/30 shrink-0" />
-                    <span className="truncate">{sale.address || 'Endereço não informado'}</span>
+                  <div className="text-xs text-white/50 flex items-center gap-1.5 mt-2">
+                    <MapPin className="size-3.5 text-white/40 shrink-0" />
+                    <span>{sale.address || 'Endereço não informado'}</span>
                   </div>
                 </div>
 
                 {/* Bloco 3: Comprador & Contato */}
-                <div className="min-w-[160px] shrink-0">
+                <div className="min-w-[170px] shrink-0">
                   <div className="flex items-center gap-1.5">
-                    <div className="text-xs font-bold text-white truncate max-w-[150px]">
+                    <div className="text-xs sm:text-sm font-bold text-white">
                       {sale.client_name || 'Cliente'}
                     </div>
                     {sale.is_vip && (
@@ -427,8 +460,8 @@ export function SalesHistoryTab() {
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-white/50 font-mono flex items-center gap-1 mt-0.5">
-                    <Phone className="size-2.5" />
+                  <div className="text-xs text-white/50 font-mono flex items-center gap-1.5 mt-0.5">
+                    <Phone className="size-3 text-white/40" />
                     <span>{sale.client_phone}</span>
                   </div>
                 </div>
@@ -436,17 +469,17 @@ export function SalesHistoryTab() {
                 {/* Bloco 4: Total Pago, Status & Ação Raio-X */}
                 <div className="flex items-center justify-between lg:justify-end gap-4 w-full lg:w-auto border-t lg:border-t-0 pt-3 lg:pt-0 border-white/5 shrink-0">
                   <div className="text-left lg:text-right">
-                    <div className="text-sm font-extrabold text-emerald-400 font-mono">
+                    <div className="text-sm sm:text-base font-extrabold text-emerald-400 font-mono">
                       {formatBRL(sale.total_amount)}
                     </div>
-                    <div className="text-[10px] text-white/40 font-mono flex items-center lg:justify-end gap-1">
-                      <CreditCard className="size-2.5" />
+                    <div className="text-[10px] text-white/40 font-mono flex items-center lg:justify-end gap-1.5 mt-0.5">
+                      <CreditCard className="size-3 text-white/40" />
                       <span>{sale.payment_method || 'PIX'} • {sale.payment_status}</span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1 ${
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1 ${
                       sale.delivery_status === 'CONCLUIDO'
                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                         : sale.delivery_status === 'A_CAMINHO'
@@ -463,7 +496,7 @@ export function SalesHistoryTab() {
                         e.stopPropagation();
                         setSelectedSale(sale);
                       }}
-                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 transition-all cursor-pointer"
+                      className="size-9 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 flex items-center justify-center transition-all cursor-pointer"
                       title="Ver Raio-X da Venda"
                     >
                       <Eye className="size-4" />

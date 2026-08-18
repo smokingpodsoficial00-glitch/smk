@@ -67,49 +67,45 @@ export function CRMDashboard() {
 
   return (
     <CRMErrorBoundary>
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-background text-white">
-        {/* Header do CRM */}
-        <header className="px-6 py-5 border-b border-white/10 shrink-0 bg-[#0a0a0a]">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-            <div className="space-y-1">
-              <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
-                <Users className="size-6 text-emerald-400 shrink-0" />
-                <span>Gestão de Clientes & CRM</span>
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                Ranking de Fidelidade, Previsão de Recompra, Follow-ups e Histórico Técnico de Vendas.
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-3 self-start sm:self-auto">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wide">
-                <div className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                Base Conectada
-              </span>
-            </div>
+      <div className="flex-1 flex flex-col h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
+        {/* ━━━ CABEÇALHO EXECUTIVO PADRONIZADO (DESIGN SYSTEM) ━━━━━━━━━━━ */}
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div className="space-y-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+              <Users className="size-6 text-emerald-400 shrink-0" />
+              <span>Gestão de Clientes & CRM</span>
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              Ranking de Fidelidade, Previsão de Recompra, Follow-ups e Histórico Técnico de Vendas.
+            </p>
           </div>
-
-          {/* Navegação Secundária */}
-          <div className="flex flex-wrap items-center gap-2">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment' | 'followups' | 'sales_history')}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none ${
-                  activeSubTab === tab.id 
-                    ? 'bg-white/10 text-white font-bold border border-white/20 shadow-sm' 
-                    : 'text-muted-foreground hover:text-white bg-[#141416] border border-white/5 hover:border-white/15'
-                }`}
-              >
-                {tab.icon}
-                <span>{tab.label}</span>
-              </button>
-            ))}
+          
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 self-start sm:self-auto">
+            <div className="size-2 rounded-full bg-emerald-400 animate-ping" />
+            <span>Base Conectada</span>
           </div>
         </header>
 
-        {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 relative custom-scrollbar">
+        {/* ━━━ ABAS SUPERIORES (ALTURAS, PADDING E RADIUS UNIFORMES) ━━━━━ */}
+        <div className="flex flex-wrap items-center gap-2">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment' | 'followups' | 'sales_history')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none ${
+                activeSubTab === tab.id 
+                  ? 'bg-white/10 text-white font-bold border border-white/20 shadow-sm' 
+                  : 'text-muted-foreground hover:text-white bg-[#0e0e10] border border-white/10 hover:border-white/20'
+              }`}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* ━━━ CONTEÚDO DA ABA ATIVA ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <div className="space-y-6">
           <CRMErrorBoundary>
             {activeSubTab === 'rfm' && <RFMMatrix onSelectClient={setSelectedClient} />}
             {activeSubTab === 'replenishment' && <PredictiveReplenishment onSelectClient={setSelectedClient} />}
@@ -125,7 +121,6 @@ export function CRMDashboard() {
               client={selectedClient} 
               onClose={() => setSelectedClient(null)} 
               onClientUpdated={() => {
-                // Ao salvar, fecha ou atualiza
                 setSelectedClient(null);
               }}
             />
