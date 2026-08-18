@@ -1,9 +1,10 @@
 import { useEffect } from "react";
-import { Search, ShoppingBag, Store } from "lucide-react";
+import { Search, ShoppingBag, Star } from "lucide-react";
 import { BRANDS } from "@/lib/products";
 import { useCart } from "@/lib/cart";
 import { useStoreConfig } from "@/lib/useStoreConfig";
-import type { Category } from "@/lib/categories";
+import { BrandDropdown } from "@/components/BrandDropdown";
+import { SortDropdown, type SortOption } from "@/components/SortDropdown";
 
 interface HeroProps {
   query: string;
@@ -12,9 +13,10 @@ interface HeroProps {
   onBrandChange: (b: string | null) => void;
   activeCategory?: string | null;
   onCategoryChange?: (c: string | null) => void;
-  categories?: Category[];
   onCartClick?: () => void;
   brands?: string[];
+  sortBy: SortOption;
+  onSortChange: (sort: SortOption) => void;
 }
 
 export function Hero({ 
@@ -24,9 +26,10 @@ export function Hero({
   onBrandChange, 
   activeCategory = null,
   onCategoryChange,
-  categories = [],
   onCartClick, 
-  brands 
+  brands,
+  sortBy,
+  onSortChange
 }: HeroProps) {
   const { totalItems } = useCart();
   const { config } = useStoreConfig();
@@ -41,12 +44,12 @@ export function Hero({
   }, [storeName]);
 
   return (
-    <section className="px-5 pt-8 pb-6 sm:pt-14 sm:pb-10 max-w-6xl mx-auto relative">
+    <section className="px-4 sm:px-6 pt-8 pb-6 sm:pt-14 sm:pb-8 max-w-6xl mx-auto relative">
       
       {/* Carrinho de topo esquerdo (Minimalista) */}
       <button 
         onClick={onCartClick}
-        className="absolute top-6 left-5 sm:top-8 flex items-center justify-center p-2 rounded-full transition-transform hover:scale-110 cursor-pointer"
+        className="absolute top-6 left-4 sm:top-8 sm:left-6 flex items-center justify-center p-2 rounded-full transition-transform hover:scale-110 cursor-pointer"
         aria-label="Ver carrinho"
       >
         <div className="relative">
@@ -83,39 +86,44 @@ export function Hero({
         </div>
       </div>
 
-      {/* Filtros por Marca e Categoria (Com rolagem horizontal suave no mobile) */}
-      <div className="mt-6 flex items-center justify-center gap-2 overflow-x-auto pb-2 custom-scrollbar max-w-full px-2">
-        <Pill 
-          label="Todas" 
-          active={activeBrand === null && (!activeCategory || activeCategory === null)} 
-          onClick={() => {
-            onBrandChange(null);
-            onCategoryChange?.(null);
-          }} 
-        />
-        {onCategoryChange && (
-          <CategoryPill
-            active={activeCategory === 'mais-vendidos'}
+      {/* Barra Unificada de Filtros e Ordenação */}
+      <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        {/* Filtros à esquerda: [ Todas ] [ ⭐ Mais Vendidos ] [ Marcas ▾ ] */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+          <Pill 
+            label="Todas" 
+            active={activeBrand === null && (!activeCategory || activeCategory === null)} 
             onClick={() => {
               onBrandChange(null);
-              onCategoryChange(activeCategory === 'mais-vendidos' ? null : 'mais-vendidos');
-            }}
-          >
-            <span className="text-amber-400 font-bold mr-1.5 text-sm">★</span>
-            <span>Mais Vendidos</span>
-          </CategoryPill>
-        )}
-        {brandList.map(b => (
-          <Pill 
-            key={b} 
-            label={b} 
-            active={activeBrand === b && !activeCategory} 
-            onClick={() => {
               onCategoryChange?.(null);
-              onBrandChange(activeBrand === b ? null : b);
             }} 
           />
-        ))}
+          {onCategoryChange && (
+            <CategoryPill
+              active={activeCategory === 'mais-vendidos'}
+              onClick={() => {
+                onBrandChange(null);
+                onCategoryChange(activeCategory === 'mais-vendidos' ? null : 'mais-vendidos');
+              }}
+            >
+              <Star className={`size-3 sm:size-3.5 mr-1.5 shrink-0 ${activeCategory === 'mais-vendidos' ? 'text-amber-500 fill-amber-500' : 'text-amber-400 fill-amber-400'}`} />
+              <span>Mais Vendidos</span>
+            </CategoryPill>
+          )}
+          <BrandDropdown
+            brands={brandList}
+            activeBrand={activeCategory ? null : activeBrand}
+            onSelectBrand={b => {
+              onCategoryChange?.(null);
+              onBrandChange(activeBrand === b ? null : b);
+            }}
+          />
+        </div>
+
+        {/* Ordenação à direita: [ Ordenar por: Padrão ▾ ] */}
+        <div className="flex items-center justify-end shrink-0">
+          <SortDropdown value={sortBy} onChange={onSortChange} />
+        </div>
       </div>
     </section>
   );
@@ -125,11 +133,14 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 border cursor-pointer ${
-        active ? "bg-white text-black font-bold border-transparent shadow-[0_0_20px_rgba(255,255,255,0.7)]"
-               : "glass text-foreground hover:bg-elevated"
+      className={`px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 border cursor-pointer select-none ${
+        active 
+          ? "bg-white text-black font-semibold border-white shadow-[0_0_14px_rgba(255,255,255,0.28)]"
+          : "glass text-white/90 border-white/10 hover:bg-elevated hover:border-white/20 hover:text-white"
       }`}
-    >{label}</button>
+    >
+      {label}
+    </button>
   );
 }
 
@@ -137,9 +148,10 @@ function CategoryPill({ children, active, onClick }: { children: React.ReactNode
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all duration-300 border cursor-pointer flex items-center ${
-        active ? "bg-white text-black border-transparent shadow-[0_0_20px_rgba(255,255,255,0.7)]"
-               : "glass text-foreground hover:bg-elevated border-white/10"
+      className={`px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 border cursor-pointer select-none flex items-center ${
+        active 
+          ? "bg-white text-black font-semibold border-white shadow-[0_0_14px_rgba(255,255,255,0.28)]"
+          : "glass text-white/90 border-white/10 hover:bg-elevated hover:border-white/20 hover:text-white"
       }`}
     >
       {children}

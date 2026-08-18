@@ -5,6 +5,7 @@ import { CartBar } from "@/components/CartBar";
 import { CartSheet } from "@/components/CartSheet";
 import { FlavorSheet } from "@/components/FlavorSheet";
 import { CartProvider } from "@/lib/cart";
+import type { SortOption } from "@/components/SortDropdown";
 import { fetchProductsFromSupabase, type Product, type PodModel } from "@/lib/products";
 import { fetchCategories, fetchProductCategoryMappings, DEFAULT_CATEGORIES, type Category } from "@/lib/categories";
 import { supabase } from "@/lib/supabase";
@@ -24,6 +25,7 @@ function Menu() {
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [categoryMappings, setCategoryMappings] = useState<Record<string, { category_ids: string[]; display_order: number }>>({});
   const [selectedCategorySlug, setSelectedCategorySlug] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>("default");
 
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -121,9 +123,9 @@ function Menu() {
   const availableBrands = useMemo(() => {
     const set = new Set<string>();
     for (const p of productList) {
-      if (p.is_active && p.brand) set.add(p.brand);
+      if (p.is_active && p.brand && p.brand.trim()) set.add(p.brand.trim());
     }
-    return Array.from(set);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [productList]);
 
   // Separar produtos com ⭐ (Mais Vendidos) e produtos normais sem duplicação
@@ -172,41 +174,65 @@ function Menu() {
       return m.categories?.some(c => c.slug === 'mais-vendidos' || c.id === MAIS_VENDIDOS_ID) || false;
     };
 
-    // Se o cliente clicou na pílula "⭐ Mais Vendidos"
-    if (selectedCategorySlug === 'mais-vendidos') {
-      const allStarred = baseList.filter(isMaisVendido).sort((a, b) => {
-        const orderA = a.displayOrder ?? 99;
-        const orderB = b.displayOrder ?? 99;
-        if (orderA !== orderB) return orderA - orderB;
-        return a.name.localeCompare(b.name);
+    const getPrice = (m: PodModel) => {
+      const p = typeof m.price === 'number' ? m.price : parseFloat(String(m.price || 0));
+      return isNaN(p) ? 0 : p;
+    };
+
+    // Função auxiliar para ordenação por preço
+    const sortModelsByPrice = <T extends PodModel>(list: T[], direction: 'asc' | 'desc'): T[] => {
+      return [...list].sort((a, b) => {
+        const priceDiff = direction === 'asc' 
+          ? getPrice(a) - getPrice(b) 
+          : getPrice(b) - getPrice(a);
+        if (priceDiff !== 0) return priceDiff;
+        return a.name.localeCompare(b.name, 'pt-BR');
       });
+    };
+
+    // 1. Se o cliente clicou na pílula "⭐ Mais Vendidos"
+    if (selectedCategorySlug === 'mais-vendidos') {
+      const allStarred = baseList.filter(isMaisVendido);
+      let sorted = allStarred;
+      if (sortBy === 'price-asc') {
+        sorted = sortModelsByPrice(allStarred, 'asc');
+      } else if (sortBy === 'price-desc') {
+        sorted = sortModelsByPrice(allStarred, 'desc');
+      } else {
+        sorted = [...allStarred].sort((a, b) => {
+          const orderA = a.displayOrder ?? 99;
+          const orderB = b.displayOrder ?? 99;
+          if (orderA !== orderB) return orderA - orderB;
+          return a.name.localeCompare(b.name, 'pt-BR');
+        });
+      }
+
       return {
         topFeaturedModels: [],
-        mainCatalogModels: allStarred,
+        mainCatalogModels: sorted,
         isOnlyMaisVendidosMode: true
       };
     }
 
-    // Modo Padrão / Busca / Marca
-    const starredAll = baseList.filter(isMaisVendido).sort((a, b) => {
-      const orderA = a.displayOrder ?? 99;
-      const orderB = b.displayOrder ?? 99;
-      if (orderA !== orderB) return orderA - orderB;
-      return a.name.localeCompare(b.name);
-    });
-
-    // Se há busca ou filtro por marca ativo, exibe em lista única ordenada (starred no topo)
+    // 2. Se há busca ou filtro por marca ativo
     if (brand || q) {
-      const sortedSearch = [...baseList].sort((a, b) => {
-        const aStar = isMaisVendido(a);
-        const bStar = isMaisVendido(b);
-        if (aStar && !bStar) return -1;
-        if (!aStar && bStar) return 1;
-        const orderA = a.displayOrder ?? 99;
-        const orderB = b.displayOrder ?? 99;
-        if (orderA !== orderB) return orderA - orderB;
-        return a.name.localeCompare(b.name);
-      });
+      let sortedSearch = [...baseList];
+      if (sortBy === 'price-asc') {
+        sortedSearch = sortModelsByPrice(baseList, 'asc');
+      } else if (sortBy === 'price-desc') {
+        sortedSearch = sortModelsByPrice(baseList, 'desc');
+      } else {
+        sortedSearch = [...baseList].sort((a, b) => {
+          const aStar = isMaisVendido(a);
+          const bStar = isMaisVendido(b);
+          if (aStar && !bStar) return -1;
+          if (!aStar && bStar) return 1;
+          const orderA = a.displayOrder ?? 99;
+          const orderB = b.displayOrder ?? 99;
+          if (orderA !== orderB) return orderA - orderB;
+          return a.name.localeCompare(b.name, 'pt-BR');
+        });
+      }
 
       return {
         topFeaturedModels: [],
@@ -215,28 +241,44 @@ function Menu() {
       };
     }
 
-    // Modo Padrão (Sem busca, sem marca, "Todas"):
-    // Seção Topo: No máximo os 4 primeiros produtos com ⭐
-    const top4 = starredAll.slice(0, 4);
-
-    // Seção Todos os Produtos: Todos os modelos RESTANTES (sem os 4 que já estão no topo, para evitar duplicação)
-    const rest = baseList.filter(m => !top4.some(top => top.name === m.name)).sort((a, b) => {
-      const aStar = isMaisVendido(a);
-      const bStar = isMaisVendido(b);
-      if (aStar && !bStar) return -1;
-      if (!aStar && bStar) return 1;
+    // 3. Modo Padrão (Sem busca, sem marca, "Todas"):
+    // Seção Topo: SEMPRE mantém os 4 primeiros pods dos Mais Vendidos na primeira posição com os mesmos produtos
+    const starredAll = baseList.filter(isMaisVendido).sort((a, b) => {
       const orderA = a.displayOrder ?? 99;
       const orderB = b.displayOrder ?? 99;
       if (orderA !== orderB) return orderA - orderB;
-      return a.name.localeCompare(b.name);
+      return a.name.localeCompare(b.name, 'pt-BR');
     });
+
+    const top4 = starredAll.slice(0, 4);
+
+    // Seção Todos os Produtos: Todos os modelos RESTANTES (sem os 4 que já estão no topo)
+    const rest = baseList.filter(m => !top4.some(top => top.name === m.name));
+    
+    let sortedRest = rest;
+    if (sortBy === 'price-asc') {
+      sortedRest = sortModelsByPrice(rest, 'asc');
+    } else if (sortBy === 'price-desc') {
+      sortedRest = sortModelsByPrice(rest, 'desc');
+    } else {
+      sortedRest = [...rest].sort((a, b) => {
+        const aStar = isMaisVendido(a);
+        const bStar = isMaisVendido(b);
+        if (aStar && !bStar) return -1;
+        if (!aStar && bStar) return 1;
+        const orderA = a.displayOrder ?? 99;
+        const orderB = b.displayOrder ?? 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return a.name.localeCompare(b.name, 'pt-BR');
+      });
+    }
 
     return {
       topFeaturedModels: top4,
-      mainCatalogModels: rest,
+      mainCatalogModels: sortedRest,
       isOnlyMaisVendidosMode: false
     };
-  }, [query, brand, selectedCategorySlug, models]);
+  }, [query, brand, selectedCategorySlug, models, sortBy, categoryMappings]);
 
   return (
     <div className="min-h-screen pb-safe">
@@ -249,6 +291,8 @@ function Menu() {
         onCategoryChange={setSelectedCategorySlug}
         onCartClick={() => setCartOpen(true)}
         brands={availableBrands}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
       />
       
       <section className="px-4 sm:px-6 max-w-6xl mx-auto">
