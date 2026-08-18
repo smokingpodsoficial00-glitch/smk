@@ -1,5 +1,5 @@
 import React, { Component, type ReactNode, useState } from "react";
-import { Users, Crown, RefreshCw, AlertTriangle } from "lucide-react";
+import { Users, Crown, RefreshCw, AlertTriangle, Target, Receipt } from "lucide-react";
 import type { RealClient } from "@/lib/crm";
 
 // Componentes do CRM
@@ -61,27 +61,27 @@ export function CRMDashboard() {
   const tabs = [
     { id: 'rfm', label: 'Ranking & Fidelidade', icon: <Crown className="size-4 text-amber-400" /> },
     { id: 'replenishment', label: 'Aviso de Fim de Pod & Recompra', icon: <RefreshCw className="size-4 text-emerald-400" /> },
-    { id: 'followups', label: '🎯 Follow-ups de Vendas & Salário', icon: null },
-    { id: 'sales_history', label: '📜 Histórico & Mural de Vendas', icon: null },
+    { id: 'followups', label: 'Follow-ups de Vendas & Salário', icon: <Target className="size-4 text-purple-400" /> },
+    { id: 'sales_history', label: 'Histórico & Mural de Vendas', icon: <Receipt className="size-4 text-blue-400" /> },
   ] as const;
 
   return (
     <CRMErrorBoundary>
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-black text-white">
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-background text-white">
         {/* Header do CRM */}
         <header className="px-6 py-5 border-b border-white/10 shrink-0 bg-[#0a0a0a]">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <Users className="size-5 text-emerald-400" />
-                Gestão de Clientes & CRM
-              </h2>
-              <p className="text-xs text-muted-foreground mt-1">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <div className="space-y-1">
+              <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+                <Users className="size-6 text-emerald-400 shrink-0" />
+                <span>Gestão de Clientes & CRM</span>
+              </h1>
+              <p className="text-xs text-muted-foreground">
                 Ranking de Fidelidade, Previsão de Recompra, Follow-ups e Histórico Técnico de Vendas.
               </p>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 self-start sm:self-auto">
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wide">
                 <div className="size-2 rounded-full bg-emerald-400 animate-pulse" />
                 Base Conectada
@@ -90,18 +90,19 @@ export function CRMDashboard() {
           </div>
 
           {/* Navegação Secundária */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment' | 'followups' | 'sales_history')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none ${
                   activeSubTab === tab.id 
-                    ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]' 
-                    : 'text-muted-foreground hover:text-white bg-[#141414] border border-white/5 hover:border-white/20'
+                    ? 'bg-white/10 text-white font-bold border border-white/20 shadow-sm' 
+                    : 'text-muted-foreground hover:text-white bg-[#141416] border border-white/5 hover:border-white/15'
                 }`}
               >
-                {tab.label}
+                {tab.icon}
+                <span>{tab.label}</span>
               </button>
             ))}
           </div>
