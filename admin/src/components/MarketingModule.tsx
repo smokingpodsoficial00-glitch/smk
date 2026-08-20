@@ -156,9 +156,29 @@ export function MarketingModule() {
   const [dispatchProgress, setDispatchProgress] = useState<{ current: number; total: number; status: string } | null>(null);
   const isAbortingRef = React.useRef(false);
 
+  const [loadingScan, setLoadingScan] = useState(false);
+
   const handleStopCampaign = () => {
     isAbortingRef.current = true;
     setDispatchProgress(prev => prev ? { ...prev, status: 'Interrompendo disparos... aguarde o contato atual.' } : null);
+  };
+
+  const handleScanWhatsAppHistory = async () => {
+    if (!confirm('Iniciar Varredura e Blindagem no WhatsApp?\n\nO sistema vai escanear o histórico de conversas para identificar todos os contatos que já receberam mensagens e garantir que NUNCA MAIS sejam repetidos.')) return;
+    setLoadingScan(true);
+    try {
+      const res = await fetch('http://localhost:3006/api/marketing/scan-chats', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        alert(`✅ Varredura Concluída com Sucesso!\n\nNovos contatos identificados: ${data.identifiedCount}\nTotal de contatos blindados no sistema: ${data.totalTracked}\n\nEsses contatos nunca mais receberão mensagens repetidas.`);
+      } else {
+        alert(`⚠️ ${data.error || 'Não foi possível concluir a varredura. Certifique-se de que o WhatsApp está conectado.'}`);
+      }
+    } catch (err: any) {
+      alert(`❌ Erro ao conectar com o servidor backend: ${err.message}`);
+    } finally {
+      setLoadingScan(false);
+    }
   };
 
   // Carrega Listas e Campanhas salvas (localStorage + backend)
@@ -553,6 +573,7 @@ export function MarketingModule() {
 
     isAbortingRef.current = false;
     setExecutingCampaignId(camp.id);
+
     // Histórico de contatos já enviados para evitar repetição acidental (Retomada Inteligente)
     const sentHistoryKey = `SP_SENT_CAMPAIGN_${camp.id}`;
     let alreadySentPhones: string[] = [];
@@ -560,11 +581,24 @@ export function MarketingModule() {
       alreadySentPhones = JSON.parse(localStorage.getItem(sentHistoryKey) || '[]');
     } catch {}
 
+    // Sincroniza e herda a blindagem central do servidor
+    try {
+      const resp = await fetch('http://localhost:3006/api/marketing/sent-history');
+      if (resp.ok) {
+        const data = await resp.json();
+        const serverCampSent = data.sentHistory?.[camp.id] || [];
+        const serverGlobalSent = data.sentHistory?.globalSent || [];
+        const combined = Array.from(new Set([...alreadySentPhones, ...serverCampSent, ...serverGlobalSent]));
+        alreadySentPhones = combined;
+        localStorage.setItem(sentHistoryKey, JSON.stringify(combined));
+      }
+    } catch {}
+
     setDispatchProgress({ 
       current: alreadySentPhones.length, 
       total: targetContacts.length || 1, 
       status: alreadySentPhones.length > 0 
-        ? `Retomando disparos... (${alreadySentPhones.length} já enviados)` 
+        ? `Retomando disparos... (${alreadySentPhones.length} já enviados e blindados)` 
         : 'Iniciando disparos com cadência Anti-Ban...' 
     });
 
@@ -585,8 +619,12 @@ export function MarketingModule() {
           const contact = targetContacts[i];
           const rawPhone = contact.cleanPhone || contact.phone;
 
+          // Normaliza telefone com DDI 55
+          const cleanDigits = String(rawPhone).replace(/\D/g, '');
+          const normalizedPhone = cleanDigits.startsWith('55') ? cleanDigits : `55${cleanDigits}`;
+
           // Pula contatos que já receberam esta campanha anteriormente
-          if (alreadySentPhones.includes(rawPhone)) {
+          if (alreadySentPhones.includes(normalizedPhone) || alreadySentPhones.includes(rawPhone)) {
             continue;
           }
 
@@ -606,26 +644,32 @@ export function MarketingModule() {
           if (isAbortingRef.current) break;
 
           try {
-            await fetch('http://localhost:3006/api/marketing/send-direct', {
+            const res = await fetch('http://localhost:3006/api/marketing/send-direct', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                phone: rawPhone,
+                phone: normalizedPhone,
                 name: contact.name,
                 text: formattedMsg,
+                campaignId: camp.id,
                 companyId: company?.id,
               })
             });
-            alreadySentPhones.push(rawPhone);
+            const resData = await res.json();
+            if (resData.skipped) {
+              console.log(`⏩ Contato ${normalizedPhone} pulado por trava do servidor.`);
+            } else {
+              sentInThisSession++;
+            }
+            alreadySentPhones.push(normalizedPhone);
             localStorage.setItem(sentHistoryKey, JSON.stringify(alreadySentPhones));
-            sentInThisSession++;
           } catch (e) {}
 
           batchCounter++;
           setDispatchProgress({
             current: alreadySentPhones.length,
             total: targetContacts.length,
-            status: `Enviado ${alreadySentPhones.length} de ${targetContacts.length} para ${contact.name || rawPhone}...`
+            status: `Enviado ${alreadySentPhones.length} de ${targetContacts.length} para ${contact.name || normalizedPhone}...`
           });
 
           // Trava 4: Delay individual com cancelamento instantâneo a cada 250ms (10 a 20s aleatórios)
@@ -728,7 +772,17 @@ export function MarketingModule() {
           </div>
 
           {/* Botões de Ação do Header */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleScanWhatsAppHistory}
+              disabled={loadingScan}
+              className="px-3.5 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+              title="Faz varredura profunda no WhatsApp para blindar e impedir que qualquer contato receba mensagens repetidas"
+            >
+              <ShieldCheck className={`size-3.5 text-purple-400 ${loadingScan ? 'animate-spin' : ''}`} />
+              <span>{loadingScan ? 'Varrendo Histórico...' : '🔍 Varredura & Blindagem'}</span>
+            </button>
+
             <button
               onClick={syncWhatsAppContactsAndGroups}
               disabled={loadingSync}

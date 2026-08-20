@@ -1752,10 +1752,24 @@ app.post('/api/chatbot/blacklist', (req, res) => {
 });
 app.post('/api/marketing/send-direct', async (req, res) => {
     try {
-        const { phone, name, text } = req.body;
+        const { phone, name, text, campaignId } = req.body;
         
         if (!phone || !text) {
             return res.status(400).json({ error: 'Telefone e texto da mensagem são obrigatórios.' });
+        }
+
+        const config = loadMarketingConfig();
+        const rawPhone = String(phone).replace(/\D/g, '');
+        const cleanPhone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
+
+        // 🛡️ TRAVA RÍGIDA ANTI-DUPLICAÇÃO: Checa se o contato já foi enviado
+        if (campaignId && isPhoneAlreadySent(campaignId, cleanPhone, config)) {
+            console.warn(`🛑 [Marketing Blindagem] Disparo IGNORADO para ${cleanPhone} (${name || 'Cliente'}). Este contato já recebeu a campanha "${campaignId}".`);
+            return res.json({ 
+                success: true, 
+                skipped: true, 
+                reason: 'Contato já recebeu esta campanha anteriormente. Disparo bloqueado por proteção de segurança anti-ban.' 
+            });
         }
 
         if (!isWhatsAppReady || !client) {
@@ -1775,8 +1789,6 @@ app.post('/api/marketing/send-direct', async (req, res) => {
         } else if (String(phone).includes('@g.us') || String(phone).includes('@c.us')) {
             formattedNumber = String(phone);
         } else {
-            const rawPhone = String(phone).replace(/\D/g, '');
-            const cleanPhone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
             formattedNumber = `${cleanPhone}@c.us`;
         }
 
@@ -1797,6 +1809,12 @@ app.post('/api/marketing/send-direct', async (req, res) => {
         } catch (chatErr) {
             // Fallback direto
             await client.sendMessage(formattedNumber, text);
+        }
+
+        // 🛡️ Grava imediatamente no JSON para que nunca mais se repita
+        if (campaignId && cleanPhone) {
+            markPhoneAsSent(campaignId, cleanPhone, config);
+            saveMarketingConfig(config);
         }
 
         console.log(`✅ [Marketing] Mensagem entregue com sucesso para ${formattedNumber}`);
@@ -1896,15 +1914,17 @@ const MARKETING_CONFIG_PATH = path.join(__dirname, 'data', 'marketing_config.jso
 function loadMarketingConfig() {
     try {
         if (!fs.existsSync(MARKETING_CONFIG_PATH)) {
-            const defaultConfig = { campaigns: [], idempotencyKeys: [], lastUpdated: null };
+            const defaultConfig = { campaigns: [], lists: [], sentHistory: { globalSent: [] }, idempotencyKeys: [], lastUpdated: null };
             fs.writeFileSync(MARKETING_CONFIG_PATH, JSON.stringify(defaultConfig, null, 2), 'utf-8');
             return defaultConfig;
         }
         const raw = fs.readFileSync(MARKETING_CONFIG_PATH, 'utf-8');
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (!parsed.sentHistory) parsed.sentHistory = { globalSent: [] };
+        return parsed;
     } catch (err) {
         console.error('❌ [Marketing] Erro ao carregar config:', err.message);
-        return { campaigns: [], idempotencyKeys: [], lastUpdated: null };
+        return { campaigns: [], lists: [], sentHistory: { globalSent: [] }, idempotencyKeys: [], lastUpdated: null };
     }
 }
 
@@ -1912,11 +1932,152 @@ function loadMarketingConfig() {
 function saveMarketingConfig(config) {
     try {
         config.lastUpdated = new Date().toISOString();
+        if (!config.sentHistory) config.sentHistory = { globalSent: [] };
         fs.writeFileSync(MARKETING_CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
     } catch (err) {
         console.error('❌ [Marketing] Erro ao salvar config:', err.message);
     }
 }
+
+// Helper: Normaliza número de telefone para formato canônico com DDI 55
+function normalizeMarketingPhone(phone) {
+    if (!phone) return '';
+    const digits = String(phone).replace(/\D/g, '');
+    if (!digits) return '';
+    return digits.startsWith('55') ? digits : `55${digits}`;
+}
+
+// Helper: Verifica se o telefone já recebeu a campanha (ou já foi contatado globalmente)
+function isPhoneAlreadySent(campId, phone, config) {
+    if (!phone) return false;
+    const clean = normalizeMarketingPhone(phone);
+    if (!clean) return false;
+    
+    if (!config.sentHistory) config.sentHistory = { globalSent: [] };
+    const campHistory = config.sentHistory[campId] || [];
+    const globalHistory = config.sentHistory.globalSent || [];
+    
+    return campHistory.includes(clean) || globalHistory.includes(clean);
+}
+
+// Helper: Registra telefone como enviado com persistência imediata
+function markPhoneAsSent(campId, phone, config) {
+    if (!phone) return;
+    const clean = normalizeMarketingPhone(phone);
+    if (!clean) return;
+    
+    if (!config.sentHistory) config.sentHistory = { globalSent: [] };
+    if (campId) {
+        if (!config.sentHistory[campId]) config.sentHistory[campId] = [];
+        if (!config.sentHistory[campId].includes(clean)) {
+            config.sentHistory[campId].push(clean);
+        }
+    }
+    if (!config.sentHistory.globalSent.includes(clean)) {
+        config.sentHistory.globalSent.push(clean);
+    }
+}
+
+// Helper: Varredura profunda no histórico real do WhatsApp para blindar contatos já abordados
+async function scanWhatsAppHistoryAndSync(config) {
+    if (!client || !isWhatsAppReady) {
+        console.warn('⚠️ [Scan History] WhatsApp não está conectado para realizar a varredura.');
+        return { success: false, error: 'WhatsApp não conectado' };
+    }
+
+    try {
+        console.log('🔍 [Scan History] Iniciando varredura profunda no histórico de conversas do WhatsApp...');
+        const chats = await client.getChats();
+        let identifiedCount = 0;
+
+        if (!config.sentHistory) config.sentHistory = { globalSent: [] };
+        if (!config.sentHistory.globalSent) config.sentHistory.globalSent = [];
+
+        // Trechos característicos das campanhas de marketing
+        const campaignSnippets = [
+            'voltamos oficialmente com as entregas',
+            '50% off no motoboy',
+            'liberamos 50% de desconto no seu frete',
+            '50% de desconto no seu frete',
+            'seu primeiro frete de hoje sai com 50%',
+            'passando só pra dar uma atenção e saber se tá curtindo',
+            'tô passando aqui só pra saber se os sabores',
+            'passando pra dar um alô e perguntar se tá curtindo',
+            'salva nosso número aí nos contatos',
+            'posso te mandar o link do cardápio'
+        ];
+
+        for (const chat of chats) {
+            // Analisa apenas chats 1 a 1
+            if (chat.isGroup || !chat.id || !chat.id._serialized || !chat.id._serialized.endsWith('@c.us')) {
+                continue;
+            }
+
+            const rawDigits = chat.id._serialized.replace('@c.us', '').replace(/\D/g, '');
+            const cleanPhone = normalizeMarketingPhone(rawDigits);
+
+            try {
+                const messages = await chat.fetchMessages({ limit: 30 });
+                let matched = false;
+
+                for (const msg of messages) {
+                    if (msg.fromMe && msg.body) {
+                        const lowerBody = msg.body.toLowerCase();
+                        if (campaignSnippets.some(s => lowerBody.includes(s))) {
+                            matched = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (matched && cleanPhone) {
+                    if (!config.sentHistory.globalSent.includes(cleanPhone)) {
+                        config.sentHistory.globalSent.push(cleanPhone);
+                        identifiedCount++;
+                    }
+                    // Vincula à campanha de reativação se existir
+                    const reatCamp = (config.campaigns || []).find(c => c.name && c.name.toLowerCase().includes('reativação'));
+                    if (reatCamp) {
+                        if (!config.sentHistory[reatCamp.id]) config.sentHistory[reatCamp.id] = [];
+                        if (!config.sentHistory[reatCamp.id].includes(cleanPhone)) {
+                            config.sentHistory[reatCamp.id].push(cleanPhone);
+                        }
+                    }
+                }
+            } catch (msgErr) {
+                // Silencioso em caso de timeout
+            }
+        }
+
+        saveMarketingConfig(config);
+        console.log(`✅ [Scan History] Varredura concluída! ${identifiedCount} novo(s) contato(s) já abordados foram catalogados e blindados.`);
+        return { success: true, identifiedCount, totalTracked: config.sentHistory.globalSent.length };
+    } catch (err) {
+        console.error('❌ [Scan History] Erro ao varrer histórico:', err.message);
+        return { success: false, error: err.message };
+    }
+}
+
+// GET /api/marketing/sent-history — Retorna histórico de disparos blindados
+app.get('/api/marketing/sent-history', (req, res) => {
+    try {
+        const config = loadMarketingConfig();
+        return res.json({ success: true, sentHistory: config.sentHistory || { globalSent: [] } });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/marketing/scan-chats — Executa varredura profunda sob demanda
+app.post('/api/marketing/scan-chats', async (req, res) => {
+    try {
+        const config = loadMarketingConfig();
+        const result = await scanWhatsAppHistoryAndSync(config);
+        return res.json(result);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
 
 // GET /api/marketing/campaigns — Retorna campanhas salvas
 app.get('/api/marketing/campaigns', (req, res) => {
@@ -2240,6 +2401,13 @@ async function marketingSchedulerTick() {
 
                             const contact = targetContacts[i];
                             const rawPhone = contact.cleanPhone || contact.phone;
+                            const cleanPhone = normalizeMarketingPhone(rawPhone);
+
+                            // 🛡️ TRAVA RÍGIDA ANTI-DUPLICAÇÃO NO SCHEDULER
+                            if (isPhoneAlreadySent(camp.id, cleanPhone, currentConfig)) {
+                                console.log(`⏩ [Scheduler 1-a-1] Pulando ${cleanPhone} (${contact.name || 'Cliente'}) - Contato já foi enviado anteriormente.`);
+                                continue;
+                            }
 
                             // Rotação sequencial exata das variações
                             let chosenText = camp.message;
@@ -2253,9 +2421,7 @@ async function marketingSchedulerTick() {
                                 .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app')
                                 .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
 
-                            const cleanDigits = String(rawPhone).replace(/\D/g, '');
-                            const formattedPhone = cleanDigits.startsWith('55') ? cleanDigits : `55${cleanDigits}`;
-                            const formattedNumber = `${formattedPhone}@c.us`;
+                            const formattedNumber = `${cleanPhone}@c.us`;
 
                             console.log(`📢 [Scheduler 1-a-1] Enviando (${i + 1}/${targetContacts.length}) para ${formattedNumber}...`);
 
@@ -2273,6 +2439,10 @@ async function marketingSchedulerTick() {
                             } catch (sendErr) {
                                 await client.sendMessage(formattedNumber, formattedMsg).catch(() => {});
                             }
+
+                            // 🛡️ Grava imediatamente no JSON para que nunca mais se repita
+                            markPhoneAsSent(camp.id, cleanPhone, currentConfig);
+                            saveMarketingConfig(currentConfig);
 
                             batchCounter++;
 
