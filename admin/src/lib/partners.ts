@@ -542,9 +542,7 @@ export function calculatePartnersFinancials(params: {
   const dCosts = (DEFAULT_MODEL_COSTS || {}) as Record<string, number>;
 
   for (const order of validOrders) {
-    const orderTotal = parseFloat(order.total_amount || 0);
     const shippingFee = parseFloat(order.shipping_fee || 0);
-    revenueSum += orderTotal;
     shippingSum += shippingFee;
 
     const items = Array.isArray(order.items) ? order.items : [];
@@ -552,6 +550,7 @@ export function calculatePartnersFinancials(params: {
       const qty = Number(item.quantity) || 1;
       const brand = (item.brand || "OUTROS").toUpperCase();
       const modelName = (item.name || "POD").toUpperCase();
+      const itemPrice = Number(item.price || item.unit_price) || 0;
       const modelKey = (item.modelKey || `${brand}__${modelName}`).toLowerCase();
 
       let itemCost = Number(item.cost_price || item.costPrice) || 0;
@@ -563,13 +562,15 @@ export function calculatePartnersFinancials(params: {
       }
       if (!itemCost) itemCost = 65;
 
+      // Faturamento dos pods (sem frete)
+      revenueSum += qty * itemPrice;
       cmvSum += qty * itemCost;
       podsSoldSum += qty;
     }
   }
 
-  // Lucro Líquido Real das Vendas
-  const netProfit = revenueSum - cmvSum - shippingSum;
+  // Lucro Líquido Real das Vendas = Faturamento dos Pods (Sem Frete) - CMV
+  const netProfit = revenueSum - cmvSum;
   const realNetProfitPostMarketing = netProfit - operationalExpenses;
   const netProfitMarginPct = revenueSum > 0 ? (realNetProfitPostMarketing / revenueSum) * 100 : 0;
 

@@ -188,9 +188,7 @@ export function FinanceDashboard() {
       const dCosts = (DEFAULT_MODEL_COSTS || {}) as Record<string, number>;
 
       for (const order of validOrders) {
-        const orderTotal = parseFloat(order.total_amount || 0);
         const shippingFee = parseFloat(order.shipping_fee || 0);
-        revenueSum += orderTotal;
         shippingSum += shippingFee;
 
         const items: OrderItem[] = Array.isArray(order.items) ? order.items : [];
@@ -214,6 +212,8 @@ export function FinanceDashboard() {
           const itemTotalRevenue = qty * itemPrice;
           const itemTotalCost = qty * itemCost;
 
+          // Faturamento Bruto Real calcula estritamente a receita dos pods (sem o frete)
+          revenueSum += itemTotalRevenue;
           cmvSum += itemTotalCost;
           podsSoldSum += qty;
 
@@ -240,8 +240,8 @@ export function FinanceDashboard() {
         }
       }
 
-      // Lucro Líquido Real = Faturamento Bruto - Custo CMV - Frete/Logística Gasta
-      const net = revenueSum - cmvSum - shippingSum;
+      // Lucro Líquido Real = Faturamento dos Pods (Sem Frete) - Custo CMV
+      const net = revenueSum - cmvSum;
       const margin = revenueSum > 0 ? (net / revenueSum) * 100 : 0;
 
       setGrossRevenue(revenueSum);
@@ -342,11 +342,11 @@ export function FinanceDashboard() {
 
       {/* ━━━ BLOCO 1: KPIs PRINCIPAIS DE VENDAS REALIZADAS ━━━━━━━━━━━━━━ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. Faturamento Bruto Real */}
+        {/* 1. Faturamento Bruto Real (Sem o Frete) */}
         <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
-              Faturamento Bruto Real
+              Faturamento Bruto Real (Sem o Frete)
             </span>
             <div className="size-9 rounded-xl bg-white/5 border border-white/15 flex items-center justify-center text-white">
               <DollarSign className="size-5" />
@@ -449,7 +449,7 @@ export function FinanceDashboard() {
           </div>
 
           <div className="pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
-            Fat (R$ {(grossRevenue || 0).toFixed(2)}) - CMV (R$ {(cmv || 0).toFixed(2)}) - Frete (R$ {(logisticsFee || 0).toFixed(2)})
+            Fat. Pods (R$ {(grossRevenue || 0).toFixed(2)}) - CMV (R$ {(cmv || 0).toFixed(2)})
           </div>
         </div>
       </div>
@@ -772,17 +772,17 @@ export function FinanceDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10 font-medium">
-              {/* Line 1: Faturamento Bruto */}
+              {/* Line 1: Faturamento Bruto (Sem Frete) */}
               <tr className="bg-emerald-500/5 hover:bg-emerald-500/10 transition-colors">
                 <td className="py-3.5 px-4 font-bold text-white flex items-center gap-2">
                   <div className="size-2 rounded-full bg-emerald-400" />
-                  <span>🟢 Faturamento Bruto Real</span>
+                  <span>🟢 Faturamento Bruto Real (Sem o Frete)</span>
                 </td>
                 <td className="py-3.5 px-4 text-right font-extrabold text-emerald-400 text-sm">
                   {formatBRL(grossRevenue)}
                 </td>
                 <td className="py-3.5 px-4 text-right font-bold text-emerald-400">100.0%</td>
-                <td className="py-3.5 px-4 text-muted-foreground">Total bruto faturado nos {totalOrders} pedidos</td>
+                <td className="py-3.5 px-4 text-muted-foreground">Total das vendas de produtos nos {totalOrders} pedidos (sem frete)</td>
               </tr>
 
               {/* Line 2: CMV */}
@@ -800,22 +800,7 @@ export function FinanceDashboard() {
                 <td className="py-3.5 px-4 text-muted-foreground">Custo de aquisição pago ao fornecedor pelos pods</td>
               </tr>
 
-              {/* Line 3: Frete / Logística */}
-              <tr className="hover:bg-white/5 transition-colors">
-                <td className="py-3.5 px-4 font-bold text-silver flex items-center gap-2">
-                  <div className="size-2 rounded-full bg-amber-400" />
-                  <span>🟧 (-) Logística & Entregas</span>
-                </td>
-                <td className="py-3.5 px-4 text-right font-bold text-amber-400">
-                  -{formatBRL(logisticsFee)}
-                </td>
-                <td className="py-3.5 px-4 text-right font-bold text-amber-400">
-                  {grossRevenue > 0 ? ((logisticsFee / grossRevenue) * 100).toFixed(1) : 0}%
-                </td>
-                <td className="py-3.5 px-4 text-muted-foreground">Taxas registradas de envio aos clientes</td>
-              </tr>
-
-              {/* Line 4: Marketing */}
+              {/* Line 3: Marketing */}
               <tr className="hover:bg-white/5 transition-colors">
                 <td className="py-3.5 px-4 font-bold text-silver flex items-center gap-2">
                   <div className="size-2 rounded-full bg-amber-500" />
@@ -828,6 +813,19 @@ export function FinanceDashboard() {
                   {grossRevenue > 0 ? ((numericMarketingSpent / grossRevenue) * 100).toFixed(1) : 0}%
                 </td>
                 <td className="py-3.5 px-4 text-muted-foreground">Investimento em anúncios no Meta/Instagram</td>
+              </tr>
+
+              {/* Line 4: Frete / Logística (Informativo) */}
+              <tr className="hover:bg-white/5 transition-colors text-white/70">
+                <td className="py-3 px-4 font-medium flex items-center gap-2">
+                  <div className="size-2 rounded-full bg-blue-400/60" />
+                  <span>🚚 (Informativo) Total de Fretes Cobrados</span>
+                </td>
+                <td className="py-3 px-4 text-right font-mono text-white/80">
+                  {formatBRL(logisticsFee)}
+                </td>
+                <td className="py-3 px-4 text-right font-mono text-white/50">—</td>
+                <td className="py-3 px-4 text-muted-foreground">Fretes cobrados e diluídos nas entregas</td>
               </tr>
 
               {/* Line 5: LUCRO LÍQUIDO REAL */}
