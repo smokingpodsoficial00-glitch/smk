@@ -48,7 +48,7 @@ export function SortDropdown({ value, onChange }: SortDropdownProps) {
       <button
         type="button"
         onClick={() => setOpen(prev => !prev)}
-        className={`inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer select-none border ${
+        className={`inline-flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer select-none border whitespace-nowrap ${
           isSorted
             ? "bg-white text-black font-semibold border-white shadow-[0_0_14px_rgba(255,255,255,0.28)]"
             : "glass text-white/90 border-white/10 hover:bg-elevated hover:border-white/20 hover:text-white"
@@ -58,7 +58,7 @@ export function SortDropdown({ value, onChange }: SortDropdownProps) {
       >
         <ArrowUpDown className={`size-3 sm:size-3.5 shrink-0 ${isSorted ? "text-black" : "text-muted-foreground"}`} />
         <span>
-          <span className={`font-normal ${isSorted ? "text-black/80" : "text-muted-foreground"}`}>Ordenar por: </span>
+          <span className={`hidden sm:inline font-normal ${isSorted ? "text-black/80" : "text-muted-foreground"}`}>Ordenar por: </span>
           <span className={`font-semibold ${isSorted ? "text-black" : "text-white"}`}>{currentOption.label}</span>
         </span>
         <ChevronDown className={`size-3 sm:size-3.5 shrink-0 transition-transform duration-200 ${isSorted ? "text-black" : "text-muted-foreground"} ${open ? "rotate-180" : ""}`} />

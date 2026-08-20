@@ -86,10 +86,10 @@ export function Hero({
         </div>
       </div>
 
-      {/* Barra Unificada de Filtros e Ordenação */}
-      <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      {/* Barra Unificada de Filtros e Ordenação na Mesma Linha */}
+      <div className="mt-5 sm:mt-8 flex items-center justify-between gap-1 sm:gap-2.5 w-full">
         {/* Filtros à esquerda: [ Todas ] [ ⭐ Mais Vendidos ] [ Marcas ▾ ] */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+        <div className="flex items-center gap-1 sm:gap-2.5 min-w-0">
           <Pill 
             label="Todas" 
             active={activeBrand === null && (!activeCategory || activeCategory === null)} 
@@ -106,7 +106,7 @@ export function Hero({
                 onCategoryChange(activeCategory === 'mais-vendidos' ? null : 'mais-vendidos');
               }}
             >
-              <Star className={`size-3 sm:size-3.5 mr-1.5 shrink-0 ${activeCategory === 'mais-vendidos' ? 'text-amber-500 fill-amber-500' : 'text-amber-400 fill-amber-400'}`} />
+              <Star className={`size-3 sm:size-3.5 mr-1 sm:mr-1.5 shrink-0 ${activeCategory === 'mais-vendidos' ? 'text-amber-500 fill-amber-500' : 'text-amber-400 fill-amber-400'}`} />
               <span>Mais Vendidos</span>
             </CategoryPill>
           )}
@@ -120,8 +120,8 @@ export function Hero({
           />
         </div>
 
-        {/* Ordenação à direita: [ Ordenar por: Padrão ▾ ] */}
-        <div className="flex items-center justify-end shrink-0">
+        {/* Ordenação à direita: [ ⇅ Padrão ▾ ] (no mobile) / [ ⇅ Ordenar por: Padrão ▾ ] (no desktop) */}
+        <div className="shrink-0">
           <SortDropdown value={sortBy} onChange={onSortChange} />
         </div>
       </div>
@@ -133,7 +133,7 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
   return (
     <button
       onClick={onClick}
-      className={`px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 border cursor-pointer select-none ${
+      className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 border cursor-pointer select-none whitespace-nowrap ${
         active 
           ? "bg-white text-black font-semibold border-white shadow-[0_0_14px_rgba(255,255,255,0.28)]"
           : "glass text-white/90 border-white/10 hover:bg-elevated hover:border-white/20 hover:text-white"
@@ -148,7 +148,7 @@ function CategoryPill({ children, active, onClick }: { children: React.ReactNode
   return (
     <button
       onClick={onClick}
-      className={`px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 border cursor-pointer select-none flex items-center ${
+      className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 border cursor-pointer select-none flex items-center whitespace-nowrap ${
         active 
           ? "bg-white text-black font-semibold border-white shadow-[0_0_14px_rgba(255,255,255,0.28)]"
           : "glass text-white/90 border-white/10 hover:bg-elevated hover:border-white/20 hover:text-white"

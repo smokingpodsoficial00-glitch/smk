@@ -40,7 +40,7 @@ export function BrandDropdown({ brands, activeBrand, onSelectBrand }: BrandDropd
       <button
         type="button"
         onClick={() => setOpen(prev => !prev)}
-        className={`inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer select-none border ${
+        className={`inline-flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer select-none border whitespace-nowrap ${
           isBrandActive
             ? "bg-white text-black font-semibold border-white shadow-[0_0_14px_rgba(255,255,255,0.28)]"
             : "glass text-white/90 border-white/10 hover:bg-elevated hover:border-white/20 hover:text-white"
@@ -49,7 +49,7 @@ export function BrandDropdown({ brands, activeBrand, onSelectBrand }: BrandDropd
         aria-expanded={open}
       >
         <Tag className={`size-3 sm:size-3.5 shrink-0 ${isBrandActive ? "text-black" : "text-muted-foreground"}`} />
-        <span className="truncate max-w-[120px] sm:max-w-[160px]">
+        <span className="truncate max-w-[70px] sm:max-w-[160px]">
           {isBrandActive ? activeBrand : "Marcas"}
         </span>
         <ChevronDown className={`size-3 sm:size-3.5 shrink-0 transition-transform duration-200 ${isBrandActive ? "text-black" : "text-muted-foreground"} ${open ? "rotate-180" : ""}`} />
