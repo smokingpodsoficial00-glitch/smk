@@ -11,7 +11,7 @@ import { fetchCategories, fetchProductCategoryMappings, DEFAULT_CATEGORIES, type
 import { supabase } from "@/lib/supabase";
 import { Loader2, Star } from "lucide-react";
 
-// Trigger Vercel auto-deploy from Git
+// Trigger Vercel Build: v1.3.0 - Filtros de Marca & Ordenacao Menor/Maior Preco
 export default function App() {
   return (
     <CartProvider>
