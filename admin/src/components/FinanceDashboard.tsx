@@ -24,11 +24,27 @@ import {
   Target,
   Percent,
   BarChart3,
+  PackagePlus,
+  Boxes,
+  Calendar,
+  Trash2,
+  Plus,
+  X,
+  AlertCircle,
+  History,
+  FileText,
+  CheckCircle2,
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchProductCostsMap } from "../lib/productCosts";
+import {
+  fetchStockRepurchases,
+  createStockRepurchase,
+  deleteStockRepurchase,
+  type StockRepurchase,
+} from "../lib/stockRepurchases";
 
 interface OrderItem {
   id?: string;
@@ -89,6 +105,21 @@ export function FinanceDashboard() {
   const [stockAssetCost, setStockAssetCost] = useState(0);
   const [stockAssetRetail, setStockAssetRetail] = useState(0);
   const [stockAssetUnits, setStockAssetUnits] = useState(0);
+
+  // Recompra de Estoque & Caixa Real State (Módulo Independente)
+  const [repurchases, setRepurchases] = useState<StockRepurchase[]>([]);
+  const [loadingRepurchases, setLoadingRepurchases] = useState(false);
+  const [isRepurchaseModalOpen, setIsRepurchaseModalOpen] = useState(false);
+  const [repurchaseToDelete, setRepurchaseToDelete] = useState<StockRepurchase | null>(null);
+
+  // Form State para Nova Recompra
+  const [stockAmountInput, setStockAmountInput] = useState("");
+  const [freightAmountInput, setFreightAmountInput] = useState("");
+  const [purchaseDateInput, setPurchaseDateInput] = useState(new Date().toISOString().split("T")[0]);
+  const [notesInput, setNotesInput] = useState("");
+  const [isSavingRepurchase, setIsSavingRepurchase] = useState(false);
+  const [repurchaseError, setRepurchaseError] = useState<string | null>(null);
+  const [repurchaseSuccessMessage, setRepurchaseSuccessMessage] = useState<string | null>(null);
 
   // Tesouraria & Fluxo de Caixa (Marketing & Outros Custos)
   const [marketingSpent, setMarketingSpent] = useState<string>(() => {
@@ -284,18 +315,145 @@ export function FinanceDashboard() {
     }
   };
 
+  const loadRepurchasesData = async (targetCompanyId: string) => {
+    try {
+      setLoadingRepurchases(true);
+      const data = await fetchStockRepurchases(targetCompanyId);
+      setRepurchases(data);
+    } catch (e) {
+      console.warn("Erro ao carregar dados de recompras:", e);
+    } finally {
+      setLoadingRepurchases(false);
+    }
+  };
+
   useEffect(() => {
+    const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
     fetchFinanceData();
+    loadRepurchasesData(targetCompanyId);
 
     const subOrders = supabase
       .channel("finance_orders_changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, fetchFinanceData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, () => {
+        fetchFinanceData();
+        loadRepurchasesData(targetCompanyId);
+      })
+      .subscribe();
+
+    const subProducts = supabase
+      .channel("finance_products_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, fetchFinanceData)
+      .subscribe();
+
+    const subRepurchases = supabase
+      .channel("finance_stock_repurchases_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_stock_repurchases" }, () => {
+        loadRepurchasesData(targetCompanyId);
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(subOrders);
+      supabase.removeChannel(subProducts);
+      supabase.removeChannel(subRepurchases);
     };
   }, [company?.id]);
+
+  // ── Cálculos Recompra de Estoque & Caixa Real (Módulo Independente) ─────────────
+  const totalStockPurchases = useMemo(() => {
+    return repurchases.reduce((sum, r) => sum + (Number(r.stock_purchase_amount) || 0), 0);
+  }, [repurchases]);
+
+  const totalFreightRepurchases = useMemo(() => {
+    return repurchases.reduce((sum, r) => sum + (Number(r.freight_amount) || 0), 0);
+  }, [repurchases]);
+
+  const totalInvestedRepurchases = useMemo(() => {
+    return totalStockPurchases + totalFreightRepurchases;
+  }, [totalStockPurchases, totalFreightRepurchases]);
+
+  // CAIXA REAL = Faturamento Bruto Real (Acumulado) - Total Pago em Recompras de Estoque
+  // REGRA FINANCEIRA: O FRETE NÃO ENTRA NO CÁLCULO DO CAIXA REAL
+  const realCash = useMemo(() => {
+    return (grossRevenue || 0) - totalStockPurchases;
+  }, [grossRevenue, totalStockPurchases]);
+
+  // Modal Handlers de Recompra
+  const handleOpenRepurchaseModal = () => {
+    setStockAmountInput("");
+    setFreightAmountInput("");
+    setPurchaseDateInput(new Date().toISOString().split("T")[0]);
+    setNotesInput("");
+    setRepurchaseError(null);
+    setRepurchaseSuccessMessage(null);
+    setIsRepurchaseModalOpen(true);
+  };
+
+  const handleSaveRepurchase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRepurchaseError(null);
+
+    const cleanStockStr = stockAmountInput.replace(/[^\d.,]/g, "").replace(",", ".");
+    const cleanFreightStr = freightAmountInput.replace(/[^\d.,]/g, "").replace(",", ".");
+
+    const stockAmount = parseFloat(cleanStockStr);
+    const freightAmount = cleanFreightStr ? parseFloat(cleanFreightStr) : 0;
+
+    if (isNaN(stockAmount) || stockAmount <= 0) {
+      setRepurchaseError("Informe um valor válido pago no estoque (maior que zero).");
+      return;
+    }
+
+    if (isNaN(freightAmount) || freightAmount < 0) {
+      setRepurchaseError("O frete da reposição não pode ser negativo.");
+      return;
+    }
+
+    try {
+      setIsSavingRepurchase(true);
+      const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+
+      const res = await createStockRepurchase({
+        companyId: targetCompanyId,
+        stock_purchase_amount: stockAmount,
+        freight_amount: freightAmount,
+        purchase_date: purchaseDateInput,
+        notes: notesInput,
+      });
+
+      if (res.error) {
+        setRepurchaseError(res.error.message || "Erro ao salvar recompra.");
+        return;
+      }
+
+      await loadRepurchasesData(targetCompanyId);
+      setRepurchaseSuccessMessage("Recompra registrada com sucesso!");
+      setTimeout(() => {
+        setIsRepurchaseModalOpen(false);
+        setRepurchaseSuccessMessage(null);
+      }, 500);
+    } catch (err: any) {
+      setRepurchaseError(err.message || "Erro inesperado ao salvar recompra.");
+    } finally {
+      setIsSavingRepurchase(false);
+    }
+  };
+
+  const handleConfirmDeleteRepurchase = async () => {
+    if (!repurchaseToDelete) return;
+    try {
+      const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+      const res = await deleteStockRepurchase(repurchaseToDelete.id, targetCompanyId);
+      if (res.error) {
+        alert("Erro ao excluir: " + res.error.message);
+        return;
+      }
+      await loadRepurchasesData(targetCompanyId);
+      setRepurchaseToDelete(null);
+    } catch (err: any) {
+      alert("Erro ao excluir: " + (err.message || "Erro inesperado"));
+    }
+  };
 
   // Cálculos Seguros de Tesouraria & Fluxo de Caixa
   const numericMarketingSpent = parseFloat(String(marketingSpent || "0").replace(",", ".")) || 0;
@@ -451,6 +609,219 @@ export function FinanceDashboard() {
           <div className="pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
             Fat. Pods (R$ {(grossRevenue || 0).toFixed(2)}) - CMV (R$ {(cmv || 0).toFixed(2)})
           </div>
+        </div>
+      </div>
+
+      {/* ━━━ NOVO BLOCO: 📦 RECOMPRA DE ESTOQUE & CAIXA REAL (MÓDULO INDEPENDENTE) ━━━━━━━━━━━━━━ */}
+      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
+        {/* Cabeçalho da Seção */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div>
+            <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <PackagePlus className="size-5 text-emerald-400" />
+              <span>Recompra de Estoque & Caixa Real</span>
+            </h3>
+            <p className="text-xs text-white/50 mt-0.5">
+              Controle de desembolsos para reposição de mercadorias, fretes de fornecedores e saldo real remanescente em caixa.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleOpenRepurchaseModal}
+              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95 cursor-pointer"
+            >
+              <Plus className="size-4 stroke-[3]" />
+              <span>Registrar Recompra</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 4 Cards de Indicadores de Recompra */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: CAIXA REAL (Destaque Principal) */}
+          <div className="bg-gradient-to-b from-emerald-500/15 via-emerald-500/5 to-black/60 border-2 border-emerald-500/50 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-xl shadow-emerald-950/20 hover:border-emerald-400 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Wallet className="size-4 text-emerald-400" /> Caixa Real
+              </span>
+              <span className="text-[10px] font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 px-2 py-0.5 rounded-full">
+                Disponível
+              </span>
+            </div>
+
+            <div>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-300 tracking-tight">
+                {formatBRL(realCash)}
+              </div>
+              <p className="text-xs font-semibold text-emerald-400/90 mt-1">
+                Faturamento acumulado − recompras de estoque
+              </p>
+            </div>
+
+            <div className="pt-2.5 border-t border-emerald-500/20 text-[10px] text-white/50 flex flex-col gap-0.5">
+              <span>Fat: {formatBRL(grossRevenue)} − Estoque: {formatBRL(totalStockPurchases)}</span>
+              <span className="text-emerald-400/70 font-medium">⚡ Fretes de reposição não são descontados</span>
+            </div>
+          </div>
+
+          {/* Card 2: RECOMPRAS DE ESTOQUE */}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-3 hover:border-white/30 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider flex items-center gap-1.5">
+                <Boxes className="size-4 text-white/70" /> Recompras de Estoque
+              </span>
+              <div className="size-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/70">
+                <Box className="size-4" />
+              </div>
+            </div>
+
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-white">
+                {formatBRL(totalStockPurchases)}
+              </div>
+              <p className="text-xs font-medium text-white/50 mt-1">
+                Total pago em produtos para reposição
+              </p>
+            </div>
+
+            <div className="pt-2.5 border-t border-white/10 text-[10px] text-white/40">
+              {repurchases.length} {repurchases.length === 1 ? 'reposição registrada' : 'reposições registradas'}
+            </div>
+          </div>
+
+          {/* Card 3: TOTAL INVESTIDO EM REPOSIÇÃO */}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-3 hover:border-white/30 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers className="size-4 text-amber-400" /> Total Investido Reposição
+              </span>
+              <div className="size-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                <DollarSign className="size-4" />
+              </div>
+            </div>
+
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-amber-300">
+                {formatBRL(totalInvestedRepurchases)}
+              </div>
+              <p className="text-xs font-medium text-white/50 mt-1">
+                Produtos + fretes de reposição
+              </p>
+            </div>
+
+            <div className="pt-2.5 border-t border-white/10 text-[10px] text-white/40">
+              Estoque ({formatBRL(totalStockPurchases)}) + Frete ({formatBRL(totalFreightRepurchases)})
+            </div>
+          </div>
+
+          {/* Card 4: FRETES DE REPOSIÇÃO */}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-3 hover:border-white/30 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider flex items-center gap-1.5">
+                <Truck className="size-4 text-white/70" /> Fretes de Reposição
+              </span>
+              <div className="size-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/70">
+                <Truck className="size-4" />
+              </div>
+            </div>
+
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-white">
+                {formatBRL(totalFreightRepurchases)}
+              </div>
+              <p className="text-xs font-medium text-white/50 mt-1">
+                Total gasto com frete dos fornecedores
+              </p>
+            </div>
+
+            <div className="pt-2.5 border-t border-white/10 text-[10px] text-white/40">
+              Fretes registrados nas reposições de estoque
+            </div>
+          </div>
+        </div>
+
+        {/* Tabela de Histórico de Recompras */}
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-white/80 uppercase tracking-wider flex items-center gap-2">
+              <History className="size-4 text-white/60" />
+              <span>Histórico de Recompras de Estoque</span>
+              <span className="text-[10px] bg-white/10 text-white/70 px-2 py-0.5 rounded-full">
+                {repurchases.length}
+              </span>
+            </h4>
+          </div>
+
+          {repurchases.length === 0 ? (
+            <div className="bg-black/20 border border-dashed border-white/10 rounded-2xl p-8 text-center space-y-3">
+              <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-white/40">
+                <PackagePlus className="size-6" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white/70">Nenhuma recompra de estoque registrada ainda</p>
+                <p className="text-xs text-white/40 mt-0.5">
+                  Registre as reposições de produtos pagas aos fornecedores para acompanhar o Caixa Real da loja.
+                </p>
+              </div>
+              <button
+                onClick={handleOpenRepurchaseModal}
+                className="inline-flex items-center gap-1.5 text-xs font-bold bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded-xl border border-white/15 transition-all cursor-pointer"
+              >
+                <Plus className="size-3.5" />
+                <span>Registrar Primeira Recompra</span>
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/40">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-white/10 bg-white/5 text-white/60 font-bold uppercase tracking-wider">
+                    <th className="py-3 px-4">Data</th>
+                    <th className="py-3 px-4 text-right">Estoque (Produtos)</th>
+                    <th className="py-3 px-4 text-right">Frete Reposição</th>
+                    <th className="py-3 px-4 text-right">Total Desembolsado</th>
+                    <th className="py-3 px-4">Observação</th>
+                    <th className="py-3 px-4 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 font-medium">
+                  {repurchases.map((rep) => {
+                    const formattedDate = rep.purchase_date
+                      ? new Date(rep.purchase_date + "T00:00:00").toLocaleDateString("pt-BR")
+                      : "—";
+                    return (
+                      <tr key={rep.id} className="hover:bg-white/5 transition-colors">
+                        <td className="py-3.5 px-4 font-mono font-bold text-white/90">
+                          {formattedDate}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-extrabold text-white text-sm">
+                          {formatBRL(rep.stock_purchase_amount)}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-bold text-white/70">
+                          {rep.freight_amount > 0 ? formatBRL(rep.freight_amount) : "R$ 0,00"}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-black text-amber-300 text-sm">
+                          {formatBRL(rep.total_repurchase_amount)}
+                        </td>
+                        <td className="py-3.5 px-4 text-white/60 max-w-xs truncate">
+                          {rep.notes || <span className="text-white/20 italic">Sem observações</span>}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <button
+                            onClick={() => setRepurchaseToDelete(rep)}
+                            title="Excluir Recompra"
+                            className="size-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 inline-flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
@@ -848,6 +1219,194 @@ export function FinanceDashboard() {
           </table>
         </div>
       </div>
+
+      {/* ━━━ MODAL: REGISTRAR RECOMPRA DE ESTOQUE ━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {isRepurchaseModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0e0e10] border border-white/20 rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl relative overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="size-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <PackagePlus className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Registrar Recompra</h3>
+                  <p className="text-[11px] text-white/50">Lançamento de aquisição de estoque no financeiro</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsRepurchaseModalOpen(false)}
+                className="size-8 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {repurchaseError && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-xs text-red-400 flex items-center gap-2">
+                <AlertCircle className="size-4 shrink-0" />
+                <span>{repurchaseError}</span>
+              </div>
+            )}
+
+            {repurchaseSuccessMessage && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 text-xs text-emerald-400 flex items-center gap-2">
+                <CheckCircle2 className="size-4 shrink-0" />
+                <span>{repurchaseSuccessMessage}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveRepurchase} className="space-y-4">
+              {/* Valor Pago no Estoque */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-white/80 flex items-center gap-1">
+                  <span>Valor pago no estoque (R$)</span>
+                  <span className="text-emerald-400">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-white/40">R$</span>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="1.000,00"
+                    value={stockAmountInput}
+                    onChange={(e) => setStockAmountInput(e.target.value)}
+                    className="w-full bg-black/60 border border-white/15 rounded-xl pl-9 pr-3 py-2.5 text-sm font-bold text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                  />
+                </div>
+                <p className="text-[10px] text-white/40">Somente o valor das mercadorias (sem o frete)</p>
+              </div>
+
+              {/* Frete da Reposição */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-white/80">Frete da reposição (R$)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-white/40">R$</span>
+                  <input
+                    type="text"
+                    placeholder="80,00"
+                    value={freightAmountInput}
+                    onChange={(e) => setFreightAmountInput(e.target.value)}
+                    className="w-full bg-black/60 border border-white/15 rounded-xl pl-9 pr-3 py-2.5 text-sm font-bold text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                  />
+                </div>
+                <p className="text-[10px] text-white/40">Opcional. Não é descontado do Caixa Real.</p>
+              </div>
+
+              {/* Data da Recompra */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-white/80 flex items-center gap-1.5">
+                  <Calendar className="size-3.5 text-white/60" />
+                  <span>Data da recompra</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={purchaseDateInput}
+                  onChange={(e) => setPurchaseDateInput(e.target.value)}
+                  className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2.5 text-sm font-medium text-white focus:outline-none focus:border-emerald-500/50 transition-colors [color-scheme:dark]"
+                />
+              </div>
+
+              {/* Observação */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-white/80">Observação</label>
+                <input
+                  type="text"
+                  placeholder="Ex.: Reposição fornecedor X, Lote #14"
+                  value={notesInput}
+                  onChange={(e) => setNotesInput(e.target.value)}
+                  className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                />
+              </div>
+
+              {/* Botões de Ação */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  disabled={isSavingRepurchase}
+                  onClick={() => setIsRepurchaseModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-white/70 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingRepurchase}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2 disabled:opacity-50 active:scale-95 cursor-pointer"
+                >
+                  {isSavingRepurchase ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      <span>Salvando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="size-4 stroke-[3]" />
+                      <span>Registrar Recompra</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ━━━ MODAL: CONFIRMAR EXCLUSÃO DE RECOMPRA ━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {repurchaseToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0e0e10] border border-red-500/30 rounded-3xl w-full max-w-sm p-6 space-y-4 shadow-2xl relative overflow-hidden">
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
+                <Trash2 className="size-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Excluir Recompra?</h3>
+                <p className="text-xs text-white/50">Esta ação irá recalcular o Caixa Real</p>
+              </div>
+            </div>
+
+            <div className="bg-black/40 border border-white/10 rounded-xl p-3 text-xs space-y-1">
+              <div className="flex justify-between">
+                <span className="text-white/60">Data:</span>
+                <span className="text-white font-bold">
+                  {new Date(repurchaseToDelete.purchase_date + "T00:00:00").toLocaleDateString("pt-BR")}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-white/60">Estoque:</span>
+                <span className="text-white font-bold">{formatBRL(repurchaseToDelete.stock_purchase_amount)}</span>
+              </div>
+              {repurchaseToDelete.freight_amount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-white/60">Frete:</span>
+                  <span className="text-white/80 font-bold">{formatBRL(repurchaseToDelete.freight_amount)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setRepurchaseToDelete(null)}
+                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-white/70 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteRepurchase}
+                className="px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-400 text-white text-xs font-bold shadow-lg shadow-red-500/20 transition-all active:scale-95 cursor-pointer"
+              >
+                Excluir Definitivamente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
