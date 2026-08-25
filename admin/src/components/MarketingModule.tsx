@@ -157,6 +157,28 @@ export function MarketingModule() {
   const isAbortingRef = React.useRef(false);
 
   const [loadingScan, setLoadingScan] = useState(false);
+  const [loadingSanitize, setLoadingSanitize] = useState(false);
+  const [diagnosticData, setDiagnosticData] = useState<{
+    totalContactsRaw: number;
+    totalUnique: number;
+    duplicateCount: number;
+    alreadySentCount: number;
+    virginCount: number;
+    listsCount: number;
+    globalSentTotal: number;
+  } | null>(null);
+
+  const fetchDiagnostic = async () => {
+    try {
+      const res = await fetch('http://localhost:3006/api/marketing/lists-diagnostic');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setDiagnosticData(data);
+        }
+      }
+    } catch (e) {}
+  };
 
   const handleStopCampaign = () => {
     isAbortingRef.current = true;
@@ -170,6 +192,7 @@ export function MarketingModule() {
       const res = await fetch('http://localhost:3006/api/marketing/scan-chats', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
+        await fetchDiagnostic();
         alert(`✅ Varredura Concluída com Sucesso!\n\nNovos contatos identificados: ${data.identifiedCount}\nTotal de contatos blindados no sistema: ${data.totalTracked}\n\nEsses contatos nunca mais receberão mensagens repetidas.`);
       } else {
         alert(`⚠️ ${data.error || 'Não foi possível concluir a varredura. Certifique-se de que o WhatsApp está conectado.'}`);
@@ -181,8 +204,41 @@ export function MarketingModule() {
     }
   };
 
+  const handleCleanAndDeduplicateLists = async () => {
+    if (!confirm('⚡ Executar Higienização & Desduplicação Automática em 1 Clique?\n\nO sistema vai:\n1. Analisar todas as listas e remover 100% dos contatos duplicados cruzados.\n2. Criar a "⭐ BASE VIRGEM" com contatos únicos prontos para disparo.\n3. Criar a "🛡️ BASE BLINDADA" para contatos já contactados.\n4. Ajustar as campanhas ativas para apontar apenas para a base limpa.\n\nDeseja continuar?')) return;
+
+    setLoadingSanitize(true);
+    try {
+      const res = await fetch('http://localhost:3006/api/marketing/clean-and-deduplicate-lists', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setBroadcastLists(data.lists);
+        localStorage.setItem(LOCAL_STORAGE_LISTS, JSON.stringify(data.lists));
+        await fetchDiagnostic();
+        // Recarrega campanhas atualizadas
+        try {
+          const campRes = await fetch('http://localhost:3006/api/marketing/campaigns');
+          const campData = await campRes.json();
+          if (campData.success && campData.campaigns) {
+            setCampaigns(campData.campaigns);
+            localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(campData.campaigns));
+          }
+        } catch (e) {}
+
+        alert(`✨ Higienização e Desduplicação Concluída com Sucesso!\n\n👥 Total de contatos analisados: ${data.totalOriginal}\n⚡ Contatos Únicos Reais: ${data.totalUnique}\n🗑️ Duplicatas Eliminadas: ${data.duplicatesRemoved}\n⭐ Base Virgem (Prontos p/ Disparo): ${data.virginCount} contatos\n🛡️ Base Blindada (Já Abordados): ${data.alreadySentCount} contatos\n\nAgora a sua base está 100% protegida contra mensagens duplicadas!`);
+      } else {
+        alert(`⚠️ ${data.error || 'Erro ao higienizar listas.'}`);
+      }
+    } catch (err: any) {
+      alert(`❌ Erro ao conectar com o servidor backend: ${err.message}`);
+    } finally {
+      setLoadingSanitize(false);
+    }
+  };
+
   // Carrega Listas e Campanhas salvas (localStorage + backend)
   useEffect(() => {
+    fetchDiagnostic();
     try {
       const savedLists = localStorage.getItem(LOCAL_STORAGE_LISTS);
       if (savedLists) {
@@ -257,6 +313,17 @@ export function MarketingModule() {
           // Backend offline: usa localStorage normalmente
           console.warn('⚠️ Backend offline, usando campanhas do localStorage.');
         });
+
+      // Tenta buscar listas atualizadas do backend
+      fetch('http://localhost:3006/api/marketing/lists')
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.lists) && data.lists.length > 0) {
+            setBroadcastLists(data.lists);
+            localStorage.setItem(LOCAL_STORAGE_LISTS, JSON.stringify(data.lists));
+          }
+        })
+        .catch(() => {});
 
     } catch (e) {
       console.warn('Erro ao carregar storage local de marketing:', e);
@@ -839,6 +906,91 @@ export function MarketingModule() {
 
       {/* Conteúdo Principal por Aba */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+
+        {/* ============================================================ */}
+        {/* CARD CENTRAL DE AUDITORIA, BLINDAGEM & DESDUPLICAÇÃO RÁPIDA */}
+        {/* ============================================================ */}
+        <div className="bg-[#0b0c10] border border-white/10 hover:border-purple-500/30 rounded-2xl p-5 shadow-lg space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 mt-0.5">
+                <ShieldCheck className="size-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-white">
+                    Auditoria de Base & Blindagem Anti-Ban
+                  </h3>
+                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
+                    Proteção Ativa
+                  </span>
+                </div>
+                <p className="text-xs text-white/50 mt-0.5">
+                  Elimina contatos duplicados entre listas e impede que o mesmo número receba mensagens repetidas.
+                </p>
+              </div>
+            </div>
+
+            {/* Ações de Higienização & Varredura */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                onClick={handleCleanAndDeduplicateLists}
+                disabled={loadingSanitize}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black text-xs font-black flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50"
+                title="Higieniza e desduplica todas as listas em 1 clique"
+              >
+                <Zap className={`size-3.5 fill-black ${loadingSanitize ? 'animate-spin' : ''}`} />
+                <span>{loadingSanitize ? 'Higienizando...' : '⚡ Higienizar & Desduplicar (1 Clique)'}</span>
+              </button>
+
+              <button
+                onClick={handleScanWhatsAppHistory}
+                disabled={loadingScan}
+                className="px-3.5 py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                title="Faz varredura profunda no WhatsApp para blindar contatos já abordados"
+              >
+                <ShieldCheck className={`size-3.5 text-purple-400 ${loadingScan ? 'animate-spin' : ''}`} />
+                <span>{loadingScan ? 'Varrendo...' : '🔍 Varrer Histórico'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Métricas Rápidas de Diagnóstico */}
+          {diagnosticData && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-white/5">
+              <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
+                <span className="text-[10px] text-white/40 uppercase font-bold block">Contatos Brutos</span>
+                <span className="text-base font-extrabold text-white font-mono">{diagnosticData.totalContactsRaw}</span>
+                <span className="text-[10px] text-white/30 block mt-0.5">Somatório de todas as listas</span>
+              </div>
+
+              <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-white/40 uppercase font-bold">Únicos Reais</span>
+                  {diagnosticData.duplicateCount > 0 && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono font-bold">
+                      -{diagnosticData.duplicateCount} dupes
+                    </span>
+                  )}
+                </div>
+                <span className="text-base font-extrabold text-purple-300 font-mono">{diagnosticData.totalUnique}</span>
+                <span className="text-[10px] text-white/30 block mt-0.5">Pessoas sem repetição</span>
+              </div>
+
+              <div className="p-3 bg-black/40 border border-emerald-500/20 rounded-xl">
+                <span className="text-[10px] text-emerald-400/80 uppercase font-bold block">⭐ Base Virgem</span>
+                <span className="text-base font-extrabold text-emerald-400 font-mono">{diagnosticData.virginCount}</span>
+                <span className="text-[10px] text-white/40 block mt-0.5">Prontos para primeiro envio</span>
+              </div>
+
+              <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
+                <span className="text-[10px] text-white/40 uppercase font-bold block">🛡️ Já Abordados / Blindados</span>
+                <span className="text-base font-extrabold text-white/70 font-mono">{diagnosticData.alreadySentCount || diagnosticData.globalSentTotal}</span>
+                <span className="text-[10px] text-white/30 block mt-0.5">Imunes a reenvio acidental</span>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* ============================================================ */}
         {/* ABA 1: CAMPANHAS DE DISPARO */}

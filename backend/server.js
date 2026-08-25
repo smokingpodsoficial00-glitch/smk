@@ -1987,9 +1987,6 @@ async function scanWhatsAppHistoryAndSync(config) {
 
     try {
         console.log('🔍 [Scan History] Iniciando varredura profunda no histórico de conversas do WhatsApp...');
-        const chats = await client.getChats();
-        let identifiedCount = 0;
-
         if (!config.sentHistory) config.sentHistory = { globalSent: [] };
         if (!config.sentHistory.globalSent) config.sentHistory.globalSent = [];
 
@@ -2004,53 +2001,60 @@ async function scanWhatsAppHistoryAndSync(config) {
             'tô passando aqui só pra saber se os sabores',
             'passando pra dar um alô e perguntar se tá curtindo',
             'salva nosso número aí nos contatos',
-            'posso te mandar o link do cardápio'
+            'posso te mandar o link do cardápio',
+            'cardápio digital',
+            'smoking pods',
+            '50% de desconto'
         ];
 
-        for (const chat of chats) {
-            // Analisa apenas chats 1 a 1
-            if (chat.isGroup || !chat.id || !chat.id._serialized || !chat.id._serialized.endsWith('@c.us')) {
-                continue;
+        let detectedPhones = [];
+        try {
+            if (client.pupPage) {
+                detectedPhones = await client.pupPage.evaluate((snippets) => {
+                    const found = new Set();
+                    try {
+                        if (!window.Store || !window.Store.Chat) return Array.from(found);
+                        const chatModels = window.Store.Chat.models || [];
+                        for (const c of chatModels) {
+                            try {
+                                if (!c || !c.id) continue;
+                                const isGroup = c.isGroup || (c.id.server === 'g.us') || (c.id._serialized && c.id._serialized.endsWith('@g.us'));
+                                if (isGroup) continue;
+
+                                const msgs = (c.msgs && c.msgs.models) ? c.msgs.models : [];
+                                for (const m of msgs) {
+                                    if (m && (m.isSentByMe || m.__x_isSentByMe || (m.id && m.id.fromMe))) {
+                                        const body = (m.body || m.__x_body || '').toLowerCase();
+                                        if (snippets.some(s => body.includes(s.toLowerCase()))) {
+                                            const rawPhone = (c.id.user || c.id._serialized.replace('@c.us', '')).replace(/\D/g, '');
+                                            if (rawPhone && rawPhone.length >= 8) {
+                                                found.add(rawPhone);
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                    } catch (e) {}
+                    return Array.from(found);
+                }, campaignSnippets);
             }
+        } catch (evalErr) {
+            console.warn('⚠️ [Scan History] Aviso na avaliação in-page:', evalErr.message);
+        }
 
-            const rawDigits = chat.id._serialized.replace('@c.us', '').replace(/\D/g, '');
-            const cleanPhone = normalizeMarketingPhone(rawDigits);
-
-            try {
-                const messages = await chat.fetchMessages({ limit: 30 });
-                let matched = false;
-
-                for (const msg of messages) {
-                    if (msg.fromMe && msg.body) {
-                        const lowerBody = msg.body.toLowerCase();
-                        if (campaignSnippets.some(s => lowerBody.includes(s))) {
-                            matched = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (matched && cleanPhone) {
-                    if (!config.sentHistory.globalSent.includes(cleanPhone)) {
-                        config.sentHistory.globalSent.push(cleanPhone);
-                        identifiedCount++;
-                    }
-                    // Vincula à campanha de reativação se existir
-                    const reatCamp = (config.campaigns || []).find(c => c.name && c.name.toLowerCase().includes('reativação'));
-                    if (reatCamp) {
-                        if (!config.sentHistory[reatCamp.id]) config.sentHistory[reatCamp.id] = [];
-                        if (!config.sentHistory[reatCamp.id].includes(cleanPhone)) {
-                            config.sentHistory[reatCamp.id].push(cleanPhone);
-                        }
-                    }
-                }
-            } catch (msgErr) {
-                // Silencioso em caso de timeout
+        let identifiedCount = 0;
+        for (const rawPhone of detectedPhones) {
+            const cleanPhone = normalizeMarketingPhone(rawPhone);
+            if (cleanPhone && !config.sentHistory.globalSent.includes(cleanPhone)) {
+                config.sentHistory.globalSent.push(cleanPhone);
+                identifiedCount++;
             }
         }
 
         saveMarketingConfig(config);
-        console.log(`✅ [Scan History] Varredura concluída! ${identifiedCount} novo(s) contato(s) já abordados foram catalogados e blindados.`);
+        console.log(`✅ [Scan History] Varredura concluída! ${identifiedCount} novo(s) contato(s) já abordados foram catalogados e blindados. Total blindados: ${config.sentHistory.globalSent.length}`);
         return { success: true, identifiedCount, totalTracked: config.sentHistory.globalSent.length };
     } catch (err) {
         console.error('❌ [Scan History] Erro ao varrer histórico:', err.message);
@@ -2075,6 +2079,201 @@ app.post('/api/marketing/scan-chats', async (req, res) => {
         const result = await scanWhatsAppHistoryAndSync(config);
         return res.json(result);
     } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/marketing/lists-diagnostic — Diagnóstico em tempo real de contatos e duplicatas
+app.get('/api/marketing/lists-diagnostic', (req, res) => {
+    try {
+        const config = loadMarketingConfig();
+        const lists = config.lists || [];
+        const globalSent = config.sentHistory?.globalSent || [];
+
+        let totalContactsRaw = 0;
+        const phoneListMap = new Map(); // phone -> [listNames]
+        const uniqueContactsMap = new Map(); // phone -> contactItem
+
+        lists.forEach(l => {
+            (l.contacts || []).forEach(c => {
+                totalContactsRaw++;
+                const clean = normalizeMarketingPhone(c.cleanPhone || c.phone);
+                if (clean) {
+                    if (!phoneListMap.has(clean)) {
+                        phoneListMap.set(clean, []);
+                        uniqueContactsMap.set(clean, c);
+                    }
+                    phoneListMap.get(clean).push(l.name);
+                }
+            });
+        });
+
+        const totalUnique = uniqueContactsMap.size;
+        const duplicateCount = totalContactsRaw - totalUnique;
+        
+        let alreadySentCount = 0;
+        let virginCount = 0;
+
+        for (const phone of uniqueContactsMap.keys()) {
+            if (globalSent.includes(phone)) {
+                alreadySentCount++;
+            } else {
+                virginCount++;
+            }
+        }
+
+        return res.json({
+            success: true,
+            totalContactsRaw,
+            totalUnique,
+            duplicateCount,
+            alreadySentCount,
+            virginCount,
+            listsCount: lists.length,
+            globalSentTotal: globalSent.length
+        });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/marketing/clean-and-deduplicate-lists — Higienização e Desduplicação Automática em 1 Clique
+app.post('/api/marketing/clean-and-deduplicate-lists', async (req, res) => {
+    try {
+        const config = loadMarketingConfig();
+        
+        // 1. Tenta varredura rápida para sincronizar contatos já abordados no WhatsApp
+        if (isWhatsAppReady && client) {
+            try {
+                await scanWhatsAppHistoryAndSync(config);
+            } catch (e) {}
+        }
+
+        const lists = config.lists || [];
+        const globalSent = config.sentHistory?.globalSent || [];
+
+        let totalOriginal = 0;
+        const seenPhonesGlobal = new Set();
+        const uniqueContacts = [];
+        const virginContacts = [];
+        const alreadySentContacts = [];
+
+        // Coleta todos os contatos e remove 100% das duplicatas
+        lists.forEach(l => {
+            (l.contacts || []).forEach(c => {
+                totalOriginal++;
+                const clean = normalizeMarketingPhone(c.cleanPhone || c.phone);
+                if (clean && !seenPhonesGlobal.has(clean)) {
+                    seenPhonesGlobal.add(clean);
+                    const contactObj = {
+                        id: `${clean}@c.us`,
+                        name: c.name || `Cliente ${clean.slice(-4)}`,
+                        phone: clean,
+                        cleanPhone: clean,
+                        isSaved: !!c.isSaved
+                    };
+                    uniqueContacts.push(contactObj);
+
+                    if (globalSent.includes(clean)) {
+                        alreadySentContacts.push(contactObj);
+                    } else {
+                        virginContacts.push(contactObj);
+                    }
+                }
+            });
+        });
+
+        // 2. Limpa as listas existentes para que NENHUM contato apareça em mais de 1 lista
+        const sanitizedLists = [];
+        const allocatedPhones = new Set();
+
+        lists.forEach(l => {
+            const cleanListContacts = [];
+            (l.contacts || []).forEach(c => {
+                const clean = normalizeMarketingPhone(c.cleanPhone || c.phone);
+                if (clean && !allocatedPhones.has(clean)) {
+                    allocatedPhones.add(clean);
+                    cleanListContacts.push({
+                        id: `${clean}@c.us`,
+                        name: c.name || `Cliente ${clean.slice(-4)}`,
+                        phone: clean,
+                        cleanPhone: clean,
+                        isSaved: !!c.isSaved
+                    });
+                }
+            });
+
+            sanitizedLists.push({
+                ...l,
+                contacts: cleanListContacts
+            });
+        });
+
+        // 3. Cria a lista oficial consolidada "BASE VIRGEM — PRONTA PARA DISPARO"
+        const virginListId = 'list_base_virgem_oficial';
+        const existingVirginIdx = sanitizedLists.findIndex(l => l.id === virginListId);
+        const virginListObj = {
+            id: virginListId,
+            name: '⭐ BASE VIRGEM (Ainda Não Enviados)',
+            description: 'Lista higienizada contendo apenas contatos que NUNCA receberam mensagens de marketing',
+            contacts: virginContacts,
+            color: '#10b981',
+            createdAt: new Date().toISOString()
+        };
+
+        if (existingVirginIdx !== -1) {
+            sanitizedLists[existingVirginIdx] = virginListObj;
+        } else {
+            sanitizedLists.unshift(virginListObj);
+        }
+
+        // 4. Se houver contatos já enviados, cria/atualiza a lista de "BASE JÁ ABORDADA / BLINDADA"
+        if (alreadySentContacts.length > 0) {
+            const sentListId = 'list_base_blindada_enviados';
+            const existingSentIdx = sanitizedLists.findIndex(l => l.id === sentListId);
+            const sentListObj = {
+                id: sentListId,
+                name: '🛡️ BASE BLINDADA (Já Contactados)',
+                description: 'Contatos que já receberam mensagens anteriores — protegidos contra novos disparos',
+                contacts: alreadySentContacts,
+                color: '#6b7280',
+                createdAt: new Date().toISOString()
+            };
+            if (existingSentIdx !== -1) {
+                sanitizedLists[existingSentIdx] = sentListObj;
+            } else {
+                sanitizedLists.push(sentListObj);
+            }
+        }
+
+        config.lists = sanitizedLists;
+
+        // 5. Ajusta campanhas ativas para apontar de forma segura para a BASE VIRGEM
+        (config.campaigns || []).forEach(c => {
+            if (c.targetType === 'lists') {
+                // Se a campanha tinha múltiplas listas repetidas, define para a Base Virgem
+                if (c.name && c.name.toLowerCase().includes('reativação')) {
+                    c.selectedListIds = [virginListId];
+                    c.totalRecipients = virginContacts.length;
+                }
+            }
+        });
+
+        saveMarketingConfig(config);
+
+        console.log(`✨ [Clean Lists] Higienização Concluída! Total Original: ${totalOriginal}, Únicos: ${uniqueContacts.length}, Duplicatas Eliminadas: ${totalOriginal - uniqueContacts.length}, Virgens: ${virginContacts.length}, Já Enviados: ${alreadySentContacts.length}`);
+
+        return res.json({
+            success: true,
+            totalOriginal,
+            totalUnique: uniqueContacts.length,
+            duplicatesRemoved: totalOriginal - uniqueContacts.length,
+            virginCount: virginContacts.length,
+            alreadySentCount: alreadySentContacts.length,
+            lists: sanitizedLists
+        });
+    } catch (err) {
+        console.error('❌ [Clean Lists] Erro:', err.message);
         return res.status(500).json({ error: err.message });
     }
 });
