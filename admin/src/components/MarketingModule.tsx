@@ -736,13 +736,18 @@ export function MarketingModule() {
           setDispatchProgress({
             current: alreadySentPhones.length,
             total: targetContacts.length,
-            status: `Enviado ${alreadySentPhones.length} de ${targetContacts.length} para ${contact.name || normalizedPhone}...`
+            status: `✅ Enviado (${alreadySentPhones.length}/${targetContacts.length}) para ${contact.name || normalizedPhone}. Aguardando intervalo de segurança anti-ban...`
           });
 
-          // Trava 4: Delay individual com cancelamento instantâneo a cada 250ms (10 a 20s aleatórios)
-          const randomDelay = Math.floor(Math.random() * 10000) + 10000;
+          // Trava 4: Intervalo de descanso individual entre contatos (20 a 35 segundos aleatórios) com cancelamento instantâneo
+          const randomDelay = Math.floor(Math.random() * 15000) + 20000;
           for (let elapsed = 0; elapsed < randomDelay; elapsed += 250) {
             if (isAbortingRef.current) break;
+            const remainingDelaySec = Math.max(0, Math.ceil((randomDelay - elapsed) / 1000));
+            setDispatchProgress(prev => prev ? {
+              ...prev,
+              status: `⏳ Intervalo de segurança anti-ban: aguardando ${remainingDelaySec}s antes do próximo contato...`
+            } : null);
             await new Promise(r => setTimeout(r, 250));
           }
 

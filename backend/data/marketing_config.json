@@ -14,9 +14,9 @@
       "batchSize": 5,
       "batchIntervalMinutes": 35,
       "status": "paused",
-      "totalRecipients": 505,
+      "totalRecipients": 425,
       "createdAt": "2026-08-15T16:11:45.844Z",
-      "lastRunDate": "15/08/2026",
+      "lastRunDate": "25/08/2026",
       "variations": [
         "Opa, tudo bem contigo? 🔥\nComo você é da nossa base antiga, tô te avisando em primeira mão: nosso delivery tá de volta à ativa em SBC!\n\nPra essa reabertura, liberamos 50% DE DESCONTO NO SEU FRETE pra você pedir hoje sem pressa. 🛵\n\nDá uma salvada no nosso contato aí na sua agenda! Quer que eu te envie o link do catálogo novo pra você ver o que chegou?",
         "Oii, quanto tempo! Tudo certo por aí? 💨\nOrganizamos tudo por aqui e reabrimos o nosso atendimento oficial com entregas rápidas!\n\nDe presente de volta pra nossa base, seu primeiro frete de hoje sai com 50% de desconto! 🎁\n\nSalva nosso contato aí no celular pra acompanhar os Status. Se quiser dar uma olhada nas opções, me avisa aqui que te mando o link!",
@@ -403,7 +403,7 @@
       "campaignName": "CPM GRUPO ESTOQUE SEMANAL"
     }
   ],
-  "lastUpdated": "2026-08-25T22:11:17.086Z",
+  "lastUpdated": "2026-08-25T22:42:35.375Z",
   "lists": [
     {
       "id": "list_base_virgem_oficial",
@@ -411,426 +411,6 @@
       "description": "Lista higienizada contendo apenas contatos que NUNCA receberam mensagens de marketing",
       "contacts": [
         {
-          "id": "5511959242138@c.us",
-          "name": "ana beatriz",
-          "phone": "5511959242138",
-          "cleanPhone": "5511959242138",
-          "isSaved": true
-        },
-        {
-          "id": "5522998300277@c.us",
-          "name": "ana carolina",
-          "phone": "5522998300277",
-          "cleanPhone": "5522998300277",
-          "isSaved": true
-        },
-        {
-          "id": "5511945979813@c.us",
-          "name": "Ana Chezze cliente",
-          "phone": "5511945979813",
-          "cleanPhone": "5511945979813",
-          "isSaved": true
-        },
-        {
-          "id": "5511994967289@c.us",
-          "name": "ana clara",
-          "phone": "5511994967289",
-          "cleanPhone": "5511994967289",
-          "isSaved": true
-        },
-        {
-          "id": "5511982672821@c.us",
-          "name": "Ana cliente SMK",
-          "phone": "5511982672821",
-          "cleanPhone": "5511982672821",
-          "isSaved": true
-        },
-        {
-          "id": "5511933131857@c.us",
-          "name": "Ana Dutra Cliente",
-          "phone": "5511933131857",
-          "cleanPhone": "5511933131857",
-          "isSaved": true
-        },
-        {
-          "id": "5511970302928@c.us",
-          "name": "ana feitosa",
-          "phone": "5511970302928",
-          "cleanPhone": "5511970302928",
-          "isSaved": true
-        },
-        {
-          "id": "5511947872512@c.us",
-          "name": "Ana Gisbert",
-          "phone": "5511947872512",
-          "cleanPhone": "5511947872512",
-          "isSaved": true
-        },
-        {
-          "id": "5511956592073@c.us",
-          "name": "Ana Giulia",
-          "phone": "5511956592073",
-          "cleanPhone": "5511956592073",
-          "isSaved": true
-        },
-        {
-          "id": "5511996826502@c.us",
-          "name": "ana paula",
-          "phone": "5511996826502",
-          "cleanPhone": "5511996826502",
-          "isSaved": true
-        },
-        {
-          "id": "5511944452819@c.us",
-          "name": "Ana Schiavon cliente",
-          "phone": "5511944452819",
-          "cleanPhone": "5511944452819",
-          "isSaved": true
-        },
-        {
-          "id": "5511966458551@c.us",
-          "name": "Ana Trigo Garota Propaganda 2",
-          "phone": "5511966458551",
-          "cleanPhone": "5511966458551",
-          "isSaved": true
-        },
-        {
-          "id": "5511930122316@c.us",
-          "name": "Ana♡",
-          "phone": "5511930122316",
-          "cleanPhone": "5511930122316",
-          "isSaved": true
-        },
-        {
-          "id": "5511966935053@c.us",
-          "name": "Anãzinha De Smurf❤",
-          "phone": "5511966935053",
-          "cleanPhone": "5511966935053",
-          "isSaved": true
-        },
-        {
-          "id": "5511948451245@c.us",
-          "name": "Anãzinha De Smurf❤",
-          "phone": "5511948451245",
-          "cleanPhone": "5511948451245",
-          "isSaved": true
-        },
-        {
-          "id": "5511945141690@c.us",
-          "name": "Anderson",
-          "phone": "5511945141690",
-          "cleanPhone": "5511945141690",
-          "isSaved": true
-        },
-        {
-          "id": "5511940757645@c.us",
-          "name": "andré",
-          "phone": "5511940757645",
-          "cleanPhone": "5511940757645",
-          "isSaved": true
-        },
-        {
-          "id": "5511983405086@c.us",
-          "name": "andréia",
-          "phone": "5511983405086",
-          "cleanPhone": "5511983405086",
-          "isSaved": true
-        },
-        {
-          "id": "5511991941595@c.us",
-          "name": "Andresson",
-          "phone": "5511991941595",
-          "cleanPhone": "5511991941595",
-          "isSaved": true
-        },
-        {
-          "id": "5511966315698@c.us",
-          "name": "angela pontes",
-          "phone": "5511966315698",
-          "cleanPhone": "5511966315698",
-          "isSaved": true
-        },
-        {
-          "id": "5511992847422@c.us",
-          "name": "angela sala",
-          "phone": "5511992847422",
-          "cleanPhone": "5511992847422",
-          "isSaved": true
-        },
-        {
-          "id": "5511954488602@c.us",
-          "name": "aninha",
-          "phone": "5511954488602",
-          "cleanPhone": "5511954488602",
-          "isSaved": true
-        },
-        {
-          "id": "5511968670748@c.us",
-          "name": "anna",
-          "phone": "5511968670748",
-          "cleanPhone": "5511968670748",
-          "isSaved": true
-        },
-        {
-          "id": "5511941352503@c.us",
-          "name": "anna cardoso",
-          "phone": "5511941352503",
-          "cleanPhone": "5511941352503",
-          "isSaved": true
-        },
-        {
-          "id": "5511930988900@c.us",
-          "name": "Antonio Banca",
-          "phone": "5511930988900",
-          "cleanPhone": "5511930988900",
-          "isSaved": true
-        },
-        {
-          "id": "5511960639082@c.us",
-          "name": "antônio caminhão",
-          "phone": "5511960639082",
-          "cleanPhone": "5511960639082",
-          "isSaved": true
-        },
-        {
-          "id": "5511986476564@c.us",
-          "name": "Aratto Ink",
-          "phone": "5511986476564",
-          "cleanPhone": "5511986476564",
-          "isSaved": true
-        },
-        {
-          "id": "5511969436215@c.us",
-          "name": "Ariane Janine Confeitaria",
-          "phone": "5511969436215",
-          "cleanPhone": "5511969436215",
-          "isSaved": true
-        },
-        {
-          "id": "5511970671363@c.us",
-          "name": "arthur",
-          "phone": "5511970671363",
-          "cleanPhone": "5511970671363",
-          "isSaved": true
-        },
-        {
-          "id": "556194084792@c.us",
-          "name": "Arthur",
-          "phone": "556194084792",
-          "cleanPhone": "556194084792",
-          "isSaved": true
-        },
-        {
-          "id": "5511989531538@c.us",
-          "name": "arthur dantas",
-          "phone": "5511989531538",
-          "cleanPhone": "5511989531538",
-          "isSaved": true
-        },
-        {
-          "id": "558195768210@c.us",
-          "name": "Bala",
-          "phone": "558195768210",
-          "cleanPhone": "558195768210",
-          "isSaved": true
-        },
-        {
-          "id": "5511943230252@c.us",
-          "name": "barbeiro hendryck coopera",
-          "phone": "5511943230252",
-          "cleanPhone": "5511943230252",
-          "isSaved": true
-        },
-        {
-          "id": "5511963342439@c.us",
-          "name": "Batidas DG",
-          "phone": "5511963342439",
-          "cleanPhone": "5511963342439",
-          "isSaved": true
-        },
-        {
-          "id": "5511947825718@c.us",
-          "name": "beatriz santana",
-          "phone": "5511947825718",
-          "cleanPhone": "5511947825718",
-          "isSaved": true
-        },
-        {
-          "id": "5511954920745@c.us",
-          "name": "Beicin",
-          "phone": "5511954920745",
-          "cleanPhone": "5511954920745",
-          "isSaved": true
-        },
-        {
-          "id": "5511947670051@c.us",
-          "name": "bela",
-          "phone": "5511947670051",
-          "cleanPhone": "5511947670051",
-          "isSaved": true
-        },
-        {
-          "id": "5511988533453@c.us",
-          "name": "bella",
-          "phone": "5511988533453",
-          "cleanPhone": "5511988533453",
-          "isSaved": true
-        },
-        {
-          "id": "5511942958314@c.us",
-          "name": "Bello",
-          "phone": "5511942958314",
-          "cleanPhone": "5511942958314",
-          "isSaved": true
-        },
-        {
-          "id": "5511940567116@c.us",
-          "name": "Belly cliente",
-          "phone": "5511940567116",
-          "cleanPhone": "5511940567116",
-          "isSaved": true
-        },
-        {
-          "id": "5511914117230@c.us",
-          "name": "belmiro",
-          "phone": "5511914117230",
-          "cleanPhone": "5511914117230",
-          "isSaved": true
-        },
-        {
-          "id": "5511965746535@c.us",
-          "name": "best shoes",
-          "phone": "5511965746535",
-          "cleanPhone": "5511965746535",
-          "isSaved": true
-        },
-        {
-          "id": "558893409246@c.us",
-          "name": "betisa",
-          "phone": "558893409246",
-          "cleanPhone": "558893409246",
-          "isSaved": true
-        },
-        {
-          "id": "5512991028786@c.us",
-          "name": "bia barcelos",
-          "phone": "5512991028786",
-          "cleanPhone": "5512991028786",
-          "isSaved": true
-        },
-        {
-          "id": "5511992927041@c.us",
-          "name": "bianca brx",
-          "phone": "5511992927041",
-          "cleanPhone": "5511992927041",
-          "isSaved": true
-        },
-        {
-          "id": "5511975646921@c.us",
-          "name": "bianca nunez",
-          "phone": "5511975646921",
-          "cleanPhone": "5511975646921",
-          "isSaved": true
-        },
-        {
-          "id": "5524988295495@c.us",
-          "name": "Biba💕",
-          "phone": "5524988295495",
-          "cleanPhone": "5524988295495",
-          "isSaved": true
-        },
-        {
-          "id": "558381014547@c.us",
-          "name": "Bica",
-          "phone": "558381014547",
-          "cleanPhone": "558381014547",
-          "isSaved": true
-        },
-        {
-          "id": "5511991971998@c.us",
-          "name": "biel",
-          "phone": "5511991971998",
-          "cleanPhone": "5511991971998",
-          "isSaved": true
-        },
-        {
-          "id": "558386818741@c.us",
-          "name": "Biel",
-          "phone": "558386818741",
-          "cleanPhone": "558386818741",
-          "isSaved": true
-        },
-        {
-          "id": "5511949416732@c.us",
-          "name": "bielzin cliente SMK",
-          "phone": "5511949416732",
-          "cleanPhone": "5511949416732",
-          "isSaved": true
-        },
-        {
-          "id": "5511985451062@c.us",
-          "name": "biquíni divas",
-          "phone": "5511985451062",
-          "cleanPhone": "5511985451062",
-          "isSaved": true
-        },
-        {
-          "id": "558382241184@c.us",
-          "name": "Bira",
-          "phone": "558382241184",
-          "cleanPhone": "558382241184",
-          "isSaved": true
-        },
-        {
-          "id": "5511947145439@c.us",
-          "name": "Bolacha",
-          "phone": "5511947145439",
-          "cleanPhone": "5511947145439",
-          "isSaved": true
-        },
-        {
-          "id": "5511989848403@c.us",
-          "name": "brambila",
-          "phone": "5511989848403",
-          "cleanPhone": "5511989848403",
-          "isSaved": true
-        },
-        {
-          "id": "5511975800524@c.us",
-          "name": "brenda hayashix",
-          "phone": "5511975800524",
-          "cleanPhone": "5511975800524",
-          "isSaved": true
-        },
-        {
-          "id": "5511932386166@c.us",
-          "name": "𝕭𝖗𝖊𝖓𝖉𝖆 𝕻𝖆𝖘𝖘𝖔𝖘 𝕿𝖆𝖙𝖙𝖔",
-          "phone": "5511932386166",
-          "cleanPhone": "5511932386166",
-          "isSaved": true
-        },
-        {
-          "id": "5511954283235@c.us",
-          "name": "bruna cliente",
-          "phone": "5511954283235",
-          "cleanPhone": "5511954283235",
-          "isSaved": true
-        },
-        {
-          "id": "5511959446210@c.us",
-          "name": "bruna isabelli",
-          "phone": "5511959446210",
-          "cleanPhone": "5511959446210",
-          "isSaved": true
-        },
-        {
-          "id": "5511962689006@c.us",
-          "name": "bruno",
-          "phone": "5511962689006",
-          "cleanPhone": "5511962689006",
-          "isSaved": true
-        },
-        {
           "id": "558386954405@c.us",
           "name": "Cabeca",
           "phone": "558386954405",
@@ -849,13 +429,6 @@
           "name": "cadorini",
           "phone": "5511930311309",
           "cleanPhone": "5511930311309",
-          "isSaved": true
-        },
-        {
-          "id": "5511984885707@c.us",
-          "name": "cadu",
-          "phone": "5511984885707",
-          "cleanPhone": "5511984885707",
           "isSaved": true
         },
         {
@@ -1024,20 +597,6 @@
           "name": "cliente isabela",
           "phone": "5511982278179",
           "cleanPhone": "5511982278179",
-          "isSaved": true
-        },
-        {
-          "id": "5511930155365@c.us",
-          "name": "cliente Smk",
-          "phone": "5511930155365",
-          "cleanPhone": "5511930155365",
-          "isSaved": true
-        },
-        {
-          "id": "5515998538740@c.us",
-          "name": "Cliente Smk",
-          "phone": "5515998538740",
-          "cleanPhone": "5515998538740",
           "isSaved": true
         },
         {
@@ -1654,20 +1213,6 @@
           "name": "cliente SMK 179",
           "phone": "5511978051269",
           "cleanPhone": "5511978051269",
-          "isSaved": true
-        },
-        {
-          "id": "5511930464993@c.us",
-          "name": "cliente SMK 18",
-          "phone": "5511930464993",
-          "cleanPhone": "5511930464993",
-          "isSaved": true
-        },
-        {
-          "id": "5511930369497@c.us",
-          "name": "cliente SMK 18",
-          "phone": "5511930369497",
-          "cleanPhone": "5511930369497",
           "isSaved": true
         },
         {
@@ -2812,13 +2357,6 @@
           "isSaved": true
         },
         {
-          "id": "5511980652468@c.us",
-          "name": "Daphne Seraggioto",
-          "phone": "5511980652468",
-          "cleanPhone": "5511980652468",
-          "isSaved": true
-        },
-        {
           "id": "5511947829717@c.us",
           "name": "Davi",
           "phone": "5511947829717",
@@ -2851,20 +2389,6 @@
           "name": "dollynho",
           "phone": "5511985559219",
           "cleanPhone": "5511985559219",
-          "isSaved": true
-        },
-        {
-          "id": "5511959677170@c.us",
-          "name": "douglas",
-          "phone": "5511959677170",
-          "cleanPhone": "5511959677170",
-          "isSaved": true
-        },
-        {
-          "id": "5511996448839@c.us",
-          "name": "Douglas",
-          "phone": "5511996448839",
-          "cleanPhone": "5511996448839",
           "isSaved": true
         },
         {
@@ -2945,13 +2469,6 @@
           "isSaved": true
         },
         {
-          "id": "5511945846937@c.us",
-          "name": "eduarda gisbert",
-          "phone": "5511945846937",
-          "cleanPhone": "5511945846937",
-          "isSaved": true
-        },
-        {
           "id": "5511912933525@c.us",
           "name": "Eduardo",
           "phone": "5511912933525",
@@ -2963,13 +2480,6 @@
           "name": "eduardo p",
           "phone": "5511992373200",
           "cleanPhone": "5511992373200",
-          "isSaved": true
-        },
-        {
-          "id": "5511951741181@c.us",
-          "name": "Eduardo Pizza",
-          "phone": "5511951741181",
-          "cleanPhone": "5511951741181",
           "isSaved": true
         },
         {
@@ -3414,13 +2924,6 @@
           "isSaved": true
         },
         {
-          "id": "5511974861998@c.us",
-          "name": "Gata",
-          "phone": "5511974861998",
-          "cleanPhone": "5511974861998",
-          "isSaved": true
-        },
-        {
           "id": "5511950930502@c.us",
           "name": "gay",
           "phone": "5511950930502",
@@ -3568,31 +3071,10 @@
           "isSaved": true
         },
         {
-          "id": "5511992094064@c.us",
-          "name": "gleid💖",
-          "phone": "5511992094064",
-          "cleanPhone": "5511992094064",
-          "isSaved": true
-        },
-        {
           "id": "5511989067248@c.us",
           "name": "gordinho",
           "phone": "5511989067248",
           "cleanPhone": "5511989067248",
-          "isSaved": true
-        },
-        {
-          "id": "5511978616226@c.us",
-          "name": "gui lima",
-          "phone": "5511978616226",
-          "cleanPhone": "5511978616226",
-          "isSaved": true
-        },
-        {
-          "id": "5511981271253@c.us",
-          "name": "Gui Lima",
-          "phone": "5511981271253",
-          "cleanPhone": "5511981271253",
           "isSaved": true
         },
         {
@@ -3848,13 +3330,6 @@
           "isSaved": true
         },
         {
-          "id": "5511946606068@c.us",
-          "name": "léo pinheiro",
-          "phone": "5511946606068",
-          "cleanPhone": "5511946606068",
-          "isSaved": true
-        },
-        {
           "id": "5511992870424@c.us",
           "name": "Letícia cliente",
           "phone": "5511992870424",
@@ -3909,1704 +3384,16 @@
           "phone": "5511983222473",
           "cleanPhone": "5511983222473",
           "isSaved": true
-        },
-        {
-          "id": "5511999109136@c.us",
-          "name": "Carolina Vieira Smk",
-          "phone": "5511999109136",
-          "cleanPhone": "5511999109136",
-          "isSaved": true
-        },
-        {
-          "id": "5511960560727@c.us",
-          "name": "Pedro Cliente Smk",
-          "phone": "5511960560727",
-          "cleanPhone": "5511960560727",
-          "isSaved": true
-        },
-        {
-          "id": "5511954898700@c.us",
-          "name": "Ricardo Pereira Cliente smk",
-          "phone": "5511954898700",
-          "cleanPhone": "5511954898700",
-          "isSaved": true
-        },
-        {
-          "id": "5511943856234@c.us",
-          "name": "Samuel",
-          "phone": "5511943856234",
-          "cleanPhone": "5511943856234",
-          "isSaved": true
-        },
-        {
-          "id": "5511948420071@c.us",
-          "name": "Agência Noma",
-          "phone": "5511948420071",
-          "cleanPhone": "5511948420071",
-          "isSaved": true
         }
       ],
       "color": "#10b981",
-      "createdAt": "2026-08-25T22:11:17.085Z"
+      "createdAt": "2026-08-25T22:42:35.375Z"
     },
     {
       "id": "list_1786807808763",
       "name": "LISTA OFICIAL REATIVAÇÃO 1",
       "description": "Lista personalizada de contatos",
-      "contacts": [
-        {
-          "id": "5511959242138@c.us",
-          "name": "ana beatriz",
-          "phone": "5511959242138",
-          "cleanPhone": "5511959242138",
-          "isSaved": true
-        },
-        {
-          "id": "5522998300277@c.us",
-          "name": "ana carolina",
-          "phone": "5522998300277",
-          "cleanPhone": "5522998300277",
-          "isSaved": true
-        },
-        {
-          "id": "5511945979813@c.us",
-          "name": "Ana Chezze cliente",
-          "phone": "5511945979813",
-          "cleanPhone": "5511945979813",
-          "isSaved": true
-        },
-        {
-          "id": "5511994967289@c.us",
-          "name": "ana clara",
-          "phone": "5511994967289",
-          "cleanPhone": "5511994967289",
-          "isSaved": true
-        },
-        {
-          "id": "5511982672821@c.us",
-          "name": "Ana cliente SMK",
-          "phone": "5511982672821",
-          "cleanPhone": "5511982672821",
-          "isSaved": true
-        },
-        {
-          "id": "5511933131857@c.us",
-          "name": "Ana Dutra Cliente",
-          "phone": "5511933131857",
-          "cleanPhone": "5511933131857",
-          "isSaved": true
-        },
-        {
-          "id": "5511970302928@c.us",
-          "name": "ana feitosa",
-          "phone": "5511970302928",
-          "cleanPhone": "5511970302928",
-          "isSaved": true
-        },
-        {
-          "id": "5511947872512@c.us",
-          "name": "Ana Gisbert",
-          "phone": "5511947872512",
-          "cleanPhone": "5511947872512",
-          "isSaved": true
-        },
-        {
-          "id": "5511956592073@c.us",
-          "name": "Ana Giulia",
-          "phone": "5511956592073",
-          "cleanPhone": "5511956592073",
-          "isSaved": true
-        },
-        {
-          "id": "5511996826502@c.us",
-          "name": "ana paula",
-          "phone": "5511996826502",
-          "cleanPhone": "5511996826502",
-          "isSaved": true
-        },
-        {
-          "id": "5511944452819@c.us",
-          "name": "Ana Schiavon cliente",
-          "phone": "5511944452819",
-          "cleanPhone": "5511944452819",
-          "isSaved": true
-        },
-        {
-          "id": "5511966458551@c.us",
-          "name": "Ana Trigo Garota Propaganda 2",
-          "phone": "5511966458551",
-          "cleanPhone": "5511966458551",
-          "isSaved": true
-        },
-        {
-          "id": "5511930122316@c.us",
-          "name": "Ana♡",
-          "phone": "5511930122316",
-          "cleanPhone": "5511930122316",
-          "isSaved": true
-        },
-        {
-          "id": "5511966935053@c.us",
-          "name": "Anãzinha De Smurf❤",
-          "phone": "5511966935053",
-          "cleanPhone": "5511966935053",
-          "isSaved": true
-        },
-        {
-          "id": "5511948451245@c.us",
-          "name": "Anãzinha De Smurf❤",
-          "phone": "5511948451245",
-          "cleanPhone": "5511948451245",
-          "isSaved": true
-        },
-        {
-          "id": "5511945141690@c.us",
-          "name": "Anderson",
-          "phone": "5511945141690",
-          "cleanPhone": "5511945141690",
-          "isSaved": true
-        },
-        {
-          "id": "5511940757645@c.us",
-          "name": "andré",
-          "phone": "5511940757645",
-          "cleanPhone": "5511940757645",
-          "isSaved": true
-        },
-        {
-          "id": "5511983405086@c.us",
-          "name": "andréia",
-          "phone": "5511983405086",
-          "cleanPhone": "5511983405086",
-          "isSaved": true
-        },
-        {
-          "id": "5511991941595@c.us",
-          "name": "Andresson",
-          "phone": "5511991941595",
-          "cleanPhone": "5511991941595",
-          "isSaved": true
-        },
-        {
-          "id": "5511966315698@c.us",
-          "name": "angela pontes",
-          "phone": "5511966315698",
-          "cleanPhone": "5511966315698",
-          "isSaved": true
-        },
-        {
-          "id": "5511992847422@c.us",
-          "name": "angela sala",
-          "phone": "5511992847422",
-          "cleanPhone": "5511992847422",
-          "isSaved": true
-        },
-        {
-          "id": "5511954488602@c.us",
-          "name": "aninha",
-          "phone": "5511954488602",
-          "cleanPhone": "5511954488602",
-          "isSaved": true
-        },
-        {
-          "id": "5511968670748@c.us",
-          "name": "anna",
-          "phone": "5511968670748",
-          "cleanPhone": "5511968670748",
-          "isSaved": true
-        },
-        {
-          "id": "5511941352503@c.us",
-          "name": "anna cardoso",
-          "phone": "5511941352503",
-          "cleanPhone": "5511941352503",
-          "isSaved": true
-        },
-        {
-          "id": "5511930988900@c.us",
-          "name": "Antonio Banca",
-          "phone": "5511930988900",
-          "cleanPhone": "5511930988900",
-          "isSaved": true
-        },
-        {
-          "id": "5511960639082@c.us",
-          "name": "antônio caminhão",
-          "phone": "5511960639082",
-          "cleanPhone": "5511960639082",
-          "isSaved": true
-        },
-        {
-          "id": "5511986476564@c.us",
-          "name": "Aratto Ink",
-          "phone": "5511986476564",
-          "cleanPhone": "5511986476564",
-          "isSaved": true
-        },
-        {
-          "id": "5511969436215@c.us",
-          "name": "Ariane Janine Confeitaria",
-          "phone": "5511969436215",
-          "cleanPhone": "5511969436215",
-          "isSaved": true
-        },
-        {
-          "id": "5511970671363@c.us",
-          "name": "arthur",
-          "phone": "5511970671363",
-          "cleanPhone": "5511970671363",
-          "isSaved": true
-        },
-        {
-          "id": "556194084792@c.us",
-          "name": "Arthur",
-          "phone": "556194084792",
-          "cleanPhone": "556194084792",
-          "isSaved": true
-        },
-        {
-          "id": "5511989531538@c.us",
-          "name": "arthur dantas",
-          "phone": "5511989531538",
-          "cleanPhone": "5511989531538",
-          "isSaved": true
-        },
-        {
-          "id": "558195768210@c.us",
-          "name": "Bala",
-          "phone": "558195768210",
-          "cleanPhone": "558195768210",
-          "isSaved": true
-        },
-        {
-          "id": "5511943230252@c.us",
-          "name": "barbeiro hendryck coopera",
-          "phone": "5511943230252",
-          "cleanPhone": "5511943230252",
-          "isSaved": true
-        },
-        {
-          "id": "5511963342439@c.us",
-          "name": "Batidas DG",
-          "phone": "5511963342439",
-          "cleanPhone": "5511963342439",
-          "isSaved": true
-        },
-        {
-          "id": "5511947825718@c.us",
-          "name": "beatriz santana",
-          "phone": "5511947825718",
-          "cleanPhone": "5511947825718",
-          "isSaved": true
-        },
-        {
-          "id": "5511954920745@c.us",
-          "name": "Beicin",
-          "phone": "5511954920745",
-          "cleanPhone": "5511954920745",
-          "isSaved": true
-        },
-        {
-          "id": "5511947670051@c.us",
-          "name": "bela",
-          "phone": "5511947670051",
-          "cleanPhone": "5511947670051",
-          "isSaved": true
-        },
-        {
-          "id": "5511988533453@c.us",
-          "name": "bella",
-          "phone": "5511988533453",
-          "cleanPhone": "5511988533453",
-          "isSaved": true
-        },
-        {
-          "id": "5511942958314@c.us",
-          "name": "Bello",
-          "phone": "5511942958314",
-          "cleanPhone": "5511942958314",
-          "isSaved": true
-        },
-        {
-          "id": "5511940567116@c.us",
-          "name": "Belly cliente",
-          "phone": "5511940567116",
-          "cleanPhone": "5511940567116",
-          "isSaved": true
-        },
-        {
-          "id": "5511914117230@c.us",
-          "name": "belmiro",
-          "phone": "5511914117230",
-          "cleanPhone": "5511914117230",
-          "isSaved": true
-        },
-        {
-          "id": "5511965746535@c.us",
-          "name": "best shoes",
-          "phone": "5511965746535",
-          "cleanPhone": "5511965746535",
-          "isSaved": true
-        },
-        {
-          "id": "558893409246@c.us",
-          "name": "betisa",
-          "phone": "558893409246",
-          "cleanPhone": "558893409246",
-          "isSaved": true
-        },
-        {
-          "id": "5512991028786@c.us",
-          "name": "bia barcelos",
-          "phone": "5512991028786",
-          "cleanPhone": "5512991028786",
-          "isSaved": true
-        },
-        {
-          "id": "5511992927041@c.us",
-          "name": "bianca brx",
-          "phone": "5511992927041",
-          "cleanPhone": "5511992927041",
-          "isSaved": true
-        },
-        {
-          "id": "5511975646921@c.us",
-          "name": "bianca nunez",
-          "phone": "5511975646921",
-          "cleanPhone": "5511975646921",
-          "isSaved": true
-        },
-        {
-          "id": "5524988295495@c.us",
-          "name": "Biba💕",
-          "phone": "5524988295495",
-          "cleanPhone": "5524988295495",
-          "isSaved": true
-        },
-        {
-          "id": "558381014547@c.us",
-          "name": "Bica",
-          "phone": "558381014547",
-          "cleanPhone": "558381014547",
-          "isSaved": true
-        },
-        {
-          "id": "5511991971998@c.us",
-          "name": "biel",
-          "phone": "5511991971998",
-          "cleanPhone": "5511991971998",
-          "isSaved": true
-        },
-        {
-          "id": "558386818741@c.us",
-          "name": "Biel",
-          "phone": "558386818741",
-          "cleanPhone": "558386818741",
-          "isSaved": true
-        },
-        {
-          "id": "5511949416732@c.us",
-          "name": "bielzin cliente SMK",
-          "phone": "5511949416732",
-          "cleanPhone": "5511949416732",
-          "isSaved": true
-        },
-        {
-          "id": "5511985451062@c.us",
-          "name": "biquíni divas",
-          "phone": "5511985451062",
-          "cleanPhone": "5511985451062",
-          "isSaved": true
-        },
-        {
-          "id": "558382241184@c.us",
-          "name": "Bira",
-          "phone": "558382241184",
-          "cleanPhone": "558382241184",
-          "isSaved": true
-        },
-        {
-          "id": "5511947145439@c.us",
-          "name": "Bolacha",
-          "phone": "5511947145439",
-          "cleanPhone": "5511947145439",
-          "isSaved": true
-        },
-        {
-          "id": "5511989848403@c.us",
-          "name": "brambila",
-          "phone": "5511989848403",
-          "cleanPhone": "5511989848403",
-          "isSaved": true
-        },
-        {
-          "id": "5511975800524@c.us",
-          "name": "brenda hayashix",
-          "phone": "5511975800524",
-          "cleanPhone": "5511975800524",
-          "isSaved": true
-        },
-        {
-          "id": "5511932386166@c.us",
-          "name": "𝕭𝖗𝖊𝖓𝖉𝖆 𝕻𝖆𝖘𝖘𝖔𝖘 𝕿𝖆𝖙𝖙𝖔",
-          "phone": "5511932386166",
-          "cleanPhone": "5511932386166",
-          "isSaved": true
-        },
-        {
-          "id": "5511954283235@c.us",
-          "name": "bruna cliente",
-          "phone": "5511954283235",
-          "cleanPhone": "5511954283235",
-          "isSaved": true
-        },
-        {
-          "id": "5511959446210@c.us",
-          "name": "bruna isabelli",
-          "phone": "5511959446210",
-          "cleanPhone": "5511959446210",
-          "isSaved": true
-        },
-        {
-          "id": "5511962689006@c.us",
-          "name": "bruno",
-          "phone": "5511962689006",
-          "cleanPhone": "5511962689006",
-          "isSaved": true
-        },
-        {
-          "id": "558386954405@c.us",
-          "name": "Cabeca",
-          "phone": "558386954405",
-          "cleanPhone": "558386954405",
-          "isSaved": true
-        },
-        {
-          "id": "551143351227@c.us",
-          "name": "cada donadelli",
-          "phone": "551143351227",
-          "cleanPhone": "551143351227",
-          "isSaved": true
-        },
-        {
-          "id": "5511930311309@c.us",
-          "name": "cadorini",
-          "phone": "5511930311309",
-          "cleanPhone": "5511930311309",
-          "isSaved": true
-        },
-        {
-          "id": "5511984885707@c.us",
-          "name": "cadu",
-          "phone": "5511984885707",
-          "cleanPhone": "5511984885707",
-          "isSaved": true
-        },
-        {
-          "id": "5511985164453@c.us",
-          "name": "Cah Maria",
-          "phone": "5511985164453",
-          "cleanPhone": "5511985164453",
-          "isSaved": true
-        },
-        {
-          "id": "5511941358141@c.us",
-          "name": "caio",
-          "phone": "5511941358141",
-          "cleanPhone": "5511941358141",
-          "isSaved": true
-        },
-        {
-          "id": "5511950869489@c.us",
-          "name": "caio malta",
-          "phone": "5511950869489",
-          "cleanPhone": "5511950869489",
-          "isSaved": true
-        },
-        {
-          "id": "5511977214031@c.us",
-          "name": "Caio Oliveira",
-          "phone": "5511977214031",
-          "cleanPhone": "5511977214031",
-          "isSaved": true
-        },
-        {
-          "id": "5511973072220@c.us",
-          "name": "camardella cliente",
-          "phone": "5511973072220",
-          "cleanPhone": "5511973072220",
-          "isSaved": true
-        },
-        {
-          "id": "5511980964365@c.us",
-          "name": "camila",
-          "phone": "5511980964365",
-          "cleanPhone": "5511980964365",
-          "isSaved": true
-        },
-        {
-          "id": "5511960897509@c.us",
-          "name": "Camila Avenue",
-          "phone": "5511960897509",
-          "cleanPhone": "5511960897509",
-          "isSaved": true
-        },
-        {
-          "id": "5511966109073@c.us",
-          "name": "carol",
-          "phone": "5511966109073",
-          "cleanPhone": "5511966109073",
-          "isSaved": true
-        },
-        {
-          "id": "5511950753363@c.us",
-          "name": "Carol Cliente",
-          "phone": "5511950753363",
-          "cleanPhone": "5511950753363",
-          "isSaved": true
-        },
-        {
-          "id": "5511985910141@c.us",
-          "name": "Carol Franchin",
-          "phone": "5511985910141",
-          "cleanPhone": "5511985910141",
-          "isSaved": true
-        },
-        {
-          "id": "5511987081951@c.us",
-          "name": "Carolina Bascoy",
-          "phone": "5511987081951",
-          "cleanPhone": "5511987081951",
-          "isSaved": true
-        },
-        {
-          "id": "5511992372463@c.us",
-          "name": "carolzinha♡",
-          "phone": "5511992372463",
-          "cleanPhone": "5511992372463",
-          "isSaved": true
-        },
-        {
-          "id": "5511951017158@c.us",
-          "name": "cartaxo",
-          "phone": "5511951017158",
-          "cleanPhone": "5511951017158",
-          "isSaved": true
-        },
-        {
-          "id": "5511994492755@c.us",
-          "name": "cathe bascoy",
-          "phone": "5511994492755",
-          "cleanPhone": "5511994492755",
-          "isSaved": true
-        },
-        {
-          "id": "5511982138328@c.us",
-          "name": "cauã lima",
-          "phone": "5511982138328",
-          "cleanPhone": "5511982138328",
-          "isSaved": true
-        },
-        {
-          "id": "5511943614844@c.us",
-          "name": "Celine Negreiros",
-          "phone": "5511943614844",
-          "cleanPhone": "5511943614844",
-          "isSaved": true
-        },
-        {
-          "id": "555499053439@c.us",
-          "name": "Cesar Augusto",
-          "phone": "555499053439",
-          "cleanPhone": "555499053439",
-          "isSaved": true
-        },
-        {
-          "id": "5511992145881@c.us",
-          "name": "chiarii",
-          "phone": "5511992145881",
-          "cleanPhone": "5511992145881",
-          "isSaved": true
-        },
-        {
-          "id": "5511940346522@c.us",
-          "name": "China Cliente",
-          "phone": "5511940346522",
-          "cleanPhone": "5511940346522",
-          "isSaved": true
-        },
-        {
-          "id": "5511991926566@c.us",
-          "name": "choko arte",
-          "phone": "5511991926566",
-          "cleanPhone": "5511991926566",
-          "isSaved": true
-        },
-        {
-          "id": "5511964412365@c.us",
-          "name": "Cibelle Caetano",
-          "phone": "5511964412365",
-          "cleanPhone": "5511964412365",
-          "isSaved": true
-        },
-        {
-          "id": "5511999796118@c.us",
-          "name": "Cj eduardo",
-          "phone": "5511999796118",
-          "cleanPhone": "5511999796118",
-          "isSaved": true
-        },
-        {
-          "id": "5511972750904@c.us",
-          "name": "cliente gabriel juliana pimenta",
-          "phone": "5511972750904",
-          "cleanPhone": "5511972750904",
-          "isSaved": true
-        },
-        {
-          "id": "5511982278179@c.us",
-          "name": "cliente isabela",
-          "phone": "5511982278179",
-          "cleanPhone": "5511982278179",
-          "isSaved": true
-        },
-        {
-          "id": "5511930155365@c.us",
-          "name": "cliente Smk",
-          "phone": "5511930155365",
-          "cleanPhone": "5511930155365",
-          "isSaved": true
-        },
-        {
-          "id": "5515998538740@c.us",
-          "name": "Cliente Smk",
-          "phone": "5515998538740",
-          "cleanPhone": "5515998538740",
-          "isSaved": true
-        },
-        {
-          "id": "5511910168381@c.us",
-          "name": "cliente SMK 1",
-          "phone": "5511910168381",
-          "cleanPhone": "5511910168381",
-          "isSaved": true
-        },
-        {
-          "id": "5511958259349@c.us",
-          "name": "cliente SMK 100",
-          "phone": "5511958259349",
-          "cleanPhone": "5511958259349",
-          "isSaved": true
-        },
-        {
-          "id": "5511955848911@c.us",
-          "name": "cliente SMK 100",
-          "phone": "5511955848911",
-          "cleanPhone": "5511955848911",
-          "isSaved": true
-        },
-        {
-          "id": "5511956022898@c.us",
-          "name": "cliente SMK 101",
-          "phone": "5511956022898",
-          "cleanPhone": "5511956022898",
-          "isSaved": true
-        },
-        {
-          "id": "5511956086123@c.us",
-          "name": "cliente SMK 102",
-          "phone": "5511956086123",
-          "cleanPhone": "5511956086123",
-          "isSaved": true
-        },
-        {
-          "id": "5511956580742@c.us",
-          "name": "cliente SMK 103",
-          "phone": "5511956580742",
-          "cleanPhone": "5511956580742",
-          "isSaved": true
-        },
-        {
-          "id": "5511956656214@c.us",
-          "name": "cliente SMK 104",
-          "phone": "5511956656214",
-          "cleanPhone": "5511956656214",
-          "isSaved": true
-        },
-        {
-          "id": "5511956696556@c.us",
-          "name": "cliente SMK 105",
-          "phone": "5511956696556",
-          "cleanPhone": "5511956696556",
-          "isSaved": true
-        },
-        {
-          "id": "5511956751381@c.us",
-          "name": "cliente SMK 106",
-          "phone": "5511956751381",
-          "cleanPhone": "5511956751381",
-          "isSaved": true
-        },
-        {
-          "id": "5511958307144@c.us",
-          "name": "cliente SMK 107",
-          "phone": "5511958307144",
-          "cleanPhone": "5511958307144",
-          "isSaved": true
-        },
-        {
-          "id": "5511957487425@c.us",
-          "name": "cliente SMK 107",
-          "phone": "5511957487425",
-          "cleanPhone": "5511957487425",
-          "isSaved": true
-        },
-        {
-          "id": "5511958452949@c.us",
-          "name": "cliente SMK 108",
-          "phone": "5511958452949",
-          "cleanPhone": "5511958452949",
-          "isSaved": true
-        },
-        {
-          "id": "5511957632186@c.us",
-          "name": "cliente SMK 108",
-          "phone": "5511957632186",
-          "cleanPhone": "5511957632186",
-          "isSaved": true
-        },
-        {
-          "id": "5511958650301@c.us",
-          "name": "cliente SMK 109",
-          "phone": "5511958650301",
-          "cleanPhone": "5511958650301",
-          "isSaved": true
-        },
-        {
-          "id": "5511959181080@c.us",
-          "name": "cliente SMK 110",
-          "phone": "5511959181080",
-          "cleanPhone": "5511959181080",
-          "isSaved": true
-        },
-        {
-          "id": "5511959861395@c.us",
-          "name": "cliente SMK 112",
-          "phone": "5511959861395",
-          "cleanPhone": "5511959861395",
-          "isSaved": true
-        },
-        {
-          "id": "5511960627331@c.us",
-          "name": "cliente SMK 113",
-          "phone": "5511960627331",
-          "cleanPhone": "5511960627331",
-          "isSaved": true
-        },
-        {
-          "id": "5511960549837@c.us",
-          "name": "cliente SMK 113",
-          "phone": "5511960549837",
-          "cleanPhone": "5511960549837",
-          "isSaved": true
-        },
-        {
-          "id": "5511960982558@c.us",
-          "name": "cliente SMK 114",
-          "phone": "5511960982558",
-          "cleanPhone": "5511960982558",
-          "isSaved": true
-        },
-        {
-          "id": "5511961028567@c.us",
-          "name": "cliente SMK 115",
-          "phone": "5511961028567",
-          "cleanPhone": "5511961028567",
-          "isSaved": true
-        },
-        {
-          "id": "5511961748375@c.us",
-          "name": "cliente SMK 116",
-          "phone": "5511961748375",
-          "cleanPhone": "5511961748375",
-          "isSaved": true
-        },
-        {
-          "id": "5511961831864@c.us",
-          "name": "cliente SMK 117",
-          "phone": "5511961831864",
-          "cleanPhone": "5511961831864",
-          "isSaved": true
-        },
-        {
-          "id": "5511962018156@c.us",
-          "name": "cliente SMK 118",
-          "phone": "5511962018156",
-          "cleanPhone": "5511962018156",
-          "isSaved": true
-        },
-        {
-          "id": "5511962055402@c.us",
-          "name": "cliente SMK 119",
-          "phone": "5511962055402",
-          "cleanPhone": "5511962055402",
-          "isSaved": true
-        },
-        {
-          "id": "5511916911348@c.us",
-          "name": "cliente SMK 12",
-          "phone": "5511916911348",
-          "cleanPhone": "5511916911348",
-          "isSaved": true
-        },
-        {
-          "id": "5511962152158@c.us",
-          "name": "cliente SMK 120",
-          "phone": "5511962152158",
-          "cleanPhone": "5511962152158",
-          "isSaved": true
-        },
-        {
-          "id": "5511962342678@c.us",
-          "name": "cliente SMK 121",
-          "phone": "5511962342678",
-          "cleanPhone": "5511962342678",
-          "isSaved": true
-        },
-        {
-          "id": "5511963085947@c.us",
-          "name": "cliente SMK 124",
-          "phone": "5511963085947",
-          "cleanPhone": "5511963085947",
-          "isSaved": true
-        },
-        {
-          "id": "5511963169391@c.us",
-          "name": "cliente SMK 125",
-          "phone": "5511963169391",
-          "cleanPhone": "5511963169391",
-          "isSaved": true
-        },
-        {
-          "id": "5511963180049@c.us",
-          "name": "cliente SMK 126",
-          "phone": "5511963180049",
-          "cleanPhone": "5511963180049",
-          "isSaved": true
-        },
-        {
-          "id": "5511963493229@c.us",
-          "name": "cliente SMK 127",
-          "phone": "5511963493229",
-          "cleanPhone": "5511963493229",
-          "isSaved": true
-        },
-        {
-          "id": "5511963588542@c.us",
-          "name": "cliente SMK 128",
-          "phone": "5511963588542",
-          "cleanPhone": "5511963588542",
-          "isSaved": true
-        },
-        {
-          "id": "5511963645893@c.us",
-          "name": "cliente SMK 129",
-          "phone": "5511963645893",
-          "cleanPhone": "5511963645893",
-          "isSaved": true
-        },
-        {
-          "id": "5511917310769@c.us",
-          "name": "cliente SMK 13",
-          "phone": "5511917310769",
-          "cleanPhone": "5511917310769",
-          "isSaved": true
-        },
-        {
-          "id": "5511917881312@c.us",
-          "name": "cliente SMK 13",
-          "phone": "5511917881312",
-          "cleanPhone": "5511917881312",
-          "isSaved": true
-        },
-        {
-          "id": "5511963841957@c.us",
-          "name": "cliente SMK 130",
-          "phone": "5511963841957",
-          "cleanPhone": "5511963841957",
-          "isSaved": true
-        },
-        {
-          "id": "5511964923145@c.us",
-          "name": "cliente SMK 131",
-          "phone": "5511964923145",
-          "cleanPhone": "5511964923145",
-          "isSaved": true
-        },
-        {
-          "id": "5511965351947@c.us",
-          "name": "cliente SMK 132",
-          "phone": "5511965351947",
-          "cleanPhone": "5511965351947",
-          "isSaved": true
-        },
-        {
-          "id": "5511965751562@c.us",
-          "name": "cliente SMK 133",
-          "phone": "5511965751562",
-          "cleanPhone": "5511965751562",
-          "isSaved": true
-        },
-        {
-          "id": "5511966353726@c.us",
-          "name": "cliente SMK 134",
-          "phone": "5511966353726",
-          "cleanPhone": "5511966353726",
-          "isSaved": true
-        },
-        {
-          "id": "5511966402015@c.us",
-          "name": "cliente SMK 135",
-          "phone": "5511966402015",
-          "cleanPhone": "5511966402015",
-          "isSaved": true
-        },
-        {
-          "id": "5511966464464@c.us",
-          "name": "cliente SMK 136",
-          "phone": "5511966464464",
-          "cleanPhone": "5511966464464",
-          "isSaved": true
-        },
-        {
-          "id": "5511967061776@c.us",
-          "name": "cliente SMK 137",
-          "phone": "5511967061776",
-          "cleanPhone": "5511967061776",
-          "isSaved": true
-        },
-        {
-          "id": "5511967258710@c.us",
-          "name": "cliente SMK 138",
-          "phone": "5511967258710",
-          "cleanPhone": "5511967258710",
-          "isSaved": true
-        },
-        {
-          "id": "5511967701078@c.us",
-          "name": "cliente SMK 139",
-          "phone": "5511967701078",
-          "cleanPhone": "5511967701078",
-          "isSaved": true
-        },
-        {
-          "id": "5511917931979@c.us",
-          "name": "cliente SMK 14",
-          "phone": "5511917931979",
-          "cleanPhone": "5511917931979",
-          "isSaved": true
-        },
-        {
-          "id": "5511968101541@c.us",
-          "name": "cliente SMK 140",
-          "phone": "5511968101541",
-          "cleanPhone": "5511968101541",
-          "isSaved": true
-        },
-        {
-          "id": "5511969536619@c.us",
-          "name": "cliente SMK 141",
-          "phone": "5511969536619",
-          "cleanPhone": "5511969536619",
-          "isSaved": true
-        },
-        {
-          "id": "5511971999443@c.us",
-          "name": "cliente SMK 142",
-          "phone": "5511971999443",
-          "cleanPhone": "5511971999443",
-          "isSaved": true
-        },
-        {
-          "id": "5511969564839@c.us",
-          "name": "cliente SMK 142",
-          "phone": "5511969564839",
-          "cleanPhone": "5511969564839",
-          "isSaved": true
-        },
-        {
-          "id": "5511970205672@c.us",
-          "name": "cliente SMK 143",
-          "phone": "5511970205672",
-          "cleanPhone": "5511970205672",
-          "isSaved": true
-        },
-        {
-          "id": "5511970427810@c.us",
-          "name": "cliente SMK 144",
-          "phone": "5511970427810",
-          "cleanPhone": "5511970427810",
-          "isSaved": true
-        },
-        {
-          "id": "5511972732702@c.us",
-          "name": "cliente SMK 144",
-          "phone": "5511972732702",
-          "cleanPhone": "5511972732702",
-          "isSaved": true
-        },
-        {
-          "id": "5511970516137@c.us",
-          "name": "cliente SMK 145",
-          "phone": "5511970516137",
-          "cleanPhone": "5511970516137",
-          "isSaved": true
-        },
-        {
-          "id": "5511970754891@c.us",
-          "name": "cliente SMK 146",
-          "phone": "5511970754891",
-          "cleanPhone": "5511970754891",
-          "isSaved": true
-        },
-        {
-          "id": "5511970776982@c.us",
-          "name": "cliente SMK 147",
-          "phone": "5511970776982",
-          "cleanPhone": "5511970776982",
-          "isSaved": true
-        },
-        {
-          "id": "5511970802254@c.us",
-          "name": "cliente SMK 148",
-          "phone": "5511970802254",
-          "cleanPhone": "5511970802254",
-          "isSaved": true
-        },
-        {
-          "id": "5511970956777@c.us",
-          "name": "cliente SMK 149",
-          "phone": "5511970956777",
-          "cleanPhone": "5511970956777",
-          "isSaved": true
-        },
-        {
-          "id": "5511921304900@c.us",
-          "name": "cliente SMK 15",
-          "phone": "5511921304900",
-          "cleanPhone": "5511921304900",
-          "isSaved": true
-        },
-        {
-          "id": "5511971583963@c.us",
-          "name": "cliente SMK 150",
-          "phone": "5511971583963",
-          "cleanPhone": "5511971583963",
-          "isSaved": true
-        },
-        {
-          "id": "5511971675968@c.us",
-          "name": "cliente SMK 151",
-          "phone": "5511971675968",
-          "cleanPhone": "5511971675968",
-          "isSaved": true
-        },
-        {
-          "id": "5511972585431@c.us",
-          "name": "cliente SMK 153",
-          "phone": "5511972585431",
-          "cleanPhone": "5511972585431",
-          "isSaved": true
-        },
-        {
-          "id": "5511972818580@c.us",
-          "name": "cliente SMK 155",
-          "phone": "5511972818580",
-          "cleanPhone": "5511972818580",
-          "isSaved": true
-        },
-        {
-          "id": "5511973345551@c.us",
-          "name": "cliente SMK 156",
-          "phone": "5511973345551",
-          "cleanPhone": "5511973345551",
-          "isSaved": true
-        },
-        {
-          "id": "5511974001551@c.us",
-          "name": "cliente SMK 157",
-          "phone": "5511974001551",
-          "cleanPhone": "5511974001551",
-          "isSaved": true
-        },
-        {
-          "id": "5511974003937@c.us",
-          "name": "cliente SMK 158",
-          "phone": "5511974003937",
-          "cleanPhone": "5511974003937",
-          "isSaved": true
-        },
-        {
-          "id": "5511974240307@c.us",
-          "name": "cliente SMK 159",
-          "phone": "5511974240307",
-          "cleanPhone": "5511974240307",
-          "isSaved": true
-        },
-        {
-          "id": "5511930074635@c.us",
-          "name": "cliente SMK 16",
-          "phone": "5511930074635",
-          "cleanPhone": "5511930074635",
-          "isSaved": true
-        },
-        {
-          "id": "5511974246899@c.us",
-          "name": "cliente SMK 160",
-          "phone": "5511974246899",
-          "cleanPhone": "5511974246899",
-          "isSaved": true
-        },
-        {
-          "id": "5511974592320@c.us",
-          "name": "cliente SMK 161",
-          "phone": "5511974592320",
-          "cleanPhone": "5511974592320",
-          "isSaved": true
-        },
-        {
-          "id": "5511975470917@c.us",
-          "name": "cliente SMK 162",
-          "phone": "5511975470917",
-          "cleanPhone": "5511975470917",
-          "isSaved": true
-        },
-        {
-          "id": "5511975754515@c.us",
-          "name": "cliente SMK 163",
-          "phone": "5511975754515",
-          "cleanPhone": "5511975754515",
-          "isSaved": true
-        },
-        {
-          "id": "5511975755865@c.us",
-          "name": "cliente SMK 164",
-          "phone": "5511975755865",
-          "cleanPhone": "5511975755865",
-          "isSaved": true
-        },
-        {
-          "id": "5511975830098@c.us",
-          "name": "cliente SMK 165",
-          "phone": "5511975830098",
-          "cleanPhone": "5511975830098",
-          "isSaved": true
-        },
-        {
-          "id": "5511975876222@c.us",
-          "name": "cliente SMK 166",
-          "phone": "5511975876222",
-          "cleanPhone": "5511975876222",
-          "isSaved": true
-        },
-        {
-          "id": "5511975883286@c.us",
-          "name": "cliente SMK 167",
-          "phone": "5511975883286",
-          "cleanPhone": "5511975883286",
-          "isSaved": true
-        },
-        {
-          "id": "5511976214092@c.us",
-          "name": "cliente SMK 168",
-          "phone": "5511976214092",
-          "cleanPhone": "5511976214092",
-          "isSaved": true
-        },
-        {
-          "id": "5511976304631@c.us",
-          "name": "cliente SMK 169",
-          "phone": "5511976304631",
-          "cleanPhone": "5511976304631",
-          "isSaved": true
-        },
-        {
-          "id": "5511930343813@c.us",
-          "name": "cliente SMK 17",
-          "phone": "5511930343813",
-          "cleanPhone": "5511930343813",
-          "isSaved": true
-        },
-        {
-          "id": "5511976432978@c.us",
-          "name": "cliente SMK 170",
-          "phone": "5511976432978",
-          "cleanPhone": "5511976432978",
-          "isSaved": true
-        },
-        {
-          "id": "5511976661845@c.us",
-          "name": "cliente SMK 171",
-          "phone": "5511976661845",
-          "cleanPhone": "5511976661845",
-          "isSaved": true
-        },
-        {
-          "id": "5511976863021@c.us",
-          "name": "cliente SMK 172",
-          "phone": "5511976863021",
-          "cleanPhone": "5511976863021",
-          "isSaved": true
-        },
-        {
-          "id": "5511976909535@c.us",
-          "name": "cliente SMK 173",
-          "phone": "5511976909535",
-          "cleanPhone": "5511976909535",
-          "isSaved": true
-        },
-        {
-          "id": "5511977489446@c.us",
-          "name": "cliente SMK 174",
-          "phone": "5511977489446",
-          "cleanPhone": "5511977489446",
-          "isSaved": true
-        },
-        {
-          "id": "5511977725226@c.us",
-          "name": "cliente SMK 176",
-          "phone": "5511977725226",
-          "cleanPhone": "5511977725226",
-          "isSaved": true
-        },
-        {
-          "id": "5511977773449@c.us",
-          "name": "cliente SMK 177",
-          "phone": "5511977773449",
-          "cleanPhone": "5511977773449",
-          "isSaved": true
-        },
-        {
-          "id": "5511978042183@c.us",
-          "name": "cliente SMK 178",
-          "phone": "5511978042183",
-          "cleanPhone": "5511978042183",
-          "isSaved": true
-        },
-        {
-          "id": "5511978051269@c.us",
-          "name": "cliente SMK 179",
-          "phone": "5511978051269",
-          "cleanPhone": "5511978051269",
-          "isSaved": true
-        },
-        {
-          "id": "5511930464993@c.us",
-          "name": "cliente SMK 18",
-          "phone": "5511930464993",
-          "cleanPhone": "5511930464993",
-          "isSaved": true
-        },
-        {
-          "id": "5511930369497@c.us",
-          "name": "cliente SMK 18",
-          "phone": "5511930369497",
-          "cleanPhone": "5511930369497",
-          "isSaved": true
-        },
-        {
-          "id": "5511978433737@c.us",
-          "name": "cliente SMK 182",
-          "phone": "5511978433737",
-          "cleanPhone": "5511978433737",
-          "isSaved": true
-        },
-        {
-          "id": "5511978554545@c.us",
-          "name": "cliente SMK 183",
-          "phone": "5511978554545",
-          "cleanPhone": "5511978554545",
-          "isSaved": true
-        },
-        {
-          "id": "5511978914869@c.us",
-          "name": "cliente SMK 184",
-          "phone": "5511978914869",
-          "cleanPhone": "5511978914869",
-          "isSaved": true
-        },
-        {
-          "id": "5511979538296@c.us",
-          "name": "cliente SMK 185",
-          "phone": "5511979538296",
-          "cleanPhone": "5511979538296",
-          "isSaved": true
-        },
-        {
-          "id": "5511980594827@c.us",
-          "name": "cliente SMK 186",
-          "phone": "5511980594827",
-          "cleanPhone": "5511980594827",
-          "isSaved": true
-        },
-        {
-          "id": "5511980998572@c.us",
-          "name": "cliente SMK 187",
-          "phone": "5511980998572",
-          "cleanPhone": "5511980998572",
-          "isSaved": true
-        },
-        {
-          "id": "5511981279122@c.us",
-          "name": "cliente SMK 189",
-          "phone": "5511981279122",
-          "cleanPhone": "5511981279122",
-          "isSaved": true
-        },
-        {
-          "id": "5511930520846@c.us",
-          "name": "cliente SMK 19",
-          "phone": "5511930520846",
-          "cleanPhone": "5511930520846",
-          "isSaved": true
-        },
-        {
-          "id": "5511981300013@c.us",
-          "name": "cliente SMK 190",
-          "phone": "5511981300013",
-          "cleanPhone": "5511981300013",
-          "isSaved": true
-        },
-        {
-          "id": "5511981405166@c.us",
-          "name": "cliente SMK 191",
-          "phone": "5511981405166",
-          "cleanPhone": "5511981405166",
-          "isSaved": true
-        },
-        {
-          "id": "5511981414055@c.us",
-          "name": "cliente SMK 192",
-          "phone": "5511981414055",
-          "cleanPhone": "5511981414055",
-          "isSaved": true
-        },
-        {
-          "id": "5511981661266@c.us",
-          "name": "cliente SMK 193",
-          "phone": "5511981661266",
-          "cleanPhone": "5511981661266",
-          "isSaved": true
-        },
-        {
-          "id": "5511981940094@c.us",
-          "name": "cliente SMK 194",
-          "phone": "5511981940094",
-          "cleanPhone": "5511981940094",
-          "isSaved": true
-        },
-        {
-          "id": "5511981958040@c.us",
-          "name": "cliente SMK 195",
-          "phone": "5511981958040",
-          "cleanPhone": "5511981958040",
-          "isSaved": true
-        },
-        {
-          "id": "5511981988177@c.us",
-          "name": "cliente SMK 196",
-          "phone": "5511981988177",
-          "cleanPhone": "5511981988177",
-          "isSaved": true
-        },
-        {
-          "id": "5511982533993@c.us",
-          "name": "cliente SMK 197",
-          "phone": "5511982533993",
-          "cleanPhone": "5511982533993",
-          "isSaved": true
-        },
-        {
-          "id": "5511982962024@c.us",
-          "name": "cliente SMK 198",
-          "phone": "5511982962024",
-          "cleanPhone": "5511982962024",
-          "isSaved": true
-        },
-        {
-          "id": "5511984528893@c.us",
-          "name": "cliente SMK 199",
-          "phone": "5511984528893",
-          "cleanPhone": "5511984528893",
-          "isSaved": true
-        },
-        {
-          "id": "5511910722007@c.us",
-          "name": "cliente SMK 2",
-          "phone": "5511910722007",
-          "cleanPhone": "5511910722007",
-          "isSaved": true
-        },
-        {
-          "id": "5511932045701@c.us",
-          "name": "cliente SMK 20",
-          "phone": "5511932045701",
-          "cleanPhone": "5511932045701",
-          "isSaved": true
-        },
-        {
-          "id": "5511985067715@c.us",
-          "name": "cliente SMK 200",
-          "phone": "5511985067715",
-          "cleanPhone": "5511985067715",
-          "isSaved": true
-        },
-        {
-          "id": "5511985496443@c.us",
-          "name": "cliente SMK 201",
-          "phone": "5511985496443",
-          "cleanPhone": "5511985496443",
-          "isSaved": true
-        },
-        {
-          "id": "5511985715789@c.us",
-          "name": "cliente SMK 202",
-          "phone": "5511985715789",
-          "cleanPhone": "5511985715789",
-          "isSaved": true
-        },
-        {
-          "id": "5511986079034@c.us",
-          "name": "cliente SMK 203",
-          "phone": "5511986079034",
-          "cleanPhone": "5511986079034",
-          "isSaved": true
-        },
-        {
-          "id": "5511986138112@c.us",
-          "name": "cliente SMK 204",
-          "phone": "5511986138112",
-          "cleanPhone": "5511986138112",
-          "isSaved": true
-        },
-        {
-          "id": "5511986154534@c.us",
-          "name": "cliente SMK 205",
-          "phone": "5511986154534",
-          "cleanPhone": "5511986154534",
-          "isSaved": true
-        },
-        {
-          "id": "5511986186932@c.us",
-          "name": "cliente SMK 206",
-          "phone": "5511986186932",
-          "cleanPhone": "5511986186932",
-          "isSaved": true
-        },
-        {
-          "id": "5511986404434@c.us",
-          "name": "cliente SMK 207",
-          "phone": "5511986404434",
-          "cleanPhone": "5511986404434",
-          "isSaved": true
-        },
-        {
-          "id": "5511986473815@c.us",
-          "name": "cliente SMK 208",
-          "phone": "5511986473815",
-          "cleanPhone": "5511986473815",
-          "isSaved": true
-        },
-        {
-          "id": "5511987327358@c.us",
-          "name": "cliente SMK 209",
-          "phone": "5511987327358",
-          "cleanPhone": "5511987327358",
-          "isSaved": true
-        },
-        {
-          "id": "5511932201799@c.us",
-          "name": "cliente SMK 21",
-          "phone": "5511932201799",
-          "cleanPhone": "5511932201799",
-          "isSaved": true
-        },
-        {
-          "id": "5511932226240@c.us",
-          "name": "cliente SMK 21",
-          "phone": "5511932226240",
-          "cleanPhone": "5511932226240",
-          "isSaved": true
-        },
-        {
-          "id": "5511989030282@c.us",
-          "name": "cliente SMK 210",
-          "phone": "5511989030282",
-          "cleanPhone": "5511989030282",
-          "isSaved": true
-        },
-        {
-          "id": "5511989089636@c.us",
-          "name": "cliente SMK 211",
-          "phone": "5511989089636",
-          "cleanPhone": "5511989089636",
-          "isSaved": true
-        },
-        {
-          "id": "5511989817001@c.us",
-          "name": "cliente SMK 212",
-          "phone": "5511989817001",
-          "cleanPhone": "5511989817001",
-          "isSaved": true
-        },
-        {
-          "id": "5511989930105@c.us",
-          "name": "cliente SMK 213",
-          "phone": "5511989930105",
-          "cleanPhone": "5511989930105",
-          "isSaved": true
-        },
-        {
-          "id": "5511989939192@c.us",
-          "name": "cliente SMK 214",
-          "phone": "5511989939192",
-          "cleanPhone": "5511989939192",
-          "isSaved": true
-        },
-        {
-          "id": "5511991024082@c.us",
-          "name": "cliente SMK 215",
-          "phone": "5511991024082",
-          "cleanPhone": "5511991024082",
-          "isSaved": true
-        },
-        {
-          "id": "5511991223799@c.us",
-          "name": "cliente SMK 216",
-          "phone": "5511991223799",
-          "cleanPhone": "5511991223799",
-          "isSaved": true
-        },
-        {
-          "id": "5511992256866@c.us",
-          "name": "cliente SMK 217",
-          "phone": "5511992256866",
-          "cleanPhone": "5511992256866",
-          "isSaved": true
-        },
-        {
-          "id": "5511992381061@c.us",
-          "name": "cliente SMK 219",
-          "phone": "5511992381061",
-          "cleanPhone": "5511992381061",
-          "isSaved": true
-        },
-        {
-          "id": "5511932591304@c.us",
-          "name": "cliente SMK 22",
-          "phone": "5511932591304",
-          "cleanPhone": "5511932591304",
-          "isSaved": true
-        },
-        {
-          "id": "5511992393451@c.us",
-          "name": "cliente SMK 220",
-          "phone": "5511992393451",
-          "cleanPhone": "5511992393451",
-          "isSaved": true
-        },
-        {
-          "id": "5511992649734@c.us",
-          "name": "cliente SMK 221",
-          "phone": "5511992649734",
-          "cleanPhone": "5511992649734",
-          "isSaved": true
-        },
-        {
-          "id": "5511992949921@c.us",
-          "name": "cliente SMK 222",
-          "phone": "5511992949921",
-          "cleanPhone": "5511992949921",
-          "isSaved": true
-        },
-        {
-          "id": "5511993102521@c.us",
-          "name": "cliente SMK 223",
-          "phone": "5511993102521",
-          "cleanPhone": "5511993102521",
-          "isSaved": true
-        },
-        {
-          "id": "5511993150236@c.us",
-          "name": "cliente SMK 224",
-          "phone": "5511993150236",
-          "cleanPhone": "5511993150236",
-          "isSaved": true
-        },
-        {
-          "id": "5511993236735@c.us",
-          "name": "cliente SMK 225",
-          "phone": "5511993236735",
-          "cleanPhone": "5511993236735",
-          "isSaved": true
-        },
-        {
-          "id": "5511993352305@c.us",
-          "name": "cliente SMK 226",
-          "phone": "5511993352305",
-          "cleanPhone": "5511993352305",
-          "isSaved": true
-        },
-        {
-          "id": "5511993562213@c.us",
-          "name": "cliente SMK 227",
-          "phone": "5511993562213",
-          "cleanPhone": "5511993562213",
-          "isSaved": true
-        },
-        {
-          "id": "5511993873250@c.us",
-          "name": "cliente SMK 228",
-          "phone": "5511993873250",
-          "cleanPhone": "5511993873250",
-          "isSaved": true
-        },
-        {
-          "id": "5511994113588@c.us",
-          "name": "cliente SMK 229",
-          "phone": "5511994113588",
-          "cleanPhone": "5511994113588",
-          "isSaved": true
-        },
-        {
-          "id": "5511934220101@c.us",
-          "name": "cliente SMK 23",
-          "phone": "5511934220101",
-          "cleanPhone": "5511934220101",
-          "isSaved": true
-        },
-        {
-          "id": "5511994298464@c.us",
-          "name": "cliente SMK 230",
-          "phone": "5511994298464",
-          "cleanPhone": "5511994298464",
-          "isSaved": true
-        },
-        {
-          "id": "5511994482104@c.us",
-          "name": "cliente SMK 231",
-          "phone": "5511994482104",
-          "cleanPhone": "5511994482104",
-          "isSaved": true
-        },
-        {
-          "id": "5511994661207@c.us",
-          "name": "cliente SMK 233",
-          "phone": "5511994661207",
-          "cleanPhone": "5511994661207",
-          "isSaved": true
-        }
-      ],
+      "contacts": [],
       "color": "#10b981",
       "createdAt": "2026-08-15T15:30:08.763Z"
     },
@@ -5614,754 +3401,492 @@
       "id": "list_1786808943867",
       "name": "REATIVAÇÃO DE BASE 2",
       "description": "Lista personalizada de contatos",
+      "contacts": [],
+      "color": "#10b981",
+      "createdAt": "2026-08-15T15:49:03.867Z"
+    },
+    {
+      "id": "list_1786825249444",
+      "name": "LISTA CLIENTES SMK ANTIGOS",
+      "description": "Apenas clientes Smk antigos",
+      "contacts": [],
+      "color": "#10b981",
+      "createdAt": "2026-08-15T20:20:49.444Z"
+    },
+    {
+      "id": "list_1786989733027",
+      "name": "LISTA CLIENTES COMPRADORES",
+      "description": "Lista personalizada de contatos",
+      "contacts": [],
+      "color": "#10b981",
+      "createdAt": "2026-08-17T18:02:13.027Z"
+    },
+    {
+      "id": "list_1786992631910",
+      "name": "lista teste",
+      "description": "Lista personalizada de contatos",
+      "contacts": [],
+      "color": "#10b981",
+      "createdAt": "2026-08-17T18:50:31.910Z"
+    },
+    {
+      "id": "list_base_blindada_enviados",
+      "name": "🛡️ BASE BLINDADA (Já Contactados)",
+      "description": "Contatos que já possuem conversas no WhatsApp — protegidos contra novos disparos",
       "contacts": [
         {
-          "id": "5511994823357@c.us",
-          "name": "cliente SMK 234",
-          "phone": "5511994823357",
-          "cleanPhone": "5511994823357",
+          "id": "5511959242138@c.us",
+          "name": "ana beatriz",
+          "phone": "5511959242138",
+          "cleanPhone": "5511959242138",
           "isSaved": true
         },
         {
-          "id": "5511994925524@c.us",
-          "name": "cliente SMK 235",
-          "phone": "5511994925524",
-          "cleanPhone": "5511994925524",
+          "id": "5522998300277@c.us",
+          "name": "ana carolina",
+          "phone": "5522998300277",
+          "cleanPhone": "5522998300277",
           "isSaved": true
         },
         {
-          "id": "5511995205009@c.us",
-          "name": "cliente SMK 236",
-          "phone": "5511995205009",
-          "cleanPhone": "5511995205009",
+          "id": "5511945979813@c.us",
+          "name": "Ana Chezze cliente",
+          "phone": "5511945979813",
+          "cleanPhone": "5511945979813",
           "isSaved": true
         },
         {
-          "id": "5511995455538@c.us",
-          "name": "cliente SMK 237",
-          "phone": "5511995455538",
-          "cleanPhone": "5511995455538",
+          "id": "5511994967289@c.us",
+          "name": "ana clara",
+          "phone": "5511994967289",
+          "cleanPhone": "5511994967289",
           "isSaved": true
         },
         {
-          "id": "5511995566668@c.us",
-          "name": "cliente SMK 238",
-          "phone": "5511995566668",
-          "cleanPhone": "5511995566668",
+          "id": "5511982672821@c.us",
+          "name": "Ana cliente SMK",
+          "phone": "5511982672821",
+          "cleanPhone": "5511982672821",
           "isSaved": true
         },
         {
-          "id": "5511995574593@c.us",
-          "name": "cliente SMK 239",
-          "phone": "5511995574593",
-          "cleanPhone": "5511995574593",
+          "id": "5511933131857@c.us",
+          "name": "Ana Dutra Cliente",
+          "phone": "5511933131857",
+          "cleanPhone": "5511933131857",
           "isSaved": true
         },
         {
-          "id": "5511934655549@c.us",
-          "name": "cliente SMK 24",
-          "phone": "5511934655549",
-          "cleanPhone": "5511934655549",
+          "id": "5511970302928@c.us",
+          "name": "ana feitosa",
+          "phone": "5511970302928",
+          "cleanPhone": "5511970302928",
           "isSaved": true
         },
         {
-          "id": "5511995688550@c.us",
-          "name": "cliente SMK 240",
-          "phone": "5511995688550",
-          "cleanPhone": "5511995688550",
+          "id": "5511947872512@c.us",
+          "name": "Ana Gisbert",
+          "phone": "5511947872512",
+          "cleanPhone": "5511947872512",
           "isSaved": true
         },
         {
-          "id": "5511995761675@c.us",
-          "name": "cliente SMK 241",
-          "phone": "5511995761675",
-          "cleanPhone": "5511995761675",
+          "id": "5511956592073@c.us",
+          "name": "Ana Giulia",
+          "phone": "5511956592073",
+          "cleanPhone": "5511956592073",
           "isSaved": true
         },
         {
-          "id": "5511995763216@c.us",
-          "name": "cliente SMK 242",
-          "phone": "5511995763216",
-          "cleanPhone": "5511995763216",
+          "id": "5511996826502@c.us",
+          "name": "ana paula",
+          "phone": "5511996826502",
+          "cleanPhone": "5511996826502",
           "isSaved": true
         },
         {
-          "id": "5511995887743@c.us",
-          "name": "cliente SMK 243",
-          "phone": "5511995887743",
-          "cleanPhone": "5511995887743",
+          "id": "5511944452819@c.us",
+          "name": "Ana Schiavon cliente",
+          "phone": "5511944452819",
+          "cleanPhone": "5511944452819",
           "isSaved": true
         },
         {
-          "id": "5511996080104@c.us",
-          "name": "cliente SMK 244",
-          "phone": "5511996080104",
-          "cleanPhone": "5511996080104",
+          "id": "5511966458551@c.us",
+          "name": "Ana Trigo Garota Propaganda 2",
+          "phone": "5511966458551",
+          "cleanPhone": "5511966458551",
           "isSaved": true
         },
         {
-          "id": "5511996498691@c.us",
-          "name": "cliente SMK 245",
-          "phone": "5511996498691",
-          "cleanPhone": "5511996498691",
+          "id": "5511930122316@c.us",
+          "name": "Ana♡",
+          "phone": "5511930122316",
+          "cleanPhone": "5511930122316",
           "isSaved": true
         },
         {
-          "id": "5511996853413@c.us",
-          "name": "cliente SMK 247",
-          "phone": "5511996853413",
-          "cleanPhone": "5511996853413",
+          "id": "5511966935053@c.us",
+          "name": "Anãzinha De Smurf❤",
+          "phone": "5511966935053",
+          "cleanPhone": "5511966935053",
           "isSaved": true
         },
         {
-          "id": "5511997061736@c.us",
-          "name": "cliente SMK 248",
-          "phone": "5511997061736",
-          "cleanPhone": "5511997061736",
+          "id": "5511948451245@c.us",
+          "name": "Anãzinha De Smurf❤",
+          "phone": "5511948451245",
+          "cleanPhone": "5511948451245",
           "isSaved": true
         },
         {
-          "id": "5511997726899@c.us",
-          "name": "cliente SMK 249",
-          "phone": "5511997726899",
-          "cleanPhone": "5511997726899",
+          "id": "5511945141690@c.us",
+          "name": "Anderson",
+          "phone": "5511945141690",
+          "cleanPhone": "5511945141690",
           "isSaved": true
         },
         {
-          "id": "5511939099033@c.us",
-          "name": "cliente SMK 25",
-          "phone": "5511939099033",
-          "cleanPhone": "5511939099033",
+          "id": "5511940757645@c.us",
+          "name": "andré",
+          "phone": "5511940757645",
+          "cleanPhone": "5511940757645",
           "isSaved": true
         },
         {
-          "id": "5511998111086@c.us",
-          "name": "cliente SMK 250",
-          "phone": "5511998111086",
-          "cleanPhone": "5511998111086",
+          "id": "5511983405086@c.us",
+          "name": "andréia",
+          "phone": "5511983405086",
+          "cleanPhone": "5511983405086",
           "isSaved": true
         },
         {
-          "id": "5511998224769@c.us",
-          "name": "cliente SMK 251",
-          "phone": "5511998224769",
-          "cleanPhone": "5511998224769",
+          "id": "5511991941595@c.us",
+          "name": "Andresson",
+          "phone": "5511991941595",
+          "cleanPhone": "5511991941595",
           "isSaved": true
         },
         {
-          "id": "5511998473348@c.us",
-          "name": "cliente SMK 252",
-          "phone": "5511998473348",
-          "cleanPhone": "5511998473348",
+          "id": "5511966315698@c.us",
+          "name": "angela pontes",
+          "phone": "5511966315698",
+          "cleanPhone": "5511966315698",
           "isSaved": true
         },
         {
-          "id": "5511998687929@c.us",
-          "name": "cliente SMK 253",
-          "phone": "5511998687929",
-          "cleanPhone": "5511998687929",
+          "id": "5511992847422@c.us",
+          "name": "angela sala",
+          "phone": "5511992847422",
+          "cleanPhone": "5511992847422",
           "isSaved": true
         },
         {
-          "id": "5511999012668@c.us",
-          "name": "cliente SMK 254",
-          "phone": "5511999012668",
-          "cleanPhone": "5511999012668",
+          "id": "5511954488602@c.us",
+          "name": "aninha",
+          "phone": "5511954488602",
+          "cleanPhone": "5511954488602",
           "isSaved": true
         },
         {
-          "id": "5511999207028@c.us",
-          "name": "cliente SMK 256",
-          "phone": "5511999207028",
-          "cleanPhone": "5511999207028",
+          "id": "5511968670748@c.us",
+          "name": "anna",
+          "phone": "5511968670748",
+          "cleanPhone": "5511968670748",
           "isSaved": true
         },
         {
-          "id": "5511999374933@c.us",
-          "name": "cliente SMK 257",
-          "phone": "5511999374933",
-          "cleanPhone": "5511999374933",
+          "id": "5511941352503@c.us",
+          "name": "anna cardoso",
+          "phone": "5511941352503",
+          "cleanPhone": "5511941352503",
           "isSaved": true
         },
         {
-          "id": "5511999920445@c.us",
-          "name": "cliente SMK 258",
-          "phone": "5511999920445",
-          "cleanPhone": "5511999920445",
+          "id": "5511930988900@c.us",
+          "name": "Antonio Banca",
+          "phone": "5511930988900",
+          "cleanPhone": "5511930988900",
           "isSaved": true
         },
         {
-          "id": "5511939609364@c.us",
-          "name": "cliente SMK 26",
-          "phone": "5511939609364",
-          "cleanPhone": "5511939609364",
+          "id": "5511960639082@c.us",
+          "name": "antônio caminhão",
+          "phone": "5511960639082",
+          "cleanPhone": "5511960639082",
           "isSaved": true
         },
         {
-          "id": "5511940233632@c.us",
-          "name": "cliente SMK 27",
-          "phone": "5511940233632",
-          "cleanPhone": "5511940233632",
+          "id": "5511986476564@c.us",
+          "name": "Aratto Ink",
+          "phone": "5511986476564",
+          "cleanPhone": "5511986476564",
           "isSaved": true
         },
         {
-          "id": "5511940318705@c.us",
-          "name": "cliente SMK 27",
-          "phone": "5511940318705",
-          "cleanPhone": "5511940318705",
+          "id": "5511969436215@c.us",
+          "name": "Ariane Janine Confeitaria",
+          "phone": "5511969436215",
+          "cleanPhone": "5511969436215",
           "isSaved": true
         },
         {
-          "id": "554917670953578@c.us",
-          "name": "cliente SMK 28",
-          "phone": "554917670953578",
-          "cleanPhone": "554917670953578",
+          "id": "5511970671363@c.us",
+          "name": "arthur",
+          "phone": "5511970671363",
+          "cleanPhone": "5511970671363",
           "isSaved": true
         },
         {
-          "id": "5511940448362@c.us",
-          "name": "cliente SMK 29",
-          "phone": "5511940448362",
-          "cleanPhone": "5511940448362",
+          "id": "556194084792@c.us",
+          "name": "Arthur",
+          "phone": "556194084792",
+          "cleanPhone": "556194084792",
           "isSaved": true
         },
         {
-          "id": "5511911075424@c.us",
-          "name": "cliente SMK 3",
-          "phone": "5511911075424",
-          "cleanPhone": "5511911075424",
+          "id": "5511989531538@c.us",
+          "name": "arthur dantas",
+          "phone": "5511989531538",
+          "cleanPhone": "5511989531538",
           "isSaved": true
         },
         {
-          "id": "5511940590586@c.us",
-          "name": "cliente SMK 30",
-          "phone": "5511940590586",
-          "cleanPhone": "5511940590586",
+          "id": "558195768210@c.us",
+          "name": "Bala",
+          "phone": "558195768210",
+          "cleanPhone": "558195768210",
           "isSaved": true
         },
         {
-          "id": "5511940723395@c.us",
-          "name": "cliente SMK 31",
-          "phone": "5511940723395",
-          "cleanPhone": "5511940723395",
+          "id": "5511943230252@c.us",
+          "name": "barbeiro hendryck coopera",
+          "phone": "5511943230252",
+          "cleanPhone": "5511943230252",
           "isSaved": true
         },
         {
-          "id": "5511940793149@c.us",
-          "name": "cliente SMK 32",
-          "phone": "5511940793149",
-          "cleanPhone": "5511940793149",
+          "id": "5511963342439@c.us",
+          "name": "Batidas DG",
+          "phone": "5511963342439",
+          "cleanPhone": "5511963342439",
           "isSaved": true
         },
         {
-          "id": "5511941021534@c.us",
-          "name": "cliente SMK 33",
-          "phone": "5511941021534",
-          "cleanPhone": "5511941021534",
+          "id": "5511947825718@c.us",
+          "name": "beatriz santana",
+          "phone": "5511947825718",
+          "cleanPhone": "5511947825718",
           "isSaved": true
         },
         {
-          "id": "5511941237883@c.us",
-          "name": "cliente SMK 34",
-          "phone": "5511941237883",
-          "cleanPhone": "5511941237883",
+          "id": "5511954920745@c.us",
+          "name": "Beicin",
+          "phone": "5511954920745",
+          "cleanPhone": "5511954920745",
           "isSaved": true
         },
         {
-          "id": "5511941515884@c.us",
-          "name": "cliente SMK 35",
-          "phone": "5511941515884",
-          "cleanPhone": "5511941515884",
+          "id": "5511947670051@c.us",
+          "name": "bela",
+          "phone": "5511947670051",
+          "cleanPhone": "5511947670051",
           "isSaved": true
         },
         {
-          "id": "5511941873627@c.us",
-          "name": "cliente SMK 37",
-          "phone": "5511941873627",
-          "cleanPhone": "5511941873627",
+          "id": "5511988533453@c.us",
+          "name": "bella",
+          "phone": "5511988533453",
+          "cleanPhone": "5511988533453",
           "isSaved": true
         },
         {
-          "id": "5511942212911@c.us",
-          "name": "cliente SMK 38",
-          "phone": "5511942212911",
-          "cleanPhone": "5511942212911",
+          "id": "5511942958314@c.us",
+          "name": "Bello",
+          "phone": "5511942958314",
+          "cleanPhone": "5511942958314",
           "isSaved": true
         },
         {
-          "id": "5511943073903@c.us",
-          "name": "cliente SMK 39",
-          "phone": "5511943073903",
-          "cleanPhone": "5511943073903",
+          "id": "5511940567116@c.us",
+          "name": "Belly cliente",
+          "phone": "5511940567116",
+          "cleanPhone": "5511940567116",
           "isSaved": true
         },
         {
-          "id": "5511942495477@c.us",
-          "name": "cliente SMK 39",
-          "phone": "5511942495477",
-          "cleanPhone": "5511942495477",
+          "id": "5511914117230@c.us",
+          "name": "belmiro",
+          "phone": "5511914117230",
+          "cleanPhone": "5511914117230",
           "isSaved": true
         },
         {
-          "id": "5511911292986@c.us",
-          "name": "cliente SMK 4",
-          "phone": "5511911292986",
-          "cleanPhone": "5511911292986",
+          "id": "5511965746535@c.us",
+          "name": "best shoes",
+          "phone": "5511965746535",
+          "cleanPhone": "5511965746535",
           "isSaved": true
         },
         {
-          "id": "5511943551483@c.us",
-          "name": "cliente SMK 40",
-          "phone": "5511943551483",
-          "cleanPhone": "5511943551483",
+          "id": "558893409246@c.us",
+          "name": "betisa",
+          "phone": "558893409246",
+          "cleanPhone": "558893409246",
           "isSaved": true
         },
         {
-          "id": "5511943620378@c.us",
-          "name": "cliente SMK 41",
-          "phone": "5511943620378",
-          "cleanPhone": "5511943620378",
+          "id": "5512991028786@c.us",
+          "name": "bia barcelos",
+          "phone": "5512991028786",
+          "cleanPhone": "5512991028786",
           "isSaved": true
         },
         {
-          "id": "5511944441708@c.us",
-          "name": "cliente SMK 42",
-          "phone": "5511944441708",
-          "cleanPhone": "5511944441708",
+          "id": "5511992927041@c.us",
+          "name": "bianca brx",
+          "phone": "5511992927041",
+          "cleanPhone": "5511992927041",
           "isSaved": true
         },
         {
-          "id": "5511944631204@c.us",
-          "name": "cliente SMK 43",
-          "phone": "5511944631204",
-          "cleanPhone": "5511944631204",
+          "id": "5511975646921@c.us",
+          "name": "bianca nunez",
+          "phone": "5511975646921",
+          "cleanPhone": "5511975646921",
           "isSaved": true
         },
         {
-          "id": "5511944544600@c.us",
-          "name": "cliente SMK 43",
-          "phone": "5511944544600",
-          "cleanPhone": "5511944544600",
+          "id": "5524988295495@c.us",
+          "name": "Biba💕",
+          "phone": "5524988295495",
+          "cleanPhone": "5524988295495",
           "isSaved": true
         },
         {
-          "id": "5511944647415@c.us",
-          "name": "cliente SMK 44",
-          "phone": "5511944647415",
-          "cleanPhone": "5511944647415",
+          "id": "558381014547@c.us",
+          "name": "Bica",
+          "phone": "558381014547",
+          "cleanPhone": "558381014547",
           "isSaved": true
         },
         {
-          "id": "5511944784089@c.us",
-          "name": "cliente SMK 50",
-          "phone": "5511944784089",
-          "cleanPhone": "5511944784089",
+          "id": "5511991971998@c.us",
+          "name": "biel",
+          "phone": "5511991971998",
+          "cleanPhone": "5511991971998",
           "isSaved": true
         },
         {
-          "id": "5511944952120@c.us",
-          "name": "cliente SMK 51",
-          "phone": "5511944952120",
-          "cleanPhone": "5511944952120",
+          "id": "558386818741@c.us",
+          "name": "Biel",
+          "phone": "558386818741",
+          "cleanPhone": "558386818741",
           "isSaved": true
         },
         {
-          "id": "5511944963931@c.us",
-          "name": "cliente SMK 52",
-          "phone": "5511944963931",
-          "cleanPhone": "5511944963931",
+          "id": "5511949416732@c.us",
+          "name": "bielzin cliente SMK",
+          "phone": "5511949416732",
+          "cleanPhone": "5511949416732",
           "isSaved": true
         },
         {
-          "id": "5511945244480@c.us",
-          "name": "cliente SMK 53",
-          "phone": "5511945244480",
-          "cleanPhone": "5511945244480",
+          "id": "5511985451062@c.us",
+          "name": "biquíni divas",
+          "phone": "5511985451062",
+          "cleanPhone": "5511985451062",
           "isSaved": true
         },
         {
-          "id": "5511945469992@c.us",
-          "name": "cliente SMK 54",
-          "phone": "5511945469992",
-          "cleanPhone": "5511945469992",
+          "id": "558382241184@c.us",
+          "name": "Bira",
+          "phone": "558382241184",
+          "cleanPhone": "558382241184",
           "isSaved": true
         },
         {
-          "id": "5511945514052@c.us",
-          "name": "cliente SMK 55",
-          "phone": "5511945514052",
-          "cleanPhone": "5511945514052",
+          "id": "5511947145439@c.us",
+          "name": "Bolacha",
+          "phone": "5511947145439",
+          "cleanPhone": "5511947145439",
           "isSaved": true
         },
         {
-          "id": "5511945901691@c.us",
-          "name": "cliente SMK 56",
-          "phone": "5511945901691",
-          "cleanPhone": "5511945901691",
+          "id": "5511989848403@c.us",
+          "name": "brambila",
+          "phone": "5511989848403",
+          "cleanPhone": "5511989848403",
           "isSaved": true
         },
         {
-          "id": "5511945907183@c.us",
-          "name": "cliente SMK 57",
-          "phone": "5511945907183",
-          "cleanPhone": "5511945907183",
+          "id": "5511975800524@c.us",
+          "name": "brenda hayashix",
+          "phone": "5511975800524",
+          "cleanPhone": "5511975800524",
           "isSaved": true
         },
         {
-          "id": "5511945944323@c.us",
-          "name": "cliente SMK 58",
-          "phone": "5511945944323",
-          "cleanPhone": "5511945944323",
+          "id": "5511932386166@c.us",
+          "name": "𝕭𝖗𝖊𝖓𝖉𝖆 𝕻𝖆𝖘𝖘𝖔𝖘 𝕿𝖆𝖙𝖙𝖔",
+          "phone": "5511932386166",
+          "cleanPhone": "5511932386166",
           "isSaved": true
         },
         {
-          "id": "5511946941180@c.us",
-          "name": "cliente SMK 59",
-          "phone": "5511946941180",
-          "cleanPhone": "5511946941180",
+          "id": "5511954283235@c.us",
+          "name": "bruna cliente",
+          "phone": "5511954283235",
+          "cleanPhone": "5511954283235",
           "isSaved": true
         },
         {
-          "id": "5511913522983@c.us",
-          "name": "cliente SMK 6",
-          "phone": "5511913522983",
-          "cleanPhone": "5511913522983",
+          "id": "5511959446210@c.us",
+          "name": "bruna isabelli",
+          "phone": "5511959446210",
+          "cleanPhone": "5511959446210",
           "isSaved": true
         },
         {
-          "id": "5511946994796@c.us",
-          "name": "cliente SMK 60",
-          "phone": "5511946994796",
-          "cleanPhone": "5511946994796",
+          "id": "5511962689006@c.us",
+          "name": "bruno",
+          "phone": "5511962689006",
+          "cleanPhone": "5511962689006",
           "isSaved": true
         },
         {
-          "id": "5511947335440@c.us",
-          "name": "cliente SMK 61",
-          "phone": "5511947335440",
-          "cleanPhone": "5511947335440",
+          "id": "5511984885707@c.us",
+          "name": "cadu",
+          "phone": "5511984885707",
+          "cleanPhone": "5511984885707",
           "isSaved": true
         },
         {
-          "id": "5511947916383@c.us",
-          "name": "cliente SMK 62",
-          "phone": "5511947916383",
-          "cleanPhone": "5511947916383",
+          "id": "5511930155365@c.us",
+          "name": "cliente Smk",
+          "phone": "5511930155365",
+          "cleanPhone": "5511930155365",
           "isSaved": true
         },
         {
-          "id": "5511948261749@c.us",
-          "name": "cliente SMK 63",
-          "phone": "5511948261749",
-          "cleanPhone": "5511948261749",
+          "id": "5515998538740@c.us",
+          "name": "Cliente Smk",
+          "phone": "5515998538740",
+          "cleanPhone": "5515998538740",
           "isSaved": true
         },
         {
-          "id": "5511948438141@c.us",
-          "name": "cliente SMK 65",
-          "phone": "5511948438141",
-          "cleanPhone": "5511948438141",
+          "id": "5511930464993@c.us",
+          "name": "cliente SMK 18",
+          "phone": "5511930464993",
+          "cleanPhone": "5511930464993",
           "isSaved": true
         },
         {
-          "id": "5511948517444@c.us",
-          "name": "cliente SMK 66",
-          "phone": "5511948517444",
-          "cleanPhone": "5511948517444",
-          "isSaved": true
-        },
-        {
-          "id": "5511949138757@c.us",
-          "name": "cliente SMK 67",
-          "phone": "5511949138757",
-          "cleanPhone": "5511949138757",
-          "isSaved": true
-        },
-        {
-          "id": "5511949188682@c.us",
-          "name": "cliente SMK 68",
-          "phone": "5511949188682",
-          "cleanPhone": "5511949188682",
-          "isSaved": true
-        },
-        {
-          "id": "5511949228198@c.us",
-          "name": "cliente SMK 69",
-          "phone": "5511949228198",
-          "cleanPhone": "5511949228198",
-          "isSaved": true
-        },
-        {
-          "id": "5511913546607@c.us",
-          "name": "cliente SMK 7",
-          "phone": "5511913546607",
-          "cleanPhone": "5511913546607",
-          "isSaved": true
-        },
-        {
-          "id": "5511949345742@c.us",
-          "name": "cliente SMK 70",
-          "phone": "5511949345742",
-          "cleanPhone": "5511949345742",
-          "isSaved": true
-        },
-        {
-          "id": "5511949382225@c.us",
-          "name": "cliente SMK 71",
-          "phone": "5511949382225",
-          "cleanPhone": "5511949382225",
-          "isSaved": true
-        },
-        {
-          "id": "5511949817756@c.us",
-          "name": "cliente SMK 72",
-          "phone": "5511949817756",
-          "cleanPhone": "5511949817756",
-          "isSaved": true
-        },
-        {
-          "id": "5511950606850@c.us",
-          "name": "cliente SMK 73",
-          "phone": "5511950606850",
-          "cleanPhone": "5511950606850",
-          "isSaved": true
-        },
-        {
-          "id": "5511950228291@c.us",
-          "name": "cliente SMK 73",
-          "phone": "5511950228291",
-          "cleanPhone": "5511950228291",
-          "isSaved": true
-        },
-        {
-          "id": "5511949890074@c.us",
-          "name": "cliente SMK 73",
-          "phone": "5511949890074",
-          "cleanPhone": "5511949890074",
-          "isSaved": true
-        },
-        {
-          "id": "5511950729534@c.us",
-          "name": "cliente SMK 74",
-          "phone": "5511950729534",
-          "cleanPhone": "5511950729534",
-          "isSaved": true
-        },
-        {
-          "id": "5511951141354@c.us",
-          "name": "cliente SMK 75",
-          "phone": "5511951141354",
-          "cleanPhone": "5511951141354",
-          "isSaved": true
-        },
-        {
-          "id": "5511951283842@c.us",
-          "name": "cliente SMK 76",
-          "phone": "5511951283842",
-          "cleanPhone": "5511951283842",
-          "isSaved": true
-        },
-        {
-          "id": "5511952054134@c.us",
-          "name": "cliente SMK 77",
-          "phone": "5511952054134",
-          "cleanPhone": "5511952054134",
-          "isSaved": true
-        },
-        {
-          "id": "5511952218657@c.us",
-          "name": "cliente SMK 78",
-          "phone": "5511952218657",
-          "cleanPhone": "5511952218657",
-          "isSaved": true
-        },
-        {
-          "id": "5511952330283@c.us",
-          "name": "cliente SMK 79",
-          "phone": "5511952330283",
-          "cleanPhone": "5511952330283",
-          "isSaved": true
-        },
-        {
-          "id": "5511914785011@c.us",
-          "name": "cliente SMK 8",
-          "phone": "5511914785011",
-          "cleanPhone": "5511914785011",
-          "isSaved": true
-        },
-        {
-          "id": "5511952743337@c.us",
-          "name": "cliente SMK 80",
-          "phone": "5511952743337",
-          "cleanPhone": "5511952743337",
-          "isSaved": true
-        },
-        {
-          "id": "5511952881348@c.us",
-          "name": "cliente SMK 81",
-          "phone": "5511952881348",
-          "cleanPhone": "5511952881348",
-          "isSaved": true
-        },
-        {
-          "id": "5511953069901@c.us",
-          "name": "cliente SMK 82",
-          "phone": "5511953069901",
-          "cleanPhone": "5511953069901",
-          "isSaved": true
-        },
-        {
-          "id": "5511953098467@c.us",
-          "name": "cliente SMK 83",
-          "phone": "5511953098467",
-          "cleanPhone": "5511953098467",
-          "isSaved": true
-        },
-        {
-          "id": "5511953128670@c.us",
-          "name": "cliente SMK 84",
-          "phone": "5511953128670",
-          "cleanPhone": "5511953128670",
-          "isSaved": true
-        },
-        {
-          "id": "5511953371209@c.us",
-          "name": "cliente SMK 85",
-          "phone": "5511953371209",
-          "cleanPhone": "5511953371209",
-          "isSaved": true
-        },
-        {
-          "id": "5511954045011@c.us",
-          "name": "cliente SMK 86",
-          "phone": "5511954045011",
-          "cleanPhone": "5511954045011",
-          "isSaved": true
-        },
-        {
-          "id": "5511954202948@c.us",
-          "name": "cliente SMK 87",
-          "phone": "5511954202948",
-          "cleanPhone": "5511954202948",
-          "isSaved": true
-        },
-        {
-          "id": "5511954375573@c.us",
-          "name": "cliente SMK 88",
-          "phone": "5511954375573",
-          "cleanPhone": "5511954375573",
-          "isSaved": true
-        },
-        {
-          "id": "5511954397965@c.us",
-          "name": "cliente SMK 89",
-          "phone": "5511954397965",
-          "cleanPhone": "5511954397965",
-          "isSaved": true
-        },
-        {
-          "id": "5511954412264@c.us",
-          "name": "cliente SMK 90",
-          "phone": "5511954412264",
-          "cleanPhone": "5511954412264",
-          "isSaved": true
-        },
-        {
-          "id": "5511954599349@c.us",
-          "name": "cliente SMK 91",
-          "phone": "5511954599349",
-          "cleanPhone": "5511954599349",
-          "isSaved": true
-        },
-        {
-          "id": "5511954673373@c.us",
-          "name": "cliente SMK 92",
-          "phone": "5511954673373",
-          "cleanPhone": "5511954673373",
-          "isSaved": true
-        },
-        {
-          "id": "5511954861430@c.us",
-          "name": "cliente SMK 93",
-          "phone": "5511954861430",
-          "cleanPhone": "5511954861430",
-          "isSaved": true
-        },
-        {
-          "id": "5511954944035@c.us",
-          "name": "cliente SMK 94",
-          "phone": "5511954944035",
-          "cleanPhone": "5511954944035",
-          "isSaved": true
-        },
-        {
-          "id": "5511954951715@c.us",
-          "name": "cliente SMK 95",
-          "phone": "5511954951715",
-          "cleanPhone": "5511954951715",
-          "isSaved": true
-        },
-        {
-          "id": "5511954960982@c.us",
-          "name": "cliente SMK 96",
-          "phone": "5511954960982",
-          "cleanPhone": "5511954960982",
-          "isSaved": true
-        },
-        {
-          "id": "5511955505646@c.us",
-          "name": "cliente SMK 97",
-          "phone": "5511955505646",
-          "cleanPhone": "5511955505646",
-          "isSaved": true
-        },
-        {
-          "id": "5511955585121@c.us",
-          "name": "cliente SMK 98",
-          "phone": "5511955585121",
-          "cleanPhone": "5511955585121",
-          "isSaved": true
-        },
-        {
-          "id": "5511955771426@c.us",
-          "name": "cliente SMK 99",
-          "phone": "5511955771426",
-          "cleanPhone": "5511955771426",
-          "isSaved": true
-        },
-        {
-          "id": "5511988387584@c.us",
-          "name": "Clínica Mediterrâneo",
-          "phone": "5511988387584",
-          "cleanPhone": "5511988387584",
-          "isSaved": true
-        },
-        {
-          "id": "5511956402404@c.us",
-          "name": "Clinica Popular Vet",
-          "phone": "5511956402404",
-          "cleanPhone": "5511956402404",
-          "isSaved": true
-        },
-        {
-          "id": "5511947574163@c.us",
-          "name": "coco",
-          "phone": "5511947574163",
-          "cleanPhone": "5511947574163",
-          "isSaved": true
-        },
-        {
-          "id": "5511950187119@c.us",
-          "name": "daiane",
-          "phone": "5511950187119",
-          "cleanPhone": "5511950187119",
-          "isSaved": true
-        },
-        {
-          "id": "5511952836472@c.us",
-          "name": "danilo guitarra",
-          "phone": "5511952836472",
-          "cleanPhone": "5511952836472",
+          "id": "5511930369497@c.us",
+          "name": "cliente SMK 18",
+          "phone": "5511930369497",
+          "cleanPhone": "5511930369497",
           "isSaved": true
         },
         {
@@ -6369,41 +3894,6 @@
           "name": "Daphne Seraggioto",
           "phone": "5511980652468",
           "cleanPhone": "5511980652468",
-          "isSaved": true
-        },
-        {
-          "id": "5511947829717@c.us",
-          "name": "Davi",
-          "phone": "5511947829717",
-          "cleanPhone": "5511947829717",
-          "isSaved": true
-        },
-        {
-          "id": "5511945622238@c.us",
-          "name": "davi g",
-          "phone": "5511945622238",
-          "cleanPhone": "5511945622238",
-          "isSaved": true
-        },
-        {
-          "id": "5511983738307@c.us",
-          "name": "Deivys Alan Furlan",
-          "phone": "5511983738307",
-          "cleanPhone": "5511983738307",
-          "isSaved": true
-        },
-        {
-          "id": "5511930519902@c.us",
-          "name": "Diamond",
-          "phone": "5511930519902",
-          "cleanPhone": "5511930519902",
-          "isSaved": true
-        },
-        {
-          "id": "5511985559219@c.us",
-          "name": "dollynho",
-          "phone": "5511985559219",
-          "cleanPhone": "5511985559219",
           "isSaved": true
         },
         {
@@ -6421,101 +3911,10 @@
           "isSaved": true
         },
         {
-          "id": "5511942504816@c.us",
-          "name": "dri",
-          "phone": "5511942504816",
-          "cleanPhone": "5511942504816",
-          "isSaved": true
-        },
-        {
-          "id": "5511965654006@c.us",
-          "name": "duda cliente",
-          "phone": "5511965654006",
-          "cleanPhone": "5511965654006",
-          "isSaved": true
-        },
-        {
-          "id": "5511990147655@c.us",
-          "name": "Duda cliente",
-          "phone": "5511990147655",
-          "cleanPhone": "5511990147655",
-          "isSaved": true
-        },
-        {
-          "id": "5511983697112@c.us",
-          "name": "Duda Nóbrega",
-          "phone": "5511983697112",
-          "cleanPhone": "5511983697112",
-          "isSaved": true
-        },
-        {
-          "id": "5511959712369@c.us",
-          "name": "duda oliveira",
-          "phone": "5511959712369",
-          "cleanPhone": "5511959712369",
-          "isSaved": true
-        },
-        {
-          "id": "5511984050176@c.us",
-          "name": "duda paz",
-          "phone": "5511984050176",
-          "cleanPhone": "5511984050176",
-          "isSaved": true
-        },
-        {
-          "id": "5511958054838@c.us",
-          "name": "duda❤️‍🩹",
-          "phone": "5511958054838",
-          "cleanPhone": "5511958054838",
-          "isSaved": true
-        },
-        {
-          "id": "5511968990564@c.us",
-          "name": "dudu costinha",
-          "phone": "5511968990564",
-          "cleanPhone": "5511968990564",
-          "isSaved": true
-        },
-        {
-          "id": "554187965031@c.us",
-          "name": "duduzsr",
-          "phone": "554187965031",
-          "cleanPhone": "554187965031",
-          "isSaved": true
-        },
-        {
-          "id": "5511965926989@c.us",
-          "name": "edson",
-          "phone": "5511965926989",
-          "cleanPhone": "5511965926989",
-          "isSaved": true
-        },
-        {
-          "id": "5511999313943@c.us",
-          "name": "Edu MST",
-          "phone": "5511999313943",
-          "cleanPhone": "5511999313943",
-          "isSaved": true
-        },
-        {
           "id": "5511945846937@c.us",
           "name": "eduarda gisbert",
           "phone": "5511945846937",
           "cleanPhone": "5511945846937",
-          "isSaved": true
-        },
-        {
-          "id": "5511912933525@c.us",
-          "name": "Eduardo",
-          "phone": "5511912933525",
-          "cleanPhone": "5511912933525",
-          "isSaved": true
-        },
-        {
-          "id": "5511992373200@c.us",
-          "name": "eduardo p",
-          "phone": "5511992373200",
-          "cleanPhone": "5511992373200",
           "isSaved": true
         },
         {
@@ -6526,447 +3925,6 @@
           "isSaved": true
         },
         {
-          "id": "5511947137218@c.us",
-          "name": "Enzo",
-          "phone": "5511947137218",
-          "cleanPhone": "5511947137218",
-          "isSaved": true
-        },
-        {
-          "id": "5511948301236@c.us",
-          "name": "Eryck",
-          "phone": "5511948301236",
-          "cleanPhone": "5511948301236",
-          "isSaved": true
-        },
-        {
-          "id": "5511991692124@c.us",
-          "name": "escudez eventos",
-          "phone": "5511991692124",
-          "cleanPhone": "5511991692124",
-          "isSaved": true
-        },
-        {
-          "id": "5511981972289@c.us",
-          "name": "esfihas godines",
-          "phone": "5511981972289",
-          "cleanPhone": "5511981972289",
-          "isSaved": true
-        },
-        {
-          "id": "5511951399313@c.us",
-          "name": "espaco araguaia",
-          "phone": "5511951399313",
-          "cleanPhone": "5511951399313",
-          "isSaved": true
-        },
-        {
-          "id": "5511966189256@c.us",
-          "name": "Espaço Diva Esmaltes",
-          "phone": "5511966189256",
-          "cleanPhone": "5511966189256",
-          "isSaved": true
-        },
-        {
-          "id": "5521979258770@c.us",
-          "name": "Especi Inova",
-          "phone": "5521979258770",
-          "cleanPhone": "5521979258770",
-          "isSaved": true
-        },
-        {
-          "id": "5511993312675@c.us",
-          "name": "evandro",
-          "phone": "5511993312675",
-          "cleanPhone": "5511993312675",
-          "isSaved": true
-        },
-        {
-          "id": "5511979811284@c.us",
-          "name": "Evy cliente",
-          "phone": "5511979811284",
-          "cleanPhone": "5511979811284",
-          "isSaved": true
-        },
-        {
-          "id": "5511998488058@c.us",
-          "name": "fefa💕",
-          "phone": "5511998488058",
-          "cleanPhone": "5511998488058",
-          "isSaved": true
-        },
-        {
-          "id": "5511987521154@c.us",
-          "name": "Feio",
-          "phone": "5511987521154",
-          "cleanPhone": "5511987521154",
-          "isSaved": true
-        },
-        {
-          "id": "5511982164605@c.us",
-          "name": "Felipe Chefia",
-          "phone": "5511982164605",
-          "cleanPhone": "5511982164605",
-          "isSaved": true
-        },
-        {
-          "id": "5511961551589@c.us",
-          "name": "felipe insta",
-          "phone": "5511961551589",
-          "cleanPhone": "5511961551589",
-          "isSaved": true
-        },
-        {
-          "id": "5511930149516@c.us",
-          "name": "felipe pal",
-          "phone": "5511930149516",
-          "cleanPhone": "5511930149516",
-          "isSaved": true
-        },
-        {
-          "id": "5511976954963@c.us",
-          "name": "felipe ramos",
-          "phone": "5511976954963",
-          "cleanPhone": "5511976954963",
-          "isSaved": true
-        },
-        {
-          "id": "5511949327440@c.us",
-          "name": "felipee",
-          "phone": "5511949327440",
-          "cleanPhone": "5511949327440",
-          "isSaved": true
-        },
-        {
-          "id": "5511943777352@c.us",
-          "name": "felipinho",
-          "phone": "5511943777352",
-          "cleanPhone": "5511943777352",
-          "isSaved": true
-        },
-        {
-          "id": "5511967460515@c.us",
-          "name": "Fernanda cliente",
-          "phone": "5511967460515",
-          "cleanPhone": "5511967460515",
-          "isSaved": true
-        },
-        {
-          "id": "5511984019738@c.us",
-          "name": "fernando walker",
-          "phone": "5511984019738",
-          "cleanPhone": "5511984019738",
-          "isSaved": true
-        },
-        {
-          "id": "5511967308919@c.us",
-          "name": "festa",
-          "phone": "5511967308919",
-          "cleanPhone": "5511967308919",
-          "isSaved": true
-        },
-        {
-          "id": "5511974893302@c.us",
-          "name": "festa",
-          "phone": "5511974893302",
-          "cleanPhone": "5511974893302",
-          "isSaved": true
-        },
-        {
-          "id": "5511985939053@c.us",
-          "name": "festa",
-          "phone": "5511985939053",
-          "cleanPhone": "5511985939053",
-          "isSaved": true
-        },
-        {
-          "id": "5511983849629@c.us",
-          "name": "festa",
-          "phone": "5511983849629",
-          "cleanPhone": "5511983849629",
-          "isSaved": true
-        },
-        {
-          "id": "5511944815608@c.us",
-          "name": "festa",
-          "phone": "5511944815608",
-          "cleanPhone": "5511944815608",
-          "isSaved": true
-        },
-        {
-          "id": "5511973427368@c.us",
-          "name": "festa",
-          "phone": "5511973427368",
-          "cleanPhone": "5511973427368",
-          "isSaved": true
-        },
-        {
-          "id": "5511993329104@c.us",
-          "name": "festa",
-          "phone": "5511993329104",
-          "cleanPhone": "5511993329104",
-          "isSaved": true
-        },
-        {
-          "id": "5511954353624@c.us",
-          "name": "festa",
-          "phone": "5511954353624",
-          "cleanPhone": "5511954353624",
-          "isSaved": true
-        },
-        {
-          "id": "5511981569017@c.us",
-          "name": "festa",
-          "phone": "5511981569017",
-          "cleanPhone": "5511981569017",
-          "isSaved": true
-        },
-        {
-          "id": "5511940033624@c.us",
-          "name": "festa",
-          "phone": "5511940033624",
-          "cleanPhone": "5511940033624",
-          "isSaved": true
-        },
-        {
-          "id": "5511999370194@c.us",
-          "name": "festa",
-          "phone": "5511999370194",
-          "cleanPhone": "5511999370194",
-          "isSaved": true
-        },
-        {
-          "id": "5511981598918@c.us",
-          "name": "festa",
-          "phone": "5511981598918",
-          "cleanPhone": "5511981598918",
-          "isSaved": true
-        },
-        {
-          "id": "5511991321796@c.us",
-          "name": "festa",
-          "phone": "5511991321796",
-          "cleanPhone": "5511991321796",
-          "isSaved": true
-        },
-        {
-          "id": "5511913493232@c.us",
-          "name": "festa",
-          "phone": "5511913493232",
-          "cleanPhone": "5511913493232",
-          "isSaved": true
-        },
-        {
-          "id": "5511987558033@c.us",
-          "name": "festa",
-          "phone": "5511987558033",
-          "cleanPhone": "5511987558033",
-          "isSaved": true
-        },
-        {
-          "id": "5511989934811@c.us",
-          "name": "festa",
-          "phone": "5511989934811",
-          "cleanPhone": "5511989934811",
-          "isSaved": true
-        },
-        {
-          "id": "5511984652332@c.us",
-          "name": "festa",
-          "phone": "5511984652332",
-          "cleanPhone": "5511984652332",
-          "isSaved": true
-        },
-        {
-          "id": "5511989229644@c.us",
-          "name": "festa",
-          "phone": "5511989229644",
-          "cleanPhone": "5511989229644",
-          "isSaved": true
-        },
-        {
-          "id": "5511964038338@c.us",
-          "name": "festa",
-          "phone": "5511964038338",
-          "cleanPhone": "5511964038338",
-          "isSaved": true
-        },
-        {
-          "id": "5511944753794@c.us",
-          "name": "festa",
-          "phone": "5511944753794",
-          "cleanPhone": "5511944753794",
-          "isSaved": true
-        },
-        {
-          "id": "5511973198929@c.us",
-          "name": "festa",
-          "phone": "5511973198929",
-          "cleanPhone": "5511973198929",
-          "isSaved": true
-        },
-        {
-          "id": "5511990019234@c.us",
-          "name": "gab cliente",
-          "phone": "5511990019234",
-          "cleanPhone": "5511990019234",
-          "isSaved": true
-        },
-        {
-          "id": "5511947939235@c.us",
-          "name": "gabi ayumi cliente",
-          "phone": "5511947939235",
-          "cleanPhone": "5511947939235",
-          "isSaved": true
-        },
-        {
-          "id": "5515996879677@c.us",
-          "name": "gabi luz",
-          "phone": "5515996879677",
-          "cleanPhone": "5515996879677",
-          "isSaved": true
-        },
-        {
-          "id": "5511910599582@c.us",
-          "name": "gabii novo",
-          "phone": "5511910599582",
-          "cleanPhone": "5511910599582",
-          "isSaved": true
-        },
-        {
-          "id": "5511977065462@c.us",
-          "name": "gabii pina cliente",
-          "phone": "5511977065462",
-          "cleanPhone": "5511977065462",
-          "isSaved": true
-        },
-        {
-          "id": "5511914798955@c.us",
-          "name": "gabizinha💕",
-          "phone": "5511914798955",
-          "cleanPhone": "5511914798955",
-          "isSaved": true
-        },
-        {
-          "id": "5512038180063@c.us",
-          "name": "gabriel",
-          "phone": "5512038180063",
-          "cleanPhone": "5512038180063",
-          "isSaved": true
-        },
-        {
-          "id": "558387882826@c.us",
-          "name": "Gabriel",
-          "phone": "558387882826",
-          "cleanPhone": "558387882826",
-          "isSaved": true
-        },
-        {
-          "id": "5511915644044@c.us",
-          "name": "gabriel brites cliente",
-          "phone": "5511915644044",
-          "cleanPhone": "5511915644044",
-          "isSaved": true
-        },
-        {
-          "id": "5511952152766@c.us",
-          "name": "gabriel déia",
-          "phone": "5511952152766",
-          "cleanPhone": "5511952152766",
-          "isSaved": true
-        },
-        {
-          "id": "5511953652800@c.us",
-          "name": "Gabriel Garcia",
-          "phone": "5511953652800",
-          "cleanPhone": "5511953652800",
-          "isSaved": true
-        },
-        {
-          "id": "5511991797402@c.us",
-          "name": "gabriel gb",
-          "phone": "5511991797402",
-          "cleanPhone": "5511991797402",
-          "isSaved": true
-        },
-        {
-          "id": "5511940460171@c.us",
-          "name": "gabriel insta",
-          "phone": "5511940460171",
-          "cleanPhone": "5511940460171",
-          "isSaved": true
-        },
-        {
-          "id": "5511984719785@c.us",
-          "name": "Gabriel Luz",
-          "phone": "5511984719785",
-          "cleanPhone": "5511984719785",
-          "isSaved": true
-        },
-        {
-          "id": "5511985488814@c.us",
-          "name": "gabriel luzzio",
-          "phone": "5511985488814",
-          "cleanPhone": "5511985488814",
-          "isSaved": true
-        },
-        {
-          "id": "5511974966959@c.us",
-          "name": "gabriel Mota",
-          "phone": "5511974966959",
-          "cleanPhone": "5511974966959",
-          "isSaved": true
-        },
-        {
-          "id": "5511963731729@c.us",
-          "name": "Gabriel Silva",
-          "phone": "5511963731729",
-          "cleanPhone": "5511963731729",
-          "isSaved": true
-        },
-        {
-          "id": "5511958238381@c.us",
-          "name": "gabriell",
-          "phone": "5511958238381",
-          "cleanPhone": "5511958238381",
-          "isSaved": true
-        },
-        {
-          "id": "5511911281182@c.us",
-          "name": "Gabriella Aureliano cliente",
-          "phone": "5511911281182",
-          "cleanPhone": "5511911281182",
-          "isSaved": true
-        },
-        {
-          "id": "5511934883416@c.us",
-          "name": "Gabrielly Polli",
-          "phone": "5511934883416",
-          "cleanPhone": "5511934883416",
-          "isSaved": true
-        },
-        {
-          "id": "5511944648070@c.us",
-          "name": "gaby",
-          "phone": "5511944648070",
-          "cleanPhone": "5511944648070",
-          "isSaved": true
-        },
-        {
-          "id": "558393357544@c.us",
-          "name": "Galego",
-          "phone": "558393357544",
-          "cleanPhone": "558393357544",
-          "isSaved": true
-        },
-        {
-          "id": "5511960613558@c.us",
-          "name": "gas",
-          "phone": "5511960613558",
-          "cleanPhone": "5511960613558",
-          "isSaved": true
-        },
-        {
           "id": "5511974861998@c.us",
           "name": "Gata",
           "phone": "5511974861998",
@@ -6974,164 +3932,10 @@
           "isSaved": true
         },
         {
-          "id": "5511950930502@c.us",
-          "name": "gay",
-          "phone": "5511950930502",
-          "cleanPhone": "5511950930502",
-          "isSaved": true
-        },
-        {
-          "id": "5511985474343@c.us",
-          "name": "GÊ Coco Drink",
-          "phone": "5511985474343",
-          "cleanPhone": "5511985474343",
-          "isSaved": true
-        },
-        {
-          "id": "558386740960@c.us",
-          "name": "Genildo da ZL",
-          "phone": "558386740960",
-          "cleanPhone": "558386740960",
-          "isSaved": true
-        },
-        {
-          "id": "5511960588161@c.us",
-          "name": "geovanna",
-          "phone": "5511960588161",
-          "cleanPhone": "5511960588161",
-          "isSaved": true
-        },
-        {
-          "id": "5511964517783@c.us",
-          "name": "Geovanna Cliente",
-          "phone": "5511964517783",
-          "cleanPhone": "5511964517783",
-          "isSaved": true
-        },
-        {
-          "id": "5511940372261@c.us",
-          "name": "german",
-          "phone": "5511940372261",
-          "cleanPhone": "5511940372261",
-          "isSaved": true
-        },
-        {
-          "id": "5511977140929@c.us",
-          "name": "gi vitória",
-          "phone": "5511977140929",
-          "cleanPhone": "5511977140929",
-          "isSaved": true
-        },
-        {
-          "id": "5511958603108@c.us",
-          "name": "gii kesia",
-          "phone": "5511958603108",
-          "cleanPhone": "5511958603108",
-          "isSaved": true
-        },
-        {
-          "id": "5511943589856@c.us",
-          "name": "giih ribeiro",
-          "phone": "5511943589856",
-          "cleanPhone": "5511943589856",
-          "isSaved": true
-        },
-        {
-          "id": "558387354926@c.us",
-          "name": "Gil",
-          "phone": "558387354926",
-          "cleanPhone": "558387354926",
-          "isSaved": true
-        },
-        {
-          "id": "5511961853398@c.us",
-          "name": "Giovanna Felix",
-          "phone": "5511961853398",
-          "cleanPhone": "5511961853398",
-          "isSaved": true
-        },
-        {
-          "id": "5511972612082@c.us",
-          "name": "Giovanna Gomes",
-          "phone": "5511972612082",
-          "cleanPhone": "5511972612082",
-          "isSaved": true
-        },
-        {
-          "id": "5511950785860@c.us",
-          "name": "giovanna mendes",
-          "phone": "5511950785860",
-          "cleanPhone": "5511950785860",
-          "isSaved": true
-        },
-        {
-          "id": "5511996454906@c.us",
-          "name": "giovanna sala",
-          "phone": "5511996454906",
-          "cleanPhone": "5511996454906",
-          "isSaved": true
-        },
-        {
-          "id": "5511969784262@c.us",
-          "name": "giovanna souza",
-          "phone": "5511969784262",
-          "cleanPhone": "5511969784262",
-          "isSaved": true
-        },
-        {
-          "id": "5511992144133@c.us",
-          "name": "giu cliente",
-          "phone": "5511992144133",
-          "cleanPhone": "5511992144133",
-          "isSaved": true
-        },
-        {
-          "id": "5511967556766@c.us",
-          "name": "giu gusta",
-          "phone": "5511967556766",
-          "cleanPhone": "5511967556766",
-          "isSaved": true
-        },
-        {
-          "id": "5511959075720@c.us",
-          "name": "Giulia 💋",
-          "phone": "5511959075720",
-          "cleanPhone": "5511959075720",
-          "isSaved": true
-        },
-        {
-          "id": "5511992626709@c.us",
-          "name": "giulia💕",
-          "phone": "5511992626709",
-          "cleanPhone": "5511992626709",
-          "isSaved": true
-        },
-        {
-          "id": "5511979913807@c.us",
-          "name": "giullya couto",
-          "phone": "5511979913807",
-          "cleanPhone": "5511979913807",
-          "isSaved": true
-        },
-        {
-          "id": "5511960439326@c.us",
-          "name": "giullya❤",
-          "phone": "5511960439326",
-          "cleanPhone": "5511960439326",
-          "isSaved": true
-        },
-        {
           "id": "5511992094064@c.us",
           "name": "gleid💖",
           "phone": "5511992094064",
           "cleanPhone": "5511992094064",
-          "isSaved": true
-        },
-        {
-          "id": "5511989067248@c.us",
-          "name": "gordinho",
-          "phone": "5511989067248",
-          "cleanPhone": "5511989067248",
           "isSaved": true
         },
         {
@@ -7149,338 +3953,12 @@
           "isSaved": true
         },
         {
-          "id": "5511960151833@c.us",
-          "name": "gustavo aguirre",
-          "phone": "5511960151833",
-          "cleanPhone": "5511960151833",
-          "isSaved": true
-        },
-        {
-          "id": "5511977769833@c.us",
-          "name": "helena cliente SMK",
-          "phone": "5511977769833",
-          "cleanPhone": "5511977769833",
-          "isSaved": true
-        },
-        {
-          "id": "5511980595735@c.us",
-          "name": "hellen garcia",
-          "phone": "5511980595735",
-          "cleanPhone": "5511980595735",
-          "isSaved": true
-        },
-        {
-          "id": "5511960795594@c.us",
-          "name": "Helo Cellini cliente",
-          "phone": "5511960795594",
-          "cleanPhone": "5511960795594",
-          "isSaved": true
-        },
-        {
-          "id": "5511944451296@c.us",
-          "name": "igor albanese",
-          "phone": "5511944451296",
-          "cleanPhone": "5511944451296",
-          "isSaved": true
-        },
-        {
-          "id": "5511959983562@c.us",
-          "name": "igor palma",
-          "phone": "5511959983562",
-          "cleanPhone": "5511959983562",
-          "isSaved": true
-        },
-        {
-          "id": "5511950406007@c.us",
-          "name": "igor primo 2",
-          "phone": "5511950406007",
-          "cleanPhone": "5511950406007",
-          "isSaved": true
-        },
-        {
-          "id": "5511945563182@c.us",
-          "name": "igor primooooo",
-          "phone": "5511945563182",
-          "cleanPhone": "5511945563182",
-          "isSaved": true
-        },
-        {
-          "id": "5511948059120@c.us",
-          "name": "Igor zara",
-          "phone": "5511948059120",
-          "cleanPhone": "5511948059120",
-          "isSaved": true
-        },
-        {
-          "id": "5511932896316@c.us",
-          "name": "julia borges",
-          "phone": "5511932896316",
-          "cleanPhone": "5511932896316",
-          "isSaved": true
-        },
-        {
-          "id": "5511982694319@c.us",
-          "name": "Julia cliente",
-          "phone": "5511982694319",
-          "cleanPhone": "5511982694319",
-          "isSaved": true
-        },
-        {
-          "id": "5511961532166@c.us",
-          "name": "julia ferreira",
-          "phone": "5511961532166",
-          "cleanPhone": "5511961532166",
-          "isSaved": true
-        },
-        {
-          "id": "5511913425294@c.us",
-          "name": "julia gisbert",
-          "phone": "5511913425294",
-          "cleanPhone": "5511913425294",
-          "isSaved": true
-        },
-        {
-          "id": "5511978603981@c.us",
-          "name": "julinha cliente",
-          "phone": "5511978603981",
-          "cleanPhone": "5511978603981",
-          "isSaved": true
-        },
-        {
-          "id": "5511947861310@c.us",
-          "name": "julyana",
-          "phone": "5511947861310",
-          "cleanPhone": "5511947861310",
-          "isSaved": true
-        },
-        {
-          "id": "5511966247862@c.us",
-          "name": "kainã",
-          "phone": "5511966247862",
-          "cleanPhone": "5511966247862",
-          "isSaved": true
-        },
-        {
-          "id": "5511998373006@c.us",
-          "name": "Kaique novo",
-          "phone": "5511998373006",
-          "cleanPhone": "5511998373006",
-          "isSaved": true
-        },
-        {
-          "id": "5511951571736@c.us",
-          "name": "kaka narciso cliente",
-          "phone": "5511951571736",
-          "cleanPhone": "5511951571736",
-          "isSaved": true
-        },
-        {
-          "id": "5511990050862@c.us",
-          "name": "karina cliente",
-          "phone": "5511990050862",
-          "cleanPhone": "5511990050862",
-          "isSaved": true
-        },
-        {
-          "id": "5511952161937@c.us",
-          "name": "karol sala",
-          "phone": "5511952161937",
-          "cleanPhone": "5511952161937",
-          "isSaved": true
-        },
-        {
-          "id": "5511978785766@c.us",
-          "name": "katherine",
-          "phone": "5511978785766",
-          "cleanPhone": "5511978785766",
-          "isSaved": true
-        },
-        {
-          "id": "5511964287358@c.us",
-          "name": "kathy cliente biel",
-          "phone": "5511964287358",
-          "cleanPhone": "5511964287358",
-          "isSaved": true
-        },
-        {
-          "id": "5511993285384@c.us",
-          "name": "katiane",
-          "phone": "5511993285384",
-          "cleanPhone": "5511993285384",
-          "isSaved": true
-        },
-        {
-          "id": "5511963632311@c.us",
-          "name": "Katlyn Oliveira cliente",
-          "phone": "5511963632311",
-          "cleanPhone": "5511963632311",
-          "isSaved": true
-        },
-        {
-          "id": "5511954501155@c.us",
-          "name": "Kaua Santana",
-          "phone": "5511954501155",
-          "cleanPhone": "5511954501155",
-          "isSaved": true
-        },
-        {
-          "id": "5511967426142@c.us",
-          "name": "kauan pedrette",
-          "phone": "5511967426142",
-          "cleanPhone": "5511967426142",
-          "isSaved": true
-        },
-        {
-          "id": "5511948603264@c.us",
-          "name": "Kethy Ribeiro cliente",
-          "phone": "5511948603264",
-          "cleanPhone": "5511948603264",
-          "isSaved": true
-        },
-        {
-          "id": "5511997385328@c.us",
-          "name": "lara cliente",
-          "phone": "5511997385328",
-          "cleanPhone": "5511997385328",
-          "isSaved": true
-        },
-        {
-          "id": "5511973691229@c.us",
-          "name": "lari melo",
-          "phone": "5511973691229",
-          "cleanPhone": "5511973691229",
-          "isSaved": true
-        },
-        {
-          "id": "5511943550978@c.us",
-          "name": "larinha💕",
-          "phone": "5511943550978",
-          "cleanPhone": "5511943550978",
-          "isSaved": true
-        },
-        {
-          "id": "5511912726736@c.us",
-          "name": "larissa balan",
-          "phone": "5511912726736",
-          "cleanPhone": "5511912726736",
-          "isSaved": true
-        },
-        {
-          "id": "5511941194428@c.us",
-          "name": "larissa cliente",
-          "phone": "5511941194428",
-          "cleanPhone": "5511941194428",
-          "isSaved": true
-        },
-        {
-          "id": "5511959826678@c.us",
-          "name": "Larissa Manoela cliente",
-          "phone": "5511959826678",
-          "cleanPhone": "5511959826678",
-          "isSaved": true
-        },
-        {
-          "id": "5511960552539@c.us",
-          "name": "lay cliente",
-          "phone": "5511960552539",
-          "cleanPhone": "5511960552539",
-          "isSaved": true
-        },
-        {
-          "id": "5511974110284@c.us",
-          "name": "Léia cliente",
-          "phone": "5511974110284",
-          "cleanPhone": "5511974110284",
-          "isSaved": true
-        },
-        {
-          "id": "5511949207977@c.us",
-          "name": "léo",
-          "phone": "5511949207977",
-          "cleanPhone": "5511949207977",
-          "isSaved": true
-        },
-        {
           "id": "5511946606068@c.us",
           "name": "léo pinheiro",
           "phone": "5511946606068",
           "cleanPhone": "5511946606068",
           "isSaved": true
         },
-        {
-          "id": "5511992870424@c.us",
-          "name": "Letícia cliente",
-          "phone": "5511992870424",
-          "cleanPhone": "5511992870424",
-          "isSaved": true
-        },
-        {
-          "id": "5511934751947@c.us",
-          "name": "letícia duarte cliente",
-          "phone": "5511934751947",
-          "cleanPhone": "5511934751947",
-          "isSaved": true
-        },
-        {
-          "id": "5511968159328@c.us",
-          "name": "leticia vital",
-          "phone": "5511968159328",
-          "cleanPhone": "5511968159328",
-          "isSaved": true
-        },
-        {
-          "id": "5511963694839@c.us",
-          "name": "Leya (luana)",
-          "phone": "5511963694839",
-          "cleanPhone": "5511963694839",
-          "isSaved": true
-        }
-      ],
-      "color": "#10b981",
-      "createdAt": "2026-08-15T15:49:03.867Z"
-    },
-    {
-      "id": "list_1786825249444",
-      "name": "LISTA CLIENTES SMK ANTIGOS",
-      "description": "Apenas clientes Smk antigos",
-      "contacts": [
-        {
-          "id": "5511940408567@c.us",
-          "name": "arthur mourao cliente SMK",
-          "phone": "5511940408567",
-          "cleanPhone": "5511940408567",
-          "isSaved": true
-        },
-        {
-          "id": "5511988279933@c.us",
-          "name": "cliente Fernanda Lima",
-          "phone": "5511988279933",
-          "cleanPhone": "5511988279933",
-          "isSaved": true
-        },
-        {
-          "id": "5511961251939@c.us",
-          "name": "Lucas Tavares cliente SMK",
-          "phone": "5511961251939",
-          "cleanPhone": "5511961251939",
-          "isSaved": true
-        },
-        {
-          "id": "5511983222473@c.us",
-          "name": "rafael cliente SMK",
-          "phone": "5511983222473",
-          "cleanPhone": "5511983222473",
-          "isSaved": true
-        }
-      ],
-      "color": "#10b981",
-      "createdAt": "2026-08-15T20:20:49.444Z"
-    },
-    {
-      "id": "list_1786989733027",
-      "name": "LISTA CLIENTES COMPRADORES",
-      "description": "Lista personalizada de contatos",
-      "contacts": [
         {
           "id": "5511999109136@c.us",
           "name": "Carolina Vieira Smk",
@@ -7508,16 +3986,7 @@
           "phone": "5511943856234",
           "cleanPhone": "5511943856234",
           "isSaved": true
-        }
-      ],
-      "color": "#10b981",
-      "createdAt": "2026-08-17T18:02:13.027Z"
-    },
-    {
-      "id": "list_1786992631910",
-      "name": "lista teste",
-      "description": "Lista personalizada de contatos",
-      "contacts": [
+        },
         {
           "id": "5511948420071@c.us",
           "name": "Agência Noma",
@@ -7526,11 +3995,639 @@
           "isSaved": true
         }
       ],
-      "color": "#10b981",
-      "createdAt": "2026-08-17T18:50:31.910Z"
+      "color": "#6b7280",
+      "createdAt": "2026-08-25T22:42:35.375Z"
     }
   ],
   "sentHistory": {
-    "globalSent": []
+    "globalSent": [
+      "5511975800524",
+      "5511932386166",
+      "5511954283235",
+      "5511959446210",
+      "5511951741181",
+      "55206494142341307",
+      "55144727647223960",
+      "55175999236980766",
+      "55100773119680749",
+      "55132263668916422",
+      "5511975774774",
+      "5514714725761096",
+      "5511946606068",
+      "5526787862044924",
+      "5537877366915178",
+      "5511978506319",
+      "5511950647577",
+      "55140411205116069",
+      "5511974861998",
+      "5577940821876932",
+      "5589709619490997",
+      "5511956659864",
+      "55271678525423785",
+      "5511910868344",
+      "5511961862365",
+      "5518026145558541",
+      "5511981271253",
+      "55249443714625607",
+      "5511937419144",
+      "5557093067423950",
+      "5511984885707",
+      "55218794224038131",
+      "5511970110400",
+      "554355449184301",
+      "5511941569172",
+      "5524416973005032",
+      "5511953533082",
+      "55169926102929452",
+      "5596170131059",
+      "5578370989723730",
+      "55260219334602859",
+      "5511977210770",
+      "5511913425376",
+      "55182123826811003",
+      "5511947145439",
+      "5554279830282281",
+      "5511945846937",
+      "55187544058740882",
+      "5511997010625",
+      "5514057578995801",
+      "55148399911362812",
+      "5511977349932",
+      "5511984114694",
+      "551653646356693",
+      "5511948420071",
+      "55115500898099363",
+      "5511913155649",
+      "55159661802160296",
+      "5511981040902",
+      "55198191299490024",
+      "5511988571215",
+      "5543783500603541",
+      "5511962689006",
+      "55251298637201597",
+      "5562217030496470",
+      "5511982038886",
+      "5511989848403",
+      "551421667782859",
+      "558382241184",
+      "55114207643189358",
+      "5511985451062",
+      "55173722954682414",
+      "5511949416732",
+      "5534733467660383",
+      "5511991971998",
+      "55135803225288905",
+      "5516651739238604",
+      "558381014547",
+      "55182235613380663",
+      "5524988295495",
+      "5516565823127558",
+      "5511975646921",
+      "55239629143932933",
+      "5511992927041",
+      "55224523811041411",
+      "5512991028786",
+      "55238061682208857",
+      "558893409246",
+      "5580011029704726",
+      "5511965746535",
+      "5532264012492813",
+      "5511914117230",
+      "55105961272381547",
+      "5511940567116",
+      "55150096641544361",
+      "5511942958314",
+      "55179019219779742",
+      "5511988533453",
+      "55111995634372750",
+      "5511947670051",
+      "556859129929924",
+      "5511954920745",
+      "55269010998399145",
+      "5511947825718",
+      "5538818484854840",
+      "5511963342439",
+      "5527706841133",
+      "5511943230252",
+      "55242055867556027",
+      "558195768210",
+      "5534179433639938",
+      "5511989531538",
+      "5512941340467427",
+      "5511970671363",
+      "55112124416237808",
+      "55173061479370761",
+      "5511969436215",
+      "5573925144920176",
+      "5511986476564",
+      "5595210986045691",
+      "5511960639082",
+      "5584744066842763",
+      "5511930988900",
+      "55185057356566682",
+      "5511941352503",
+      "5596580963192952",
+      "5511968670748",
+      "553973314543680",
+      "5511954488602",
+      "55105630509600951",
+      "5511992847422",
+      "55114087367319646",
+      "5511966315698",
+      "5543740198641775",
+      "5511991941595",
+      "55237988667773100",
+      "5511983405086",
+      "55258741849030668",
+      "5511940757645",
+      "55211080462733503",
+      "5511945141690",
+      "55215714866716914",
+      "5511982672821",
+      "55219008989139084",
+      "5511948451245",
+      "55211737676624099",
+      "55152054894964804",
+      "5511930122316",
+      "55244920543662224",
+      "5511966458551",
+      "55106296867029080",
+      "5511944452819",
+      "55222754200625236",
+      "55260537212518631",
+      "5511967865134",
+      "5511996826502",
+      "55207820733608179",
+      "5511956592073",
+      "5522540122628275",
+      "5511947872512",
+      "5523129019695302",
+      "5511970302928",
+      "5591706192060422",
+      "5511933131857",
+      "55108409319870471",
+      "5511994967289",
+      "55255503393370132",
+      "5511945979813",
+      "5589241149296772",
+      "5522998300277",
+      "55257779826688214",
+      "5511959242138",
+      "55157651136684116",
+      "5511966124292",
+      "55201708911231087",
+      "5511930155365",
+      "55160103646904416",
+      "5511999109136",
+      "55193406840115392",
+      "5511994852268",
+      "55216466855071997",
+      "5511983632721",
+      "5592578103984154",
+      "55444202602559",
+      "5511994813325",
+      "5511984287367",
+      "55193711782760693",
+      "5511957891933",
+      "55109736531910856",
+      "5549504480960604",
+      "5511959649350",
+      "5511954898700",
+      "55265802674602199",
+      "5511930813320",
+      "55137335924617319",
+      "5511952225594",
+      "55208121263870055",
+      "5511959712568",
+      "55112335372943581",
+      "5511994536087",
+      "5511360238891093",
+      "5511972793107",
+      "55133075317076124",
+      "5511948885361",
+      "55150478927216721",
+      "5511947122440",
+      "55164724931076149",
+      "5511970378683",
+      "55209165444202689",
+      "5511946038307",
+      "55216513697083489",
+      "5522997805878",
+      "55221779326935170",
+      "558396215887",
+      "5524245224652814",
+      "5521990065583",
+      "55251186984812768",
+      "5511979648616",
+      "55264385553543376",
+      "5511959169321",
+      "55277978990809337",
+      "5511983960766",
+      "5579654580928686",
+      "5580801253355685",
+      "558396720970",
+      "5585831247204439",
+      "5513996780573",
+      "556910686302290",
+      "5511990279793",
+      "55231756888289459",
+      "5511999631016",
+      "5580908711403534",
+      "5511986905114",
+      "55248545932238941",
+      "5511942006986",
+      "55250456756486204",
+      "5511981265350",
+      "55259716806615131",
+      "5511987367461",
+      "55207356742869050",
+      "5511969243863",
+      "5523610072805494",
+      "5511987597260",
+      "55238555452428488",
+      "5511995317983",
+      "5542911068631081",
+      "5511990187671",
+      "5550650666766459",
+      "5511958916106",
+      "55123231285567725",
+      "5511917231502",
+      "55208125760159775",
+      "5511947205128",
+      "5562217030467688",
+      "5511986894007",
+      "5570605051293822",
+      "558381858681",
+      "55179040593961078",
+      "5583981858681",
+      "55219632464093242",
+      "558179032657",
+      "55120363283721984620",
+      "55154258146099453",
+      "5511954570494",
+      "55264467040489637",
+      "5511959941910",
+      "5524189708836957",
+      "55595971136514",
+      "55157148575182902",
+      "5511960560727",
+      "55123282841948292",
+      "5511984710466",
+      "55170991355490360",
+      "5511993554907",
+      "5594919330934817",
+      "5586896466211066",
+      "5515558187997",
+      "55241673649045653",
+      "5511941004082",
+      "55220504040444079",
+      "5511943946926",
+      "55261920426848346",
+      "5511977572366",
+      "5563346606891208",
+      "5511976107742",
+      "5511954628053",
+      "55239599448248432",
+      "5570708130517012",
+      "5511943062303",
+      "55223394838651113",
+      "5593933003636",
+      "5521698325827715",
+      "551133888000",
+      "556653575450742",
+      "553188839488",
+      "55279636747509858",
+      "5511949725591",
+      "55172800224551108",
+      "555391800903",
+      "55155693252395074",
+      "553183080627",
+      "5589631974531079",
+      "5519706496709",
+      "55249340719272191",
+      "5511980151316",
+      "55159812008542265",
+      "5511966256518",
+      "55182708345000005",
+      "5511910341748",
+      "5527518325284975",
+      "5511953173524",
+      "5590710296547552",
+      "553384123591",
+      "55159391319851109",
+      "5511936236537",
+      "55190916094652452",
+      "5521993230818",
+      "55104952340955366",
+      "558393550273",
+      "5511961544294",
+      "55236175990227039",
+      "5598281854099678",
+      "553189053371",
+      "5511988236801",
+      "55204140433150056",
+      "55220009766850678",
+      "5511989591916",
+      "55175681929482399",
+      "558596753958",
+      "5519989703448",
+      "5595992670073059",
+      "5511995186464",
+      "557864118726880",
+      "55156706243928272",
+      "5511962895611",
+      "5511967246235",
+      "5515801604128966",
+      "55278181324009635",
+      "553496842926",
+      "5511996448839",
+      "5515058205716663",
+      "55101636710105155",
+      "5511911359319",
+      "5511930369497",
+      "55233332856107087",
+      "5546282752188665",
+      "5511969752243",
+      "5528995726872645",
+      "5511939492692",
+      "5511946927404",
+      "55190649454309570",
+      "55575592755261",
+      "551123656834",
+      "5511948419998",
+      "5597492083429444",
+      "55254194065871090",
+      "554892171927",
+      "5597740990197819",
+      "5511918776045",
+      "55193024571228274",
+      "5515998550157",
+      "5523983550410838",
+      "5516991969984",
+      "5511992094064",
+      "55161241712582797",
+      "55159442238734373",
+      "5511952933261",
+      "55124438876012779",
+      "5515559299909",
+      "55154885832069217",
+      "5511948779333",
+      "5562582488613049",
+      "5511967625588",
+      "5514998877125",
+      "5563677269069981",
+      "5536958764056749",
+      "5511971214397",
+      "55226946675941614",
+      "553491785868",
+      "55150938203484174",
+      "5511997219781",
+      "55257213142724704",
+      "5511913024047",
+      "5532943103856756",
+      "5511944868044",
+      "55118928332312756",
+      "557583130426",
+      "55127058420232377",
+      "5511953255754",
+      "55118095192530998",
+      "5511936199255",
+      "55194257344270543",
+      "5511991188872",
+      "5531297980358899",
+      "5511966251923",
+      "55255361877585953",
+      "5511991185769",
+      "55159399272255515",
+      "557591606001",
+      "5585204014252229",
+      "5511966234889",
+      "55228647063556117",
+      "5511947576659",
+      "55144414466961489",
+      "5511966249976",
+      "55201211282198591",
+      "5519787593423",
+      "5580183482679431",
+      "5511925619988",
+      "5564927104548982",
+      "5521968039491",
+      "5511998341559",
+      "55162839524282555",
+      "55254666176741564",
+      "553899748957",
+      "553498871152",
+      "55143486401704122",
+      "556181505210",
+      "55128410982604821",
+      "55234879245656288",
+      "559491724816",
+      "55182910460137597",
+      "5511967372432",
+      "5511963411527",
+      "55127122509189272",
+      "5511984063023",
+      "55238718728319219",
+      "5591663292711100",
+      "5568251929305170",
+      "5511940318774",
+      "5511973641803",
+      "5585439868334130",
+      "554514363003128",
+      "5511991188232",
+      "55216737689682130",
+      "5511936224831",
+      "5511985278678",
+      "5533359162028120",
+      "55166284188729401",
+      "559392479686",
+      "55259076839710860",
+      "556281316369",
+      "55195383011635275",
+      "5511976026238",
+      "55113147054706774",
+      "558899176661",
+      "55272834223988897",
+      "5511991574407",
+      "5531641410002947",
+      "553291458107",
+      "55119731407327446",
+      "556181937164",
+      "5510106544611575",
+      "5511953982562",
+      "55242090898391057",
+      "5511925732733",
+      "5524997179429078",
+      "555192157729",
+      "5511953509029",
+      "55101761079582781",
+      "55259622619336913",
+      "554491759612",
+      "55159781507563674",
+      "5511963766704",
+      "55277369323540650",
+      "5511932843670",
+      "55115624864932065",
+      "557488611841",
+      "55106416438247436",
+      "5511981210139",
+      "5593231509426343",
+      "5511952139588",
+      "5511962823028",
+      "55230893683794100",
+      "55267757505515614",
+      "5511935034810",
+      "55128368435540162",
+      "553191865980",
+      "55220800510611658",
+      "551151284746",
+      "5595924353274046",
+      "551151288490",
+      "55267512709177444",
+      "5511994319769",
+      "55187746073215224",
+      "554998233961",
+      "5511967063089",
+      "5575909990187090",
+      "5511976048656",
+      "55224240343232643",
+      "55162457305784323",
+      "5511943383834",
+      "5511965745631",
+      "55145367547007093",
+      "55179139428536385",
+      "5511910867089",
+      "5519546547159063",
+      "5519994348898",
+      "55266447087497468",
+      "554141414141",
+      "5511959284861",
+      "55136563484840038",
+      "551140042985",
+      "55118992219943032",
+      "5541021668880509",
+      "5556989672852",
+      "5511986319598",
+      "55222384833478881",
+      "5519984175511",
+      "5560065604177942",
+      "5511995490751",
+      "55182244203339780",
+      "5574883392340080",
+      "5511918999148",
+      "55129571345190940",
+      "554497309214",
+      "5511980652468",
+      "55206150561730747",
+      "55124859011055723",
+      "5511942428822",
+      "5511971627404",
+      "5575162095497272",
+      "5511967680401",
+      "55258948393365711",
+      "5511967744089",
+      "5539750509551759",
+      "5511988474848",
+      "5546411433427140",
+      "5511939476161",
+      "5530078008328283",
+      "55229523689881774",
+      "5511933368511",
+      "5511991592246",
+      "55190370197594244",
+      "55163956635246764",
+      "5511977901335",
+      "5511958112786",
+      "55132963748597958",
+      "55151105589792817",
+      "5511970258727",
+      "5591418647363657",
+      "551143560598",
+      "5511985515418",
+      "5532706360553566",
+      "5511987110210",
+      "5521955956752386",
+      "55113950297477249",
+      "5511968808973",
+      "5588945249497306",
+      "554784824146",
+      "5588639635751107",
+      "5511984156674",
+      "5511952495356",
+      "55139324578336896",
+      "5511980805229",
+      "55268796333940961",
+      "55135716772249766",
+      "551149508309",
+      "55209088252215492",
+      "554892167044",
+      "55192788935249940",
+      "556293120927",
+      "5511988690602",
+      "5595013400764478",
+      "5536950291570850",
+      "5511981458525",
+      "55140948025643034",
+      "557996865287",
+      "55148679402979428",
+      "5519998618630",
+      "5547691400782018",
+      "554699193270",
+      "55123068143943734",
+      "5511947913050",
+      "55136155395789053",
+      "5511912862402",
+      "5586651384627364",
+      "5511996088598",
+      "5583605984378982",
+      "5511976060206",
+      "556116654211195",
+      "558399306368",
+      "55135072527155271",
+      "556194184962",
+      "555192430748",
+      "55144920971108498",
+      "5572031349551113",
+      "553599158798",
+      "55220212150439967",
+      "5511937755805",
+      "5594128587161611",
+      "5511945561399",
+      "55231950463840463",
+      "5515413092907",
+      "55204823366492362",
+      "554831982388",
+      "5578843520000002",
+      "554796641045",
+      "55132143913164890",
+      "555197890396",
+      "55177661875896361",
+      "5511938042861",
+      "55188180284313837",
+      "5511972202550",
+      "5575728896917563",
+      "5511993062410",
+      "55177601679257762",
+      "5511978201958",
+      "551752003224",
+      "551752880813",
+      "551752880943",
+      "551753991154",
+      "551753991439",
+      "551753991616",
+      "551753991814",
+      "551753992016",
+      "551732812751",
+      "551732812998",
+      "551752003020",
+      "5511977300561",
+      "55184799859875880"
+    ],
+    "camp_1786810305844": [
+      "5511975800524",
+      "5511932386166",
+      "5511954283235",
+      "5511959446210"
+    ]
   }
 }

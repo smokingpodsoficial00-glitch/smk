@@ -1794,22 +1794,24 @@ app.post('/api/marketing/send-direct', async (req, res) => {
 
         console.log(`📢 [Marketing] Enviando mensagem personalizada para ${formattedNumber} (${name || 'Cliente'})...`);
 
+        // 🛡️ Simulação humana garantida: Digitando... entre 12 e 18 segundos OBRIGATÓRIOS
+        const typingDurationMs = Math.floor(Math.random() * 6000) + 12000;
         try {
             const chat = await client.getChatById(formattedNumber);
             if (chat) {
                 await chat.sendStateTyping();
-                // Simulação humana ultra realista: Digitando... entre 10 e 15 segundos
-                const typingDurationMs = Math.floor(Math.random() * 5000) + 10000;
-                await new Promise(resolve => setTimeout(resolve, typingDurationMs));
-                await client.sendMessage(formattedNumber, text);
-                await chat.clearState();
-            } else {
-                await client.sendMessage(formattedNumber, text);
             }
-        } catch (chatErr) {
-            // Fallback direto
-            await client.sendMessage(formattedNumber, text);
-        }
+        } catch (chatErr) {}
+
+        // Delay obrigatório inegociável
+        await new Promise(resolve => setTimeout(resolve, typingDurationMs));
+
+        await client.sendMessage(formattedNumber, text);
+
+        try {
+            const chat = await client.getChatById(formattedNumber);
+            if (chat) await chat.clearState();
+        } catch (chatErr) {}
 
         // 🛡️ Grava imediatamente no JSON para que nunca mais se repita
         if (campaignId && cleanPhone) {
@@ -1980,87 +1982,177 @@ function markPhoneAsSent(campId, phone, config) {
 
 // Helper: Varredura profunda no histórico real do WhatsApp para blindar contatos já abordados
 async function scanWhatsAppHistoryAndSync(config) {
-    if (!client || !isWhatsAppReady) {
+    if (!client || !isWhatsAppReady || !client.pupPage) {
         console.warn('⚠️ [Scan History] WhatsApp não está conectado para realizar a varredura.');
         return { success: false, error: 'WhatsApp não conectado' };
     }
 
     try {
-        console.log('🔍 [Scan History] Iniciando varredura profunda no histórico de conversas do WhatsApp...');
+        console.log('🔍 [Scan History] Iniciando varredura real nos 319+ chats do WhatsApp...');
         if (!config.sentHistory) config.sentHistory = { globalSent: [] };
         if (!config.sentHistory.globalSent) config.sentHistory.globalSent = [];
 
-        // Trechos característicos das campanhas de marketing
-        const campaignSnippets = [
-            'voltamos oficialmente com as entregas',
-            '50% off no motoboy',
-            'liberamos 50% de desconto no seu frete',
-            '50% de desconto no seu frete',
-            'seu primeiro frete de hoje sai com 50%',
-            'passando só pra dar uma atenção e saber se tá curtindo',
-            'tô passando aqui só pra saber se os sabores',
-            'passando pra dar um alô e perguntar se tá curtindo',
-            'salva nosso número aí nos contatos',
-            'posso te mandar o link do cardápio',
-            'cardápio digital',
-            'smoking pods',
-            '50% de desconto'
-        ];
-
-        let detectedPhones = [];
-        try {
-            if (client.pupPage) {
-                detectedPhones = await client.pupPage.evaluate((snippets) => {
-                    const found = new Set();
+        // 1. Puxa todos os chats ativos diretamente de WAWebCollections
+        const rawChats = await client.pupPage.evaluate(() => {
+            const results = [];
+            try {
+                const collections = window.require('WAWebCollections');
+                const ChatCollection = collections ? collections.Chat : null;
+                if (!ChatCollection) return [];
+                const models = ChatCollection.models || (ChatCollection._models ? ChatCollection._models : []);
+                for (const c of models) {
                     try {
-                        if (!window.Store || !window.Store.Chat) return Array.from(found);
-                        const chatModels = window.Store.Chat.models || [];
-                        for (const c of chatModels) {
-                            try {
-                                if (!c || !c.id) continue;
-                                const isGroup = c.isGroup || (c.id.server === 'g.us') || (c.id._serialized && c.id._serialized.endsWith('@g.us'));
-                                if (isGroup) continue;
+                        if (!c || !c.id) continue;
+                        const idStr = c.id._serialized || '';
+                        const isGroup = c.isGroup || (c.id.server === 'g.us') || idStr.endsWith('@g.us');
+                        if (isGroup) continue;
 
-                                const msgs = (c.msgs && c.msgs.models) ? c.msgs.models : [];
-                                for (const m of msgs) {
-                                    if (m && (m.isSentByMe || m.__x_isSentByMe || (m.id && m.id.fromMe))) {
-                                        const body = (m.body || m.__x_body || '').toLowerCase();
-                                        if (snippets.some(s => body.includes(s.toLowerCase()))) {
-                                            const rawPhone = (c.id.user || c.id._serialized.replace('@c.us', '')).replace(/\D/g, '');
-                                            if (rawPhone && rawPhone.length >= 8) {
-                                                found.add(rawPhone);
-                                            }
-                                            break;
-                                        }
-                                    }
-                                }
-                            } catch (e) {}
-                        }
+                        const name = c.name || c.formattedTitle || c.pushname || '';
+                        const user = c.id.user || '';
+                        results.push({ name: String(name), user: String(user) });
                     } catch (e) {}
-                    return Array.from(found);
-                }, campaignSnippets);
+                }
+            } catch (err) {}
+            return results;
+        });
+
+        // 2. Puxa contatos salvos na agenda do WhatsApp
+        let rawContacts = [];
+        try {
+            rawContacts = await client.getContacts();
+        } catch (e) {}
+
+        const contactsByName = new Map();
+        rawContacts.forEach(c => {
+            if (c && c.name && c.id && c.id.user) {
+                contactsByName.set(c.name.toLowerCase().trim(), c.id.user);
             }
-        } catch (evalErr) {
-            console.warn('⚠️ [Scan History] Aviso na avaliação in-page:', evalErr.message);
-        }
+        });
 
         let identifiedCount = 0;
-        for (const rawPhone of detectedPhones) {
-            const cleanPhone = normalizeMarketingPhone(rawPhone);
-            if (cleanPhone && !config.sentHistory.globalSent.includes(cleanPhone)) {
-                config.sentHistory.globalSent.push(cleanPhone);
+        const allDetectedPhones = new Set();
+
+        for (const chat of rawChats) {
+            const chatName = chat.name.toLowerCase().trim();
+            // Telefone pelo nome na agenda
+            if (contactsByName.has(chatName)) {
+                const phone = contactsByName.get(chatName);
+                const clean = normalizeMarketingPhone(phone);
+                if (clean) allDetectedPhones.add(clean);
+            }
+            // Telefone direto do ID
+            const directDigits = chat.user.replace(/\D/g, '');
+            if (directDigits.length >= 8 && directDigits.length <= 15) {
+                const clean = normalizeMarketingPhone(directDigits);
+                if (clean) allDetectedPhones.add(clean);
+            }
+            // Telefone no próprio nome
+            const nameDigits = chat.name.replace(/\D/g, '');
+            if (nameDigits.length >= 8 && nameDigits.length <= 15) {
+                const clean = normalizeMarketingPhone(nameDigits);
+                if (clean) allDetectedPhones.add(clean);
+            }
+        }
+
+        // Adiciona todos os identificados ao globalSent
+        for (const phone of allDetectedPhones) {
+            if (!config.sentHistory.globalSent.includes(phone)) {
+                config.sentHistory.globalSent.push(phone);
                 identifiedCount++;
             }
         }
 
         saveMarketingConfig(config);
-        console.log(`✅ [Scan History] Varredura concluída! ${identifiedCount} novo(s) contato(s) já abordados foram catalogados e blindados. Total blindados: ${config.sentHistory.globalSent.length}`);
+        console.log(`✅ [Scan History] Varredura concluída! ${allDetectedPhones.size} chats reais identificados. ${identifiedCount} novos cadastrados no globalSent. Total blindados: ${config.sentHistory.globalSent.length}`);
         return { success: true, identifiedCount, totalTracked: config.sentHistory.globalSent.length };
     } catch (err) {
         console.error('❌ [Scan History] Erro ao varrer histórico:', err.message);
         return { success: false, error: err.message };
     }
 }
+
+// GET /api/marketing/test-chats-scan — Puxa lista real de todos os chats abertos no WhatsApp de forma 100% segura
+app.get('/api/marketing/test-chats-scan', async (req, res) => {
+    try {
+        if (!isWhatsAppReady || !client || !client.pupPage) {
+            return res.status(503).json({ error: 'WhatsApp não está pronto.' });
+        }
+        console.log('🔍 [API] Inspecionando chats reais no WhatsApp Web via WAWebCollections...');
+        
+        const extractedChats = await client.pupPage.evaluate(() => {
+            const results = [];
+            try {
+                let ChatCollection = null;
+                try {
+                    const collections = window.require('WAWebCollections');
+                    ChatCollection = collections.Chat;
+                } catch (e) {}
+
+                if (!ChatCollection) {
+                    return { error: 'WAWebCollections.Chat não encontrado' };
+                }
+                
+                const models = ChatCollection.models || (ChatCollection._models ? ChatCollection._models : []);
+                
+                for (const c of models) {
+                    try {
+                        if (!c || !c.id) continue;
+                        const idStr = c.id._serialized || (c.id.user ? `${c.id.user}@c.us` : '');
+                        const isGroup = c.isGroup || (c.id.server === 'g.us') || (idStr.endsWith('@g.us'));
+                        if (isGroup) continue; // Pula grupos
+
+                        const userPhone = (c.id.user || '').replace(/\D/g, '');
+                        if (!userPhone) continue;
+
+                        const name = c.name || c.formattedTitle || c.pushname || userPhone;
+                        const unreadCount = c.unreadCount || 0;
+                        const t = c.t || 0; // Timestamp da última mensagem
+                        
+                        let lastMsgText = '';
+                        let lastMsgFromMe = false;
+                        
+                        if (c.msgs && c.msgs.models && c.msgs.models.length > 0) {
+                            const lastM = c.msgs.models[c.msgs.models.length - 1];
+                            if (lastM) {
+                                lastMsgText = String(lastM.body || lastM.__x_body || '').slice(0, 100);
+                                lastMsgFromMe = !!(lastM.isSentByMe || lastM.__x_isSentByMe || (lastM.id && lastM.id.fromMe));
+                            }
+                        }
+
+                        results.push({
+                            id: idStr,
+                            phone: userPhone.startsWith('55') ? userPhone : `55${userPhone}`,
+                            name: String(name),
+                            unreadCount,
+                            timestamp: t,
+                            lastMsgText,
+                            lastMsgFromMe
+                        });
+                    } catch (chatInnerErr) {}
+                }
+            } catch (err) {
+                return { error: err.message || String(err) };
+            }
+            return results;
+        });
+
+        if (extractedChats && extractedChats.error) {
+            return res.status(500).json({ error: extractedChats.error });
+        }
+
+        const chatList = Array.isArray(extractedChats) ? extractedChats : [];
+        console.log(`📊 [API] Mapeados ${chatList.length} chats individuais ativos no WhatsApp.`);
+
+        return res.json({
+            success: true,
+            totalFound: chatList.length,
+            chats: chatList
+        });
+    } catch (err) {
+        console.error('❌ Erro no test-chats-scan:', err);
+        return res.status(500).json({ error: err.message });
+    }
+});
 
 // GET /api/marketing/sent-history — Retorna histórico de disparos blindados
 app.get('/api/marketing/sent-history', (req, res) => {
@@ -2142,10 +2234,32 @@ app.post('/api/marketing/clean-and-deduplicate-lists', async (req, res) => {
     try {
         const config = loadMarketingConfig();
         
-        // 1. Tenta varredura rápida para sincronizar contatos já abordados no WhatsApp
-        if (isWhatsAppReady && client) {
+        // 1. Executa varredura profunda no WhatsApp real (WAWebCollections.Chat)
+        let activeChatNames = new Set();
+        if (isWhatsAppReady && client && client.pupPage) {
             try {
                 await scanWhatsAppHistoryAndSync(config);
+                const rawChats = await client.pupPage.evaluate(() => {
+                    const results = [];
+                    try {
+                        const collections = window.require('WAWebCollections');
+                        const ChatCollection = collections ? collections.Chat : null;
+                        if (!ChatCollection) return [];
+                        const models = ChatCollection.models || (ChatCollection._models ? ChatCollection._models : []);
+                        for (const c of models) {
+                            try {
+                                if (!c || !c.id) continue;
+                                const idStr = c.id._serialized || '';
+                                const isGroup = c.isGroup || (c.id.server === 'g.us') || idStr.endsWith('@g.us');
+                                if (isGroup) continue;
+                                const name = c.name || c.formattedTitle || c.pushname || '';
+                                results.push(String(name).toLowerCase().trim());
+                            } catch (e) {}
+                        }
+                    } catch (err) {}
+                    return results;
+                });
+                activeChatNames = new Set(rawChats);
             } catch (e) {}
         }
 
@@ -2163,6 +2277,8 @@ app.post('/api/marketing/clean-and-deduplicate-lists', async (req, res) => {
             (l.contacts || []).forEach(c => {
                 totalOriginal++;
                 const clean = normalizeMarketingPhone(c.cleanPhone || c.phone);
+                const nameLower = (c.name || '').toLowerCase().trim();
+
                 if (clean && !seenPhonesGlobal.has(clean)) {
                     seenPhonesGlobal.add(clean);
                     const contactObj = {
@@ -2174,7 +2290,9 @@ app.post('/api/marketing/clean-and-deduplicate-lists', async (req, res) => {
                     };
                     uniqueContacts.push(contactObj);
 
-                    if (globalSent.includes(clean)) {
+                    const isAlreadySent = globalSent.includes(clean) || (nameLower && activeChatNames.has(nameLower));
+
+                    if (isAlreadySent) {
                         alreadySentContacts.push(contactObj);
                     } else {
                         virginContacts.push(contactObj);
@@ -2234,7 +2352,7 @@ app.post('/api/marketing/clean-and-deduplicate-lists', async (req, res) => {
             const sentListObj = {
                 id: sentListId,
                 name: '🛡️ BASE BLINDADA (Já Contactados)',
-                description: 'Contatos que já receberam mensagens anteriores — protegidos contra novos disparos',
+                description: 'Contatos que já possuem conversas no WhatsApp — protegidos contra novos disparos',
                 contacts: alreadySentContacts,
                 color: '#6b7280',
                 createdAt: new Date().toISOString()
@@ -2251,7 +2369,6 @@ app.post('/api/marketing/clean-and-deduplicate-lists', async (req, res) => {
         // 5. Ajusta campanhas ativas para apontar de forma segura para a BASE VIRGEM
         (config.campaigns || []).forEach(c => {
             if (c.targetType === 'lists') {
-                // Se a campanha tinha múltiplas listas repetidas, define para a Base Virgem
                 if (c.name && c.name.toLowerCase().includes('reativação')) {
                     c.selectedListIds = [virginListId];
                     c.totalRecipients = virginContacts.length;
