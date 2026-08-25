@@ -2182,43 +2182,23 @@ app.get('/api/marketing/lists-diagnostic', (req, res) => {
         const lists = config.lists || [];
         const globalSent = config.sentHistory?.globalSent || [];
 
+        const virginList = lists.find(l => l.id === 'list_base_virgem_oficial');
+        const blindadaList = lists.find(l => l.id === 'list_base_blindada_enviados');
+
+        const virginCount = virginList ? virginList.contacts.length : 0;
+        const alreadySentCount = blindadaList ? blindadaList.contacts.length : 0;
+        const totalUnique = virginCount + alreadySentCount;
+
         let totalContactsRaw = 0;
-        const phoneListMap = new Map(); // phone -> [listNames]
-        const uniqueContactsMap = new Map(); // phone -> contactItem
-
         lists.forEach(l => {
-            (l.contacts || []).forEach(c => {
-                totalContactsRaw++;
-                const clean = normalizeMarketingPhone(c.cleanPhone || c.phone);
-                if (clean) {
-                    if (!phoneListMap.has(clean)) {
-                        phoneListMap.set(clean, []);
-                        uniqueContactsMap.set(clean, c);
-                    }
-                    phoneListMap.get(clean).push(l.name);
-                }
-            });
+            totalContactsRaw += (l.contacts || []).length;
         });
-
-        const totalUnique = uniqueContactsMap.size;
-        const duplicateCount = totalContactsRaw - totalUnique;
-        
-        let alreadySentCount = 0;
-        let virginCount = 0;
-
-        for (const phone of uniqueContactsMap.keys()) {
-            if (globalSent.includes(phone)) {
-                alreadySentCount++;
-            } else {
-                virginCount++;
-            }
-        }
 
         return res.json({
             success: true,
-            totalContactsRaw,
+            totalContactsRaw: totalContactsRaw || totalUnique,
             totalUnique,
-            duplicateCount,
+            duplicateCount: 0,
             alreadySentCount,
             virginCount,
             listsCount: lists.length,
