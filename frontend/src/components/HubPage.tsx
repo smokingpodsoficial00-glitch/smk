@@ -84,15 +84,39 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
 
   return (
     <main className="min-h-screen bg-background text-foreground flex flex-col items-center px-4 py-8 sm:py-14 relative overflow-x-hidden selection:bg-white/20 selection:text-white">
-      {/* Luzes ambiente de fundo (Glow sutil no topo) */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gradient-to-b from-white/[0.05] via-white/[0.02] to-transparent blur-3xl pointer-events-none -z-10" />
+      
+      {/* 📦 Embalagens Oficiais 3D Flutuando no Fundo (Criando o efeito de profundidade e vidro fosco) */}
+      <div 
+        className="fixed top-2 -left-20 sm:left-4 md:left-[max(1rem,calc(50%-380px))] w-64 sm:w-72 md:w-80 pointer-events-none -z-10 select-none opacity-45 sm:opacity-55 -rotate-[22deg] transition-transform duration-1000 filter drop-shadow-[0_25px_40px_rgba(0,0,0,0.95)]"
+        aria-hidden="true"
+      >
+        <img 
+          src="/packaging-1.png" 
+          alt="Smoking Pods Embalagem Oficial Topo" 
+          className="w-full h-auto object-contain"
+        />
+      </div>
 
-      <div className="w-full max-w-md sm:max-w-lg flex flex-col gap-6 sm:gap-7">
+      <div 
+        className="fixed bottom-12 -right-20 sm:right-4 md:right-[max(1rem,calc(50%-380px))] w-64 sm:w-72 md:w-80 pointer-events-none -z-10 select-none opacity-40 sm:opacity-50 rotate-[22deg] transition-transform duration-1000 filter drop-shadow-[0_25px_40px_rgba(0,0,0,0.95)]"
+        aria-hidden="true"
+      >
+        <img 
+          src="/packaging-2.png" 
+          alt="Smoking Pods Embalagem Oficial Fundo" 
+          className="w-full h-auto object-contain"
+        />
+      </div>
+
+      {/* Luzes ambiente de fundo (Glow sutil no topo) */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gradient-to-b from-white/[0.06] via-white/[0.02] to-transparent blur-3xl pointer-events-none -z-10" />
+
+      <div className="w-full max-w-md sm:max-w-lg flex flex-col gap-6 sm:gap-7 relative z-0">
         
         {/* 1. Header / Identidade Visual Tipográfica Centralizada */}
         <header className="flex flex-col items-center text-center gap-3 pt-2">
-          {/* Status em Tempo Real (Pill Animado) */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass-strong border border-white/10 text-[11px] font-medium text-white/90 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
+          {/* Status em Tempo Real (Pill Animado com Vidro Fosco) */}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-900/60 backdrop-blur-2xl border border-white/15 text-[11px] font-medium text-white/90 shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
             <span className="relative flex h-2 w-2">
               {isCurrentlyOpen ? (
                 <>
@@ -111,7 +135,7 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
           </div>
 
           {/* Nome da Loja (Tipografia Exata do Cardápio) */}
-          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mt-1">
+          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mt-1 drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
             {storeName}
           </h1>
 
@@ -121,19 +145,19 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
           </p>
         </header>
 
-        {/* 2. Os 3 Botões de Ação Principais (CTAs) */}
+        {/* 2. Os 3 Botões de Ação Principais (CTAs com Glassmorphism Real) */}
         <section className="flex flex-col gap-3.5 mt-2" aria-label="Ações Principais">
           
           {/* CTA 1: Cardápio Digital Interativo (Link Direto para a Vercel) */}
           <a
             href="https://smokingproject01.vercel.app/"
-            className="group relative w-full text-left p-4 sm:p-5 rounded-2xl bg-card/80 backdrop-blur-xl border border-white/20 hover:border-white/60 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(255,255,255,0.12)] cursor-pointer overflow-hidden block"
+            className="group relative w-full text-left p-4 sm:p-5 rounded-2xl bg-neutral-900/50 backdrop-blur-2xl border border-white/20 hover:border-white/60 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:shadow-[0_0_30px_rgba(255,255,255,0.15)] cursor-pointer overflow-hidden block"
           >
             {/* Shimmer/Brilho de fundo no hover */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
 
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/10 text-white text-[9px] sm:text-[10px] font-bold uppercase tracking-wider border border-white/20">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/10 text-white text-[9px] sm:text-[10px] font-bold uppercase tracking-wider border border-white/20 backdrop-blur-md">
                 <Sparkles className="size-2.5 text-amber-400 fill-amber-400" />
                 🔥 Catálogo Ao Vivo
               </span>
@@ -141,7 +165,7 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
             </div>
 
             <div className="flex items-start gap-3.5 mt-2">
-              <div className="p-2.5 sm:p-3 rounded-xl bg-elevated border border-white/10 text-white group-hover:bg-white group-hover:text-black transition-colors shrink-0">
+              <div className="p-2.5 sm:p-3 rounded-xl bg-elevated/80 backdrop-blur-md border border-white/10 text-white group-hover:bg-white group-hover:text-black transition-colors shrink-0">
                 <Package className="size-5 sm:size-6" />
               </div>
               <div className="flex flex-col min-w-0 pr-2">
@@ -160,17 +184,17 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="group relative w-full text-left p-4 sm:p-5 rounded-2xl bg-card/80 backdrop-blur-xl border border-border hover:border-emerald-500/50 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(16,185,129,0.12)] cursor-pointer"
+            className="group relative w-full text-left p-4 sm:p-5 rounded-2xl bg-neutral-900/50 backdrop-blur-2xl border border-white/10 hover:border-emerald-500/50 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:shadow-[0_0_30px_rgba(16,185,129,0.15)] cursor-pointer block"
           >
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20 backdrop-blur-md">
                 ⚡ Atendimento Rápido
               </span>
               <ChevronRight className="size-4 sm:size-5 text-muted-foreground group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
             </div>
 
             <div className="flex items-start gap-3.5 mt-2">
-              <div className="p-2.5 sm:p-3 rounded-xl bg-elevated border border-white/10 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-black transition-colors shrink-0">
+              <div className="p-2.5 sm:p-3 rounded-xl bg-elevated/80 backdrop-blur-md border border-white/10 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-black transition-colors shrink-0">
                 <MessageCircle className="size-5 sm:size-6" />
               </div>
               <div className="flex flex-col min-w-0 pr-2">
@@ -189,17 +213,17 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
             href={vipGroupUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="group relative w-full text-left p-4 sm:p-5 rounded-2xl bg-card/80 backdrop-blur-xl border border-border hover:border-amber-400/50 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(251,191,36,0.12)] cursor-pointer"
+            className="group relative w-full text-left p-4 sm:p-5 rounded-2xl bg-neutral-900/50 backdrop-blur-2xl border border-white/10 hover:border-amber-400/50 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:shadow-[0_0_30px_rgba(251,191,36,0.15)] cursor-pointer block"
           >
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-400/10 text-amber-300 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider border border-amber-400/20">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-400/10 text-amber-300 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider border border-amber-400/20 backdrop-blur-md">
                 🔕 Grupo Silenciado
               </span>
               <ChevronRight className="size-4 sm:size-5 text-muted-foreground group-hover:text-amber-300 group-hover:translate-x-0.5 transition-all" />
             </div>
 
             <div className="flex items-start gap-3.5 mt-2">
-              <div className="p-2.5 sm:p-3 rounded-xl bg-elevated border border-white/10 text-amber-400 group-hover:bg-amber-400 group-hover:text-black transition-colors shrink-0">
+              <div className="p-2.5 sm:p-3 rounded-xl bg-elevated/80 backdrop-blur-md border border-white/10 text-amber-400 group-hover:bg-amber-400 group-hover:text-black transition-colors shrink-0">
                 <Crown className="size-5 sm:size-6" />
               </div>
               <div className="flex flex-col min-w-0 pr-2">
@@ -214,21 +238,21 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
           </a>
         </section>
 
-        {/* 3. Badges de Autoridade & Prova Social (Grid 3 Colunas) */}
+        {/* 3. Badges de Autoridade & Prova Social (Grid 3 Colunas com Vidro Fosco) */}
         <section className="grid grid-cols-3 gap-2.5 sm:gap-3" aria-label="Garantias e Autoridade">
-          <div className="flex flex-col items-center text-center p-3 rounded-xl glass border border-white/5 gap-1.5">
+          <div className="flex flex-col items-center text-center p-3 rounded-xl bg-neutral-900/50 backdrop-blur-2xl border border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.3)] gap-1.5">
             <Truck className="size-5 text-white/80" />
             <h3 className="text-[11px] sm:text-xs font-bold text-white leading-tight">Delivery Rápido</h3>
             <p className="text-[9px] sm:text-[10px] text-muted-foreground leading-tight">25 a 35 min em SBC e ABC</p>
           </div>
 
-          <div className="flex flex-col items-center text-center p-3 rounded-xl glass border border-white/5 gap-1.5">
+          <div className="flex flex-col items-center text-center p-3 rounded-xl bg-neutral-900/50 backdrop-blur-2xl border border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.3)] gap-1.5">
             <ShieldCheck className="size-5 text-white/80" />
             <h3 className="text-[11px] sm:text-xs font-bold text-white leading-tight">100% Originais</h3>
             <p className="text-[9px] sm:text-[10px] text-muted-foreground leading-tight">Lacrados com procedência</p>
           </div>
 
-          <div className="flex flex-col items-center text-center p-3 rounded-xl glass border border-white/5 gap-1.5">
+          <div className="flex flex-col items-center text-center p-3 rounded-xl bg-neutral-900/50 backdrop-blur-2xl border border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.3)] gap-1.5">
             <CheckCircle2 className="size-5 text-white/80" />
             <h3 className="text-[11px] sm:text-xs font-bold text-white leading-tight">+10.000 Pedidos</h3>
             <p className="text-[9px] sm:text-[10px] text-muted-foreground leading-tight">Entregues desde 2023</p>
@@ -236,9 +260,9 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
         </section>
 
         {/* 4. Card de Horários de Funcionamento & Região */}
-        <section className="p-4 rounded-2xl glass border border-white/10 flex flex-col gap-3">
+        <section className="p-4 rounded-2xl bg-neutral-900/50 backdrop-blur-2xl border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.3)] flex flex-col gap-3">
           <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-elevated text-white/90 shrink-0">
+            <div className="p-2 rounded-lg bg-elevated/80 backdrop-blur-md text-white/90 shrink-0 border border-white/5">
               <Clock className="size-4" />
             </div>
             <div className="flex flex-col text-xs sm:text-[13px]">
@@ -251,7 +275,7 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
           <div className="h-px bg-white/10 w-full" />
 
           <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-elevated text-white/90 shrink-0">
+            <div className="p-2 rounded-lg bg-elevated/80 backdrop-blur-md text-white/90 shrink-0 border border-white/5">
               <MapPin className="size-4" />
             </div>
             <div className="flex flex-col text-xs sm:text-[13px]">
@@ -265,7 +289,7 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
         <div className="flex justify-center">
           <button
             onClick={handleShare}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass hover:bg-elevated text-xs font-medium text-white/80 hover:text-white transition-all cursor-pointer border border-white/10"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neutral-900/60 backdrop-blur-2xl hover:bg-elevated text-xs font-medium text-white/80 hover:text-white transition-all cursor-pointer border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
           >
             {copied ? (
               <>
@@ -283,7 +307,7 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
 
         {/* 5. Compliance & Rodapé */}
         <footer className="flex flex-col items-center text-center gap-2 pt-2 pb-6 text-muted-foreground text-[11px]">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-[10px] sm:text-[11px] text-white/60">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.03] backdrop-blur-md border border-white/5 text-[10px] sm:text-[11px] text-white/60">
             <AlertTriangle className="size-3.5 text-amber-400 shrink-0" />
             <span>Proibido para menores de 18 anos. Produtos restritos a adultos.</span>
           </div>
