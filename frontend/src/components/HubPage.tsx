@@ -84,34 +84,10 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
 
   return (
     <main className="min-h-screen bg-background text-foreground flex flex-col items-center px-4 py-8 sm:py-14 relative overflow-x-hidden selection:bg-white/20 selection:text-white">
-      
-      {/* 📦 Embalagens Oficiais 3D Flutuando no Fundo (Criando o efeito de profundidade e vidro fosco) */}
-      <div 
-        className="fixed top-2 -left-20 sm:left-4 md:left-[max(1rem,calc(50%-380px))] w-64 sm:w-72 md:w-80 pointer-events-none -z-10 select-none opacity-45 sm:opacity-55 -rotate-[22deg] transition-transform duration-1000 filter drop-shadow-[0_25px_40px_rgba(0,0,0,0.95)]"
-        aria-hidden="true"
-      >
-        <img 
-          src="/packaging-1.png" 
-          alt="Smoking Pods Embalagem Oficial Topo" 
-          className="w-full h-auto object-contain"
-        />
-      </div>
-
-      <div 
-        className="fixed bottom-12 -right-20 sm:right-4 md:right-[max(1rem,calc(50%-380px))] w-64 sm:w-72 md:w-80 pointer-events-none -z-10 select-none opacity-40 sm:opacity-50 rotate-[22deg] transition-transform duration-1000 filter drop-shadow-[0_25px_40px_rgba(0,0,0,0.95)]"
-        aria-hidden="true"
-      >
-        <img 
-          src="/packaging-2.png" 
-          alt="Smoking Pods Embalagem Oficial Fundo" 
-          className="w-full h-auto object-contain"
-        />
-      </div>
-
       {/* Luzes ambiente de fundo (Glow sutil no topo) */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gradient-to-b from-white/[0.06] via-white/[0.02] to-transparent blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gradient-to-b from-white/[0.05] via-white/[0.02] to-transparent blur-3xl pointer-events-none -z-10" />
 
-      <div className="w-full max-w-md sm:max-w-lg flex flex-col gap-6 sm:gap-7 relative z-0">
+      <div className="w-full max-w-md sm:max-w-lg flex flex-col gap-6 sm:gap-7 relative z-10">
         
         {/* 1. Header / Identidade Visual Tipográfica Centralizada */}
         <header className="flex flex-col items-center text-center gap-3 pt-2">
