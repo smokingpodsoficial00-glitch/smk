@@ -13,23 +13,12 @@ import { supabase } from "@/lib/supabase";
 import { Loader2, Star } from "lucide-react";
 
 function getInitialView(): "hub" | "menu" {
-  if (typeof window === "undefined") return "hub";
+  if (typeof window === "undefined") return "menu";
   const path = window.location.pathname.toLowerCase();
   const search = new URLSearchParams(window.location.search);
   const hash = window.location.hash.toLowerCase();
 
-  if (
-    path.includes("/cardapio") ||
-    path.includes("/menu") ||
-    path.includes("/catalogo") ||
-    search.get("view") === "menu" ||
-    search.get("page") === "cardapio" ||
-    hash.includes("cardapio") ||
-    hash.includes("menu")
-  ) {
-    return "menu";
-  }
-
+  // Se o usuário acessar explicitamente /hub, /links ou /bio
   if (
     path.includes("/hub") ||
     path.includes("/links") ||
@@ -42,8 +31,8 @@ function getInitialView(): "hub" | "menu" {
     return "hub";
   }
 
-  // Padrão: Hub Central / Link na Bio
-  return "hub";
+  // Padrão Absoluto: Cardápio Digital Original na raiz /
+  return "menu";
 }
 
 export default function App() {
@@ -67,7 +56,7 @@ function MainApp() {
 
   const navigateTo = (newView: "hub" | "menu") => {
     setView(newView);
-    const targetPath = newView === "hub" ? "/hub" : "/cardapio";
+    const targetPath = newView === "hub" ? "/hub" : "/";
     window.history.pushState({ view: newView }, "", targetPath);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };

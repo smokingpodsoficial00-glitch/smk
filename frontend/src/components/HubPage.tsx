@@ -124,9 +124,13 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
         {/* 2. Os 3 Botões de Ação Principais (CTAs com Glassmorphism Real) */}
         <section className="flex flex-col gap-3.5 mt-2" aria-label="Ações Principais">
           
-          {/* CTA 1: Cardápio Digital Interativo (Link Direto para a Vercel) */}
+          {/* CTA 1: Cardápio Digital Interativo */}
           <a
-            href="https://smokingproject01.vercel.app/"
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              onOpenMenu();
+            }}
             className="group relative w-full text-left p-4 sm:p-5 rounded-2xl bg-neutral-900/50 backdrop-blur-2xl border border-white/20 hover:border-white/60 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:shadow-[0_0_30px_rgba(255,255,255,0.15)] cursor-pointer overflow-hidden block"
           >
             {/* Shimmer/Brilho de fundo no hover */}
