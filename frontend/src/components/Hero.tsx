@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Search, ShoppingBag, Star } from "lucide-react";
+import { Search, ShoppingBag, Star, LayoutGrid } from "lucide-react";
 import { BRANDS } from "@/lib/products";
 import { useCart } from "@/lib/cart";
 import { useStoreConfig } from "@/lib/useStoreConfig";
@@ -14,6 +14,7 @@ interface HeroProps {
   activeCategory?: string | null;
   onCategoryChange?: (c: string | null) => void;
   onCartClick?: () => void;
+  onBackToHub?: () => void;
   brands?: string[];
   sortBy: SortOption;
   onSortChange: (sort: SortOption) => void;
@@ -27,6 +28,7 @@ export function Hero({
   activeCategory = null,
   onCategoryChange,
   onCartClick, 
+  onBackToHub,
   brands,
   sortBy,
   onSortChange
@@ -61,6 +63,18 @@ export function Hero({
           )}
         </div>
       </button>
+
+      {/* Botão de Links / Hub de topo direito */}
+      {onBackToHub && (
+        <button
+          onClick={onBackToHub}
+          className="absolute top-6 right-4 sm:top-8 sm:right-6 flex items-center gap-1.5 px-3 py-1.5 rounded-full glass hover:bg-elevated transition-all cursor-pointer text-xs font-medium text-white/90 border border-white/10"
+          aria-label="Voltar para os Links da Bio"
+        >
+          <LayoutGrid className="w-3.5 h-3.5 text-silver" />
+          <span className="hidden sm:inline">Links</span>
+        </button>
+      )}
 
       {/* Destaque Central: Nome da Loja */}
       <div className="flex flex-col items-center text-center gap-3 sm:gap-4 pt-4">

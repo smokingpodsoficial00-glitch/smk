@@ -4,6 +4,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { CartBar } from "@/components/CartBar";
 import { CartSheet } from "@/components/CartSheet";
 import { FlavorSheet } from "@/components/FlavorSheet";
+import { HubPage } from "@/components/HubPage";
 import { CartProvider } from "@/lib/cart";
 import type { SortOption } from "@/components/SortDropdown";
 import { fetchProductsFromSupabase, type Product, type PodModel } from "@/lib/products";
@@ -11,16 +12,74 @@ import { fetchCategories, fetchProductCategoryMappings, DEFAULT_CATEGORIES, type
 import { supabase } from "@/lib/supabase";
 import { Loader2, Star } from "lucide-react";
 
-// Trigger Vercel Build: v1.3.1 - Layout Mobile Filtros e Ordenacao em Linha Unica
+function getInitialView(): "hub" | "menu" {
+  if (typeof window === "undefined") return "hub";
+  const path = window.location.pathname.toLowerCase();
+  const search = new URLSearchParams(window.location.search);
+  const hash = window.location.hash.toLowerCase();
+
+  if (
+    path.includes("/cardapio") ||
+    path.includes("/menu") ||
+    path.includes("/catalogo") ||
+    search.get("view") === "menu" ||
+    search.get("page") === "cardapio" ||
+    hash.includes("cardapio") ||
+    hash.includes("menu")
+  ) {
+    return "menu";
+  }
+
+  if (
+    path.includes("/hub") ||
+    path.includes("/links") ||
+    path.includes("/bio") ||
+    search.get("view") === "hub" ||
+    search.get("page") === "hub" ||
+    hash.includes("hub") ||
+    hash.includes("links")
+  ) {
+    return "hub";
+  }
+
+  // Padrão: Hub Central / Link na Bio
+  return "hub";
+}
+
 export default function App() {
   return (
     <CartProvider>
-      <Menu />
+      <MainApp />
     </CartProvider>
   );
 }
 
-function Menu() {
+function MainApp() {
+  const [view, setView] = useState<"hub" | "menu">(getInitialView);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setView(getInitialView());
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const navigateTo = (newView: "hub" | "menu") => {
+    setView(newView);
+    const targetPath = newView === "hub" ? "/hub" : "/cardapio";
+    window.history.pushState({ view: newView }, "", targetPath);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  if (view === "hub") {
+    return <HubPage onOpenMenu={() => navigateTo("menu")} />;
+  }
+
+  return <Menu onBackToHub={() => navigateTo("hub")} />;
+}
+
+function Menu({ onBackToHub }: { onBackToHub: () => void }) {
   const [productList, setProductList] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [categoryMappings, setCategoryMappings] = useState<Record<string, { category_ids: string[]; display_order: number }>>({});
@@ -290,6 +349,7 @@ function Menu() {
         activeCategory={selectedCategorySlug}
         onCategoryChange={setSelectedCategorySlug}
         onCartClick={() => setCartOpen(true)}
+        onBackToHub={onBackToHub}
         brands={availableBrands}
         sortBy={sortBy}
         onSortChange={setSortBy}

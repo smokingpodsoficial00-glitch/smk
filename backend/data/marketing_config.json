@@ -190,8 +190,8 @@
       "selectedListIds": [
         "list_1786807808763"
       ],
-      "targetGroupId": "120363427803492997@g.us",
-      "targetGroupName": "SMK/FINANÇAS/GERAL",
+      "targetGroupId": "120363429733361752@g.us",
+      "targetGroupName": "Clientes Smoking Vip",
       "frequencyDays": 7,
       "scheduledWeekday": "SABADO",
       "scheduledTime": "19:30",
@@ -200,7 +200,10 @@
       "status": "active",
       "totalRecipients": 1,
       "createdAt": "2026-08-15T18:16:24.280Z",
-      "lastRunDate": "22/08/2026"
+      "lastRunDate": "22/08/2026",
+      "variations": [],
+      "useVariations": false,
+      "startDate": "2026-08-26"
     },
     {
       "id": "camp_1786818802616",
@@ -210,8 +213,8 @@
       "selectedListIds": [
         "list_1786807808763"
       ],
-      "targetGroupId": "120363427803492997@g.us",
-      "targetGroupName": "SMK/FINANÇAS/GERAL",
+      "targetGroupId": "120363429733361752@g.us",
+      "targetGroupName": "Clientes Smoking Vip",
       "frequencyDays": 7,
       "scheduledWeekday": "DOMINGO",
       "scheduledTime": "12:00",
@@ -220,7 +223,10 @@
       "status": "active",
       "totalRecipients": 1,
       "createdAt": "2026-08-15T18:33:22.616Z",
-      "lastRunDate": "23/08/2026"
+      "lastRunDate": "23/08/2026",
+      "variations": [],
+      "useVariations": false,
+      "startDate": "2026-08-26"
     },
     {
       "id": "camp_1786819959793",
@@ -230,8 +236,8 @@
       "selectedListIds": [
         "list_1786807808763"
       ],
-      "targetGroupId": "120363427803492997@g.us",
-      "targetGroupName": "SMK/FINANÇAS/GERAL",
+      "targetGroupId": "120363429733361752@g.us",
+      "targetGroupName": "Clientes Smoking Vip",
       "frequencyDays": 7,
       "scheduledWeekday": "DOMINGO",
       "scheduledTime": "19:30",
@@ -240,7 +246,10 @@
       "status": "active",
       "totalRecipients": 1,
       "createdAt": "2026-08-15T18:52:39.793Z",
-      "lastRunDate": "23/08/2026"
+      "lastRunDate": "23/08/2026",
+      "variations": [],
+      "useVariations": false,
+      "startDate": "2026-08-26"
     },
     {
       "id": "camp_1786820824361",
@@ -250,8 +259,8 @@
       "selectedListIds": [
         "list_1786807808763"
       ],
-      "targetGroupId": "120363427803492997@g.us",
-      "targetGroupName": "SMK/FINANÇAS/GERAL",
+      "targetGroupId": "120363429733361752@g.us",
+      "targetGroupName": "Clientes Smoking Vip",
       "frequencyDays": 7,
       "scheduledWeekday": "TERCA",
       "scheduledTime": "16:00",
@@ -260,7 +269,10 @@
       "status": "active",
       "totalRecipients": 1,
       "createdAt": "2026-08-15T19:07:04.361Z",
-      "lastRunDate": "18/08/2026"
+      "lastRunDate": "18/08/2026",
+      "variations": [],
+      "useVariations": false,
+      "startDate": "2026-08-26"
     },
     {
       "id": "camp_1786821475258",
@@ -270,8 +282,8 @@
       "selectedListIds": [
         "list_1786807808763"
       ],
-      "targetGroupId": "120363427803492997@g.us",
-      "targetGroupName": "SMK/FINANÇAS/GERAL",
+      "targetGroupId": "120363429733361752@g.us",
+      "targetGroupName": "Clientes Smoking Vip",
       "frequencyDays": 7,
       "scheduledWeekday": "QUARTA",
       "scheduledTime": "16:00",
@@ -280,7 +292,10 @@
       "status": "active",
       "totalRecipients": 1,
       "createdAt": "2026-08-15T19:17:55.258Z",
-      "lastRunDate": "19/08/2026"
+      "lastRunDate": "26/08/2026",
+      "variations": [],
+      "useVariations": false,
+      "startDate": "2026-08-26"
     },
     {
       "id": "camp_1786992261357",
@@ -401,9 +416,14 @@
       "key": "camp_1786812557221_2026-08-24_14:05",
       "timestamp": "2026-08-24T17:05:53.614Z",
       "campaignName": "CPM GRUPO ESTOQUE SEMANAL"
+    },
+    {
+      "key": "camp_1786821475258_2026-08-26_16:00",
+      "timestamp": "2026-08-26T19:00:28.102Z",
+      "campaignName": "CPM  LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!"
     }
   ],
-  "lastUpdated": "2026-08-25T22:42:35.375Z",
+  "lastUpdated": "2026-08-26T20:37:49.712Z",
   "lists": [
     {
       "id": "list_base_virgem_oficial",
@@ -3390,34 +3410,60 @@
       "createdAt": "2026-08-25T22:42:35.375Z"
     },
     {
-      "id": "list_1786807808763",
-      "name": "LISTA OFICIAL REATIVAÇÃO 1",
-      "description": "Lista personalizada de contatos",
-      "contacts": [],
-      "color": "#10b981",
-      "createdAt": "2026-08-15T15:30:08.763Z"
-    },
-    {
-      "id": "list_1786808943867",
-      "name": "REATIVAÇÃO DE BASE 2",
-      "description": "Lista personalizada de contatos",
-      "contacts": [],
-      "color": "#10b981",
-      "createdAt": "2026-08-15T15:49:03.867Z"
-    },
-    {
-      "id": "list_1786825249444",
-      "name": "LISTA CLIENTES SMK ANTIGOS",
-      "description": "Apenas clientes Smk antigos",
-      "contacts": [],
-      "color": "#10b981",
-      "createdAt": "2026-08-15T20:20:49.444Z"
-    },
-    {
       "id": "list_1786989733027",
       "name": "LISTA CLIENTES COMPRADORES",
       "description": "Lista personalizada de contatos",
-      "contacts": [],
+      "contacts": [
+        {
+          "id": "5511999109136@c.us",
+          "name": "Carolina Vieira Smk",
+          "phone": "5511999109136",
+          "cleanPhone": "5511999109136",
+          "isSaved": true
+        },
+        {
+          "id": "5511913425376@c.us",
+          "name": "Gustavo Cliente Smk",
+          "phone": "5511913425376",
+          "cleanPhone": "5511913425376",
+          "isSaved": true
+        },
+        {
+          "id": "5511984287367@c.us",
+          "name": "Livia Pizza SMK",
+          "phone": "5511984287367",
+          "cleanPhone": "5511984287367",
+          "isSaved": true
+        },
+        {
+          "id": "5511960560727@c.us",
+          "name": "Pedro Cliente Smk",
+          "phone": "5511960560727",
+          "cleanPhone": "5511960560727",
+          "isSaved": true
+        },
+        {
+          "id": "5511954898700@c.us",
+          "name": "Ricardo Pereira Cliente smk",
+          "phone": "5511954898700",
+          "cleanPhone": "5511954898700",
+          "isSaved": true
+        },
+        {
+          "id": "5511943856234@c.us",
+          "name": "Samuel",
+          "phone": "5511943856234",
+          "cleanPhone": "5511943856234",
+          "isSaved": true
+        },
+        {
+          "id": "5511963946855@c.us",
+          "name": "Vitoria",
+          "phone": "5511963946855",
+          "cleanPhone": "5511963946855",
+          "isSaved": true
+        }
+      ],
       "color": "#10b981",
       "createdAt": "2026-08-17T18:02:13.027Z"
     },
@@ -4621,13 +4667,43 @@
       "551732812998",
       "551752003020",
       "5511977300561",
-      "55184799859875880"
+      "55184799859875880",
+      "558386954405",
+      "551143351227",
+      "5511930311309",
+      "5511985164453",
+      "5511941358141",
+      "5511950869489",
+      "5511977214031",
+      "5511973072220",
+      "5511980964365",
+      "5511960897509",
+      "5511966109073",
+      "5511950753363",
+      "5511985910141",
+      "5511987081951",
+      "5511992372463"
     ],
     "camp_1786810305844": [
       "5511975800524",
       "5511932386166",
       "5511954283235",
-      "5511959446210"
+      "5511959446210",
+      "558386954405",
+      "551143351227",
+      "5511930311309",
+      "5511985164453",
+      "5511941358141",
+      "5511950869489",
+      "5511977214031",
+      "5511973072220",
+      "5511980964365",
+      "5511960897509",
+      "5511966109073",
+      "5511950753363",
+      "5511985910141",
+      "5511987081951",
+      "5511992372463"
     ]
   }
 }
