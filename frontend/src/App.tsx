@@ -159,8 +159,21 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
 
       const matchedCategories = categories.filter(c => modelCategoryIds.includes(c.id));
 
+      const hasAnyPromo = modelVariants.some(v => v.is_promotional);
+      const minPrice = modelVariants.length > 0 ? Math.min(...modelVariants.map(v => v.price)) : m.price;
+      const maxOriginalPrice = hasAnyPromo 
+        ? Math.max(...modelVariants.filter(v => v.is_promotional).map(v => v.original_price || v.price))
+        : minPrice;
+      const maxDiscountPct = hasAnyPromo
+        ? Math.max(...modelVariants.filter(v => v.is_promotional).map(v => v.discount_pct || 0))
+        : 0;
+
       return {
         ...m,
+        price: minPrice,
+        original_price: hasAnyPromo && maxOriginalPrice > minPrice ? maxOriginalPrice : undefined,
+        is_promotional: hasAnyPromo,
+        discount_pct: maxDiscountPct,
         variants: modelVariants,
         categories: matchedCategories,
         displayOrder: modelDisplayOrder

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { fetchProductPromotionsMap } from "@/lib/productPromotions";
 
 export interface Product {
   id: string;
@@ -7,6 +8,10 @@ export interface Product {
   puffs: number;
   flavor: string;
   price: number;
+  original_price?: number;
+  promo_price?: number;
+  is_promotional?: boolean;
+  discount_pct?: number;
   stock: number;
   image_url: string;
   is_active: boolean;
@@ -17,6 +22,9 @@ export interface PodModel {
   brand: string;
   puffs: number;
   price: number;
+  original_price?: number;
+  is_promotional?: boolean;
+  discount_pct?: number;
   variants: Product[];
   categories?: Array<{ id: string; name: string; slug: string; badge_text: string }>;
   displayOrder?: number;
@@ -46,6 +54,7 @@ for (const model of baseModels) {
       puffs: model.puffs,
       flavor: mockFlavors[i],
       price: model.price,
+      original_price: model.price,
       stock: 15,
       image_url: "",
       is_active: true,
@@ -55,11 +64,17 @@ for (const model of baseModels) {
 
 export async function fetchProductsFromSupabase(): Promise<Product[]> {
   try {
-    const { data, error } = await supabase
-      .from("smoking_products")
-      .select("*")
-      .order("brand", { ascending: true })
-      .order("name", { ascending: true });
+    const [productsRes, promosMap] = await Promise.all([
+      supabase
+        .from("smoking_products")
+        .select("*")
+        .order("brand", { ascending: true })
+        .order("name", { ascending: true }),
+      fetchProductPromotionsMap(),
+    ]);
+
+    const data = productsRes.data;
+    const error = productsRes.error;
 
     if (!error && data && data.length > 0) {
       return data
@@ -67,21 +82,35 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
           if (item.is_active === false) return false;
           return true;
         })
-        .map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          brand: item.brand,
-          puffs: item.puffs || 5000,
-          flavor: item.flavor,
-          price: parseFloat(item.price),
-          stock: parseInt(item.stock) || 0,
-          image_url: item.image_url || "",
-          is_active: item.is_active ?? true,
-        }));
+        .map((item: any) => {
+          const originalPrice = parseFloat(item.price) || 0;
+          const promoInfo = promosMap[item.id];
+          const hasPromo = Boolean(promoInfo && promoInfo.isPromotional && promoInfo.promoPrice && promoInfo.promoPrice > 0);
+
+          const finalPrice = hasPromo ? Number(promoInfo.promoPrice) : originalPrice;
+          const discountPct = hasPromo
+            ? promoInfo.discountPct || Math.round(((originalPrice - finalPrice) / originalPrice) * 100)
+            : 0;
+
+          return {
+            id: item.id,
+            name: item.name,
+            brand: item.brand,
+            puffs: item.puffs || 5000,
+            flavor: item.flavor,
+            price: finalPrice,
+            original_price: originalPrice,
+            promo_price: hasPromo ? finalPrice : undefined,
+            is_promotional: hasPromo,
+            discount_pct: discountPct,
+            stock: parseInt(item.stock) || 0,
+            image_url: item.image_url || "",
+            is_active: item.is_active ?? true,
+          };
+        });
     }
   } catch (err) {
     console.error("Erro ao buscar produtos do Supabase no cardápio:", err);
   }
   return fallbackProducts;
 }
-

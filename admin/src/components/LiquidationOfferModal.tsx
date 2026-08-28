@@ -227,24 +227,56 @@ export const LiquidationOfferModal: React.FC<LiquidationOfferModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3.5 border-t border-white/10 bg-[#141414] flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-semibold transition-colors cursor-pointer"
-          >
-            Cancelar
-          </button>
+        <div className="px-5 py-3.5 border-t border-white/10 bg-[#141414] flex items-center justify-between gap-2">
+          {product.isPromotional ? (
+            <button
+              type="button"
+              onClick={async () => {
+                if (window.confirm(`Deseja realmente encerrar a promoção de ${product.brand} ${product.name} (${product.flavor}) e restaurar o preço normal de R$ ${currentPrice.toFixed(2)}?`)) {
+                  setIsSaving(true);
+                  try {
+                    await updateProductPromotion({
+                      productId: product.id,
+                      isPromotional: false,
+                      companyId,
+                    });
+                    alert("Promoção encerrada com sucesso! O preço normal foi restaurado no catálogo.");
+                    if (onOfferSaved) onOfferSaved();
+                    onClose();
+                  } catch (e) {
+                    console.error(e);
+                    alert("Erro ao encerrar promoção.");
+                  } finally {
+                    setIsSaving(false);
+                  }
+                }
+              }}
+              disabled={isSaving}
+              className="px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Encerrar Promoção
+            </button>
+          ) : <div />}
 
-          <button
-            type="button"
-            onClick={handleSaveOffer}
-            disabled={isSaving}
-            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-lg shadow-amber-500/20"
-          >
-            <Sparkles className="size-3.5 text-black" />
-            <span>{isSaving ? "Salvando..." : "Salvar Oferta de Queima"}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSaveOffer}
+              disabled={isSaving}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-lg shadow-amber-500/20"
+            >
+              <Sparkles className="size-3.5 text-black" />
+              <span>{isSaving ? "Salvando..." : "Salvar Oferta de Queima"}</span>
+            </button>
+          </div>
         </div>
 
       </div>

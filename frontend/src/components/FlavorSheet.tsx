@@ -70,8 +70,15 @@ function FlavorItem({ product }: { product: Product }) {
 
   return (
     <li className="flex items-center justify-between p-3.5 rounded-2xl bg-card/60 border border-border">
-      <div className="flex flex-col min-w-0 flex-1">
-        <span className="text-sm font-semibold truncate">{product.flavor}</span>
+      <div className="flex flex-col min-w-0 flex-1 pr-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-sm font-semibold truncate">{product.flavor}</span>
+          {product.is_promotional && (
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+              OFERTA {product.discount_pct ? `-${product.discount_pct}%` : ""}
+            </span>
+          )}
+        </div>
         {outOfStock ? (
            <span className="text-[11px] text-red-400 font-medium">Esgotado</span>
         ) : (
@@ -81,7 +88,16 @@ function FlavorItem({ product }: { product: Product }) {
         )}
       </div>
       <div className="flex items-center gap-4 shrink-0 pl-3">
-        <span className="text-sm font-semibold tracking-tight">{formatBRL(product.price)}</span>
+        <div className="flex flex-col items-end">
+          {product.is_promotional && product.original_price && product.original_price > product.price && (
+            <span className="text-[11px] text-muted-foreground line-through font-normal">
+              {formatBRL(product.original_price)}
+            </span>
+          )}
+          <span className={`text-sm font-semibold tracking-tight ${product.is_promotional ? "text-emerald-400 font-bold" : "text-foreground"}`}>
+            {formatBRL(product.price)}
+          </span>
+        </div>
         
         {quantity > 0 ? (
           <div className="flex items-center gap-2 bg-elevated rounded-full p-1 border border-border/50">

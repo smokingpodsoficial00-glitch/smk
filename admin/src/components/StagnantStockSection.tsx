@@ -300,11 +300,11 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
                       </div>
                     )}
                     <div>
-                      <div className="font-bold text-white flex items-center gap-1.5">
+                      <div className="font-bold text-white flex items-center gap-1.5 flex-wrap">
                         <span>{item.brand} {item.name}</span>
                         {item.isPromotional && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-in fade-in">
-                            EM PROMOÇÃO
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 border border-red-500/40 animate-in fade-in">
+                            EM PROMOÇÃO {item.promoData?.discountPct ? `(-${item.promoData.discountPct}%)` : ""}
                           </span>
                         )}
                       </div>
@@ -341,17 +341,30 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
                   </span>
                 </td>
 
-                {/* Preço de Venda */}
-                <td className="p-3.5 text-right font-bold text-white">
-                  R$ {item.sellPrice.toFixed(2)}
+                {/* Preço de Venda (Mostra Preço Normal e Preço Promocional se ativo) */}
+                <td className="p-3.5 text-right font-bold">
+                  {item.isPromotional && item.promoData?.promoPrice && item.promoData.promoPrice < item.sellPrice ? (
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] text-muted-foreground line-through font-normal">
+                        R$ {item.sellPrice.toFixed(2)}
+                      </span>
+                      <span className="text-emerald-400 text-xs font-bold">
+                        R$ {item.promoData.promoPrice.toFixed(2)}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-white text-xs">
+                      R$ {item.sellPrice.toFixed(2)}
+                    </span>
+                  )}
                 </td>
 
                 {/* Custo Unitário */}
-                <td className="p-3.5 text-right text-muted-foreground">
+                <td className="p-3.5 text-right text-muted-foreground text-xs">
                   {item.costPrice > 0 ? `R$ ${item.costPrice.toFixed(2)}` : "—"}
                 </td>
 
-                {/* Ações (Criar Oferta) */}
+                {/* Ações (Criar Oferta & Encerrar Promoção) */}
                 <td className="p-3.5 text-center">
                   <div className="flex items-center justify-center gap-1.5">
                     <button
@@ -360,21 +373,28 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
                       className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 shadow-md shadow-amber-500/10"
                     >
                       <Tag className="size-3.5 text-black" />
-                      <span>Criar Oferta</span>
+                      <span>{item.isPromotional ? "Editar Oferta" : "Criar Oferta"}</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleTogglePromotion(item)}
-                      className={`px-2.5 py-1.5 rounded-xl font-semibold text-xs border transition-colors cursor-pointer ${
-                        item.isPromotional
-                          ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
-                          : "bg-white/5 hover:bg-white/10 text-muted-foreground border-white/10"
-                      }`}
-                      title="Alternar selo EM PROMOÇÃO no produto"
-                    >
-                      {item.isPromotional ? "Promo Ativa" : "+ Promo"}
-                    </button>
+                    {item.isPromotional ? (
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePromotion(item)}
+                        className="px-2.5 py-1.5 rounded-xl font-semibold text-xs border bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30 transition-colors cursor-pointer"
+                        title="Encerrar promoção e voltar ao preço normal"
+                      >
+                        Encerrar
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePromotion(item)}
+                        className="px-2.5 py-1.5 rounded-xl font-semibold text-xs border bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white border-white/10 transition-colors cursor-pointer"
+                        title="Ativar promoção rápida (-15%)"
+                      >
+                        + Promo
+                      </button>
+                    )}
                   </div>
                 </td>
 

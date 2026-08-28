@@ -30,7 +30,12 @@ export function ProductCard({ model, onClick }: { model: PodModel; onClick: () =
         <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 glass px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-silver">
           {model.puffs.toLocaleString("pt-BR")} puffs
         </div>
-        {primaryCategory && (
+        {model.is_promotional && (
+          <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 bg-red-500 text-white font-bold px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] tracking-wider shadow-lg shadow-red-500/40 uppercase flex items-center gap-1 animate-in fade-in">
+            <span>🔥 OFERTA {model.discount_pct ? `-${model.discount_pct}%` : ""}</span>
+          </div>
+        )}
+        {!model.is_promotional && primaryCategory && (
           <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 glass-strong px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold text-amber-300 border border-amber-400/40 shadow-[0_0_12px_rgba(251,191,36,0.35)]">
             {primaryCategory.badge_text || primaryCategory.name}
           </div>
@@ -45,7 +50,16 @@ export function ProductCard({ model, onClick }: { model: PodModel; onClick: () =
         </div>
 
         <div className="mt-auto flex items-center justify-between gap-2 sm:gap-3 pt-1">
-          <span className="text-base sm:text-lg font-semibold tracking-tight">{formatBRL(model.price)}</span>
+          <div className="flex flex-col min-w-0">
+            {model.is_promotional && model.original_price && model.original_price > model.price && (
+              <span className="text-[11px] sm:text-xs text-muted-foreground line-through font-normal">
+                {formatBRL(model.original_price)}
+              </span>
+            )}
+            <span className={`text-base sm:text-lg font-semibold tracking-tight ${model.is_promotional ? "text-emerald-400 font-bold" : "text-foreground"}`}>
+              {formatBRL(model.price)}
+            </span>
+          </div>
           <div className="relative grid place-items-center px-3 sm:px-4 h-8 sm:h-10 rounded-full bg-elevated text-foreground text-[10px] sm:text-xs font-semibold tracking-wide whitespace-nowrap transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
             Ver Opções
           </div>
