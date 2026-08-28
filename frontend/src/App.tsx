@@ -96,12 +96,12 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
   useEffect(() => {
     loadProducts();
 
-    // Polling de 3 em 3 segundos para manter sincronizado (sem F5)
+    // Sincronização em segundo plano suave a cada 20 segundos (Realtime já atualiza na hora)
     const intervalId = setInterval(() => {
       loadProducts();
-    }, 3000);
+    }, 20000);
 
-    // Inscrição em tempo real para atualizações no Supabase (produtos e categorias/destaques)
+    // Inscrição em tempo real para atualizações no Supabase (produtos e pedidos)
     const subscription = supabase
       .channel("public:realtime_menu")
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => {

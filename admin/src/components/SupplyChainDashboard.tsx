@@ -247,19 +247,27 @@ export function SupplyChainDashboard() {
   const fetchData = async () => {
     const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
     try {
-      const { data: prodData } = await supabase
-        .from("smoking_products")
-        .select("*")
-        .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
-        .neq("brand", "__STORE_CONFIG__")
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: true });
+      // Executa todas as consultas ao Supabase em paralelo para carregamento ultrarrápido
+      const [prodRes, ordersRes, costsMap, cats, catMapRes] = await Promise.all([
+        supabase
+          .from("smoking_products")
+          .select("*")
+          .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
+          .neq("brand", "__STORE_CONFIG__")
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: true }),
+        supabase
+          .from("smoking_orders")
+          .select("items, delivery_status, client_phone, client_name, created_at")
+          .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
+          .neq("delivery_status", "CANCELADO"),
+        fetchProductCostsMap(targetCompanyId),
+        fetchCategories(),
+        fetchProductCategoryMappings(targetCompanyId)
+      ]);
 
-      const { data: realOrders } = await supabase
-        .from("smoking_orders")
-        .select("items, delivery_status, client_phone, client_name, created_at")
-        .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
-        .neq("delivery_status", "CANCELADO");
+      const prodData = prodRes.data;
+      const realOrders = ordersRes.data;
 
       if (realOrders) {
         setRawOrdersList(realOrders);
@@ -296,9 +304,6 @@ export function SupplyChainDashboard() {
         realSalesList = Object.values(flavorSalesMap);
       }
 
-      // Carregar Custos Persistidos no Supabase DB
-      const costsMap = await fetchProductCostsMap(targetCompanyId);
-
       if (prodData) {
         const mergedProducts = prodData.map((p: any) => {
           const brandName = (p.brand || "Genérico").trim();
@@ -328,11 +333,8 @@ export function SupplyChainDashboard() {
       }
       setTopSelling(realSalesList);
 
-      // Carregar Categorias e Mapeamentos
-      const cats = await fetchCategories();
-      setCategoriesList(cats);
-      const catMapRes = await fetchProductCategoryMappings(targetCompanyId);
-      setCategoryMappings(catMapRes.productMap);
+      setCategoriesList(cats || []);
+      setCategoryMappings(catMapRes?.productMap || {});
     } catch (err) {
       console.error("Erro ao carregar dados do Supabase:", err);
     } finally {
@@ -342,8 +344,26 @@ export function SupplyChainDashboard() {
 
   useEffect(() => {
     fetchData();
-    const intervalId = setInterval(() => fetchData(), 3000);
-    return () => clearInterval(intervalId);
+
+    // Inscrição Realtime no Supabase para atualização instantânea sem sobrecarga de rede
+    const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+    const channel = supabase
+      .channel(`supply_chain_realtime_${targetCompanyId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => {
+        fetchData();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    // Sincronização em segundo plano suave a cada 15 segundos
+    const intervalId = setInterval(() => fetchData(), 15000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(intervalId);
+    };
   }, [company?.id]);
 
   // ─── Handlers ───────────────────────────────────────────
