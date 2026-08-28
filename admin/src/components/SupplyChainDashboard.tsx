@@ -1307,17 +1307,19 @@ export function SupplyChainDashboard() {
       </div>
 
       {/* ━━━ CONTEÚDO PRINCIPAL ━━━━━━━━━━━━━ */}
-      <div className="px-4 md:px-6 lg:px-8 py-5 space-y-5">
-
-        {activeMainView === "PARADOS" ? (
+      {activeMainView === "PARADOS" ? (
+        <div className="px-4 md:px-6 lg:px-8 py-5 space-y-5">
           <StagnantStockSection
             products={products}
             orders={rawOrdersList}
             companyId={company?.id}
             onStockUpdated={fetchData}
           />
-        ) : (
-          <>
+        </div>
+      ) : null}
+
+      {activeMainView === "ESTOQUE" && (
+      <div className="px-4 md:px-6 lg:px-8 py-5 space-y-5">
         {/* ── KPIs GRUPO PRINCIPAL (4 CARDS MINIMALISTAS) ─────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* 1. Produtos (Neutro) */}
@@ -1955,6 +1957,7 @@ export function SupplyChainDashboard() {
           )}
         </div>
       </div>
+      )}
 
       {/* ━━━ MODAL CARD DEDICADO DE GESTÃO DE SABORES POR MODELO ━━━━━━━━━━━━━━ */}
       {viewingFlavorsGroup && (() => {
@@ -3046,9 +3049,8 @@ export function SupplyChainDashboard() {
                 )}
               </button>
             </div>
+          </div>
         </div>
-      )}
-      </>
       )}
 
       {/* ━━━ MODAL DE REGISTRO DE VENDA MANUAL ━━━━━━━━━━━━━━━━ */}
