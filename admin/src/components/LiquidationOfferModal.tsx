@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { X, Tag, DollarSign, TrendingUp, AlertTriangle, Check, Sparkles } from "lucide-react";
+import { X, Tag, DollarSign, TrendingUp, AlertTriangle, Check, Sparkles, Crown } from "lucide-react";
 import { updateProductPromotion } from "../lib/productPromotions";
+import { VipGroupOfferModal } from "./VipGroupOfferModal";
 
 interface LiquidationOfferModalProps {
   isOpen: boolean;
@@ -20,13 +21,19 @@ export const LiquidationOfferModal: React.FC<LiquidationOfferModalProps> = ({
   const [selectedDiscount, setSelectedDiscount] = useState<number | null>(15);
   const [customPrice, setCustomPrice] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isVipModalOpen, setIsVipModalOpen] = useState(false);
 
   useEffect(() => {
     if (product) {
       const currentPrice = parseFloat(product.price) || 0;
-      setSelectedDiscount(15);
-      const defaultPromoPrice = (currentPrice * 0.85).toFixed(2);
-      setCustomPrice(defaultPromoPrice);
+      if (product.promoData && product.promoData.isPromotional && product.promoData.promoPrice > 0) {
+        setCustomPrice(product.promoData.promoPrice.toFixed(2));
+        setSelectedDiscount(product.promoData.discountPct || null);
+      } else {
+        setSelectedDiscount(15);
+        const defaultPromoPrice = (currentPrice * 0.85).toFixed(2);
+        setCustomPrice(defaultPromoPrice);
+      }
     }
   }, [product]);
 
@@ -55,17 +62,17 @@ export const LiquidationOfferModal: React.FC<LiquidationOfferModalProps> = ({
   const isBelowCost = promoPrice > 0 && promoPrice < costPrice;
   const currentMarginPct = currentPrice > 0 ? ((currentPrice - costPrice) / currentPrice) * 100 : 0;
 
-  const handleSaveOffer = async () => {
+  const saveOfferInternal = async (): Promise<boolean> => {
     if (promoPrice <= 0) {
       alert("Por favor, informe um preço promocional válido.");
-      return;
+      return false;
     }
 
     if (isBelowCost) {
       const confirmBelowCost = window.confirm(
         `ATENÇÃO: O preço promocional (R$ ${promoPrice.toFixed(2)}) está ABAIXO do custo unitário (R$ ${costPrice.toFixed(2)}).\n\nVocê terá um prejuízo estimado de R$ ${Math.abs(totalProfit).toFixed(2)} se vender todo o estoque.\n\nDeseja confirmar assim mesmo?`
       );
-      if (!confirmBelowCost) return;
+      if (!confirmBelowCost) return false;
     }
 
     setIsSaving(true);
@@ -80,206 +87,250 @@ export const LiquidationOfferModal: React.FC<LiquidationOfferModalProps> = ({
         companyId,
       });
 
-      alert(`Oferta de Queima salva com sucesso para ${product.brand} ${product.name} (${product.flavor})!`);
       if (onOfferSaved) onOfferSaved();
-      onClose();
+      return true;
     } catch (e) {
       console.error(e);
       alert("Erro ao salvar oferta.");
+      return false;
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleSaveOffer = async () => {
+    const success = await saveOfferInternal();
+    if (success) {
+      alert(`Oferta de Queima salva com sucesso para ${product.brand} ${product.name} (${product.flavor})!`);
+      onClose();
+    }
+  };
+
+  const handleSaveAndOpenVip = async () => {
+    const success = await saveOfferInternal();
+    if (success) {
+      setIsVipModalOpen(true);
+    }
+  };
+
+  const discountPctFinal = currentPrice > 0 ? Math.round(((currentPrice - promoPrice) / currentPrice) * 100) : 0;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
-      <div className="bg-[#111111] border border-amber-500/30 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
-        
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-white/10 bg-[#161616] flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="size-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-              <Tag className="size-4" />
-            </div>
-            <div>
-              <h3 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
-                Oferta de Queima de Estoque
-              </h3>
-              <p className="text-[11px] text-muted-foreground">
-                Liquidação e promoção de rápida saída de capital
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="size-7 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="p-5 space-y-4 overflow-y-auto max-h-[80vh] custom-scrollbar">
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+        <div className="bg-[#111111] border border-amber-500/30 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
           
-          {/* Card do Produto Selecionado */}
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-black/40 border border-white/10">
-            {product.image_url ? (
-              <img src={product.image_url} alt={product.name} className="size-12 rounded-lg object-contain bg-black/60 p-1 border border-white/10 shrink-0" />
-            ) : (
-              <div className="size-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-muted-foreground font-bold text-xs">
-                {product.brand?.substring(0, 2) || "POD"}
+          {/* Header */}
+          <div className="px-5 py-4 border-b border-white/10 bg-[#161616] flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="size-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <Tag className="size-4" />
               </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-white truncate">{product.brand} {product.name}</span>
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  {product.flavor}
-                </span>
-              </div>
-              <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-1">
-                <span>Estoque: <strong className="text-white">{stock} un.</strong></span>
-                <span>Custo: <strong className="text-white">R$ {costPrice.toFixed(2)}</strong></span>
-                <span>Atual: <strong className="text-emerald-400">R$ {currentPrice.toFixed(2)}</strong></span>
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
+                  Oferta de Queima de Estoque
+                </h3>
+                <p className="text-[11px] text-muted-foreground">
+                  Liquidação e promoção de rápida saída de capital
+                </p>
               </div>
             </div>
-          </div>
-
-          {/* Botões Rápidos de Desconto */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground block">
-              Sugestões Rápidas de Desconto:
-            </label>
-            <div className="grid grid-cols-4 gap-2">
-              {[10, 15, 20, 25].map((pct) => (
-                <button
-                  key={pct}
-                  type="button"
-                  onClick={() => handleSelectDiscount(pct)}
-                  className={`py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                    selectedDiscount === pct
-                      ? "bg-amber-500 text-black border-amber-400 shadow-lg shadow-amber-500/20"
-                      : "bg-black/40 hover:bg-white/5 text-white border-white/10"
-                  }`}
-                >
-                  -{pct}%
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Input de Preço Promocional Personalizado */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground block">
-              Preço Promocional Personalizado (R$):
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-bold">R$</span>
-              <input
-                type="number"
-                step="0.01"
-                value={customPrice}
-                onChange={(e) => handleCustomPriceChange(e.target.value)}
-                className="w-full bg-black/60 border border-amber-500/40 rounded-xl pl-9 pr-3 py-2 text-sm font-bold text-white focus:outline-none focus:border-amber-400"
-                placeholder="0.00"
-              />
-            </div>
-          </div>
-
-          {/* Alerta de Prejuízo (Abaixo do Custo) */}
-          {isBelowCost && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2.5 animate-in fade-in">
-              <AlertTriangle className="size-4 shrink-0 text-red-400" />
-              <span>Preço promocional abaixo do custo unitário (R$ {costPrice.toFixed(2)}). Haverá prejuízo no lote.</span>
-            </div>
-          )}
-
-          {/* Quadro de Simulação Financeira em Tempo Real */}
-          <div className="p-3.5 rounded-xl bg-black/60 border border-white/10 space-y-2.5 text-xs">
-            <div className="flex justify-between items-center pb-2 border-b border-white/10">
-              <span className="text-muted-foreground">Novo Preço de Venda:</span>
-              <strong className="text-base text-amber-400">R$ {promoPrice.toFixed(2)}</strong>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Lucro por Unidade:</span>
-              <strong className={unitProfit >= 0 ? "text-emerald-400" : "text-red-400"}>
-                R$ {unitProfit.toFixed(2)}
-              </strong>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Lucro Total Se Vender Todo o Estoque:</span>
-              <strong className={totalProfit >= 0 ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>
-                R$ {totalProfit.toFixed(2)}
-              </strong>
-            </div>
-
-            <div className="flex justify-between items-center pt-1 border-t border-white/5">
-              <span className="text-muted-foreground">Nova Margem de Lucro:</span>
-              <strong className={newMarginPct >= 0 ? "text-white" : "text-red-400"}>
-                {newMarginPct.toFixed(1)}% (antes: {currentMarginPct.toFixed(1)}%)
-              </strong>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Footer */}
-        <div className="px-5 py-3.5 border-t border-white/10 bg-[#141414] flex items-center justify-between gap-2">
-          {product.isPromotional ? (
-            <button
-              type="button"
-              onClick={async () => {
-                if (window.confirm(`Deseja realmente encerrar a promoção de ${product.brand} ${product.name} (${product.flavor}) e restaurar o preço normal de R$ ${currentPrice.toFixed(2)}?`)) {
-                  setIsSaving(true);
-                  try {
-                    await updateProductPromotion({
-                      productId: product.id,
-                      isPromotional: false,
-                      companyId,
-                    });
-                    alert("Promoção encerrada com sucesso! O preço normal foi restaurado no catálogo.");
-                    if (onOfferSaved) onOfferSaved();
-                    onClose();
-                  } catch (e) {
-                    console.error(e);
-                    alert("Erro ao encerrar promoção.");
-                  } finally {
-                    setIsSaving(false);
-                  }
-                }
-              }}
-              disabled={isSaving}
-              className="px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold transition-colors cursor-pointer"
-            >
-              Encerrar Promoção
-            </button>
-          ) : <div />}
-
-          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-semibold transition-colors cursor-pointer"
+              className="size-7 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white flex items-center justify-center transition-colors cursor-pointer"
             >
-              Cancelar
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSaveOffer}
-              disabled={isSaving}
-              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-lg shadow-amber-500/20"
-            >
-              <Sparkles className="size-3.5 text-black" />
-              <span>{isSaving ? "Salvando..." : "Salvar Oferta de Queima"}</span>
+              <X className="size-4" />
             </button>
           </div>
-        </div>
 
+          {/* Body */}
+          <div className="p-5 space-y-4 overflow-y-auto max-h-[80vh] custom-scrollbar">
+            
+            {/* Card do Produto Selecionado */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-black/40 border border-white/10">
+              {product.image_url ? (
+                <img src={product.image_url} alt={product.name} className="size-12 rounded-lg object-contain bg-black/60 p-1 border border-white/10 shrink-0" />
+              ) : (
+                <div className="size-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-muted-foreground font-bold text-xs">
+                  {product.brand?.substring(0, 2) || "POD"}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-white truncate">{product.brand} {product.name}</span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    {product.flavor}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-1">
+                  <span>Estoque: <strong className="text-white">{stock} un.</strong></span>
+                  <span>Custo: <strong className="text-white">{costPrice > 0 ? `R$ ${costPrice.toFixed(2)}` : "—"}</strong></span>
+                  <span>Atual: <strong className="text-emerald-400">R$ {currentPrice.toFixed(2)}</strong></span>
+                </div>
+              </div>
+            </div>
+
+            {/* Botões Rápidos de Desconto */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Escolha o Desconto Rápido:</label>
+              <div className="grid grid-cols-4 gap-2">
+                {[10, 15, 20, 25].map((pct) => (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => handleSelectDiscount(pct)}
+                    className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      selectedDiscount === pct
+                        ? "bg-amber-500 text-black border-amber-400 shadow-md shadow-amber-500/20 scale-[1.02]"
+                        : "bg-white/5 text-white border-white/10 hover:bg-white/10"
+                    }`}
+                  >
+                    -{pct}%
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Preço Promocional Personalizado */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Ou digite o Preço Promocional (R$):</label>
+              <div className="relative">
+                <DollarSign className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="number"
+                  step="0.01"
+                  value={customPrice}
+                  onChange={(e) => handleCustomPriceChange(e.target.value)}
+                  placeholder="Ex: 69.90"
+                  className="w-full bg-black/60 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm font-bold text-emerald-400 focus:outline-none focus:border-amber-400 transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Alerta se Preço Abaixo do Custo */}
+            {isBelowCost && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-2.5 text-xs text-red-400">
+                <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="font-bold block">Atenção: Preço abaixo do custo unitário!</strong>
+                  <span>O custo unitário é R$ {costPrice.toFixed(2)}. Esta oferta resultará em margem negativa.</span>
+                </div>
+              </div>
+            )}
+
+            {/* Resumo da Oferta */}
+            <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 space-y-2 text-xs">
+              <div className="flex justify-between items-center pb-2 border-b border-white/10">
+                <span className="text-muted-foreground">Novo Preço de Venda:</span>
+                <strong className="text-base text-amber-400">R$ {promoPrice.toFixed(2)}</strong>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Lucro por Unidade:</span>
+                <strong className={unitProfit >= 0 ? "text-emerald-400" : "text-red-400"}>
+                  R$ {unitProfit.toFixed(2)}
+                </strong>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Lucro Total Se Vender Todo o Estoque:</span>
+                <strong className={totalProfit >= 0 ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>
+                  R$ {totalProfit.toFixed(2)}
+                </strong>
+              </div>
+
+              <div className="flex justify-between items-center pt-1 border-t border-white/5">
+                <span className="text-muted-foreground">Nova Margem de Lucro:</span>
+                <strong className={newMarginPct >= 0 ? "text-white" : "text-red-400"}>
+                  {newMarginPct.toFixed(1)}% (antes: {currentMarginPct.toFixed(1)}%)
+                </strong>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Footer */}
+          <div className="px-5 py-3.5 border-t border-white/10 bg-[#141414] flex items-center justify-between gap-2 flex-wrap">
+            {product.isPromotional ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (window.confirm(`Deseja realmente encerrar a promoção de ${product.brand} ${product.name} (${product.flavor}) e restaurar o preço normal de R$ ${currentPrice.toFixed(2)}?`)) {
+                    setIsSaving(true);
+                    try {
+                      await updateProductPromotion({
+                        productId: product.id,
+                        isPromotional: false,
+                        companyId,
+                      });
+                      alert("Promoção encerrada com sucesso! O preço normal foi restaurado no catálogo.");
+                      if (onOfferSaved) onOfferSaved();
+                      onClose();
+                    } catch (e) {
+                      console.error(e);
+                      alert("Erro ao encerrar promoção.");
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }
+                }}
+                disabled={isSaving}
+                className="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Encerrar Promoção
+              </button>
+            ) : <div />}
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveAndOpenVip}
+                disabled={isSaving || stock <= 0}
+                className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95"
+                title="Salvar promoção e abrir painel de divulgação para o Grupo VIP"
+              >
+                <Crown className="size-3.5 text-amber-400" />
+                <span>Enviar para Grupo VIP</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveOffer}
+                disabled={isSaving}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-lg shadow-amber-500/20"
+              >
+                <Sparkles className="size-3.5 text-black" />
+                <span>{isSaving ? "Salvando..." : "Salvar Oferta"}</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
       </div>
-    </div>
+
+      {/* Modal de Divulgação para o Grupo VIP */}
+      {isVipModalOpen && (
+        <VipGroupOfferModal
+          isOpen={isVipModalOpen}
+          onClose={() => {
+            setIsVipModalOpen(false);
+            onClose();
+          }}
+          product={product}
+          promoPrice={promoPrice}
+          discountPct={discountPctFinal}
+          companyId={companyId}
+        />
+      )}
+    </>
   );
 };

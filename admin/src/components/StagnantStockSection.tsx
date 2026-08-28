@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from "react";
 import {
   PackageSearch, Tag, Sparkles, Search, Clock, Box, DollarSign,
-  AlertCircle, ChevronRight, CheckCircle2
+  AlertCircle, ChevronRight, CheckCircle2, Crown
 } from "lucide-react";
 import { fetchProductPromotionsMap, updateProductPromotion, type PromoData } from "../lib/productPromotions";
 import { LiquidationOfferModal } from "./LiquidationOfferModal";
+import { VipGroupOfferModal } from "./VipGroupOfferModal";
 
 const STAGNANT_MIN_DAYS = 7; // Regra mínima obrigatória: 7 dias
 
@@ -24,6 +25,7 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [promotionsMap, setPromotionsMap] = useState<Record<string, PromoData>>({});
   const [selectedOfferProduct, setSelectedOfferProduct] = useState<any | null>(null);
+  const [selectedVipProduct, setSelectedVipProduct] = useState<any | null>(null);
 
   // Carregar mapa de promoções do Supabase DB
   const loadPromotions = async () => {
@@ -364,9 +366,9 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
                   {item.costPrice > 0 ? `R$ ${item.costPrice.toFixed(2)}` : "—"}
                 </td>
 
-                {/* Ações (Criar Oferta & Encerrar Promoção) */}
+                {/* Ações (Criar Oferta, Grupo VIP & Encerrar Promoção) */}
                 <td className="p-3.5 text-center">
-                  <div className="flex items-center justify-center gap-1.5">
+                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
                     <button
                       type="button"
                       onClick={() => setSelectedOfferProduct(item)}
@@ -375,6 +377,18 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
                       <Tag className="size-3.5 text-black" />
                       <span>{item.isPromotional ? "Editar Oferta" : "Criar Oferta"}</span>
                     </button>
+
+                    {item.isPromotional && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVipProduct(item)}
+                        className="px-2.5 py-1.5 rounded-xl font-bold text-xs bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-colors cursor-pointer flex items-center gap-1"
+                        title="Divulgar oferta no Grupo VIP"
+                      >
+                        <Crown className="size-3.5 text-amber-400" />
+                        <span>VIP</span>
+                      </button>
+                    )}
 
                     {item.isPromotional ? (
                       <button
@@ -427,6 +441,18 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
             loadPromotions();
             if (onStockUpdated) onStockUpdated();
           }}
+        />
+      )}
+
+      {/* Modal Dedicado de Divulgação para o Grupo VIP */}
+      {selectedVipProduct && (
+        <VipGroupOfferModal
+          isOpen={Boolean(selectedVipProduct)}
+          onClose={() => setSelectedVipProduct(null)}
+          product={selectedVipProduct}
+          promoPrice={selectedVipProduct.promoData?.promoPrice || selectedVipProduct.sellPrice * 0.85}
+          discountPct={selectedVipProduct.promoData?.discountPct || 15}
+          companyId={companyId}
         />
       )}
 
