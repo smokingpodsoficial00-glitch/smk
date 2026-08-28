@@ -4,7 +4,7 @@ import {
   Trash2, Search, Filter, ArrowUpDown, MoreVertical, Copy, Edit3, DollarSign, 
   CheckCircle2, X, TrendingUp, PieChart, ChevronRight, ChevronDown, ChevronUp, 
   Tag, Box, Boxes, Zap, Camera, Download, FileText, BarChart3, Check, Share2, Smartphone, 
-  Monitor, Store, ExternalLink, ListOrdered, Save, Star, ShoppingCart
+  Monitor, Store, ExternalLink, ListOrdered, Save, Star, ShoppingCart, Flame
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatBRL } from "@/lib/cart";
@@ -13,6 +13,7 @@ import { fetchCategories, fetchProductCategoryMappings, updateModelCategories, D
 import { fetchProductCostsMap, updateProductCost } from "../lib/productCosts";
 import { ManualSaleModal } from "./ManualSaleModal";
 import { ReplenishmentPlannerModal, loadSavedGoals, type FinancialGoals } from "./ReplenishmentPlannerModal";
+import { StagnantStockSection } from "./StagnantStockSection";
 
 // ─── Donut chart colors ───────────────────────────────────
 const DONUT_COLORS = ["#34d399", "#60a5fa", "#a78bfa", "#fbbf24", "#f87171", "#f472b6", "#38bdf8"];
@@ -26,6 +27,8 @@ export function SupplyChainDashboard() {
   const { company } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [topSelling, setTopSelling] = useState<any[]>([]);
+  const [rawOrdersList, setRawOrdersList] = useState<any[]>([]);
+  const [activeMainView, setActiveMainView] = useState<"ESTOQUE" | "PARADOS">("ESTOQUE");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -254,9 +257,13 @@ export function SupplyChainDashboard() {
 
       const { data: realOrders } = await supabase
         .from("smoking_orders")
-        .select("items, delivery_status, client_phone, client_name")
+        .select("items, delivery_status, client_phone, client_name, created_at")
         .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
         .neq("delivery_status", "CANCELADO");
+
+      if (realOrders) {
+        setRawOrdersList(realOrders);
+      }
 
       let realSalesList: any[] = [];
       if (realOrders && realOrders.length > 0) {
@@ -1221,14 +1228,43 @@ export function SupplyChainDashboard() {
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-white/10">
         <div className="px-4 md:px-6 lg:px-8 py-3.5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                <PackageSearch className="size-5 text-emerald-400" />
-                Central de Gestão de Estoque
-              </h2>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Controle unificado de produtos, estoque e reposição
-              </p>
+            <div className="flex items-center gap-4 flex-wrap">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                  <PackageSearch className="size-5 text-emerald-400" />
+                  Central de Gestão de Estoque
+                </h2>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Controle unificado de produtos, estoque e reposição
+                </p>
+              </div>
+
+              {/* Seletor de Visão Principal: Visão Geral Estoque x Produtos Parados */}
+              <div className="flex items-center bg-black/60 border border-white/15 rounded-xl p-1 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveMainView("ESTOQUE")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    activeMainView === "ESTOQUE"
+                      ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20"
+                      : "text-muted-foreground hover:text-white"
+                  }`}
+                >
+                  Visão Geral Estoque
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveMainView("PARADOS")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeMainView === "PARADOS"
+                      ? "bg-amber-500 text-black shadow-md shadow-amber-500/20"
+                      : "text-muted-foreground hover:text-white"
+                  }`}
+                >
+                  <Flame className="size-3.5" />
+                  <span>Produtos Parados</span>
+                </button>
+              </div>
             </div>
 
             {/* Botões Superiores com Hierarquia Clara */}
@@ -1273,6 +1309,15 @@ export function SupplyChainDashboard() {
       {/* ━━━ CONTEÚDO PRINCIPAL ━━━━━━━━━━━━━ */}
       <div className="px-4 md:px-6 lg:px-8 py-5 space-y-5">
 
+        {activeMainView === "PARADOS" ? (
+          <StagnantStockSection
+            products={products}
+            orders={rawOrdersList}
+            companyId={company?.id}
+            onStockUpdated={fetchData}
+          />
+        ) : (
+          <>
         {/* ── KPIs GRUPO PRINCIPAL (4 CARDS MINIMALISTAS) ─────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* 1. Produtos (Neutro) */}
@@ -3001,8 +3046,9 @@ export function SupplyChainDashboard() {
                 )}
               </button>
             </div>
-          </div>
         </div>
+      )}
+      </>
       )}
 
       {/* ━━━ MODAL DE REGISTRO DE VENDA MANUAL ━━━━━━━━━━━━━━━━ */}
