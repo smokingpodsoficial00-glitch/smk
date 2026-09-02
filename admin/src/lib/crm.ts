@@ -108,61 +108,57 @@ export async function updateClientCrmProfile(
 export async function fetchLiveClients(companyId?: string): Promise<RealClient[]> {
   if (!companyId) return [];
   try {
-    // 1. Buscar Pedidos
-    const { data: rawOrders, error: ordersErr } = await supabase
-      .from('smoking_orders')
-      .select('*')
-      .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
-      .eq('company_id', companyId)
-      .order('created_at', { ascending: false });
+    // Executa as 3 consultas ao Supabase em paralelo para carregamento ultrarrápido do CRM
+    const [ordersRes, clientsRes, productsRes] = await Promise.all([
+      supabase
+        .from('smoking_orders')
+        .select('*')
+        .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('smoking_clients')
+        .select('*'),
+      supabase
+        .from('smoking_products')
+        .select('id, name, flavor, brand, puffs')
+    ]);
+
+    const rawOrders = ordersRes.data;
+    if (ordersRes.error) {
+      console.error("Erro ao buscar smoking_orders:", ordersRes.error);
+    }
 
     const orders = (rawOrders || []).filter(
-      o => o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' && (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_'))
+      (o: any) => o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' && (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_'))
     );
 
-    if (ordersErr) {
-      console.error("Erro ao buscar smoking_orders:", ordersErr);
-    }
 
-    // 2. Buscar Cadastro Mestre de Clientes
-    let clientsMap = new Map<string, any>();
-    try {
-      const { data: clientsData } = await supabase
-        .from('smoking_clients')
-        .select('*');
-
-      if (clientsData && Array.isArray(clientsData)) {
-        for (const c of clientsData) {
-          if (c && c.phone) {
-            const clean = String(c.phone).replace(/\D/g, '');
-            if (clean) clientsMap.set(clean, c);
-          }
+    // 2. Montar Cadastro Mestre de Clientes
+    const clientsMap = new Map<string, any>();
+    const clientsData = clientsRes.data;
+    if (clientsData && Array.isArray(clientsData)) {
+      for (const c of clientsData) {
+        if (c && c.phone) {
+          const clean = String(c.phone).replace(/\D/g, '');
+          if (clean) clientsMap.set(clean, c);
         }
       }
-    } catch (e) {
-      console.warn("Aviso ao consultar smoking_clients:", e);
     }
 
-    // 3. Buscar Cadastro Mestre de Produtos (Estoque) para pegar Puffs exatos
-    let productsMap = new Map<string, any>();
-    try {
-      const { data: productsData } = await supabase
-        .from('smoking_products')
-        .select('id, name, flavor, brand, puffs');
-
-      if (productsData && Array.isArray(productsData)) {
-        for (const p of productsData) {
-          if (p.id) productsMap.set(String(p.id), p);
-          // Opcional: tentar cruzar por nome + sabor se n tiver ID no pedido
-          if (p.name && p.flavor) {
-             const key = `${String(p.name).toLowerCase()}_${String(p.flavor).toLowerCase()}`;
-             productsMap.set(key, p);
-          }
+    // 3. Montar Cadastro Mestre de Produtos (Estoque) para pegar Puffs exatos
+    const productsMap = new Map<string, any>();
+    const productsData = productsRes.data;
+    if (productsData && Array.isArray(productsData)) {
+      for (const p of productsData) {
+        if (p.id) productsMap.set(String(p.id), p);
+        if (p.name && p.flavor) {
+          const key = `${String(p.name).toLowerCase()}_${String(p.flavor).toLowerCase()}`;
+          productsMap.set(key, p);
         }
       }
-    } catch (e) {
-      console.warn("Aviso ao consultar smoking_products:", e);
     }
+
 
     // Agrupar pedidos por cliente (chave: número WhatsApp limpo)
     const clientGroups = new Map<string, any[]>();

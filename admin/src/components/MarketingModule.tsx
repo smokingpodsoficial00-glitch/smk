@@ -103,7 +103,7 @@ const OFFICIAL_TEMPLATES = [
 const LOCAL_STORAGE_LISTS = 'smoking_broadcast_lists_v1';
 const LOCAL_STORAGE_CAMPAIGNS = 'smoking_marketing_campaigns_v1';
 
-export function MarketingModule() {
+export default function MarketingModule() {
   const { company } = useAuth();
   
   // Abas do Módulo: 'hub' | 'campaigns' | 'broadcast_lists' | 'groups'

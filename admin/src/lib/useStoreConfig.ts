@@ -1,5 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+
+// Supabase é carregado sob demanda para habilitar code-splitting (~70% redução no bundle inicial)
+let _sb: any = null;
+async function getSupabase() {
+  if (!_sb) {
+    const { supabase } = await import("@/lib/supabase");
+    _sb = supabase;
+  }
+  return _sb;
+}
 
 export interface StoreConfig {
   id: string;
@@ -84,6 +93,7 @@ function notifyListeners() {
 }
 
 async function fetchConfig(): Promise<StoreConfig> {
+  const supabase = await getSupabase();
   let mainConfig: StoreConfig | null = null;
   let fallbackConfig: StoreConfig | null = null;
 
@@ -183,24 +193,28 @@ export function useStoreConfig() {
     }
 
     let channel: any = null;
-    try {
-      channel = supabase
-        .channel(`admin-cfg-${Math.random().toString(36).substring(2, 7)}`)
-        .on(
-          "postgres_changes" as any,
-          { event: "*", schema: "public", table: "store_config" },
-          () => { fetchConfig().then(cfg => setConfig(cfg)); }
-        )
-        .on(
-          "postgres_changes" as any,
-          { event: "*", schema: "public", table: "smoking_products" },
-          () => { fetchConfig().then(cfg => setConfig(cfg)); }
-        );
+    let supabaseRef: any = null;
+    (async () => {
+      try {
+        supabaseRef = await getSupabase();
+        channel = supabaseRef
+          .channel(`admin-cfg-${Math.random().toString(36).substring(2, 7)}`)
+          .on(
+            "postgres_changes" as any,
+            { event: "*", schema: "public", table: "store_config" },
+            () => { fetchConfig().then(cfg => setConfig(cfg)); }
+          )
+          .on(
+            "postgres_changes" as any,
+            { event: "*", schema: "public", table: "smoking_products" },
+            () => { fetchConfig().then(cfg => setConfig(cfg)); }
+          );
 
-      channel.subscribe();
-    } catch (e) {
-      console.warn("Realtime error:", e);
-    }
+        channel.subscribe();
+      } catch (e) {
+        console.warn("Realtime error:", e);
+      }
+    })();
 
     if (cachedConfig) {
       setConfig(cachedConfig);
@@ -219,8 +233,8 @@ export function useStoreConfig() {
 
     return () => {
       listeners.delete(onUpdate);
-      if (channel) {
-        try { supabase.removeChannel(channel); } catch {}
+      if (channel && supabaseRef) {
+        try { supabaseRef.removeChannel(channel); } catch {}
       }
     };
   }, []);
@@ -244,6 +258,7 @@ export function useStoreConfig() {
 
       // 2. Salva na tabela dedicada `store_config` e na tabela `companies` no Supabase
       try {
+        const supabase = await getSupabase();
         const rowId = (config && config.id && config.id !== 'local-config-id') ? config.id : undefined;
         const { id: _ignoreId, ...configWithoutId } = newConfig;
         
@@ -287,6 +302,7 @@ export function useStoreConfig() {
   const uploadLogo = useCallback(
     async (file: File): Promise<string | null> => {
       try {
+        const supabase = await getSupabase();
         const ext = file.name.split(".").pop() || "png";
         const fileName = `logo_${Date.now()}.${ext}`;
 

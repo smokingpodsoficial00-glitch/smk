@@ -8,7 +8,7 @@ import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
-export function SettingsPage() {
+export default function SettingsPage() {
   const { config, loading, saving, saveStatus, updateConfig, uploadLogo } = useStoreConfig();
   const { company, refreshCompany } = useAuth() as any || {};
 

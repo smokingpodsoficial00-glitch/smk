@@ -23,7 +23,7 @@ const MEDAL_STYLES = [
   { emoji: "🥉", barFrom: "from-orange-500", barTo: "to-orange-300", text: "text-orange-300" },
 ];
 
-export function SupplyChainDashboard() {
+export default function SupplyChainDashboard() {
   const { company } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [topSelling, setTopSelling] = useState<any[]>([]);

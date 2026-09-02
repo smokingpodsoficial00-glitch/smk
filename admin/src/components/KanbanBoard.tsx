@@ -43,7 +43,7 @@ const saveCompletedIds = (ids: string[]) => {
   } catch {}
 };
 
-export function KanbanBoard() {
+export default function KanbanBoard() {
   const { company } = useAuth();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,10 +115,11 @@ export function KanbanBoard() {
   useEffect(() => {
     fetchOrders();
 
-    // Polling de 3 em 3 segundos para manter sincronizado entre usuários
+    // Sincronização em segundo plano suave a cada 20 segundos (Realtime já atualiza na hora sem sobrecarga)
     const intervalId = setInterval(() => {
       fetchOrders();
-    }, 3000);
+    }, 20000);
+
 
     // Inscrição Realtime no canal do Supabase
     const subscription = supabase

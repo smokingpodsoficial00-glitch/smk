@@ -1,17 +1,29 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import {
   LayoutDashboard, PackageSearch, Users, Settings, CircleDollarSign,
-  MoreHorizontal, Store, ChevronRight, PanelLeftOpen, Bot, Megaphone, Scale
+  MoreHorizontal, Store, ChevronRight, PanelLeftOpen, Bot, Megaphone, Scale, Loader2
 } from "lucide-react";
-import { KanbanBoard } from "@/components/KanbanBoard";
-import { FinanceDashboard } from "@/components/FinanceDashboard";
-import { SupplyChainDashboard } from "@/components/SupplyChainDashboard";
-import { CRMDashboard } from "@/components/CRMDashboard";
-import { SettingsPage } from "@/components/SettingsPage";
-import { ChatbotPage } from "@/components/ChatbotPage";
-import { MarketingModule } from "@/components/MarketingModule";
-import { PartnersDashboard } from "@/components/PartnersDashboard";
 import { useStoreConfig } from "@/lib/useStoreConfig";
+
+// Lazy loading sob demanda de cada dashboard para acelerar o carregamento inicial
+const KanbanBoard = lazy(() => import("@/components/KanbanBoard"));
+const FinanceDashboard = lazy(() => import("@/components/FinanceDashboard"));
+const SupplyChainDashboard = lazy(() => import("@/components/SupplyChainDashboard"));
+const CRMDashboard = lazy(() => import("@/components/CRMDashboard"));
+const SettingsPage = lazy(() => import("@/components/SettingsPage"));
+const ChatbotPage = lazy(() => import("@/components/ChatbotPage"));
+const MarketingModule = lazy(() => import("@/components/MarketingModule"));
+const PartnersDashboard = lazy(() => import("@/components/PartnersDashboard"));
+
+function TabLoadingFallback() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center h-full bg-[#050505] text-white/60 gap-3">
+      <Loader2 className="size-8 text-emerald-400 animate-spin" />
+      <span className="text-xs font-semibold tracking-wide text-white/40 uppercase">Carregando módulo...</span>
+    </div>
+  );
+}
+
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("pedidos");
@@ -269,15 +281,18 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        {activeTab === 'pedidos' && <KanbanBoard />}
-        {activeTab === 'financeiro' && <FinanceDashboard />}
-        {activeTab === 'estoque' && <SupplyChainDashboard />}
-        {activeTab === 'clientes' && <CRMDashboard />}
-        {activeTab === 'chatbot' && <ChatbotPage />}
-        {activeTab === 'marketing' && <MarketingModule />}
-        {activeTab === 'socios' && <PartnersDashboard />}
-        {activeTab === 'configuracoes' && <SettingsPage />}
+        <Suspense fallback={<TabLoadingFallback />}>
+          {activeTab === 'pedidos' && <KanbanBoard />}
+          {activeTab === 'financeiro' && <FinanceDashboard />}
+          {activeTab === 'estoque' && <SupplyChainDashboard />}
+          {activeTab === 'clientes' && <CRMDashboard />}
+          {activeTab === 'chatbot' && <ChatbotPage />}
+          {activeTab === 'marketing' && <MarketingModule />}
+          {activeTab === 'socios' && <PartnersDashboard />}
+          {activeTab === 'configuracoes' && <SettingsPage />}
+        </Suspense>
       </main>
+
     </div>
   );
 }

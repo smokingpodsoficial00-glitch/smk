@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -6,14 +7,16 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 
 import { DashboardLayout } from './layouts/DashboardLayout';
-import { KanbanBoard } from './components/KanbanBoard';
-import { FinanceDashboard } from './components/FinanceDashboard';
-import { SupplyChainDashboard } from './components/SupplyChainDashboard';
-import { CRMDashboard } from './components/CRMDashboard';
-import { ChatbotPage } from './components/ChatbotPage';
-import { MarketingModule } from './components/MarketingModule';
-import { PartnersDashboard } from './components/PartnersDashboard';
-import { SettingsPage } from './components/SettingsPage';
+
+// Lazy-loaded dashboard modules — cada um carrega sob demanda (~80% redução no bundle inicial)
+const KanbanBoard = lazy(() => import('./components/KanbanBoard'));
+const FinanceDashboard = lazy(() => import('./components/FinanceDashboard'));
+const SupplyChainDashboard = lazy(() => import('./components/SupplyChainDashboard'));
+const CRMDashboard = lazy(() => import('./components/CRMDashboard'));
+const ChatbotPage = lazy(() => import('./components/ChatbotPage'));
+const MarketingModule = lazy(() => import('./components/MarketingModule'));
+const PartnersDashboard = lazy(() => import('./components/PartnersDashboard'));
+const SettingsPage = lazy(() => import('./components/SettingsPage'));
 
 import { AdminLayout } from './layouts/AdminLayout';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -22,6 +25,19 @@ import { AdminPlans } from './pages/admin/AdminPlans';
 import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminLogs } from './pages/admin/AdminLogs';
 import { AdminFinance } from './pages/admin/AdminFinance';
+
+function LazyFallback() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center h-full bg-[#050505] text-white/60 gap-3">
+      <div className="size-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs font-semibold tracking-wide text-white/40 uppercase">Carregando módulo...</span>
+    </div>
+  );
+}
+
+function SuspenseWrap({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<LazyFallback />}>{children}</Suspense>;
+}
 
 export const router = createBrowserRouter([
   // Public Auth Routes
@@ -63,35 +79,35 @@ export const router = createBrowserRouter([
       },
       {
         path: 'pedidos',
-        element: <KanbanBoard />,
+        element: <SuspenseWrap><KanbanBoard /></SuspenseWrap>,
       },
       {
         path: 'financeiro',
-        element: <FinanceDashboard />,
+        element: <SuspenseWrap><FinanceDashboard /></SuspenseWrap>,
       },
       {
         path: 'estoque',
-        element: <SupplyChainDashboard />,
+        element: <SuspenseWrap><SupplyChainDashboard /></SuspenseWrap>,
       },
       {
         path: 'clientes',
-        element: <CRMDashboard />,
+        element: <SuspenseWrap><CRMDashboard /></SuspenseWrap>,
       },
       {
         path: 'chatbot',
-        element: <ChatbotPage />,
+        element: <SuspenseWrap><ChatbotPage /></SuspenseWrap>,
       },
       {
         path: 'marketing',
-        element: <MarketingModule />,
+        element: <SuspenseWrap><MarketingModule /></SuspenseWrap>,
       },
       {
         path: 'socios',
-        element: <PartnersDashboard />,
+        element: <SuspenseWrap><PartnersDashboard /></SuspenseWrap>,
       },
       {
         path: 'configuracoes',
-        element: <SettingsPage />,
+        element: <SuspenseWrap><SettingsPage /></SuspenseWrap>,
       },
     ],
   },

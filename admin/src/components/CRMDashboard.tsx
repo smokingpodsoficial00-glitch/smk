@@ -54,7 +54,7 @@ class CRMErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
   }
 }
 
-export function CRMDashboard() {
+export default function CRMDashboard() {
   const [activeSubTab, setActiveSubTab] = useState<'rfm' | 'replenishment' | 'followups' | 'sales_history'>('rfm');
   const [selectedClient, setSelectedClient] = useState<RealClient | null>(null);
 

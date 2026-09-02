@@ -86,7 +86,7 @@ const DEFAULT_MODEL_COSTS: Record<string, number> = {
   "elfbar__te30k": 65,
 };
 
-export function FinanceDashboard() {
+export default function FinanceDashboard() {
   const { company } = useAuth();
   const [loading, setLoading] = useState(true);
 
@@ -143,15 +143,24 @@ export function FinanceDashboard() {
     try {
       setLoading(true);
 
-      // 1. Carregar Mapa de Custos Persistidos
-      const persistedCosts = await fetchProductCostsMap(targetCompanyId).catch(() => ({}));
+      // Executa todas as consultas financeiras em paralelo para carregamento ultrarrápido
+      const [persistedCostsRes, ordersRes, productsRes] = await Promise.all([
+        fetchProductCostsMap(targetCompanyId).catch(() => ({})),
+        supabase
+          .from("smoking_orders")
+          .select("*")
+          .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
+          .neq("delivery_status", "CANCELADO"),
+        supabase
+          .from("smoking_products")
+          .select("*")
+          .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
+          .eq("is_active", true)
+      ]);
 
-      // 2. Carregar Pedidos Reais de Clientes
-      const { data: rawOrders } = await supabase
-        .from("smoking_orders")
-        .select("*")
-        .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
-        .neq("delivery_status", "CANCELADO");
+      const persistedCosts = persistedCostsRes || {};
+      const rawOrders = ordersRes.data;
+      const productsData = productsRes.data;
 
       const validOrders = (rawOrders || []).filter(
         (o) =>
@@ -160,12 +169,6 @@ export function FinanceDashboard() {
           (!o.client_name || !o.client_name.toLowerCase().includes("system config"))
       );
 
-      // 3. Carregar Produtos Ativos em Estoque
-      const { data: productsData } = await supabase
-        .from("smoking_products")
-        .select("*")
-        .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
-        .eq("is_active", true);
 
       let totalStockCostSum = 0;
       let totalStockRetailSum = 0;

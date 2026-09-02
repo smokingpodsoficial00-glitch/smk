@@ -25,7 +25,7 @@ import { NewTransactionModal } from './partners/NewTransactionModal';
 import { EditPartnerModal } from './partners/EditPartnerModal';
 import { DilutionSimulatorModal } from './partners/DilutionSimulatorModal';
 
-export function PartnersDashboard() {
+export default function PartnersDashboard() {
   const { company } = useAuth();
   const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
 

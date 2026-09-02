@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { Hero } from "@/components/Hero";
 import { ProductCard } from "@/components/ProductCard";
 import { CartBar } from "@/components/CartBar";
 import { CartSheet } from "@/components/CartSheet";
 import { FlavorSheet } from "@/components/FlavorSheet";
-import { HubPage } from "@/components/HubPage";
 import { CartProvider } from "@/lib/cart";
 import type { SortOption } from "@/components/SortDropdown";
 import { fetchProductsFromSupabase, type Product, type PodModel } from "@/lib/products";
 import { fetchCategories, fetchProductCategoryMappings, DEFAULT_CATEGORIES, type Category } from "@/lib/categories";
 import { supabase } from "@/lib/supabase";
 import { Loader2, Star } from "lucide-react";
+
+// Lazy loading sob demanda da página Hub
+const HubPage = lazy(() => import("@/components/HubPage").then(m => ({ default: m.HubPage })));
 
 function getInitialView(): "hub" | "menu" {
   if (typeof window === "undefined") return "menu";
@@ -62,11 +64,20 @@ function MainApp() {
   };
 
   if (view === "hub") {
-    return <HubPage onOpenMenu={() => navigateTo("menu")} />;
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen bg-[#070709] flex flex-col items-center justify-center text-white/50 gap-3">
+          <Loader2 className="size-8 text-emerald-400 animate-spin" />
+        </div>
+      }>
+        <HubPage onOpenMenu={() => navigateTo("menu")} />
+      </Suspense>
+    );
   }
 
   return <Menu onBackToHub={() => navigateTo("hub")} />;
 }
+
 
 function Menu({ onBackToHub }: { onBackToHub: () => void }) {
   const [productList, setProductList] = useState<Product[]>([]);

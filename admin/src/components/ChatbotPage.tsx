@@ -111,7 +111,7 @@ assim que mandar o print do comprovante já coloco seu pedido em separação!`;
 
 const DEFAULT_OPENAI_KEY = "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";
 
-export function ChatbotPage() {
+export default function ChatbotPage() {
   const { config } = useStoreConfig();
   const { company } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
