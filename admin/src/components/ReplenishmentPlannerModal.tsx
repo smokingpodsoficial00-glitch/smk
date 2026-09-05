@@ -31,7 +31,7 @@ import {
   PackageCheck
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { updateProductCost } from "../lib/productCosts";
+import { updateProductCost, fetchProductCostsMap } from "../lib/productCosts";
 
 export interface OrderItem {
   id: string;
@@ -42,6 +42,16 @@ export interface OrderItem {
   unitSell: number;
   flavors: string;
   badge?: string;
+}
+
+export interface StockModelSuggestion {
+  key: string;
+  brand: string;
+  model: string;
+  costPrice: number;
+  sellPrice: number;
+  flavors: string[];
+  totalStock: number;
 }
 
 export interface FinancialGoals {
@@ -191,6 +201,12 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
   const [newPodSell, setNewPodSell] = useState("89.90");
   const [newPodFlavors, setNewPodFlavors] = useState("Sabores Sortidos");
 
+  // Sugestões Inteligentes puxadas do Estoque em Tempo Real
+  const [stockSuggestions, setStockSuggestions] = useState<StockModelSuggestion[]>([]);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [showBrandDropdown, setShowBrandDropdown] = useState(false);
+  const [selectedStockModel, setSelectedStockModel] = useState<StockModelSuggestion | null>(null);
+
   // Estado de Faturamento / Caixa Real da Empresa em Tempo Real (Mesma fonte do Financeiro)
   const [liveAccumulatedRevenue, setLiveAccumulatedRevenue] = useState<number | null>(null);
 
@@ -199,6 +215,54 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
     if (!isOpen) return;
 
     const targetCompanyId = companyId || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+
+    // 1. Buscar produtos do estoque para auto-sugestão inteligente
+    const loadStockSuggestions = async () => {
+      try {
+        const { data: dbProducts } = await supabase
+          .from("smoking_products")
+          .select("id, name, brand, flavor, price, stock")
+          .or(`company_id.eq.${targetCompanyId},company_id.is.null`);
+
+        const costsMap = await fetchProductCostsMap(targetCompanyId);
+
+        const groupMap = new Map<string, StockModelSuggestion>();
+        (dbProducts || []).forEach((p: any) => {
+          const brand = (p.brand || "").trim();
+          const model = (p.name || "").trim();
+          if (!model) return;
+          const key = `${brand.toLowerCase()}-${model.toLowerCase()}`;
+          const modelKeyRaw = `${brand.toLowerCase()} ${model.toLowerCase()}`;
+          const cost = costsMap[p.id] || costsMap[key] || costsMap[modelKeyRaw] || 65;
+          const sell = parseFloat(p.price) || 89.90;
+          const stock = parseInt(p.stock) || 0;
+          const flavor = (p.flavor || "").trim();
+
+          if (!groupMap.has(key)) {
+            groupMap.set(key, {
+              key,
+              brand,
+              model,
+              costPrice: cost,
+              sellPrice: sell,
+              flavors: flavor && flavor.toLowerCase() !== "padrão" && flavor.toLowerCase() !== "padrao" ? [flavor] : [],
+              totalStock: stock
+            });
+          } else {
+            const existing = groupMap.get(key)!;
+            existing.totalStock += stock;
+            if (flavor && flavor.toLowerCase() !== "padrão" && flavor.toLowerCase() !== "padrao" && !existing.flavors.includes(flavor)) {
+              existing.flavors.push(flavor);
+            }
+          }
+        });
+        setStockSuggestions(Array.from(groupMap.values()));
+      } catch (err) {
+        console.error("Erro ao carregar sugestões do estoque:", err);
+      }
+    };
+
+    loadStockSuggestions();
 
     const fetchRealSalesRevenue = async () => {
       try {
@@ -242,6 +306,7 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
         { event: "*", schema: "public", table: "smoking_orders" },
         () => {
           fetchRealSalesRevenue();
+          loadStockSuggestions();
         }
       )
       .subscribe();
@@ -301,6 +366,70 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
     saveOrderItemsToStorage(updated);
   };
 
+  const handleSelectSuggestion = (sug: StockModelSuggestion) => {
+    setNewPodBrand(sug.brand);
+    setNewPodModel(sug.model);
+    setNewPodCost(sug.costPrice.toString());
+    setNewPodSell(sug.sellPrice.toString());
+    if (sug.flavors.length > 0) {
+      setNewPodFlavors(sug.flavors.slice(0, 3).join(", "));
+    }
+    setSelectedStockModel(sug);
+    setShowModelDropdown(false);
+    setShowBrandDropdown(false);
+  };
+
+  const handleModelChange = (val: string) => {
+    setNewPodModel(val);
+    setShowModelDropdown(true);
+
+    const norm = val.trim().toLowerCase();
+    const exact = stockSuggestions.find(s => {
+      const matchModel = s.model.toLowerCase() === norm;
+      const matchBrand = newPodBrand ? s.brand.toLowerCase() === newPodBrand.trim().toLowerCase() : true;
+      return matchModel && matchBrand;
+    });
+
+    if (exact) {
+      if (!newPodBrand) setNewPodBrand(exact.brand);
+      setNewPodCost(exact.costPrice.toString());
+      setNewPodSell(exact.sellPrice.toString());
+      setSelectedStockModel(exact);
+    }
+  };
+
+  const handleBrandChange = (val: string) => {
+    setNewPodBrand(val);
+    setShowBrandDropdown(true);
+
+    if (newPodModel) {
+      const normModel = newPodModel.trim().toLowerCase();
+      const normBrand = val.trim().toLowerCase();
+      const exact = stockSuggestions.find(s => s.model.toLowerCase() === normModel && s.brand.toLowerCase() === normBrand);
+      if (exact) {
+        setNewPodCost(exact.costPrice.toString());
+        setNewPodSell(exact.sellPrice.toString());
+        setSelectedStockModel(exact);
+      }
+    }
+  };
+
+  const filteredModelSuggestions = useMemo(() => {
+    const qModel = newPodModel.trim().toLowerCase();
+    const qBrand = newPodBrand.trim().toLowerCase();
+    return stockSuggestions.filter(s => {
+      const brandMatch = !qBrand || s.brand.toLowerCase().includes(qBrand);
+      const modelMatch = !qModel || s.model.toLowerCase().includes(qModel) || `${s.brand} ${s.model}`.toLowerCase().includes(qModel);
+      return brandMatch && modelMatch;
+    });
+  }, [stockSuggestions, newPodModel, newPodBrand]);
+
+  const uniqueStockBrands = useMemo(() => {
+    const set = new Set<string>();
+    stockSuggestions.forEach(s => set.add(s.brand));
+    return Array.from(set);
+  }, [stockSuggestions]);
+
   const handleAddPodToOrder = () => {
     if (!newPodModel.trim()) return;
 
@@ -325,7 +454,10 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
     setNewPodCost("65");
     setNewPodSell("89.90");
     setNewPodFlavors("Sabores Sortidos");
+    setSelectedStockModel(null);
     setShowAddPodForm(false);
+    setShowModelDropdown(false);
+    setShowBrandDropdown(false);
   };
 
   const handleResetOrderToDefault = () => {
@@ -722,44 +854,160 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
           {activeTab === "order" && (
             <div className="space-y-4">
 
-              {/* Formulário Retrátil para Adicionar Novo Pod ao Pedido */}
+              {/* Formulário Retrátil Inteligente para Adicionar Novo Pod ao Pedido */}
               {showAddPodForm && (
-                <div className="bg-[#141414] border border-emerald-500/30 rounded-xl p-4 space-y-3 animate-in slide-in-from-top-2">
+                <div className="bg-[#141414] border border-emerald-500/30 rounded-xl p-4 space-y-3.5 animate-in slide-in-from-top-2 shadow-2xl">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Plus className="size-4 text-emerald-400" />
-                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Adicionar Modelo / Pod ao Pedido</h4>
+                      <div className="size-6 rounded-lg bg-emerald-500/20 text-emerald-400 grid place-items-center">
+                        <Plus className="size-3.5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">Adicionar Modelo / Pod ao Pedido</h4>
+                        <p className="text-[10px] text-muted-foreground">Sugestão automática inteligente do estoque para preenchimento rápido</p>
+                      </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowAddPodForm(false)}
-                      className="size-5 rounded bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white grid place-items-center"
+                      className="size-6 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white grid place-items-center cursor-pointer transition-colors"
                     >
-                      <X className="size-3" />
+                      <X className="size-3.5" />
                     </button>
                   </div>
 
+                  {/* Pílulas de Sugestão Rápida do Estoque */}
+                  {stockSuggestions.length > 0 && (
+                    <div className="space-y-1.5 pb-2.5 border-b border-white/5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase text-emerald-400 flex items-center gap-1">
+                          <Zap className="size-3" /> Sugestões Rápidas do seu Estoque:
+                        </span>
+                        <span className="text-[9px] text-muted-foreground">Clique para preencher Custo e Venda automaticamente</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
+                        {stockSuggestions.slice(0, 10).map((sug) => {
+                          const isSelected =
+                            newPodModel.trim().toLowerCase() === sug.model.toLowerCase() &&
+                            (!newPodBrand || newPodBrand.trim().toLowerCase() === sug.brand.toLowerCase());
+                          return (
+                            <button
+                              key={sug.key}
+                              type="button"
+                              onClick={() => handleSelectSuggestion(sug)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer active:scale-95 ${
+                                isSelected
+                                  ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-sm shadow-emerald-500/30"
+                                  : "bg-white/5 border-white/10 text-zinc-300 hover:bg-white/10 hover:border-emerald-500/40 hover:text-white"
+                              }`}
+                            >
+                              <span className="text-[9px] font-bold text-muted-foreground uppercase">{sug.brand}</span>
+                              <span className="font-semibold">{sug.model}</span>
+                              <span className="text-[10px] text-emerald-400 font-bold ml-0.5">R$ {sug.sellPrice.toFixed(2)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-semibold uppercase text-muted-foreground">Marca</label>
+                    {/* Marca com Autocomplete */}
+                    <div className="space-y-1 relative">
+                      <label className="text-[10px] font-semibold uppercase text-muted-foreground flex items-center justify-between">
+                        <span>Marca</span>
+                        {selectedStockModel && (
+                          <span className="text-emerald-400 text-[9px] font-normal flex items-center gap-0.5">
+                            <Check className="size-2.5" /> Estoque
+                          </span>
+                        )}
+                      </label>
                       <input
                         type="text"
-                        placeholder="Ex: Elfbar, Ignite, Waka..."
+                        placeholder="Ex: Ignite, Elfbar, Lost Mary..."
                         value={newPodBrand}
-                        onChange={(e) => setNewPodBrand(e.target.value)}
-                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                        onChange={(e) => handleBrandChange(e.target.value)}
+                        onFocus={() => setShowBrandDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowBrandDropdown(false), 200)}
+                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400 transition-colors"
                       />
+                      {showBrandDropdown && uniqueStockBrands.length > 0 && (
+                        <div className="absolute left-0 right-0 top-full mt-1 bg-[#1a1a1a] border border-white/15 rounded-lg shadow-2xl z-50 max-h-36 overflow-y-auto divide-y divide-white/5">
+                          {uniqueStockBrands
+                            .filter(b => !newPodBrand || b.toLowerCase().includes(newPodBrand.toLowerCase()))
+                            .map(brand => (
+                              <div
+                                key={brand}
+                                onMouseDown={() => {
+                                  setNewPodBrand(brand);
+                                  setShowBrandDropdown(false);
+                                }}
+                                className="px-3 py-1.5 text-xs text-zinc-200 hover:bg-emerald-500/20 hover:text-emerald-300 cursor-pointer flex items-center justify-between"
+                              >
+                                <span className="font-medium">{brand}</span>
+                                <span className="text-[9px] text-muted-foreground">Marca cadastrada</span>
+                              </div>
+                            ))}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-semibold uppercase text-muted-foreground">Modelo do Pod *</label>
+                    {/* Modelo do Pod com Autocomplete Inteligente */}
+                    <div className="space-y-1 relative">
+                      <label className="text-[10px] font-semibold uppercase text-muted-foreground flex items-center justify-between">
+                        <span>Modelo do Pod *</span>
+                        {selectedStockModel && (
+                          <span className="text-emerald-400 text-[9px] font-normal">
+                            Preços sincronizados
+                          </span>
+                        )}
+                      </label>
                       <input
                         type="text"
-                        placeholder="Ex: BC15K, Pulse 15K..."
+                        placeholder="Ex: V250, BC15K, V80..."
                         value={newPodModel}
-                        onChange={(e) => setNewPodModel(e.target.value)}
-                        className="w-full bg-black/50 border border-emerald-500/40 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white focus:outline-none focus:border-emerald-400"
+                        onChange={(e) => handleModelChange(e.target.value)}
+                        onFocus={() => setShowModelDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowModelDropdown(false), 250)}
+                        className="w-full bg-black/50 border border-emerald-500/40 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white focus:outline-none focus:border-emerald-400 transition-colors"
                       />
+                      {showModelDropdown && filteredModelSuggestions.length > 0 && (
+                        <div className="absolute left-0 right-0 top-full mt-1 bg-[#181818] border border-emerald-500/50 rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-white/5 custom-scrollbar">
+                          <div className="px-3 py-1.5 bg-black/70 text-[9px] text-emerald-400 uppercase font-bold sticky top-0 flex items-center justify-between backdrop-blur-sm">
+                            <span>Produtos do Estoque</span>
+                            <span>Venda / Custo</span>
+                          </div>
+                          {filteredModelSuggestions.map((sug) => (
+                            <div
+                              key={sug.key}
+                              onMouseDown={() => handleSelectSuggestion(sug)}
+                              className="px-3 py-2 hover:bg-emerald-500/15 cursor-pointer transition-colors flex items-center justify-between group"
+                            >
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-bold text-white group-hover:text-emerald-300">
+                                    {sug.model}
+                                  </span>
+                                  <span className="text-[9px] uppercase px-1.5 py-0.5 bg-white/10 rounded text-zinc-300 font-semibold">
+                                    {sug.brand}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] mt-0.5">
+                                  {sug.totalStock > 0 ? (
+                                    <span className="text-emerald-400 font-medium">● {sug.totalStock} un em estoque</span>
+                                  ) : (
+                                    <span className="text-zinc-500">● Sem estoque atual</span>
+                                  )}
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xs font-bold text-emerald-400">R$ {sug.sellPrice.toFixed(2)}</div>
+                                <div className="text-[10px] text-zinc-400">Custo: R$ {sug.costPrice.toFixed(2)}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-1">
@@ -769,49 +1017,100 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                         min="1"
                         value={newPodQty}
                         onChange={(e) => setNewPodQty(e.target.value)}
-                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400 transition-colors"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-semibold uppercase text-muted-foreground">Custo Unitário (R$)</label>
+                      <label className="text-[10px] font-semibold uppercase text-muted-foreground flex items-center justify-between">
+                        <span>Custo Unitário (R$)</span>
+                        {selectedStockModel && (
+                          <span className="text-[9px] text-emerald-400 font-normal">Auto</span>
+                        )}
+                      </label>
                       <input
                         type="number"
+                        step="0.01"
                         value={newPodCost}
                         onChange={(e) => setNewPodCost(e.target.value)}
-                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-emerald-400 focus:outline-none focus:border-emerald-400"
+                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-emerald-400 focus:outline-none focus:border-emerald-400 transition-colors"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="space-y-1 sm:col-span-2">
-                      <label className="text-[10px] font-semibold uppercase text-muted-foreground">Sabores Escolhidos</label>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-[10px] font-semibold uppercase text-muted-foreground flex items-center justify-between">
+                        <span>Sabores Escolhidos</span>
+                        <span className="text-[9px] text-muted-foreground">Ex: Menthol (2x), Grape Ice (1x)</span>
+                      </label>
                       <input
                         type="text"
                         placeholder="Ex: Watermelon Ice, Blue Razz..."
                         value={newPodFlavors}
                         onChange={(e) => setNewPodFlavors(e.target.value)}
-                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400 transition-colors"
                       />
+                      {/* Chips de Sabores Registrados no Estoque para esse modelo */}
+                      {selectedStockModel && selectedStockModel.flavors.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                          <span className="text-[9px] text-muted-foreground mr-1">Sabores no cadastro:</span>
+                          {selectedStockModel.flavors.map((flv) => (
+                            <button
+                              key={flv}
+                              type="button"
+                              onClick={() => {
+                                if (!newPodFlavors || newPodFlavors === "Sabores Sortidos") {
+                                  setNewPodFlavors(flv);
+                                } else if (!newPodFlavors.includes(flv)) {
+                                  setNewPodFlavors(`${newPodFlavors}, ${flv}`);
+                                }
+                              }}
+                              className="px-2 py-0.5 rounded text-[10px] bg-white/5 hover:bg-emerald-500/20 text-zinc-300 hover:text-emerald-300 border border-white/10 hover:border-emerald-500/40 transition-colors cursor-pointer"
+                            >
+                              + {flv}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-semibold uppercase text-muted-foreground">Preço Venda Pretendido (R$)</label>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold uppercase text-muted-foreground flex items-center justify-between">
+                        <span>Preço Venda Pretendido (R$)</span>
+                        {selectedStockModel && (
+                          <span className="text-[9px] text-emerald-400 font-normal">Auto</span>
+                        )}
+                      </label>
                       <input
                         type="number"
+                        step="0.01"
                         value={newPodSell}
                         onChange={(e) => setNewPodSell(e.target.value)}
-                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400 transition-colors"
                       />
+                      {/* Margem estimada calculada em tempo real */}
+                      {parseFloat(newPodSell) > 0 && parseFloat(newPodCost) > 0 && (
+                        <div className="text-[10px] text-muted-foreground flex items-center justify-between pt-0.5">
+                          <span>Margem Estimada:</span>
+                          <span className="font-bold text-emerald-400">
+                            R$ {(parseFloat(newPodSell) - parseFloat(newPodCost)).toFixed(2)} (
+                            {(
+                              ((parseFloat(newPodSell) - parseFloat(newPodCost)) / parseFloat(newPodSell)) *
+                              100
+                            ).toFixed(0)}
+                            %)
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-1">
+                  <div className="flex justify-end gap-2 pt-1 border-t border-white/5">
                     <button
                       type="button"
                       onClick={() => setShowAddPodForm(false)}
-                      className="px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-xs transition-colors cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-xs transition-colors cursor-pointer"
                     >
                       Cancelar
                     </button>
@@ -819,7 +1118,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                       type="button"
                       onClick={handleAddPodToOrder}
                       disabled={!newPodModel.trim()}
-                      className="px-3.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                      className="px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-lg shadow-emerald-500/20 active:scale-95"
                     >
                       Inserir no Pedido
                     </button>
