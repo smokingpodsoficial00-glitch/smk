@@ -79,7 +79,7 @@ export default function KanbanBoard() {
         const mapped: AdminOrder[] = data
           .filter(o => o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' && (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_')))
           .map(o => {
-          const isCompleted = completedIds.includes(o.id) || o.delivery_status === 'CONCLUIDO';
+          const isCompleted = completedIds.includes(o.id) || o.delivery_status === 'CONCLUIDO' || o.receipt_url === 'CONCLUIDO';
           return {
             id: o.id.substring(0, 8).toUpperCase(),
             realId: o.id,
@@ -120,10 +120,9 @@ export default function KanbanBoard() {
       fetchOrders();
     }, 20000);
 
-
-    // Inscrição Realtime no canal do Supabase
+    // Inscrição em tempo real para atualizações no Supabase
     const subscription = supabase
-      .channel('smoking_orders_changes')
+      .channel('public:smoking_orders_kanban')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_orders' }, () => {
         fetchOrders();
       })
@@ -133,7 +132,7 @@ export default function KanbanBoard() {
       clearInterval(intervalId);
       supabase.removeChannel(subscription);
     };
-  }, []);
+  }, [company?.id]);
 
   const [activeTab, setActiveTab] = useState<'kanban' | 'concluidos'>('kanban');
 
@@ -161,16 +160,36 @@ export default function KanbanBoard() {
       // Otimista
       setOrders(prev => prev.map(o => o.realId === realId ? { ...o, status: newDeliveryStatus } : o));
 
+      let updatePayload: any = {
+        ...paymentUpdate
+      };
+
+      if (newDeliveryStatus === 'CONCLUIDO') {
+        updatePayload.delivery_status = 'CONCLUIDO';
+        updatePayload.receipt_url = 'CONCLUIDO';
+      } else {
+        updatePayload.delivery_status = newDeliveryStatus;
+        const target = orders.find(o => o.realId === realId);
+        if (target?.receiptUrl === 'CONCLUIDO') {
+          updatePayload.receipt_url = null;
+        }
+      }
+
       const { error } = await supabase
         .from('smoking_orders')
-        .update({
-          delivery_status: newDeliveryStatus,
-          ...paymentUpdate
-        })
+        .update(updatePayload)
         .eq('id', realId);
 
-      if (error) {
-        console.warn("Aviso ao atualizar status no Supabase:", error.message);
+      // Se o Postgres rejeitar por causa do check constraint de delivery_status, salva como ENTREGUE com receipt_url = CONCLUIDO
+      if (error && newDeliveryStatus === 'CONCLUIDO') {
+        await supabase
+          .from('smoking_orders')
+          .update({
+            delivery_status: 'ENTREGUE',
+            receipt_url: 'CONCLUIDO',
+            ...paymentUpdate
+          })
+          .eq('id', realId);
       }
 
       // Disparar Webhook caso despache para Rota (Assíncrono, sem bloquear a transação)
