@@ -58,6 +58,10 @@ export default function KanbanBoard() {
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
 
   const fetchOrders = async () => {
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 4000);
+
     try {
       let query = supabase
         .from('smoking_orders')
@@ -69,9 +73,15 @@ export default function KanbanBoard() {
         query = query.or(`company_id.eq.${company.id},company_id.is.null`);
       }
 
-      const { data, error } = await query;
-      if (error) {
-        console.error("Erro na busca do Kanban:", error);
+      let { data, error } = await query;
+      if (error && company?.id) {
+        console.warn("Erro na busca com company_id, buscando todos os pedidos:", error);
+        const fallbackRes = await supabase
+          .from('smoking_orders')
+          .select('*')
+          .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
+          .order('created_at', { ascending: false });
+        data = fallbackRes.data;
       }
 
       if (data) {
@@ -108,6 +118,7 @@ export default function KanbanBoard() {
     } catch (err) {
       console.error("Erro ao buscar pedidos no Supabase:", err);
     } finally {
+      clearTimeout(safetyTimer);
       setLoading(false);
     }
   };

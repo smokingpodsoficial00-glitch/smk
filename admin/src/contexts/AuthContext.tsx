@@ -122,19 +122,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: 'admin',
         };
 
-        // Garante vínculo no banco de dados
-        await supabase.from('company_users').upsert({
-          company_id: mainComp.id,
-          auth_user_id: authUser.id,
-          name: activeCompUser.name,
-          email: activeCompUser.email,
-          role: 'admin',
-          is_active: true
-        }, { onConflict: 'auth_user_id' });
-
         setCompany(mainComp as Company);
         setCompanyUser(activeCompUser);
         saveLocalSession(authUser, mainComp as Company, activeCompUser);
+
+        try {
+          await supabase.from('company_users').upsert({
+            company_id: mainComp.id,
+            auth_user_id: authUser.id,
+            name: activeCompUser.name,
+            email: activeCompUser.email,
+            role: 'admin',
+            is_active: true
+          }, { onConflict: 'auth_user_id' });
+        } catch (e) {
+          console.warn('company_users opcional:', e);
+        }
+
         setLoading(false);
         return;
       }
