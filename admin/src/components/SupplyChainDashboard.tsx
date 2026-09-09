@@ -2059,11 +2059,22 @@ export default function SupplyChainDashboard() {
                   }
 
                   return (
-                    <div key={f.id} className="p-4 rounded-2xl border border-white/10 bg-black/30 flex items-center justify-between gap-4 hover:border-white/20 transition-all">
+                    <div key={f.id} className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 ${
+                      f.is_active === false 
+                        ? "border-red-500/20 bg-red-950/10 opacity-75" 
+                        : "border-white/10 bg-black/30 hover:border-white/20"
+                    }`}>
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="size-2.5 rounded-full bg-emerald-400 shrink-0" />
+                        <div className={`size-2.5 rounded-full shrink-0 ${f.is_active === false ? "bg-red-400" : "bg-emerald-400"}`} />
                         <div>
-                          <div className="text-sm font-bold text-white truncate">{f.flavor || 'Padrão'}</div>
+                          <div className="text-sm font-bold text-white truncate flex items-center gap-2">
+                            {f.flavor || 'Padrão'}
+                            {f.is_active === false && (
+                              <span className="text-[10px] px-2 py-0.2 rounded-md bg-red-500/20 text-red-400 font-normal">
+                                Oculto do cardápio
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2 mt-1">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${stockBadgeClass}`}>
                               {stockLabel}
@@ -2072,8 +2083,35 @@ export default function SupplyChainDashboard() {
                         </div>
                       </div>
 
-                      {/* Controles de Estoque Estáveis */}
-                      <div className="flex items-center gap-2.5 shrink-0">
+                      {/* Ações e Controles de Estoque */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Botão Ocultar/Exibir Sabor no Cardápio */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleActive(f.id, f.is_active ?? true)}
+                          className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                            f.is_active !== false 
+                              ? "bg-white/5 hover:bg-white/10 text-emerald-400 border-emerald-500/20" 
+                              : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/20"
+                          }`}
+                          title={f.is_active !== false ? "Visível no Cardápio (Clique para Ocultar)" : "Oculto do Cardápio (Clique para Exibir)"}
+                        >
+                          {f.is_active !== false ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                        </button>
+
+                        {/* Botão Excluir Sabor Permanentemente */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteProduct(f.id, f.flavor || 'Padrão')}
+                          className="p-2 rounded-xl border border-white/5 bg-white/5 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 hover:border-red-500/20 transition-all cursor-pointer"
+                          title="Excluir sabor do sistema"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+
+                        <div className="w-[1px] h-6 bg-white/10 mx-1" />
+
+                        {/* Controles de Estoque Estáveis */}
                         <button
                           onClick={() => handleUpdateStock(f.id, Math.max(0, (f.stock || 0) - 1))}
                           className="size-9 rounded-xl bg-elevated border border-white/10 flex items-center justify-center text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer"
@@ -2104,12 +2142,21 @@ export default function SupplyChainDashboard() {
               </div>
 
               {/* Modal Footer */}
-              <div className="p-4 border-t border-border bg-black/40 flex justify-end">
+              <div className="p-4 border-t border-border bg-black/40 flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  {hasModalPendingChanges ? "Alterações de estoque pendentes serão salvas automaticamente" : ""}
+                </span>
                 <button
-                  onClick={() => setViewingFlavorsGroup(null)}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer"
+                  onClick={async () => {
+                    if (hasModalPendingChanges) {
+                      await handleSaveAllStockChanges();
+                    }
+                    setViewingFlavorsGroup(null);
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
                 >
-                  Concluir
+                  <Check className="size-4" />
+                  Salvar e Concluir
                 </button>
               </div>
 
