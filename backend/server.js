@@ -11,7 +11,51 @@ const { supabase } = require('./supabase');
 const { transcribeAudio } = require('./audioService');
 const QRCodeImage = require('qrcode');
 const app = express();
-app.use(cors());
+
+// Configuração segura e restrita de CORS para produção e desenvolvimento
+const rawCorsOrigins = process.env.CORS_ORIGINS || '';
+const configuredOrigins = rawCorsOrigins
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+const defaultDevOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Permite requisições sem header Origin (ex: chamadas diretas servidor-a-servidor, curl, webhooks)
+    if (!origin) return callback(null, true);
+
+    if (configuredOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Suporte a wildcard em subdomínios (ex: https://*-smoking-pods.vercel.app)
+    const matchesPattern = configuredOrigins.some(pattern => {
+      if (!pattern.includes('*')) return false;
+      const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
+      return regex.test(origin);
+    });
+    if (matchesPattern) return callback(null, true);
+
+    // Em ambiente de desenvolvimento local, permite as portas locais do Vite
+    if (process.env.NODE_ENV !== 'production' && defaultDevOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS bloqueado: Origem '${origin}' não autorizada pelo servidor.`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const port = process.env.PORT || 3006;
@@ -598,12 +642,7 @@ async function handleReceiptReceived(senderNumber, contactName, messageText, has
 
         console.log(`🧾 [Comprovante] Recebido de ${senderNumber} (${contactName}). Atualizando/Gravando pedido para o Kanban...`);
 
-        // 1. Salva/Atualiza Cliente
-        await supabase
-            .from('smoking_clients')
-            .upsert({ phone: senderNumber, name: contactName }, { onConflict: 'phone' });
-
-        // 2. Buscar último pedido do cliente que ainda não foi concluído
+        // 1. Buscar último pedido do cliente que ainda não foi concluído
         const { data: existingOrders } = await supabase
             .from('smoking_orders')
             .select('*')
@@ -751,18 +790,21 @@ async function syncWhatsAppOrderToKanbanAndDeductStock(senderNumber, contactName
         const itemsTotal = orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
         // 4. Grava/Atualiza Cliente em smoking_clients
+        const companyId = await getPrimaryCompanyId();
+        const clientPayload = {
+            phone: displayPhone,
+            name: clientName,
+            address: shippingAddress,
+            created_at: new Date().toISOString()
+        };
+        if (companyId) clientPayload.company_id = companyId;
+
         await supabase
             .from('smoking_clients')
-            .upsert({
-                phone: displayPhone,
-                name: clientName,
-                address: shippingAddress,
-                created_at: new Date().toISOString()
-            }, { onConflict: 'phone' });
+            .upsert(clientPayload, { onConflict: 'phone' });
 
         // 5. Se houver um pedido na aba "AGUARDANDO_PAGAMENTO", atualiza os dados dele.
         // Caso o pedido anterior já esteja em "PREPARANDO", "EM_ROTA" ou "ENTREGUE", cria um NOVO pedido separado!
-        const companyId = await getPrimaryCompanyId();
 
         const { data: existingOrders } = await supabase
             .from('smoking_orders')
@@ -821,7 +863,9 @@ async function syncWhatsAppOrderToKanbanAndDeductStock(senderNumber, contactName
 
         console.log(`🛒 [Kanban WhatsApp] Pedido #${orderId} registrado na aba "AGUARDANDO_PAGAMENTO"! Cliente: ${clientName} | Frete: R$ ${shippingFee.toFixed(2)} | Endereço: ${shippingAddress}`);
 
-        // 6. Deduz Estoque (Reposicao) dos produtos vendidos
+        // 6. A baixa de estoque é realizada 100% via Trigger SQL (trg_stock_on_order_insert) no Supabase ao inserir em smoking_orders.
+        // O loop manual em JS foi desativado para evitar baixa dupla (conflito histórico corrigido).
+        /*
         for (const item of orderItems) {
             if (item.product_id) {
                 const { data: p } = await supabase
@@ -841,6 +885,7 @@ async function syncWhatsAppOrderToKanbanAndDeductStock(senderNumber, contactName
                 }
             }
         }
+        */
 
         return orderId;
     } catch (err) {
@@ -1886,7 +1931,8 @@ app.post('/api/crm/update-client', async (req, res) => {
         if (inVipGroup !== undefined) payload.in_vip_group = inVipGroup;
         if (prospectingStatus !== undefined) payload.prospecting_status = prospectingStatus;
         if (customNotes !== undefined) payload.custom_notes = customNotes;
-        if (companyId) payload.company_id = companyId;
+        const targetCompanyId = companyId || await getPrimaryCompanyId();
+        if (targetCompanyId) payload.company_id = targetCompanyId;
 
         const { data, error } = await supabase
             .from('smoking_clients')

@@ -19,6 +19,7 @@ import {
   type PartnerTransaction,
   type CompanyFinancialOverview
 } from '@/lib/partners';
+import { runPartnersValidationSuite, type PartnersTestSuiteReport } from '@/lib/partnersTester';
 
 import { NewPartnerModal } from './partners/NewPartnerModal';
 import { NewTransactionModal } from './partners/NewTransactionModal';
@@ -32,6 +33,8 @@ export default function PartnersDashboard() {
   // Data states
   const [partners, setPartners] = useState<Partner[]>([]);
   const [transactions, setTransactions] = useState<PartnerTransaction[]>([]);
+  const [isValidating, setIsValidating] = useState(false);
+  const [testReport, setTestReport] = useState<PartnersTestSuiteReport | null>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [persistedCosts, setPersistedCosts] = useState<Record<string, number>>({});
@@ -200,6 +203,26 @@ export default function PartnersDashboard() {
 
         {/* Ações Rápidas */}
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              setIsValidating(true);
+              try {
+                const rep = await runPartnersValidationSuite();
+                setTestReport(rep);
+              } finally {
+                setIsValidating(false);
+                loadAllData();
+              }
+            }}
+            disabled={isValidating}
+            className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+            title="Executar bateria controlada de 18 testes do Bloco 8"
+          >
+            <ShieldCheck className="size-3.5 text-emerald-400" />
+            <span>{isValidating ? 'Validando 18 testes...' : 'Validar Sociedade (Bloco 8)'}</span>
+          </button>
+
           <button
             onClick={() => setShowDilutionModal(true)}
             className="px-3 py-2 rounded-xl text-xs font-bold bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
@@ -730,6 +753,91 @@ export default function PartnersDashboard() {
           currentOverview={financials}
           existingPartners={partners}
         />
+      )}
+
+      {/* Modal de Relatório de Validação do Bloco 8 */}
+      {testReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-[#0e0e10] border border-white/10 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-2 rounded-xl ${testReport.allPassed ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                  <ShieldCheck className="size-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white">Relatório de Validação — Bloco 8</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {testReport.passedTests} de {testReport.totalTests} testes aprovados ({testReport.allPassed ? '100% Sucesso' : 'Com ressalvas'})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setTestReport(null)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-white hover:bg-white/5 transition-all"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto custom-scrollbar flex-1 text-xs">
+              {/* Cap Table Summary */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold">Capital Total</span>
+                  <p className="text-sm font-bold text-white mt-1">R$ {testReport.capTable.totalCapital.toFixed(2)}</p>
+                </div>
+                <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold">Eduardo</span>
+                  <p className="text-sm font-bold text-emerald-400 mt-1">R$ {testReport.capTable.eduardoCapital.toFixed(2)} ({testReport.capTable.eduardoEquityPct})</p>
+                </div>
+                <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold">Gabriel</span>
+                  <p className="text-sm font-bold text-blue-400 mt-1">R$ {testReport.capTable.gabrielCapital.toFixed(2)} ({testReport.capTable.gabrielEquityPct})</p>
+                </div>
+                <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold">Cap Table</span>
+                  <p className="text-sm font-bold text-emerald-400 mt-1">{testReport.capTable.isBalanced ? '100% Equilibrado' : 'Desbalanceado'}</p>
+                </div>
+              </div>
+
+              {/* Lista dos 18 Testes */}
+              <div className="space-y-2">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">Itens da Bateria Controlada</h3>
+                <div className="space-y-1.5">
+                  {testReport.results.map(r => (
+                    <div
+                      key={r.id}
+                      className={`p-2.5 rounded-xl border flex items-start gap-2.5 ${
+                        r.passed ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-300' : 'bg-red-500/5 border-red-500/20 text-red-300'
+                      }`}
+                    >
+                      <span className="font-bold text-[11px] min-w-[20px]">{r.id}.</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-[11px] flex items-center justify-between">
+                          <span>{r.description}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.passed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                            {r.passed ? 'APROVADO' : 'FALHA'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{r.details}</p>
+                        {r.error && <p className="text-[10px] text-red-400 mt-0.5">Erro: {r.error}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-white/10 flex justify-end">
+              <button
+                onClick={() => setTestReport(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition-all"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

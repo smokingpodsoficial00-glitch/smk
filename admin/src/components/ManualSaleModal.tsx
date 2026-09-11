@@ -86,35 +86,50 @@ export function ManualSaleModal({
           setProductsList(prods);
         }
 
-        // 2. Buscar Clientes Reais (Filtrando qualquer configuracao de sistema)
-        const { data: orders } = await supabase
-          .from("smoking_orders")
-          .select("client_name, client_phone, shipping_address")
-          .order("created_at", { ascending: false })
-          .limit(100);
+        // 2. Buscar Clientes Oficiais de smoking_clients (com fallback para smoking_orders)
+        const { data: dbClients } = await supabase
+          .from("smoking_clients")
+          .select("name, phone, address")
+          .or(`company_id.eq.${companyId},company_id.is.null`)
+          .order("name", { ascending: true });
 
-        if (orders) {
-          const uniqueClients = new Map<string, any>();
-          orders.forEach((o) => {
-            const phone = (o.client_phone || "").trim();
-            const name = (o.client_name || "").trim();
+        if (dbClients && dbClients.length > 0) {
+          const uniqueClients = dbClients.map((c) => ({
+            client_name: c.name || "",
+            client_phone: c.phone || "",
+            shipping_address: c.address || "",
+          }));
+          setClientsList(uniqueClients);
+        } else {
+          const { data: orders } = await supabase
+            .from("smoking_orders")
+            .select("client_name, client_phone, shipping_address")
+            .order("created_at", { ascending: false })
+            .limit(100);
 
-            if (
-              phone &&
-              !phone.startsWith("__SYSTEM_") &&
-              !name.toLowerCase().includes("system") &&
-              !name.toLowerCase().includes("config")
-            ) {
-              if (!uniqueClients.has(phone)) {
-                uniqueClients.set(phone, {
-                  client_name: name,
-                  client_phone: phone,
-                  shipping_address: o.shipping_address || "",
-                });
+          if (orders) {
+            const uniqueClients = new Map<string, any>();
+            orders.forEach((o) => {
+              const phone = (o.client_phone || "").trim();
+              const name = (o.client_name || "").trim();
+
+              if (
+                phone &&
+                !phone.startsWith("__SYSTEM_") &&
+                !name.toLowerCase().includes("system") &&
+                !name.toLowerCase().includes("config")
+              ) {
+                if (!uniqueClients.has(phone)) {
+                  uniqueClients.set(phone, {
+                    client_name: name,
+                    client_phone: phone,
+                    shipping_address: o.shipping_address || "",
+                  });
+                }
               }
-            }
-          });
-          setClientsList(Array.from(uniqueClients.values()));
+            });
+            setClientsList(Array.from(uniqueClients.values()));
+          }
         }
       } catch (err) {
         console.error("Erro ao carregar catálogo para venda manual:", err);
@@ -272,13 +287,13 @@ export function ManualSaleModal({
     setSubmitting(true);
 
     try {
-      // 1. Inserir/Atualizar Cliente no CRM (smoking_customers)
+      // 1. Inserir/Atualizar Cliente no CRM (smoking_clients)
       const rawPhone = clientPhone.trim();
       const cleanPhone = rawPhone.replace(/\D/g, "");
       const formattedPhone = cleanPhone ? (cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`) : "5511999999999";
 
       try {
-        await supabase.from("smoking_customers").upsert(
+        await supabase.from("smoking_clients").upsert(
           {
             phone: formattedPhone,
             name: clientName.trim(),
@@ -289,7 +304,7 @@ export function ManualSaleModal({
           { onConflict: "phone" }
         );
       } catch (custErr) {
-        // Ignora caso tabela nao tenha constraint de conflito
+        console.warn("Aviso ao salvar cliente em smoking_clients:", custErr);
       }
 
       // 2. Formatar Itens do Pedido no padrão smoking_orders

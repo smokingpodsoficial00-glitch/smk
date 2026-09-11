@@ -4,6 +4,10 @@ import { RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { router } from './router';
 import './index.css';
+import './lib/storageTester';
+import './lib/partnersTester';
+import './lib/followUpsTester';
+import './lib/stockEntryTester';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

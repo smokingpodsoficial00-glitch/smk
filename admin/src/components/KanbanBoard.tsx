@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+import { getBackendUrl } from "@/lib/backend";
 import { ManualSaleModal } from "./ManualSaleModal";
 // stockSync: trigger SQL trg_stock_on_order_delete cuida da devolução automática
 
@@ -207,7 +208,7 @@ export default function KanbanBoard() {
       if (newDeliveryStatus === 'EM_ROTA') {
         const order = orders.find(o => o.realId === realId);
         if (order) {
-          fetch('http://localhost:3006/api/webhook/dispatch', {
+          fetch(`${getBackendUrl()}/api/webhook/dispatch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

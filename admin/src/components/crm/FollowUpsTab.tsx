@@ -2,16 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { 
   Calendar, Clock, CheckCircle2, AlertTriangle, MessageSquare, 
   Plus, Search, Filter, Trash2, Edit3, ArrowRight, Phone,
-  Sparkles, Check, DollarSign, Package, RefreshCw, Layers
+  Sparkles, Check, DollarSign, Package, RefreshCw, Layers, XCircle,
+  ShieldCheck, X
 } from 'lucide-react';
 import { 
   fetchFollowUps, 
   completeFollowUp, 
+  cancelFollowUp,
   deleteFollowUp, 
   FOLLOWUP_CATEGORIES, 
   type FollowUpItem, 
   type FollowUpReasonCategory 
 } from '@/lib/followUps';
+import { runFollowUpsValidationSuite, type FollowUpsTestSuiteReport } from '@/lib/followUpsTester';
 import { useAuth } from '@/contexts/AuthContext';
 import { NewFollowUpModal } from './NewFollowUpModal';
 import { supabase } from '@/lib/supabase';
@@ -22,6 +25,8 @@ export function FollowUpsTab() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClientForModal, setSelectedClientForModal] = useState<any | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+  const [testReport, setTestReport] = useState<FollowUpsTestSuiteReport | null>(null);
 
   // Filtros
   const [tabFilter, setTabFilter] = useState<'today' | 'overdue' | 'upcoming' | 'all' | 'completed'>('today');
@@ -43,8 +48,18 @@ export function FollowUpsTab() {
     loadData();
 
     const channel = supabase
-      .channel('follow_ups_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_follow_ups' }, loadData)
+      .channel('crm_follow_ups_changes')
+      .on(
+        'postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'smoking_crm_follow_ups' 
+        }, 
+        () => {
+          loadData();
+        }
+      )
       .subscribe();
 
     return () => {
@@ -54,13 +69,20 @@ export function FollowUpsTab() {
 
   // Ações
   const handleComplete = async (id: string) => {
-    await completeFollowUp(id);
+    await completeFollowUp(id, company?.id);
     await loadData();
+  };
+
+  const handleCancel = async (id: string) => {
+    if (confirm('Deseja realmente cancelar este agendamento de follow-up?')) {
+      await cancelFollowUp(id, company?.id);
+      await loadData();
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('Deseja realmente excluir este agendamento de follow-up?')) {
-      await deleteFollowUp(id);
+      await deleteFollowUp(id, company?.id);
       await loadData();
     }
   };
@@ -219,6 +241,25 @@ export function FollowUpsTab() {
           </select>
 
           <button
+            onClick={async () => {
+              setIsValidating(true);
+              try {
+                const rep = await runFollowUpsValidationSuite();
+                setTestReport(rep);
+                await loadData();
+              } finally {
+                setIsValidating(false);
+              }
+            }}
+            disabled={isValidating}
+            className="px-3.5 py-2 bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            title="Executar Bateria de Testes Controlados do Bloco 9"
+          >
+            <ShieldCheck className="size-4 text-purple-400" />
+            <span>{isValidating ? 'Validando...' : 'Validar Bloco 9'}</span>
+          </button>
+
+          <button
             onClick={() => {
               setSelectedClientForModal(null);
               setIsModalOpen(true);
@@ -256,12 +297,15 @@ export function FollowUpsTab() {
             const isOverdue = (item.daysDiff || 0) < 0 && item.status === 'pendente';
             const isToday = (item.daysDiff || 0) === 0 && item.status === 'pendente';
             const isCompleted = item.status === 'concluido';
+            const isCancelled = item.status === 'cancelado';
 
             return (
               <div 
                 key={item.id}
                 className={`bg-[#0c0c0c] border rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all shadow-md ${
-                  isOverdue 
+                  isCancelled
+                    ? 'border-white/5 opacity-50 bg-[#080808]'
+                    : isOverdue 
                     ? 'border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.08)]' 
                     : isToday 
                     ? 'border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.08)]'
@@ -292,6 +336,10 @@ export function FollowUpsTab() {
                       {isCompleted ? (
                         <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1">
                           <CheckCircle2 className="size-3" /> Venda Fechada
+                        </span>
+                      ) : isCancelled ? (
+                        <span className="bg-white/10 text-white/50 border border-white/10 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1">
+                          <XCircle className="size-3" /> Cancelado
                         </span>
                       ) : isOverdue ? (
                         <span className="bg-red-500/15 text-red-400 border border-red-500/30 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase animate-pulse flex items-center gap-1">
@@ -335,16 +383,27 @@ export function FollowUpsTab() {
 
                 {/* Ações do Card */}
                 <div className="flex items-center justify-between pt-2 border-t border-white/5 gap-2">
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    className="p-2 rounded-xl text-white/40 hover:text-red-400 hover:bg-white/5 transition-colors cursor-pointer"
-                    title="Excluir Follow-up"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="p-2 rounded-xl text-white/40 hover:text-red-400 hover:bg-white/5 transition-colors cursor-pointer"
+                      title="Excluir Follow-up"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                    {!isCompleted && !isCancelled && (
+                      <button
+                        onClick={() => handleCancel(item.id)}
+                        className="p-2 rounded-xl text-white/40 hover:text-amber-400 hover:bg-white/5 transition-colors cursor-pointer"
+                        title="Cancelar Follow-up"
+                      >
+                        <XCircle className="size-4" />
+                      </button>
+                    )}
+                  </div>
 
                   <div className="flex items-center gap-2">
-                    {!isCompleted && (
+                    {!isCompleted && !isCancelled && (
                       <button
                         onClick={() => handleComplete(item.id)}
                         className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
@@ -380,6 +439,61 @@ export function FollowUpsTab() {
         onFollowUpCreated={loadData}
         initialClient={selectedClientForModal}
       />
+
+      {/* Modal de Relatório de Validação do Bloco 9 */}
+      {testReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-[#0e0e10] border border-white/10 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-2 rounded-xl ${testReport.allPassed ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                  <ShieldCheck className="size-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white">Relatório de Validação — Bloco 9 (Follow-ups)</h2>
+                  <p className="text-xs text-white/50">
+                    {testReport.passedTests} de {testReport.totalTests} testes aprovados ({testReport.allPassed ? '100% Sucesso' : 'Com ressalvas'})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setTestReport(null)}
+                className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto custom-scrollbar flex-1 text-xs">
+              <div className="space-y-2">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">Itens da Bateria Controlada</h3>
+                <div className="space-y-1.5">
+                  {testReport.results.map(r => (
+                    <div
+                      key={r.id}
+                      className={`p-2.5 rounded-xl border flex items-start gap-2.5 ${
+                        r.passed ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-300' : 'bg-red-500/5 border-red-500/20 text-red-300'
+                      }`}
+                    >
+                      <span className="font-bold text-[11px] min-w-[20px]">{r.id}.</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-[11px] flex items-center justify-between">
+                          <span>{r.description}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.passed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                            {r.passed ? 'APROVADO' : 'FALHA'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-white/60 mt-0.5">{r.details}</p>
+                        {r.error && <p className="text-[10px] text-red-400 mt-0.5">Erro: {r.error}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

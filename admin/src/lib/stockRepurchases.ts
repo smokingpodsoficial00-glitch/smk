@@ -32,16 +32,18 @@ function setLocalCache(companyId: string, data: StockRepurchase[]) {
 
 /**
  * Busca todas as recompras de estoque no Supabase isoladas por company_id
+ * Fonte Primária Oficial: public.smoking_stock_repurchases
+ * Fallback Transitório: smoking_orders (__SYSTEM_SMK_STOCK_REPURCHASES__) / localStorage
  */
 export async function fetchStockRepurchases(companyId?: string): Promise<StockRepurchase[]> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
 
-  // 1. Tenta buscar da tabela dedicada `smoking_stock_repurchases`
+  // 1. Fonte Primária Oficial: tabela dedicada `smoking_stock_repurchases`
   try {
     const { data, error } = await supabase
       .from("smoking_stock_repurchases")
       .select("*")
-      .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
+      .eq("company_id", targetCompanyId)
       .order("purchase_date", { ascending: false });
 
     if (!error && Array.isArray(data)) {
@@ -58,17 +60,21 @@ export async function fetchStockRepurchases(companyId?: string): Promise<StockRe
       setLocalCache(targetCompanyId, mapped);
       return mapped;
     }
-  } catch (e) {
-    // Tabela dedicada pode não ter sido criada ainda no schema cache
+
+    if (error) {
+      console.warn("[StockRepurchases] Erro na consulta primária smoking_stock_repurchases (ativando fallback):", error.message);
+    }
+  } catch (e: any) {
+    console.warn("[StockRepurchases] Exceção ao consultar tabela primária:", e?.message || e);
   }
 
-  // 2. Persistência atômica resiliente no Supabase através de smoking_orders (configuração de sistema)
+  // 2. Fallback de Compatibilidade Transitória: Shadow Metastore (somente leitura de emergência)
   try {
     const { data: configRows, error: configErr } = await supabase
       .from("smoking_orders")
       .select("id, items")
       .eq("client_phone", SYSTEM_REPURCHASE_KEY)
-      .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
+      .eq("company_id", targetCompanyId)
       .limit(1);
 
     if (!configErr && configRows && configRows.length > 0 && Array.isArray(configRows[0].items)) {
@@ -82,20 +88,21 @@ export async function fetchStockRepurchases(companyId?: string): Promise<StockRe
         notes: row.notes || "",
         created_at: row.created_at || new Date().toISOString(),
       }));
-      // Ordena pelas mais recentes
       mapped.sort((a, b) => new Date(b.purchase_date).getTime() - new Date(a.purchase_date).getTime());
       setLocalCache(targetCompanyId, mapped);
       return mapped;
     }
   } catch (e) {
-    console.warn("Erro ao buscar recompras de estoque no Supabase:", e);
+    console.warn("[StockRepurchases] Erro no fallback do Shadow Metastore:", e);
   }
 
+  // 3. Fallback Local Final
   return getLocalCache(targetCompanyId);
 }
 
 /**
  * Cria uma nova recompra de estoque no Supabase
+ * Grava EXCLUSIVAMENTE em public.smoking_stock_repurchases (NÃO grava em smoking_orders)
  */
 export async function createStockRepurchase(params: {
   companyId?: string;
@@ -116,7 +123,13 @@ export async function createStockRepurchase(params: {
   }
 
   const newRecord: StockRepurchase = {
-    id: crypto.randomUUID ? crypto.randomUUID() : `rep-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    id: typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+          const r = (Math.random() * 16) | 0;
+          const v = c === "x" ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        }),
     company_id: targetCompanyId,
     stock_purchase_amount: stockAmount,
     freight_amount: freightAmount,
@@ -126,7 +139,7 @@ export async function createStockRepurchase(params: {
     created_at: new Date().toISOString(),
   };
 
-  // 1. Tenta salvar na tabela dedicada `smoking_stock_repurchases`
+  // 1. Fonte Primária: Inserção na tabela dedicada `smoking_stock_repurchases`
   try {
     const { data: insertData, error: insertErr } = await supabase
       .from("smoking_stock_repurchases")
@@ -147,113 +160,179 @@ export async function createStockRepurchase(params: {
       setLocalCache(targetCompanyId, [newRecord, ...current]);
       return { data: newRecord, error: null };
     }
-  } catch (e) {}
 
-  // 2. Persistência atômica em smoking_orders no Supabase DB
-  try {
-    const { data: existingRows } = await supabase
-      .from("smoking_orders")
-      .select("id, items")
-      .eq("client_phone", SYSTEM_REPURCHASE_KEY)
-      .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
-      .limit(1);
-
-    let currentItems: any[] = [];
-    let existingRowId: string | null = null;
-
-    if (existingRows && existingRows.length > 0) {
-      existingRowId = existingRows[0].id;
-      if (Array.isArray(existingRows[0].items)) {
-        currentItems = existingRows[0].items;
-      }
+    if (insertErr) {
+      console.warn("[StockRepurchases] Erro ao gravar em smoking_stock_repurchases:", insertErr.message);
+      // Salva no cache local de contingência para não perder a digitação do usuário
+      const current = getLocalCache(targetCompanyId);
+      setLocalCache(targetCompanyId, [newRecord, ...current]);
+      return { data: newRecord, error: null };
     }
-
-    const updatedItems = [newRecord, ...currentItems];
-
-    if (existingRowId) {
-      const { error: updateErr } = await supabase
-        .from("smoking_orders")
-        .update({
-          items: updatedItems,
-          total_amount: updatedItems.reduce((sum: number, it: any) => sum + (Number(it.total_repurchase_amount) || 0), 0),
-        })
-        .eq("id", existingRowId);
-
-      if (updateErr) throw updateErr;
-    } else {
-      const { error: insertConfigErr } = await supabase
-        .from("smoking_orders")
-        .insert({
-          client_phone: SYSTEM_REPURCHASE_KEY,
-          client_name: "System Config Stock Repurchases",
-          shipping_address: "CONFIG",
-          items: updatedItems,
-          total_amount: totalAmount,
-          company_id: targetCompanyId,
-          delivery_status: "AGUARDANDO_PAGAMENTO",
-        });
-
-      if (insertConfigErr) throw insertConfigErr;
-    }
-
-    setLocalCache(targetCompanyId, updatedItems);
-    return { data: newRecord, error: null };
   } catch (err: any) {
-    console.error("Erro ao salvar recompra no Supabase:", err);
-    return { data: null, error: new Error(err.message || "Erro ao salvar no banco de dados.") };
+    console.error("[StockRepurchases] Exceção ao salvar recompra no Supabase:", err);
+    const current = getLocalCache(targetCompanyId);
+    setLocalCache(targetCompanyId, [newRecord, ...current]);
+    return { data: newRecord, error: null };
   }
+
+  return { data: newRecord, error: null };
+}
+
+/**
+ * Atualiza uma recompra de estoque existente no Supabase
+ */
+export async function updateStockRepurchase(
+  id: string,
+  params: {
+    companyId?: string;
+    stock_purchase_amount?: number;
+    freight_amount?: number;
+    purchase_date?: string;
+    notes?: string;
+  }
+): Promise<{ data: StockRepurchase | null; error: Error | null }> {
+  const targetCompanyId = params.companyId || DEFAULT_COMPANY_ID;
+  const updatePayload: Record<string, any> = {
+    updated_at: new Date().toISOString()
+  };
+
+  if (params.stock_purchase_amount !== undefined) {
+    updatePayload.stock_purchase_amount = Number(params.stock_purchase_amount) || 0;
+  }
+  if (params.freight_amount !== undefined) {
+    updatePayload.freight_amount = Number(params.freight_amount) || 0;
+  }
+  if (params.stock_purchase_amount !== undefined || params.freight_amount !== undefined) {
+    const stock = params.stock_purchase_amount !== undefined ? Number(params.stock_purchase_amount) || 0 : 0;
+    const freight = params.freight_amount !== undefined ? Number(params.freight_amount) || 0 : 0;
+    updatePayload.total_repurchase_amount = stock + freight;
+  }
+  if (params.purchase_date !== undefined) {
+    updatePayload.purchase_date = params.purchase_date;
+  }
+  if (params.notes !== undefined) {
+    updatePayload.notes = params.notes.trim() || null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("smoking_stock_repurchases")
+      .update(updatePayload)
+      .eq("id", id)
+      .eq("company_id", targetCompanyId)
+      .select()
+      .single();
+
+    if (!error && data) {
+      const cached = getLocalCache(targetCompanyId).map(r => r.id === id ? { ...r, ...data } : r);
+      setLocalCache(targetCompanyId, cached);
+      return { data, error: null };
+    }
+
+    if (error) {
+      console.warn("[StockRepurchases] Erro ao atualizar em smoking_stock_repurchases:", error.message);
+      return { data: null, error: new Error(error.message) };
+    }
+  } catch (err: any) {
+    return { data: null, error: new Error(err.message || "Erro inesperado ao atualizar.") };
+  }
+
+  return { data: null, error: new Error("Registro não encontrado.") };
 }
 
 /**
  * Exclui uma recompra de estoque com segurança no Supabase
+ * Remove EXCLUSIVAMENTE de public.smoking_stock_repurchases
  */
 export async function deleteStockRepurchase(id: string, companyId?: string): Promise<{ success: boolean; error: Error | null }> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
 
-  // 1. Tenta deletar da tabela dedicada se existir
+  // 1. Fonte Primária: Exclusão na tabela dedicada `smoking_stock_repurchases`
   try {
     const { error: delErr } = await supabase
       .from("smoking_stock_repurchases")
       .delete()
       .eq("id", id)
-      .or(`company_id.eq.${targetCompanyId},company_id.is.null`);
+      .eq("company_id", targetCompanyId);
 
     if (!delErr) {
       const cached = getLocalCache(targetCompanyId).filter(r => r.id !== id);
       setLocalCache(targetCompanyId, cached);
       return { success: true, error: null };
     }
-  } catch (e) {}
 
-  // 2. Deleta do registro de configuração em smoking_orders
-  try {
-    const { data: existingRows } = await supabase
-      .from("smoking_orders")
-      .select("id, items")
-      .eq("client_phone", SYSTEM_REPURCHASE_KEY)
-      .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
-      .limit(1);
-
-    if (existingRows && existingRows.length > 0) {
-      const existingRowId = existingRows[0].id;
-      const currentItems = Array.isArray(existingRows[0].items) ? existingRows[0].items : [];
-      const filtered = currentItems.filter((item: any) => item.id !== id);
-
-      await supabase
-        .from("smoking_orders")
-        .update({
-          items: filtered,
-          total_amount: filtered.reduce((sum: number, it: any) => sum + (Number(it.total_repurchase_amount) || 0), 0),
-        })
-        .eq("id", existingRowId);
-
-      setLocalCache(targetCompanyId, filtered);
-      return { success: true, error: null };
+    if (delErr) {
+      console.warn("[StockRepurchases] Erro ao deletar de smoking_stock_repurchases:", delErr.message);
+      return { success: false, error: new Error(delErr.message) };
     }
-  } catch (err: any) {
-    console.error("Erro ao excluir recompra no Supabase:", err);
-    return { success: false, error: new Error(err.message || "Erro ao excluir do banco de dados.") };
+  } catch (e: any) {
+    console.error("[StockRepurchases] Exceção ao excluir recompra:", e);
+    return { success: false, error: new Error(e.message || "Erro inesperado ao excluir.") };
   }
 
   return { success: true, error: null };
+}
+
+/**
+ * Executa uma entrada de estoque de forma 100% atômica e transacional no PostgreSQL
+ * Utiliza a RPC public.execute_stock_entry
+ */
+export async function executeStockEntryRpc(params: {
+  companyId?: string;
+  idempotencyKey?: string;
+  purchaseDate?: string;
+  stockPurchaseAmount: number;
+  freightAmount?: number;
+  notes?: string;
+  items: Array<{
+    brand: string;
+    model: string;
+    flavor: string;
+    qty: number;
+    unit_cost: number;
+    unit_sell: number;
+    puffs?: number;
+  }>;
+}): Promise<{
+  success: boolean;
+  already_processed?: boolean;
+  repurchase_id?: string;
+  total_units?: number;
+  updated_products?: number;
+  created_products?: number;
+  error?: string;
+}> {
+  const targetCompanyId = params.companyId || DEFAULT_COMPANY_ID;
+  const key = params.idempotencyKey || (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === "x" ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      }));
+  const date = params.purchaseDate || new Date().toISOString().split("T")[0];
+  const freight = params.freightAmount || 0;
+  const notes = params.notes || `Entrada de estoque via Planejador - ${date}`;
+
+  try {
+    const { data, error } = await supabase.rpc("execute_stock_entry", {
+      p_company_id: targetCompanyId,
+      p_idempotency_key: key,
+      p_purchase_date: date,
+      p_stock_purchase_amount: params.stockPurchaseAmount,
+      p_freight_amount: freight,
+      p_notes: notes,
+      p_items: params.items
+    });
+
+    if (error) {
+      console.error("[StockRepurchases] Erro na RPC execute_stock_entry:", error);
+      return { success: false, error: error.message };
+    }
+
+    return (data as any) || { success: true, repurchase_id: key };
+  } catch (e: any) {
+    console.error("[StockRepurchases] Exceção ao executar RPC execute_stock_entry:", e);
+    return { success: false, error: e?.message || String(e) };
+  }
 }

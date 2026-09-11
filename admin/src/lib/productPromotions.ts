@@ -28,11 +28,36 @@ export function saveLocalProductPromotions(promos: Record<string, PromoData>) {
   }
 }
 
+/**
+ * Busca promoções oficiais do banco Supabase.
+ * FONTE PRIMÁRIA: Tabela 'smoking_products' no Supabase.
+ */
 export async function fetchProductPromotionsMap(companyId?: string): Promise<Record<string, PromoData>> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
   const result: Record<string, PromoData> = {};
 
   try {
+    // 1. SUPABASE COMO FONTE PRIMÁRIA: busca direta da tabela smoking_products
+    const { data: products, error: prodErr } = await supabase
+      .from("smoking_products")
+      .select("id, promo_price, is_promotional, discount_pct")
+      .eq("company_id", targetCompanyId)
+      .eq("is_promotional", true);
+
+    if (!prodErr && products && products.length > 0) {
+      products.forEach((p: any) => {
+        result[p.id] = {
+          productId: p.id,
+          isPromotional: true,
+          promoPrice: parseFloat(p.promo_price) || 0,
+          discountPct: parseFloat(p.discount_pct) || 0,
+        };
+      });
+      saveLocalProductPromotions(result);
+      return result;
+    }
+
+    // 2. Transição/Contingência: lê de smoking_orders se ainda não migrado
     const { data: orderConfig, error: configErr } = await supabase
       .from("smoking_orders")
       .select("items")
@@ -56,12 +81,17 @@ export async function fetchProductPromotionsMap(companyId?: string): Promise<Rec
       return result;
     }
   } catch (e) {
-    console.warn("Erro ao buscar promoções no Supabase DB:", e);
+    console.warn("Aviso: Falha ao buscar promoções no Supabase DB. Usando cache secundário.", e);
   }
 
+  console.warn("Aviso: Operando com cache local de promoções.");
   return getLocalProductPromotions();
 }
 
+/**
+ * Atualiza ou remove uma promoção de produto.
+ * FONTE PRIMÁRIA: Atualiza a tabela 'smoking_products' no Supabase.
+ */
 export async function updateProductPromotion(params: {
   productId: string;
   isPromotional: boolean;
@@ -72,15 +102,40 @@ export async function updateProductPromotion(params: {
   const { productId, isPromotional, promoPrice, discountPct, companyId } = params;
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
 
+  // 1. Atualizar cache local
   const currentLocal = getLocalProductPromotions();
-  currentLocal[productId] = {
-    productId,
-    isPromotional,
-    promoPrice: promoPrice || 0,
-    discountPct: discountPct || 0,
-  };
+  if (isPromotional) {
+    currentLocal[productId] = {
+      productId,
+      isPromotional: true,
+      promoPrice: promoPrice || 0,
+      discountPct: discountPct || 0,
+    };
+  } else {
+    delete currentLocal[productId];
+  }
   saveLocalProductPromotions(currentLocal);
 
+  // 2. Persistir no Supabase na tabela oficial smoking_products (FONTE PRIMÁRIA)
+  try {
+    const { error: prodErr } = await supabase
+      .from("smoking_products")
+      .update({
+        is_promotional: isPromotional,
+        promo_price: isPromotional ? (promoPrice || null) : null,
+        discount_pct: isPromotional ? (discountPct || null) : null,
+      })
+      .eq("id", productId)
+      .eq("company_id", targetCompanyId);
+
+    if (prodErr) {
+      console.warn("Aviso ao atualizar promoção em smoking_products:", prodErr.message);
+    }
+  } catch (e) {
+    console.warn("Erro ao persistir promoção em smoking_products:", e);
+  }
+
+  // 3. Sincronizar também no Shadow Metastore (smoking_orders) para compatibilidade retroativa
   try {
     const { data: existingRows } = await supabase
       .from("smoking_orders")
@@ -101,33 +156,24 @@ export async function updateProductPromotion(params: {
 
     const preservedItems = currentItems.filter((item: any) => item.productId !== productId && item.id !== productId);
 
-    preservedItems.push({
-      id: productId,
-      productId: productId,
-      isPromotional,
-      promoPrice: promoPrice || 0,
-      discountPct: discountPct || 0,
-    });
+    if (isPromotional) {
+      preservedItems.push({
+        id: productId,
+        productId: productId,
+        isPromotional: true,
+        promoPrice: promoPrice || 0,
+        discountPct: discountPct || 0,
+      });
+    }
 
     if (existingRowId) {
       await supabase
         .from("smoking_orders")
         .update({ items: preservedItems })
         .eq("id", existingRowId);
-    } else {
-      await supabase
-        .from("smoking_orders")
-        .insert({
-          client_phone: SYSTEM_PROMO_KEY,
-          client_name: "System Config Product Promotions",
-          shipping_address: "CONFIG",
-          items: preservedItems,
-          total_amount: 0,
-          company_id: targetCompanyId,
-        });
     }
   } catch (e) {
-    console.warn("Erro ao salvar promoção no Supabase DB:", e);
+    console.warn("Erro ao sincronizar promoção no shadow metastore:", e);
   }
 
   return true;

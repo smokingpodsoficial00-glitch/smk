@@ -2,11 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import {
   Store, Upload, Palette, Phone, Key, MapPin, Globe,
   Save, CheckCircle2, AlertCircle, Loader2, ImagePlus,
-  Trash2, Eye, Type, X, Smartphone, CreditCard, Copy, ExternalLink, Check
+  Trash2, Eye, Type, X, Smartphone, CreditCard, Copy, ExternalLink, Check,
+  ShieldCheck
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { runStorageValidationSuite, type StorageTestReport } from "@/lib/storageTester";
 
 export default function SettingsPage() {
   const { config, loading, saving, saveStatus, updateConfig, uploadLogo } = useStoreConfig();
@@ -32,6 +34,10 @@ export default function SettingsPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Storage Testing (Bloco 7)
+  const [storageTesting, setStorageTesting] = useState(false);
+  const [storageTestReport, setStorageTestReport] = useState<StorageTestReport | null>(null);
 
   // Slugifier seguro com suporte a acentos e caracteres especiais em Português
   const generateSlug = (str: string) => {
@@ -219,41 +225,136 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <button
-            onClick={handleSave}
-            disabled={saving || uploadingLogo || !hasChanges()}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all duration-300 cursor-pointer ${
-              saveStatus === "success"
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={async () => {
+                setStorageTesting(true);
+                try {
+                  const rep = await runStorageValidationSuite();
+                  setStorageTestReport(rep);
+                } finally {
+                  setStorageTesting(false);
+                }
+              }}
+              disabled={storageTesting}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer shadow-sm hover:shadow-emerald-500/10"
+              title="Testa upload, leitura pública e remoção nos buckets products e store-assets"
+            >
+              {storageTesting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <ShieldCheck className="size-4 text-emerald-400" />
+              )}
+              <span>{storageTesting ? "Testando..." : "Validar Storage (Bloco 7)"}</span>
+            </button>
+
+            <button
+              onClick={handleSave}
+              disabled={saving || uploadingLogo || !hasChanges()}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all duration-300 cursor-pointer ${
+                saveStatus === "success"
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                  : saveStatus === "error"
+                  ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                  : hasChanges()
+                  ? "bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_20px_rgba(16,185,129,0.2)] active:scale-[0.97]"
+                  : "bg-white/5 text-white/30 cursor-not-allowed"
+              }`}
+            >
+              {saving || uploadingLogo ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : saveStatus === "success" ? (
+                <CheckCircle2 className="size-4" />
+              ) : saveStatus === "error" ? (
+                <AlertCircle className="size-4" />
+              ) : (
+                <Save className="size-4" />
+              )}
+              {saving || uploadingLogo
+                ? "Salvando..."
+                : saveStatus === "success"
+                ? "Salvo com sucesso!"
                 : saveStatus === "error"
-                ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                : hasChanges()
-                ? "bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_20px_rgba(16,185,129,0.2)] active:scale-[0.97]"
-                : "bg-white/5 text-white/30 cursor-not-allowed"
-            }`}
-          >
-            {saving || uploadingLogo ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : saveStatus === "success" ? (
-              <CheckCircle2 className="size-4" />
-            ) : saveStatus === "error" ? (
-              <AlertCircle className="size-4" />
-            ) : (
-              <Save className="size-4" />
-            )}
-            {saving || uploadingLogo
-              ? "Salvando..."
-              : saveStatus === "success"
-              ? "Salvo com sucesso!"
-              : saveStatus === "error"
-              ? "Erro ao salvar"
-              : "Salvar Alterações"}
-          </button>
+                ? "Erro ao salvar"
+                : "Salvar Alterações"}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Content */}
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+        {/* Painel de Resultados do Teste de Storage (Bloco 7) */}
+        {storageTestReport && (
+          <div className={`p-5 rounded-2xl border transition-all ${
+            storageTestReport.allPassed
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+              : "bg-red-500/10 border-red-500/30 text-red-400"
+          }`}>
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2 font-bold text-sm">
+                {storageTestReport.allPassed ? (
+                  <CheckCircle2 className="size-5 text-emerald-400" />
+                ) : (
+                  <AlertCircle className="size-5 text-red-400" />
+                )}
+                <span>
+                  {storageTestReport.allPassed
+                    ? "BLOCO 7 — SUPABASE STORAGE VALIDADO COM SUCESSO!"
+                    : "BLOCO 7 — FALHA NA VALIDAÇÃO DO STORAGE"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStorageTestReport(null)}
+                className="text-white/40 hover:text-white text-xs p-1"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 text-xs">
+              {/* Bucket products */}
+              <div className="bg-black/30 p-3.5 rounded-xl border border-white/5 space-y-2">
+                <div className="font-bold text-white flex items-center justify-between">
+                  <span>📦 Bucket: products</span>
+                  <span className={storageTestReport.productsTest.uploadAccepted ? "text-emerald-400" : "text-red-400"}>
+                    {storageTestReport.productsTest.uploadAccepted ? "OK" : "Erro"}
+                  </span>
+                </div>
+                <div className="space-y-1 text-white/70">
+                  <p>• Upload temporário: {storageTestReport.productsTest.uploadAccepted ? "✅ Aceito" : "❌ Falhou"}</p>
+                  <p>• Confirmação na listagem: {storageTestReport.productsTest.objectExists ? "✅ Presente" : "❌ Ausente"}</p>
+                  <p>• Leitura pública (HTTP {storageTestReport.productsTest.publicReadStatus}): {storageTestReport.productsTest.publicReadOk ? "✅ 200 OK" : "❌ Erro"}</p>
+                  <p>• Atualização (UPDATE): {storageTestReport.productsTest.updateAccepted ? "✅ Aceita" : "❌ Falhou"}</p>
+                  <p>• Remoção do teste: {storageTestReport.productsTest.removalConfirmed ? "✅ Removido" : "❌ Não removido"}</p>
+                </div>
+              </div>
+
+              {/* Bucket store-assets */}
+              <div className="bg-black/30 p-3.5 rounded-xl border border-white/5 space-y-2">
+                <div className="font-bold text-white flex items-center justify-between">
+                  <span>🖼️ Bucket: store-assets</span>
+                  <span className={storageTestReport.storeAssetsTest.uploadAccepted ? "text-emerald-400" : "text-red-400"}>
+                    {storageTestReport.storeAssetsTest.uploadAccepted ? "OK" : "Erro"}
+                  </span>
+                </div>
+                <div className="space-y-1 text-white/70">
+                  <p>• Upload temporário: {storageTestReport.storeAssetsTest.uploadAccepted ? "✅ Aceito" : "❌ Falhou"}</p>
+                  <p>• Confirmação na listagem: {storageTestReport.storeAssetsTest.objectExists ? "✅ Presente" : "❌ Ausente"}</p>
+                  <p>• Leitura pública (HTTP {storageTestReport.storeAssetsTest.publicReadStatus}): {storageTestReport.storeAssetsTest.publicReadOk ? "✅ 200 OK" : "❌ Erro"}</p>
+                  <p>• Atualização (UPDATE): {storageTestReport.storeAssetsTest.updateAccepted ? "✅ Aceita" : "❌ Falhou"}</p>
+                  <p>• Remoção do teste: {storageTestReport.storeAssetsTest.removalConfirmed ? "✅ Removido" : "❌ Não removido"}</p>
+                </div>
+              </div>
+            </div>
+
+            <p className="mt-3 text-[11px] text-white/50 text-right">
+              Sessão autenticada: {storageTestReport.authenticatedUser || "Anônimo"} • {new Date(storageTestReport.timestamp).toLocaleTimeString()}
+            </p>
+          </div>
+        )}
         {/* ─── Seção 1: Identidade da Loja (Nome e Logo) ─── */}
         <section className="bg-card border border-border rounded-2xl p-6 space-y-6">
           <div className="flex items-center gap-2.5 pb-3 border-b border-border">

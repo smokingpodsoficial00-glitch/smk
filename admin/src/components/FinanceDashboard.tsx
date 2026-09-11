@@ -87,8 +87,20 @@ const DEFAULT_MODEL_COSTS: Record<string, number> = {
 };
 
 export default function FinanceDashboard() {
-  const { company } = useAuth();
+  const { user, company, companyUser, loading: authLoading, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
+
+  // Estados de Controle de Erro e Ciclo de Vida da Consulta
+  const [financeError, setFinanceError] = useState<{
+    message: string;
+    code?: string;
+    isAuthError?: boolean;
+  } | null>(null);
+  const [repurchasesError, setRepurchasesError] = useState<{
+    message: string;
+    code?: string;
+  } | null>(null);
+  const [hasLoadedSuccessfully, setHasLoadedSuccessfully] = useState(false);
 
   // Financial Metrics State
   const [grossRevenue, setGrossRevenue] = useState(0);
@@ -138,10 +150,22 @@ export default function FinanceDashboard() {
     } catch (e) {}
   };
 
-  const fetchFinanceData = async () => {
-    const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+  const fetchFinanceData = async (isRetry = false) => {
+    if (authLoading) return;
+
+    if (!user || !company?.id || !companyUser) {
+      setFinanceError({
+        message: "Sessão não autenticada ou empresa não identificada. Por favor, realize o login novamente.",
+        isAuthError: true,
+      });
+      setLoading(false);
+      return;
+    }
+
+    const targetCompanyId = company.id;
     try {
       setLoading(true);
+      setFinanceError(null);
 
       // Executa todas as consultas financeiras em paralelo para carregamento ultrarrápido
       const [persistedCostsRes, ordersRes, productsRes] = await Promise.all([
@@ -149,26 +173,72 @@ export default function FinanceDashboard() {
         supabase
           .from("smoking_orders")
           .select("*")
-          .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
+          .eq("company_id", targetCompanyId)
           .neq("delivery_status", "CANCELADO"),
         supabase
           .from("smoking_products")
           .select("*")
-          .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
-          .eq("is_active", true)
+          .eq("company_id", targetCompanyId)
+          .eq("is_active", true),
       ]);
+
+      // Inspecionar explicitamente se smoking_orders retornou erro
+      if (ordersRes.error) {
+        console.error("[FinanceDashboard] Erro ao consultar smoking_orders:", ordersRes.error.message);
+        const isAuth = ordersRes.error.code === "42501" ||
+          ordersRes.error.message?.includes("permission denied") ||
+          ordersRes.error.message?.includes("JWT") ||
+          ordersRes.error.message?.includes("token");
+
+        // Tentativa de recuperação única se for erro de permissão/token
+        if (isAuth && !isRetry) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData?.session?.user) {
+            console.log("[FinanceDashboard] Sessão Supabase confirmada. Executando retry único...");
+            return fetchFinanceData(true);
+          }
+        }
+
+        setFinanceError({
+          message: isAuth
+            ? "Não foi possível carregar os dados financeiros. Sua sessão pode ter expirado ou houve um problema de permissão no acesso aos pedidos."
+            : `Erro ao carregar pedidos: ${ordersRes.error.message}`,
+          code: ordersRes.error.code,
+          isAuthError: isAuth,
+        });
+        setLoading(false);
+        return; // NUNCA transforma erro em array vazio nem calcula zero!
+      }
+
+      // Inspecionar explicitamente se smoking_products retornou erro
+      if (productsRes.error) {
+        console.error("[FinanceDashboard] Erro ao consultar smoking_products:", productsRes.error.message);
+        setFinanceError({
+          message: `Erro ao carregar catálogo de produtos: ${productsRes.error.message}`,
+          code: productsRes.error.code,
+        });
+        setLoading(false);
+        return;
+      }
 
       const persistedCosts = persistedCostsRes || {};
       const rawOrders = ordersRes.data;
       const productsData = productsRes.data;
 
-      const validOrders = (rawOrders || []).filter(
+      if (!rawOrders) {
+        setFinanceError({
+          message: "Resposta do banco de dados não retornou lista de pedidos válida.",
+        });
+        setLoading(false);
+        return;
+      }
+
+      const validOrders = rawOrders.filter(
         (o) =>
           o.client_phone !== "__SYSTEM_SMK_BEST_SELLERS__" &&
           (!o.client_phone || !o.client_phone.startsWith("__SYSTEM_")) &&
           (!o.client_name || !o.client_name.toLowerCase().includes("system config"))
       );
-
 
       let totalStockCostSum = 0;
       let totalStockRetailSum = 0;
@@ -311,8 +381,13 @@ export default function FinanceDashboard() {
 
       modelProfitList.sort((a, b) => b.profit - a.profit);
       setModelProfits(modelProfitList);
-    } catch (err) {
-      console.error("Erro ao calcular inteligência financeira:", err);
+      setHasLoadedSuccessfully(true);
+      setFinanceError(null);
+    } catch (err: any) {
+      console.error("[FinanceDashboard] Erro ao calcular inteligência financeira:", err);
+      setFinanceError({
+        message: err?.message || "Erro inesperado ao processar os indicadores financeiros.",
+      });
     } finally {
       setLoading(false);
     }
@@ -321,17 +396,56 @@ export default function FinanceDashboard() {
   const loadRepurchasesData = async (targetCompanyId: string) => {
     try {
       setLoadingRepurchases(true);
-      const data = await fetchStockRepurchases(targetCompanyId);
-      setRepurchases(data);
-    } catch (e) {
-      console.warn("Erro ao carregar dados de recompras:", e);
+      setRepurchasesError(null);
+      const { data, error } = await supabase
+        .from("smoking_stock_repurchases")
+        .select("*")
+        .eq("company_id", targetCompanyId)
+        .order("purchase_date", { ascending: false });
+
+      if (error) {
+        console.error("[FinanceDashboard] Erro na consulta de smoking_stock_repurchases:", error.message);
+        setRepurchasesError({
+          message: error.message,
+          code: error.code,
+        });
+        return;
+      }
+
+      if (Array.isArray(data)) {
+        const mapped: StockRepurchase[] = data.map((row: any) => ({
+          id: row.id,
+          company_id: row.company_id || targetCompanyId,
+          stock_purchase_amount: Number(row.stock_purchase_amount) || 0,
+          freight_amount: Number(row.freight_amount) || 0,
+          total_repurchase_amount: Number(row.total_repurchase_amount) || (Number(row.stock_purchase_amount) || 0) + (Number(row.freight_amount) || 0),
+          purchase_date: row.purchase_date || new Date().toISOString().split("T")[0],
+          notes: row.notes || "",
+          created_at: row.created_at || new Date().toISOString(),
+        }));
+        setRepurchases(mapped);
+      }
+    } catch (e: any) {
+      console.error("[FinanceDashboard] Exceção ao carregar recompras:", e?.message || e);
+      setRepurchasesError({ message: e?.message || "Erro inesperado ao carregar recompras" });
     } finally {
       setLoadingRepurchases(false);
     }
   };
 
   useEffect(() => {
-    const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+    if (authLoading) return;
+
+    if (!user || !company?.id || !companyUser) {
+      setFinanceError({
+        message: "Sessão não autenticada ou empresa não identificada. Faça login novamente.",
+        isAuthError: true,
+      });
+      setLoading(false);
+      return;
+    }
+
+    const targetCompanyId = company.id;
     fetchFinanceData();
     loadRepurchasesData(targetCompanyId);
 
@@ -345,7 +459,7 @@ export default function FinanceDashboard() {
 
     const subProducts = supabase
       .channel("finance_products_changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, fetchFinanceData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => fetchFinanceData())
       .subscribe();
 
     const subRepurchases = supabase
@@ -360,7 +474,7 @@ export default function FinanceDashboard() {
       supabase.removeChannel(subProducts);
       supabase.removeChannel(subRepurchases);
     };
-  }, [company?.id]);
+  }, [user, company?.id, companyUser, authLoading]);
 
   // ── Cálculos Recompra de Estoque & Caixa Real (Módulo Independente) ─────────────
   const totalStockPurchases = useMemo(() => {
@@ -414,7 +528,11 @@ export default function FinanceDashboard() {
 
     try {
       setIsSavingRepurchase(true);
-      const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+      if (!company?.id) {
+        setRepurchaseError("Empresa não identificada na sessão atual.");
+        return;
+      }
+      const targetCompanyId = company.id;
 
       const res = await createStockRepurchase({
         companyId: targetCompanyId,
@@ -443,9 +561,9 @@ export default function FinanceDashboard() {
   };
 
   const handleConfirmDeleteRepurchase = async () => {
-    if (!repurchaseToDelete) return;
+    if (!repurchaseToDelete || !company?.id) return;
     try {
-      const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+      const targetCompanyId = company.id;
       const res = await deleteStockRepurchase(repurchaseToDelete.id, targetCompanyId);
       if (res.error) {
         alert("Erro ao excluir: " + res.error.message);
@@ -473,7 +591,8 @@ export default function FinanceDashboard() {
   const averageNetMarginPercent = grossRevenue > 0 ? (realNetProfitPostMarketing / grossRevenue) * 100 : 0;
   const averagePricePerPod = totalPodsSold > 0 ? grossRevenue / totalPodsSold : 0;
 
-  if (loading) {
+  // Estado A: Carregando
+  if (loading || authLoading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-background min-h-screen">
         <Loader2 className="size-8 text-emerald-400 animate-spin mb-2" />
@@ -482,6 +601,64 @@ export default function FinanceDashboard() {
     );
   }
 
+  // Estado D: Erro de Consulta (NUNCA exibe cards com R$ 0,00 falsos)
+  if (financeError) {
+    return (
+      <div className="flex-1 flex flex-col h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+              <Sparkles className="size-6 text-emerald-400" />
+              <span>Inteligência Financeira & Estratégia de Vendas</span>
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Métricas de Vendas, Tesouraria, Campeões de Lucro por Pod e DRE Executivo.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/30 self-start sm:self-auto">
+            <AlertCircle className="size-3.5" />
+            <span>Falha de Comunicação</span>
+          </div>
+        </header>
+
+        <div className="bg-[#0e0e10] border border-red-500/30 rounded-3xl p-8 sm:p-12 text-center space-y-6 max-w-2xl mx-auto my-12 shadow-2xl">
+          <div className="size-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto text-red-400">
+            <AlertCircle className="size-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-xl font-bold text-white">Não foi possível carregar os dados financeiros</h3>
+            <p className="text-sm text-white/60 max-w-lg mx-auto leading-relaxed">
+              {financeError.message || "Sua sessão pode ter expirado ou houve um problema de conexão com o banco de dados."}
+            </p>
+            {financeError.code && (
+              <p className="text-[11px] font-mono text-white/40">Código do banco: {financeError.code}</p>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
+            {financeError.isAuthError && (
+              <button
+                onClick={() => signOut()}
+                className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-6 py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95 text-xs sm:text-sm cursor-pointer"
+              >
+                Fazer Login Novamente
+              </button>
+            )}
+
+            <button
+              onClick={() => fetchFinanceData(false)}
+              className="bg-white/10 hover:bg-white/20 text-white font-bold px-6 py-3 rounded-xl border border-white/15 transition-all active:scale-95 text-xs sm:text-sm cursor-pointer"
+            >
+              Tentar Novamente
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Estado B (com dados) e Estado C (dados legítimos vazios)
   return (
     <div className="flex-1 flex flex-col h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
       {/* Cabeçalho */}
@@ -500,6 +677,23 @@ export default function FinanceDashboard() {
           <span>Supabase Realtime Conectado</span>
         </div>
       </header>
+
+      {/* Aviso caso consulta de recompras tenha falhado */}
+      {repurchasesError && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-center gap-3">
+          <AlertCircle className="size-5 shrink-0 text-amber-400" />
+          <span>Aviso: Não foi possível sincronizar o histórico de recompras ({repurchasesError.message}).</span>
+        </div>
+      )}
+
+      {/* Estado C: Carregado com Sucesso, porém sem nenhum pedido registrado para a empresa */}
+      {hasLoadedSuccessfully && totalOrders === 0 && (
+        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-8 text-center space-y-2">
+          <ShoppingBag className="size-8 text-white/30 mx-auto" />
+          <h4 className="text-base font-bold text-white">Nenhum pedido registrado</h4>
+          <p className="text-xs text-white/50">Não há registros de vendas concluídas para esta empresa no banco de dados.</p>
+        </div>
+      )}
 
       {/* ━━━ BLOCO 1: KPIs PRINCIPAIS DE VENDAS REALIZADAS ━━━━━━━━━━━━━━ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

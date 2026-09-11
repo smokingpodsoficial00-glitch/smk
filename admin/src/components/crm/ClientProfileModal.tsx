@@ -375,6 +375,7 @@ export function ClientProfileModal({
           if (onClientUpdated) onClientUpdated();
         }}
         initialClient={{
+          id: client.id,
           name: client.name,
           phone: client.phone,
           product: client.lastProduct,

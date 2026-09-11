@@ -9,6 +9,7 @@ import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
 import { calculateShippingQuote } from "@/lib/shipping";
 import { useAuth } from "@/contexts/AuthContext";
+import { getBackendUrl } from "@/lib/backend";
 // stockSync: triggers SQL cuidam da dedução/devolução automaticamente
 
 const DEFINITIVE_SYSTEM_PROMPT = `SCRIPT DEFINITIVO — IA SMOKING PODS (Eloisa — Especialista em Vendas)
@@ -109,8 +110,6 @@ chave pix:
 
 assim que mandar o print do comprovante já coloco seu pedido em separação!`;
 
-const DEFAULT_OPENAI_KEY = "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";
-
 export default function ChatbotPage() {
   const { config } = useStoreConfig();
   const { company } = useAuth();
@@ -125,13 +124,13 @@ export default function ChatbotPage() {
   // Notification for Order Created
   const [newOrderCreatedToast, setNewOrderCreatedToast] = useState<{ id: string; clientName: string; total: number; productName: string } | null>(null);
 
-  // OpenAI Integration State (lê de forma segura sem expor na UI)
+  // OpenAI Integration State (lê de forma segura via variável de ambiente ou localStorage sem expor segredos privados)
   const [openAiKey, setOpenAiKey] = useState<string>(() => {
     const envKey = (import.meta as any).env?.VITE_OPENAI_API_KEY;
     const localKey = localStorage.getItem("openai_api_key_v1");
     if (localKey && localKey.startsWith("sk-")) return localKey;
     if (envKey && envKey.startsWith("sk-")) return envKey;
-    return "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";
+    return "";
   });
 
   // System Prompt
@@ -166,7 +165,7 @@ export default function ChatbotPage() {
   useEffect(() => {
     const checkQr = async () => {
       try {
-        const res = await fetch("http://localhost:3006/api/qr");
+        const res = await fetch(`${getBackendUrl()}/api/qr`);
         if (res.ok) {
           const data = await res.json();
           if (data.isReady) {
@@ -963,7 +962,7 @@ ${isOngoingConversation
   const handleGenerateNewQr = async () => {
     setIsQrLoading(true);
     try {
-      await fetch("http://localhost:3006/api/logout", { method: "POST" });
+      await fetch(`${getBackendUrl()}/api/logout`, { method: "POST" });
       setIsConnected(false);
       setRealIsReady(false);
       setRealQrImageUrl(null);
@@ -978,7 +977,7 @@ ${isOngoingConversation
     setIsQrLoading(true);
     try {
       if (isConnected) {
-        await fetch("http://localhost:3006/api/logout", { method: "POST" });
+        await fetch(`${getBackendUrl()}/api/logout`, { method: "POST" });
         setIsConnected(false);
         setRealIsReady(false);
         setRealQrImageUrl(null);
@@ -1003,8 +1002,8 @@ ${isOngoingConversation
       setOrderCreatedThisSession(false);
       orderCreatedRef.current = false;
 
-      // 2. Chamar o backend para zerar todo o histórico em memória da IA no WhatsApp (porta 3006)
-      const res = await fetch("http://localhost:3006/api/chat/reset-history", { method: "POST" });
+      // 2. Chamar o backend para zerar todo o histórico em memória da IA no WhatsApp
+      const res = await fetch(`${getBackendUrl()}/api/chat/reset-history`, { method: "POST" });
       const data = await res.json();
       if (res.ok) {
         alert("🧹 Histórico de conversas da IA zerado com sucesso! Pronta para novos testes do zero.");
@@ -1012,7 +1011,7 @@ ${isOngoingConversation
         alert("Histórico local do simulador zerado. Aviso do servidor: " + (data?.error || "Servidor offline"));
       }
     } catch (e: any) {
-      alert("Histórico do simulador zerado! (Servidor backend não respondeu na porta 3006).");
+      alert("Histórico do simulador zerado! (Servidor backend não respondeu).");
     } finally {
       setIsResettingHistory(false);
     }
@@ -1040,7 +1039,7 @@ ${isOngoingConversation
   // Busca status de segurança do backend
   const fetchSecurityStatus = async () => {
     try {
-      const res = await fetch("http://localhost:3006/api/chatbot/security-status");
+      const res = await fetch(`${getBackendUrl()}/api/chatbot/security-status`);
       if (res.ok) {
         const data = await res.json();
         setIsEloisaMasterActive(data.isEloisaAiActive);
@@ -1065,7 +1064,7 @@ ${isOngoingConversation
         setAvailableContacts(JSON.parse(cached));
       } else {
         setLoadingContactsList(true);
-        const res = await fetch('http://localhost:3006/api/marketing/whatsapp-data');
+        const res = await fetch(`${getBackendUrl()}/api/marketing/whatsapp-data`);
         if (res.ok) {
           const data = await res.json();
           if (data.contacts) {
@@ -1085,7 +1084,7 @@ ${isOngoingConversation
     setLoadingSecurity(true);
     try {
       const next = !isEloisaMasterActive;
-      const res = await fetch("http://localhost:3006/api/chatbot/toggle-master", {
+      const res = await fetch(`${getBackendUrl()}/api/chatbot/toggle-master`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active: next })
@@ -1102,7 +1101,7 @@ ${isOngoingConversation
 
   const handleResumeChat = async (phone: string) => {
     try {
-      await fetch("http://localhost:3006/api/chatbot/silence-chat", {
+      await fetch(`${getBackendUrl()}/api/chatbot/silence-chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, action: "resume" })
@@ -1115,7 +1114,7 @@ ${isOngoingConversation
     const targetPhone = phoneToAdd || newBlacklistPhone.trim();
     if (!targetPhone) return;
     try {
-      const res = await fetch("http://localhost:3006/api/chatbot/blacklist", {
+      const res = await fetch(`${getBackendUrl()}/api/chatbot/blacklist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: targetPhone, action: "add" })
@@ -1130,7 +1129,7 @@ ${isOngoingConversation
 
   const handleRemoveBlacklist = async (phone: string) => {
     try {
-      const res = await fetch("http://localhost:3006/api/chatbot/blacklist", {
+      const res = await fetch(`${getBackendUrl()}/api/chatbot/blacklist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, action: "remove" })
@@ -1525,7 +1524,7 @@ ${isOngoingConversation
                   </div>
 
                   <p className="text-[11px] text-muted-foreground text-center mt-4 font-mono">
-                    {realQrImageUrl ? "🟢 Escaneie o QR Code acima no WhatsApp da loja" : "⏳ Conectando ao serviço WhatsApp na porta 3006..."}
+                    {realQrImageUrl ? "🟢 Escaneie o QR Code acima no WhatsApp da loja" : "⏳ Conectando ao serviço WhatsApp..."}
                   </p>
                 </>
               )}

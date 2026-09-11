@@ -1,5 +1,8 @@
 import { supabase } from "@/lib/supabase";
 
+export const DEFAULT_COMPANY_ID = 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+export const LOCAL_STORAGE_KEY = 'smoking_strategic_followups_v1';
+
 export type FollowUpReasonCategory = 
   | 'sem_dinheiro_salario'
   | 'pix_pendente'
@@ -12,7 +15,8 @@ export type FollowUpStatus = 'pendente' | 'concluido' | 'cancelado';
 
 export interface FollowUpItem {
   id: string;
-  company_id?: string | null;
+  company_id: string;
+  client_id?: string | null;
   client_phone: string;
   client_name: string;
   reason_category: FollowUpReasonCategory;
@@ -24,14 +28,13 @@ export interface FollowUpItem {
   scheduled_time?: string | null; // HH:mm
   status: FollowUpStatus;
   order_id?: string | null;
-  created_at: string;
   completed_at?: string | null;
+  created_at: string;
+  updated_at?: string | null;
   whatsappUrl?: string;
   whatsappMessage?: string;
   daysDiff?: number; // < 0 atrasado, 0 hoje, > 0 futuro
 }
-
-const LOCAL_STORAGE_KEY = 'smoking_strategic_followups_v1';
 
 export const FOLLOWUP_CATEGORIES: Record<FollowUpReasonCategory, { label: string; icon: string; defaultCopy: string }> = {
   sem_dinheiro_salario: {
@@ -100,37 +103,59 @@ export function calculateDaysDiff(scheduledDateStr: string): number {
   return Math.round(diffTime / (1000 * 60 * 60 * 24));
 }
 
-// Buscar todos os follow-ups
-export async function fetchFollowUps(companyId?: string): Promise<FollowUpItem[]> {
+// Helpers seguros para LocalStorage (Fallback / Cache Secundário)
+export function getLocalFollowUps(): FollowUpItem[] {
   try {
-    let query = supabase
-      .from('smoking_follow_ups')
-      .select('*')
-      .order('scheduled_date', { ascending: true });
-
-    if (companyId) {
-      query = query.eq('company_id', companyId);
-    }
-
-    const { data, error } = await query;
-
-    if (error || !data) {
-      // Fallback para LocalStorage se tabela ainda não estiver criada
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      const localItems: FollowUpItem[] = saved ? JSON.parse(saved) : [];
-      return enrichFollowUps(localItems);
-    }
-
-    return enrichFollowUps(data);
-  } catch (err) {
-    console.warn("Aviso ao buscar follow-ups no Supabase, usando LocalStorage:", err);
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    return enrichFollowUps(saved ? JSON.parse(saved) : []);
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_KEY) : null;
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.warn('[FollowUps] Erro ao ler fallback LocalStorage:', e);
+    return [];
   }
 }
 
-// Enriquecer items com helpers calculados
-function enrichFollowUps(items: any[]): FollowUpItem[] {
+export function saveLocalFollowUps(items: FollowUpItem[]): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(items));
+    }
+  } catch (e) {
+    console.warn('[FollowUps] Erro ao gravar cache secundário no LocalStorage:', e);
+  }
+}
+
+function addLocalFollowUp(item: FollowUpItem): void {
+  try {
+    const current = getLocalFollowUps();
+    const updated = [item, ...current.filter(i => i.id !== item.id)];
+    saveLocalFollowUps(updated);
+  } catch (e) {
+    console.warn('[FollowUps] Erro ao adicionar item no cache local:', e);
+  }
+}
+
+function updateLocalFollowUp(id: string, updates: Partial<FollowUpItem>): void {
+  try {
+    const current = getLocalFollowUps();
+    const updated = current.map(item => item.id === id ? { ...item, ...updates } : item);
+    saveLocalFollowUps(updated);
+  } catch (e) {
+    console.warn('[FollowUps] Erro ao atualizar item no cache local:', e);
+  }
+}
+
+function deleteLocalFollowUp(id: string): void {
+  try {
+    const current = getLocalFollowUps();
+    const updated = current.filter(item => item.id !== id);
+    saveLocalFollowUps(updated);
+  } catch (e) {
+    console.warn('[FollowUps] Erro ao remover item do cache local:', e);
+  }
+}
+
+// Enriquecer items com helpers calculados (WhatsApp url, dias de diferença, cópias formatadas)
+export function enrichFollowUps(items: any[]): FollowUpItem[] {
   return items.map(item => {
     const cleanPhone = String(item.client_phone || '').replace(/\D/g, '');
     const waNumber = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
@@ -140,12 +165,15 @@ function enrichFollowUps(items: any[]): FollowUpItem[] {
 
     return {
       ...item,
+      company_id: item.company_id || DEFAULT_COMPANY_ID,
+      client_id: item.client_id || null,
       client_phone: item.client_phone || cleanPhone,
       client_name: item.client_name || 'Cliente',
-      reason_category: item.reason_category || 'outro',
+      reason_category: (item.reason_category as FollowUpReasonCategory) || 'outro',
       reason_description: item.reason_description || '',
-      status: item.status || 'pendente',
+      status: (item.status as FollowUpStatus) || 'pendente',
       scheduled_date: item.scheduled_date || new Date().toISOString().split('T')[0],
+      scheduled_time: item.scheduled_time || '10:00',
       daysDiff,
       whatsappMessage: msg,
       whatsappUrl,
@@ -153,9 +181,40 @@ function enrichFollowUps(items: any[]): FollowUpItem[] {
   });
 }
 
-// Criar novo Follow-up
+// 1. Buscar todos os follow-ups — SUPABASE COMO FONTE PRIMÁRIA
+export async function fetchFollowUps(companyId?: string): Promise<FollowUpItem[]> {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  try {
+    const { data, error } = await supabase
+      .from('smoking_crm_follow_ups')
+      .select('*')
+      .eq('company_id', targetCompanyId)
+      .order('scheduled_date', { ascending: true });
+
+    if (!error && data) {
+      const enriched = enrichFollowUps(data);
+      // Sincroniza cache local com a resposta oficial do Supabase
+      saveLocalFollowUps(data);
+      return enriched;
+    }
+
+    if (error) {
+      console.warn('[FollowUps] Erro ao buscar no Supabase (ativando fallback local):', error.message);
+    }
+  } catch (err: any) {
+    console.warn('[FollowUps] Exceção ao consultar Supabase (ativando fallback local):', err?.message || err);
+  }
+
+  // Fallback seguro se Supabase indisponível
+  const localItems = getLocalFollowUps();
+  console.info('[FollowUps] Consumindo cache secundário local:', localItems.length, 'itens.');
+  return enrichFollowUps(localItems);
+}
+
+// 2. Criar novo Follow-up — GRAVAÇÃO PRIMÁRIA NO SUPABASE
 export async function createFollowUp(item: {
   company_id?: string;
+  client_id?: string | null;
   client_phone: string;
   client_name: string;
   reason_category: FollowUpReasonCategory;
@@ -165,133 +224,137 @@ export async function createFollowUp(item: {
   target_puffs?: number;
   scheduled_date: string;
   scheduled_time?: string;
+  order_id?: string | null;
 }): Promise<FollowUpItem | null> {
+  const targetCompanyId = item.company_id || DEFAULT_COMPANY_ID;
   const cleanPhone = String(item.client_phone).replace(/\D/g, '');
   const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
 
   const payload = {
-    company_id: item.company_id,
+    company_id: targetCompanyId,
+    client_id: item.client_id || null,
     client_phone: formattedPhone,
     client_name: item.client_name.trim() || 'Cliente',
-    reason_category: item.reason_category,
+    reason_category: item.reason_category || 'outro',
     reason_description: (item.reason_description || '').trim(),
     target_product: item.target_product || null,
     target_flavor: item.target_flavor || null,
-    target_puffs: item.target_puffs || null,
-    scheduled_date: item.scheduled_date,
+    target_puffs: item.target_puffs ? Number(item.target_puffs) : null,
+    scheduled_date: item.scheduled_date || new Date().toISOString().split('T')[0],
     scheduled_time: item.scheduled_time || '10:00',
     status: 'pendente' as FollowUpStatus,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    order_id: item.order_id || null,
   };
 
   try {
     const { data, error } = await supabase
-      .from('smoking_follow_ups')
+      .from('smoking_crm_follow_ups')
       .insert(payload)
       .select()
       .single();
 
     if (!error && data) {
+      addLocalFollowUp(data);
       return enrichFollowUps([data])[0];
     }
-  } catch (e) {}
 
-  // Fallback LocalStorage
-  const localId = `fu_${Date.now()}`;
+    if (error) {
+      console.warn('[FollowUps] Erro ao criar no Supabase (ativando fallback local):', error.message);
+    }
+  } catch (err: any) {
+    console.warn('[FollowUps] Exceção ao criar no Supabase (ativando fallback local):', err?.message || err);
+  }
+
+  // Fallback LocalStorage seguro (sempre UUID válido para compatibilidade total)
+  const localId = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : '00000000-0000-4000-8000-' + String(Date.now()).padStart(12, '0').slice(-12);
+
   const localItem: FollowUpItem = {
     ...payload,
     id: localId,
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
-
-  try {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    const list = saved ? JSON.parse(saved) : [];
-    list.unshift(localItem);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
-  } catch (e) {}
-
+  addLocalFollowUp(localItem);
   return enrichFollowUps([localItem])[0];
 }
 
-// Marcar Follow-up como Concluído (Venda Fechada)
-export async function completeFollowUp(id: string): Promise<boolean> {
+// 3. Atualizar Follow-up (Data, Notas, etc.) — SUPABASE PRIMÁRIO
+export async function updateFollowUp(
+  id: string, 
+  updates: Partial<FollowUpItem>, 
+  companyId?: string
+): Promise<boolean> {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const dbUpdates: any = {
+    ...updates,
+    updated_at: new Date().toISOString()
+  };
+
+  // Remove campos calculados e virtuais antes de gravar no banco
+  delete dbUpdates.whatsappUrl;
+  delete dbUpdates.whatsappMessage;
+  delete dbUpdates.daysDiff;
+
   try {
     const { error } = await supabase
-      .from('smoking_follow_ups')
-      .update({
-        status: 'concluido',
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id);
+      .from('smoking_crm_follow_ups')
+      .update(dbUpdates)
+      .eq('id', id)
+      .eq('company_id', targetCompanyId);
 
-    if (!error) return true;
-  } catch (e) {}
-
-  // LocalStorage update
-  try {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) {
-      const list = JSON.parse(saved).map((item: any) => 
-        item.id === id ? { ...item, status: 'concluido', completed_at: new Date().toISOString() } : item
-      );
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+    if (!error) {
+      updateLocalFollowUp(id, dbUpdates);
       return true;
     }
-  } catch (e) {}
 
+    console.warn('[FollowUps] Erro ao atualizar no Supabase (ativando fallback local):', error.message);
+  } catch (err: any) {
+    console.warn('[FollowUps] Exceção ao atualizar no Supabase (ativando fallback local):', err?.message || err);
+  }
+
+  updateLocalFollowUp(id, dbUpdates);
   return true;
 }
 
-// Reagendar ou Atualizar Follow-up
-export async function updateFollowUp(id: string, updates: Partial<FollowUpItem>): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from('smoking_follow_ups')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id);
-
-    if (!error) return true;
-  } catch (e) {}
-
-  try {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) {
-      const list = JSON.parse(saved).map((item: any) => 
-        item.id === id ? { ...item, ...updates, updated_at: new Date().toISOString() } : item
-      );
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
-      return true;
-    }
-  } catch (e) {}
-
-  return true;
+// 4. Marcar Follow-up como Concluído (Venda Fechada)
+export async function completeFollowUp(id: string, companyId?: string, orderId?: string): Promise<boolean> {
+  return updateFollowUp(id, {
+    status: 'concluido',
+    completed_at: new Date().toISOString(),
+    ...(orderId ? { order_id: orderId } : {})
+  }, companyId);
 }
 
-// Excluir Follow-up
-export async function deleteFollowUp(id: string): Promise<boolean> {
+// 5. Cancelar Follow-up
+export async function cancelFollowUp(id: string, companyId?: string): Promise<boolean> {
+  return updateFollowUp(id, {
+    status: 'cancelado',
+    updated_at: new Date().toISOString()
+  }, companyId);
+}
+
+// 6. Excluir Follow-up — SUPABASE PRIMÁRIO
+export async function deleteFollowUp(id: string, companyId?: string): Promise<boolean> {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
   try {
     const { error } = await supabase
-      .from('smoking_follow_ups')
+      .from('smoking_crm_follow_ups')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('company_id', targetCompanyId);
 
-    if (!error) return true;
-  } catch (e) {}
-
-  try {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) {
-      const list = JSON.parse(saved).filter((item: any) => item.id !== id);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+    if (!error) {
+      deleteLocalFollowUp(id);
       return true;
     }
-  } catch (e) {}
 
+    console.warn('[FollowUps] Erro ao excluir no Supabase (ativando fallback local):', error.message);
+  } catch (err: any) {
+    console.warn('[FollowUps] Exceção ao excluir no Supabase (ativando fallback local):', err?.message || err);
+  }
+
+  deleteLocalFollowUp(id);
   return true;
 }
