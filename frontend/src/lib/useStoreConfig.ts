@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { getCatalogCompanyId } from "@/lib/products";
 
 export interface StoreConfig {
   id: string;
@@ -64,15 +65,17 @@ async function fetchConfig(): Promise<StoreConfig> {
   let mainConfig: StoreConfig | null = null;
   let fallbackConfig: StoreConfig | null = null;
 
-  // 1. Tentar ler da tabela dedicada `store_config`
+  // 1. Tentar ler da tabela dedicada `store_config` filtrado pela empresa atual
   try {
+    const companyId = getCatalogCompanyId();
     const { data, error } = await supabase
       .from("store_config")
       .select("*")
-      .limit(1);
+      .eq("company_id", companyId)
+      .maybeSingle();
 
-    if (!error && data && data.length > 0) {
-      mainConfig = data[0] as StoreConfig;
+    if (!error && data) {
+      mainConfig = data as StoreConfig;
     }
   } catch (e) {
     console.warn("Tabela store_config não acessível no frontend:", e);

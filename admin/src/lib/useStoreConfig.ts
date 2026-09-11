@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { validateAndNormalizeBrazilianPhone } from "@/lib/phoneUtils";
 
 // Supabase é carregado sob demanda para habilitar code-splitting (~70% redução no bundle inicial)
 let _sb: any = null;
@@ -92,20 +93,22 @@ function notifyListeners() {
   }
 }
 
-async function fetchConfig(): Promise<StoreConfig> {
+async function fetchConfig(targetCompanyId?: string): Promise<StoreConfig> {
   const supabase = await getSupabase();
   let mainConfig: StoreConfig | null = null;
   let fallbackConfig: StoreConfig | null = null;
+  const companyId = targetCompanyId || (typeof window !== 'undefined' ? localStorage.getItem('smk_auth_company_id') : null) || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
 
-  // 1. Tentar ler da tabela dedicada `store_config` no Supabase (se existir)
+  // 1. Tentar ler da tabela dedicada `store_config` no Supabase filtrado por company_id
   try {
     const { data, error } = await supabase
       .from("store_config")
       .select("*")
-      .limit(1);
+      .eq("company_id", companyId)
+      .maybeSingle();
 
-    if (!error && data && data.length > 0) {
-      mainConfig = data[0] as StoreConfig;
+    if (!error && data) {
+      mainConfig = data as StoreConfig;
     }
   } catch (e) {
     console.warn("Tabela store_config não acessível:", e);
@@ -299,6 +302,61 @@ export function useStoreConfig() {
     [config]
   );
 
+  const updateStoreWhatsApp = useCallback(
+    async (phone: string, targetCompanyId?: string): Promise<{ success: boolean; error?: string; normalized?: string }> => {
+      const val = validateAndNormalizeBrazilianPhone(phone);
+      if (!val.valid) {
+        return { success: false, error: val.error || "Número de WhatsApp inválido" };
+      }
+
+      setSaving(true);
+      try {
+        const supabase = await getSupabase();
+        const companyId = targetCompanyId || (typeof window !== "undefined" ? localStorage.getItem("smk_auth_company_id") : null) || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+
+        // Atualização cirúrgica: SOMENTE whatsapp_number e updated_at em store_config
+        const { error: updateError } = await supabase
+          .from("store_config")
+          .update({
+            whatsapp_number: val.normalized,
+            updated_at: new Date().toISOString()
+          })
+          .eq("company_id", companyId);
+
+        if (updateError) {
+          console.error("Erro ao atualizar whatsapp_number em store_config:", updateError);
+          setSaving(false);
+          return { success: false, error: updateError.message };
+        }
+
+        // Também atualiza o campo phone na tabela companies para manter sincronismo
+        await supabase
+          .from("companies")
+          .update({ phone: val.normalized })
+          .eq("id", companyId);
+
+        // Atualiza cache em memória e estado
+        const updatedConfig = {
+          ...config,
+          whatsapp_number: val.normalized,
+          updated_at: new Date().toISOString()
+        };
+        cachedConfig = updatedConfig;
+        setConfig(updatedConfig);
+        saveLocalFallback(updatedConfig);
+        notifyListeners();
+
+        setSaving(false);
+        return { success: true, normalized: val.normalized };
+      } catch (err: any) {
+        console.error("Exceção ao atualizar whatsapp_number:", err);
+        setSaving(false);
+        return { success: false, error: err.message || "Erro ao conectar ao banco" };
+      }
+    },
+    [config]
+  );
+
   const uploadLogo = useCallback(
     async (file: File): Promise<string | null> => {
       try {
@@ -367,6 +425,7 @@ export function useStoreConfig() {
     saving,
     saveStatus,
     updateConfig,
+    updateStoreWhatsApp,
     uploadLogo,
     refreshConfig,
   };

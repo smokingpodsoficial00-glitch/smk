@@ -25,12 +25,13 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
   const [copied, setCopied] = useState(false);
 
   const storeName = config?.store_name || "Smoking Pods";
-  const whatsappNumber = config?.whatsapp_number?.replace(/\D/g, "") || "5511977300561";
+  const rawPhone = config?.whatsapp_number?.replace(/\D/g, "") || "";
+  const whatsappNumber = rawPhone.length >= 10 ? (rawPhone.startsWith("55") ? rawPhone : `55${rawPhone}`) : null;
   
-  // Link para o WhatsApp com mensagem pré-formatada
-  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+  // Link para o WhatsApp com mensagem pré-formatada (sem número hardcoded)
+  const whatsappUrl = whatsappNumber ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
     "Olá! Vim pelo Link da Bio e gostaria de ver os sabores disponíveis e fazer um pedido."
-  )}`;
+  )}` : null;
 
   // Link para o Grupo VIP do WhatsApp
   const vipGroupUrl = (config as any)?.vip_group_url || "https://chat.whatsapp.com/Bk2rFAAgHlvKgc8pQANqYg";
@@ -161,10 +162,20 @@ export function HubPage({ onOpenMenu }: HubPageProps) {
 
           {/* CTA 2: Fazer Pedido Direto no WhatsApp */}
           <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group relative w-full text-left p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-neutral-900/50 backdrop-blur-2xl border border-white/10 hover:border-emerald-500/50 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:shadow-[0_0_30px_rgba(16,185,129,0.15)] cursor-pointer block"
+            href={whatsappUrl || "#"}
+            onClick={(e) => {
+              if (!whatsappUrl) {
+                e.preventDefault();
+                alert("WhatsApp de atendimento não configurado.");
+              }
+            }}
+            target={whatsappUrl ? "_blank" : undefined}
+            rel={whatsappUrl ? "noopener noreferrer" : undefined}
+            className={`group relative w-full text-left p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-neutral-900/50 backdrop-blur-2xl border border-white/10 transition-all duration-300 shadow-[0_8px_32px_rgba(0,0,0,0.4)] cursor-pointer block ${
+              whatsappUrl 
+                ? "hover:border-emerald-500/50 hover:-translate-y-0.5 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)]" 
+                : "opacity-60 cursor-not-allowed"
+            }`}
           >
             <div className="flex items-center justify-between gap-2 mb-1">
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20 backdrop-blur-md">
