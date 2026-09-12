@@ -32,6 +32,9 @@ export type RealClient = {
   urgencyLevel: 'urgent' | 'warning' | 'ok';
   nextReplenishmentDate: string;
   orders: any[];
+  lastOrderTimestamp?: number;
+  lastActivityTimestamp?: number;
+  clientCreatedAt?: string;
 };
 
 // Exportação de tempo de execução para compatibilidade
@@ -327,6 +330,9 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
           urgencyLevel,
           nextReplenishmentDate,
           orders: clientOrders,
+          lastOrderTimestamp,
+          lastActivityTimestamp: lastOrderTimestamp,
+          clientCreatedAt: client.created_at,
         });
       } else {
         // --- CLIENTE NOVO CADASTRADO (0 COMPRAS) ---
@@ -372,6 +378,9 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
           urgencyLevel: 'ok',
           nextReplenishmentDate: '-',
           orders: [],
+          lastOrderTimestamp: 0,
+          lastActivityTimestamp: client.created_at ? new Date(client.created_at).getTime() : 0,
+          clientCreatedAt: client.created_at,
         });
       }
     }
@@ -426,8 +435,21 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
         urgencyLevel: 'ok',
         nextReplenishmentDate: '-',
         orders: clientOrders,
+        lastOrderTimestamp,
+        lastActivityTimestamp: lastOrderTimestamp,
+        clientCreatedAt: latestOrder.created_at,
       });
     }
+
+    // 5. Ordenação Definitiva do CRM (Bloco 37):
+    // 1. data/hora do último pedido do cliente (latestOrder.created_at);
+    // 2. se o cliente ainda não possuir pedido, usar created_at como fallback.
+    result.sort((a, b) => {
+      const timeA = a.lastActivityTimestamp || 0;
+      const timeB = b.lastActivityTimestamp || 0;
+      if (timeB !== timeA) return timeB - timeA;
+      return (a.name || '').localeCompare(b.name || '');
+    });
 
     return result;
   } catch (err) {

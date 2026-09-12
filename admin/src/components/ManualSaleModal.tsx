@@ -292,8 +292,9 @@ export function ManualSaleModal({
       const cleanPhone = rawPhone.replace(/\D/g, "");
       const formattedPhone = cleanPhone ? (cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`) : "5511999999999";
 
+      let clientSaveWarning: string | null = null;
       try {
-        await supabase.from("smoking_clients").upsert(
+        const { data: _clientData, error: clientErr } = await supabase.from("smoking_clients").upsert(
           {
             phone: formattedPhone,
             name: clientName.trim(),
@@ -303,8 +304,14 @@ export function ManualSaleModal({
           },
           { onConflict: "phone" }
         );
+
+        if (clientErr) {
+          console.error("❌ Erro ao atualizar/salvar cliente em smoking_clients:", clientErr);
+          clientSaveWarning = "Não foi possível atualizar o cadastro do cliente.";
+        }
       } catch (custErr) {
-        console.warn("Aviso ao salvar cliente em smoking_clients:", custErr);
+        console.error("❌ Exceção ao salvar cliente em smoking_clients:", custErr);
+        clientSaveWarning = "Não foi possível atualizar o cadastro do cliente.";
       }
 
       // 2. Formatar Itens do Pedido no padrão smoking_orders
@@ -379,7 +386,11 @@ export function ManualSaleModal({
       // pela Trigger SQL no Supabase (decrement_stock_on_payment) ao inserir o pedido com payment_status = 'PAGO'.
       // Não fazemos segundo update em JS para evitar baixa duplicada!
 
-      setSuccessMessage("✅ Venda registrada com sucesso! Estoque abatido, ranking e CRM atualizados.");
+      if (clientSaveWarning) {
+        setSuccessMessage(`✅ Venda registrada com sucesso! (${clientSaveWarning})`);
+      } else {
+        setSuccessMessage("✅ Venda registrada com sucesso! Estoque abatido, ranking e CRM atualizados.");
+      }
 
       setTimeout(() => {
         onSaleSuccess();
