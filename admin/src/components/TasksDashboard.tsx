@@ -1,20 +1,21 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  CheckSquare, Plus, FolderPlus, Sparkles, Filter, 
+  CheckSquare, Plus, FolderPlus, Filter, 
   CheckCircle2, Clock, AlertCircle, RefreshCw, Layers,
-  Trash2, User, ChevronRight, Inbox
+  Trash2, User, ChevronRight, Inbox, Sparkles, LayoutGrid
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { fetchPartners, type Partner } from '../lib/partners';
 import { 
   fetchPartnerTasks, fetchTaskCategories, deleteTaskCategory, 
-  deletePartnerTask, toggleTaskStatus,
+  deletePartnerTask, toggleTaskStatus, updatePartnerTask,
   type PartnerTask, type TaskCategory 
 } from '../lib/tasks';
 import { TaskCard } from './tasks/TaskCard';
 import { NewTaskModal } from './tasks/NewTaskModal';
 import { NewCategoryModal } from './tasks/NewCategoryModal';
+import { TaskDetailModal } from './tasks/TaskDetailModal';
 
 export default function TasksDashboard() {
   const { company } = useAuth();
@@ -25,31 +26,30 @@ export default function TasksDashboard() {
   const [tasks, setTasks] = useState<PartnerTask[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filtros
+  // Filtro
   const [filterMode, setFilterMode] = useState<'ATIVAS' | 'CONCLUIDAS' | 'TODAS'>('ATIVAS');
 
   // Modais
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<PartnerTask | null>(null);
+
   const [modalDefaultPartnerId, setModalDefaultPartnerId] = useState<string | undefined>(undefined);
   const [modalDefaultCategoryId, setModalDefaultCategoryId] = useState<string | undefined>(undefined);
 
-  // Carregar Dados
+  // Carregamento de Dados
   const loadAllData = async () => {
     if (!companyId) return;
     try {
       setLoading(true);
 
-      // 1. Sócios
       const loadedPartners = await fetchPartners(companyId);
       const activePartners = loadedPartners.filter(p => p.is_active !== false);
       setPartners(activePartners);
 
-      // 2. Categorias / Blocos
       const loadedCategories = await fetchTaskCategories(companyId, activePartners);
       setCategories(loadedCategories);
 
-      // 3. Tarefas
       const loadedTasks = await fetchPartnerTasks(companyId);
       setTasks(loadedTasks);
     } catch (err) {
@@ -63,7 +63,7 @@ export default function TasksDashboard() {
     loadAllData();
   }, [companyId]);
 
-  // Supabase Realtime Subscription para sincronia instantânea entre Gabriel e Eduardo
+  // Realtime Supabase
   useEffect(() => {
     if (!companyId) return;
 
@@ -82,7 +82,7 @@ export default function TasksDashboard() {
     };
   }, [companyId]);
 
-  // Identificar Sócios Específicos
+  // Identificação dos Sócios
   const gabrielPartner = useMemo(() => {
     return partners.find(p => p.name.toLowerCase().includes('gabriel')) || partners[0];
   }, [partners]);
@@ -91,7 +91,7 @@ export default function TasksDashboard() {
     return partners.find(p => p.name.toLowerCase().includes('eduardo')) || partners[1] || partners[0];
   }, [partners]);
 
-  // Filtragem de Tarefas por Status
+  // Filtragem de Tarefas
   const filteredTasks = useMemo(() => {
     if (filterMode === 'ATIVAS') {
       return tasks.filter(t => t.status !== 'CONCLUIDA');
@@ -102,19 +102,33 @@ export default function TasksDashboard() {
     return tasks;
   }, [tasks, filterMode]);
 
-  // Handlers de Ações
+  // Ações de Tarefas
   const handleToggleStatus = async (task: PartnerTask) => {
     const updated = await toggleTaskStatus(task, companyId);
     setTasks(prev => prev.map(t => t.id === task.id ? updated : t));
+    if (selectedTaskForDetail?.id === task.id) {
+      setSelectedTaskForDetail(updated);
+    }
+  };
+
+  const handleUpdateTask = async (taskId: string, updates: Partial<PartnerTask>) => {
+    await updatePartnerTask(taskId, companyId, updates);
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+    if (selectedTaskForDetail?.id === taskId) {
+      setSelectedTaskForDetail(prev => prev ? { ...prev, ...updates } : null);
+    }
   };
 
   const handleDeleteTask = async (taskId: string) => {
     await deletePartnerTask(taskId, companyId);
     setTasks(prev => prev.filter(t => t.id !== taskId));
+    if (selectedTaskForDetail?.id === taskId) {
+      setSelectedTaskForDetail(null);
+    }
   };
 
   const handleDeleteCategory = async (categoryId: string, categoryName: string) => {
-    if (confirm(`Deseja realmente excluir o bloco "${categoryName}"? As tarefas vinculadas a ele ficarão na área Geral.`)) {
+    if (confirm(`Deseja realmente excluir o setor "${categoryName}"? As tarefas vinculadas a ele ficarão na área Geral.`)) {
       await deleteTaskCategory(categoryId, companyId);
       setCategories(prev => prev.filter(c => c.id !== categoryId));
       setTasks(prev => prev.map(t => t.category_id === categoryId ? { ...t, category_id: null } : t));
@@ -132,41 +146,42 @@ export default function TasksDashboard() {
     setIsCategoryModalOpen(true);
   };
 
-  // Contadores Rápidos
+  // Contadores
+  const totalCompletedCount = tasks.filter(t => t.status === 'CONCLUIDA').length;
   const activeCountGabriel = tasks.filter(t => t.assigned_partner_id === gabrielPartner?.id && t.status !== 'CONCLUIDA').length;
   const activeCountEduardo = tasks.filter(t => t.assigned_partner_id === eduardoPartner?.id && t.status !== 'CONCLUIDA').length;
-  const totalCompletedCount = tasks.filter(t => t.status === 'CONCLUIDA').length;
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
-      {/* ━━━ HEADER PRINCIPAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/10 pb-5">
+    <div className="flex-1 flex flex-col h-full overflow-y-auto bg-[#08080a] p-4 sm:p-6 lg:p-8 space-y-7 text-white custom-scrollbar">
+      
+      {/* ━━━ CABEÇALHO MODERNO & RESPIRO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-white/10">
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="size-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+          <div className="flex items-center gap-3">
+            <div className="size-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-sm">
               <CheckSquare className="size-5" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
                 <span>QG de Tarefas & Operações</span>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold uppercase">
+                <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
                   SÓCIOS
                 </span>
               </h1>
-              <p className="text-xs text-white/50 mt-0.5">
-                Painel espelhado de demandas operacionais, metas por setor e execução diária.
+              <p className="text-xs text-white/50 mt-0.5 font-normal">
+                Painel espelhado de execução diária, alinhamento estratégico e demandas dos sócios.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Ações Globais e Filtro */}
+        {/* Barra de Ações Rápidas */}
         <div className="flex flex-wrap items-center gap-3 self-start lg:self-auto">
-          {/* Alternador de Filtro */}
-          <div className="flex items-center bg-black/40 border border-white/15 rounded-xl p-1 text-xs">
+          {/* Alternador de Filtro Limpo */}
+          <div className="flex items-center bg-[#121216] border border-white/10 rounded-xl p-1 text-xs">
             <button
               onClick={() => setFilterMode('ATIVAS')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                 filterMode === 'ATIVAS' 
                   ? 'bg-white/15 text-white shadow-sm' 
                   : 'text-white/40 hover:text-white'
@@ -176,7 +191,7 @@ export default function TasksDashboard() {
             </button>
             <button
               onClick={() => setFilterMode('CONCLUIDAS')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                 filterMode === 'CONCLUIDAS' 
                   ? 'bg-white/15 text-emerald-300 shadow-sm' 
                   : 'text-white/40 hover:text-white'
@@ -186,7 +201,7 @@ export default function TasksDashboard() {
             </button>
             <button
               onClick={() => setFilterMode('TODAS')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                 filterMode === 'TODAS' 
                   ? 'bg-white/15 text-white shadow-sm' 
                   : 'text-white/40 hover:text-white'
@@ -202,10 +217,10 @@ export default function TasksDashboard() {
               setModalDefaultPartnerId(undefined);
               setIsCategoryModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95"
+            className="inline-flex items-center gap-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95"
           >
             <FolderPlus className="size-4" />
-            <span>+ Novo Bloco</span>
+            <span>+ Novo Setor</span>
           </button>
 
           {/* Botão Nova Tarefa */}
@@ -223,12 +238,12 @@ export default function TasksDashboard() {
         </div>
       </header>
 
-      {/* ━━━ VISÃO ESPELHO (LADO A LADO: GABRIEL VS EDUARDO) ━━━━━━━━━━━━━━ */}
+      {/* ━━━ VISÃO ESPELHO RESPIRÁVEL (50% / 50%) ━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8 items-start">
         
-        {/* 👤 COLUNA ESQUERDA: GABRIEL */}
+        {/* 👤 COLUNA: GABRIEL */}
         {gabrielPartner && (
-          <PartnerColumn
+          <ModernPartnerColumn
             partner={gabrielPartner}
             badgeArea="Marketing & Vendas"
             activeTasksCount={activeCountGabriel}
@@ -241,12 +256,13 @@ export default function TasksDashboard() {
             onDeleteCategory={handleDeleteCategory}
             onAddTask={(catId) => openNewTaskForPartner(gabrielPartner.id, catId)}
             onAddCategory={() => openNewCategoryForPartner(gabrielPartner.id)}
+            onOpenDetail={(task) => setSelectedTaskForDetail(task)}
           />
         )}
 
-        {/* 👤 COLUNA DIREITA: EDUARDO */}
+        {/* 👤 COLUNA: EDUARDO */}
         {eduardoPartner && (
-          <PartnerColumn
+          <ModernPartnerColumn
             partner={eduardoPartner}
             badgeArea="Construção do Sistema"
             activeTasksCount={activeCountEduardo}
@@ -259,12 +275,28 @@ export default function TasksDashboard() {
             onDeleteCategory={handleDeleteCategory}
             onAddTask={(catId) => openNewTaskForPartner(eduardoPartner.id, catId)}
             onAddCategory={() => openNewCategoryForPartner(eduardoPartner.id)}
+            onOpenDetail={(task) => setSelectedTaskForDetail(task)}
           />
         )}
 
       </div>
 
-      {/* ━━━ MODAIS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* ━━━ MODAIS DO SISTEMA ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      
+      {/* 1. Modal Detalhes & Descrição Completa */}
+      <TaskDetailModal
+        task={selectedTaskForDetail}
+        isOpen={!!selectedTaskForDetail}
+        onClose={() => setSelectedTaskForDetail(null)}
+        category={categories.find(c => c.id === selectedTaskForDetail?.category_id)}
+        assignedPartnerName={partners.find(p => p.id === selectedTaskForDetail?.assigned_partner_id)?.name}
+        creatorPartnerName={partners.find(p => p.id === selectedTaskForDetail?.created_by_partner_id)?.name}
+        onToggleStatus={handleToggleStatus}
+        onUpdateTask={handleUpdateTask}
+        onDeleteTask={handleDeleteTask}
+      />
+
+      {/* 2. Modal Nova Tarefa */}
       <NewTaskModal
         isOpen={isTaskModalOpen}
         onClose={() => setIsTaskModalOpen(false)}
@@ -276,6 +308,7 @@ export default function TasksDashboard() {
         onTaskCreated={(newTask) => setTasks(prev => [newTask, ...prev])}
       />
 
+      {/* 3. Modal Novo Bloco / Setor */}
       <NewCategoryModal
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
@@ -288,9 +321,9 @@ export default function TasksDashboard() {
   );
 }
 
-// ── SUB-COMPONENTE: COLUNA DO SÓCIO COM SEUS BLOCOS ──
+// ── SUB-COMPONENTE: COLUNA DO SÓCIO COM DESIGN LIMPO & LEVE ──
 
-interface PartnerColumnProps {
+interface ModernPartnerColumnProps {
   partner: Partner;
   badgeArea: string;
   activeTasksCount: number;
@@ -303,9 +336,10 @@ interface PartnerColumnProps {
   onDeleteCategory: (categoryId: string, categoryName: string) => void;
   onAddTask: (categoryId?: string) => void;
   onAddCategory: () => void;
+  onOpenDetail: (task: PartnerTask) => void;
 }
 
-function PartnerColumn({
+function ModernPartnerColumn({
   partner,
   badgeArea,
   activeTasksCount,
@@ -318,102 +352,89 @@ function PartnerColumn({
   onDeleteCategory,
   onAddTask,
   onAddCategory,
-}: PartnerColumnProps) {
-  // Tarefas sem categoria vinculada
-  const unassignedCategoryTasks = tasks.filter(t => !t.category_id || !categories.some(c => c.id === t.category_id));
+  onOpenDetail,
+}: ModernPartnerColumnProps) {
+  const unassignedTasks = tasks.filter(t => !t.category_id || !categories.some(c => c.id === t.category_id));
 
   return (
-    <div className="bg-[#0b0b0d] border border-white/10 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl">
-      {/* Header do Sócio */}
-      <div className="flex items-center justify-between border-b border-white/10 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="size-11 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 border border-white/15 flex items-center justify-center font-black text-lg text-white shadow-inner">
+    <div className="space-y-6">
+      {/* Card do Perfil do Sócio (Arejado e Elegante) */}
+      <div className="bg-[#101014] border border-white/10 rounded-3xl p-5 sm:p-6 shadow-xl flex items-center justify-between">
+        <div className="flex items-center gap-3.5">
+          <div className="size-12 rounded-2xl bg-gradient-to-br from-white/15 to-white/5 border border-white/15 flex items-center justify-center font-black text-xl text-white shadow-inner">
             {partner.name.charAt(0).toUpperCase()}
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg font-black text-white tracking-tight">{partner.name}</h2>
-              <span className="text-[10px] bg-white/10 text-white/70 border border-white/15 px-2 py-0.5 rounded-full font-bold">
+              <span className="text-[10px] bg-white/10 text-white/75 border border-white/15 px-2.5 py-0.5 rounded-full font-bold">
                 {badgeArea}
               </span>
             </div>
-            <p className="text-xs text-white/40 mt-0.5">
-              {activeTasksCount} {activeTasksCount === 1 ? 'demanda pendente' : 'demandas pendentes'}
+            <p className="text-xs text-white/40 mt-1 font-medium">
+              {activeTasksCount === 0 ? (
+                <span className="text-emerald-400 font-semibold">Tudo zerado por aqui! 🎉</span>
+              ) : (
+                <span>{activeTasksCount} {activeTasksCount === 1 ? 'demanda pendente' : 'demandas pendentes'}</span>
+              )}
             </p>
           </div>
         </div>
 
-        {/* Botão Rápido de Adicionar Tarefa para Este Sócio */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => onAddTask()}
-            className="inline-flex items-center gap-1.5 text-xs font-bold bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded-xl border border-white/15 transition-all cursor-pointer"
-            title={`Adicionar tarefa para ${partner.name}`}
-          >
-            <Plus className="size-3.5" />
-            <span>+ Tarefa</span>
-          </button>
-        </div>
+        {/* Botão Rápido de Adicionar Tarefa */}
+        <button
+          onClick={() => onAddTask()}
+          className="inline-flex items-center gap-1.5 text-xs font-extrabold bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl border border-white/15 transition-all cursor-pointer active:scale-95 shadow-sm"
+        >
+          <Plus className="size-3.5 stroke-[3]" />
+          <span>+ Tarefa</span>
+        </button>
       </div>
 
-      {/* Blocos de Setores do Sócio */}
+      {/* Lista de Setores e Tarefas */}
       <div className="space-y-6">
         {categories.map((category) => {
-          const categoryTasks = tasks.filter(t => t.category_id === category.id);
+          const catTasks = tasks.filter(t => t.category_id === category.id);
 
           return (
-            <div 
-              key={category.id} 
-              className="bg-black/40 border border-white/5 rounded-2xl p-4 sm:p-5 space-y-4 hover:border-white/10 transition-colors"
-            >
-              {/* Header do Bloco / Setor */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
+            <div key={category.id} className="space-y-3">
+              {/* Header do Setor (Leve, sem caixas aninhadas pesadas) */}
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
                   <div 
-                    className="size-3.5 rounded-md" 
+                    className="size-2.5 rounded-full" 
                     style={{ backgroundColor: category.color }} 
                   />
-                  <h3 className="text-sm font-extrabold text-white tracking-tight flex items-center gap-2">
-                    <span>{category.name}</span>
-                    <span className="text-[10px] bg-white/10 text-white/60 px-2 py-0.5 rounded-full font-mono font-bold">
-                      {categoryTasks.length}
-                    </span>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-white/80">
+                    {category.name}
                   </h3>
+                  <span className="text-[10px] font-mono font-bold text-white/40 bg-white/5 border border-white/10 px-1.5 py-0.2 rounded-md">
+                    {catTasks.length}
+                  </span>
                 </div>
 
-                {/* Ações do Bloco */}
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => onAddTask(category.id)}
-                    className="p-1.5 rounded-lg text-white/40 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                    className="p-1 rounded-lg text-white/40 hover:text-emerald-400 hover:bg-white/5 transition-colors cursor-pointer"
                     title={`Adicionar tarefa em ${category.name}`}
                   >
                     <Plus className="size-3.5" />
                   </button>
                   <button
                     onClick={() => onDeleteCategory(category.id, category.name)}
-                    className="p-1.5 rounded-lg text-white/20 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                    title="Excluir este bloco"
+                    className="p-1 rounded-lg text-white/20 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                    title="Excluir este setor"
                   >
                     <Trash2 className="size-3.5" />
                   </button>
                 </div>
               </div>
 
-              {/* Lista de Tarefas do Bloco */}
-              {categoryTasks.length === 0 ? (
-                <div className="py-6 text-center border border-dashed border-white/5 rounded-xl bg-black/20">
-                  <p className="text-xs text-white/30 italic">Nenhuma tarefa pendente neste bloco.</p>
-                  <button
-                    onClick={() => onAddTask(category.id)}
-                    className="mt-2 text-[11px] font-bold text-emerald-400 hover:underline cursor-pointer"
-                  >
-                    + Adicionar a primeira tarefa
-                  </button>
-                </div>
-              ) : (
+              {/* Lista de Cards da Categoria */}
+              {catTasks.length > 0 ? (
                 <div className="space-y-3">
-                  {categoryTasks.map((task) => {
+                  {catTasks.map((task) => {
                     const creator = allPartners.find(p => p.id === task.created_by_partner_id);
                     return (
                       <TaskCard
@@ -424,30 +445,40 @@ function PartnerColumn({
                         assignedName={partner.name}
                         onToggleStatus={onToggleStatus}
                         onDelete={onDeleteTask}
+                        onOpenDetail={onOpenDetail}
                       />
                     );
                   })}
                 </div>
+              ) : (
+                /* Item vazio sutil e discreto (sem caixa gigante agoniante) */
+                <button
+                  onClick={() => onAddTask(category.id)}
+                  className="w-full py-2.5 px-4 rounded-xl border border-dashed border-white/5 hover:border-white/15 text-left text-xs text-white/30 hover:text-white/60 hover:bg-white/[0.02] transition-all flex items-center justify-between cursor-pointer"
+                >
+                  <span className="italic">Nenhuma tarefa pendente neste setor</span>
+                  <span className="text-[11px] font-semibold text-emerald-400/80 hover:text-emerald-400">+ Adicionar</span>
+                </button>
               )}
             </div>
           );
         })}
 
-        {/* Bloco: Geral / Sem Bloco Especificado */}
-        {unassignedCategoryTasks.length > 0 && (
-          <div className="bg-black/30 border border-dashed border-white/10 rounded-2xl p-4 sm:p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Layers className="size-4 text-white/40" />
-                <h3 className="text-sm font-bold text-white/70">Demandas Gerais (Sem Bloco)</h3>
-                <span className="text-[10px] bg-white/10 text-white/60 px-2 py-0.5 rounded-full font-mono">
-                  {unassignedCategoryTasks.length}
-                </span>
-              </div>
+        {/* Tarefas Gerais (Sem Setor) */}
+        {unassignedTasks.length > 0 && (
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center gap-2 px-1">
+              <Layers className="size-3.5 text-white/40" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">
+                Geral / Outras Demandas
+              </h3>
+              <span className="text-[10px] font-mono font-bold text-white/40 bg-white/5 border border-white/10 px-1.5 py-0.2 rounded-md">
+                {unassignedTasks.length}
+              </span>
             </div>
 
             <div className="space-y-3">
-              {unassignedCategoryTasks.map((task) => {
+              {unassignedTasks.map((task) => {
                 const creator = allPartners.find(p => p.id === task.created_by_partner_id);
                 return (
                   <TaskCard
@@ -457,6 +488,7 @@ function PartnerColumn({
                     assignedName={partner.name}
                     onToggleStatus={onToggleStatus}
                     onDelete={onDeleteTask}
+                    onOpenDetail={onOpenDetail}
                   />
                 );
               })}
@@ -464,13 +496,13 @@ function PartnerColumn({
           </div>
         )}
 
-        {/* Botão de Rodapé para Criar Novo Bloco */}
+        {/* Botão de Adicionar Novo Setor ao Sócio */}
         <button
           onClick={onAddCategory}
-          className="w-full py-3.5 border border-dashed border-white/15 hover:border-purple-500/40 rounded-2xl text-xs font-bold text-white/50 hover:text-purple-300 hover:bg-purple-500/5 transition-all flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full py-3 rounded-2xl border border-dashed border-white/10 hover:border-purple-500/40 text-xs font-bold text-white/40 hover:text-purple-300 hover:bg-purple-500/5 transition-all flex items-center justify-center gap-2 cursor-pointer mt-4"
         >
-          <FolderPlus className="size-4 text-purple-400" />
-          <span>Criar Novo Bloco para {partner.name}</span>
+          <FolderPlus className="size-3.5 text-purple-400" />
+          <span>Criar Novo Setor para {partner.name}</span>
         </button>
       </div>
     </div>
