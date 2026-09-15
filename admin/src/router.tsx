@@ -16,6 +16,7 @@ const CRMDashboard = lazy(() => import('./components/CRMDashboard'));
 const ChatbotPage = lazy(() => import('./components/ChatbotPage'));
 const MarketingModule = lazy(() => import('./components/MarketingModule'));
 const PartnersDashboard = lazy(() => import('./components/PartnersDashboard'));
+const CompanyTasksPage = lazy(() => import('./components/CompanyTasksPage'));
 const SettingsPage = lazy(() => import('./components/SettingsPage'));
 
 import { AdminLayout } from './layouts/AdminLayout';
@@ -104,6 +105,10 @@ export const router = createBrowserRouter([
       {
         path: 'socios',
         element: <SuspenseWrap><PartnersDashboard /></SuspenseWrap>,
+      },
+      {
+        path: 'tarefas',
+        element: <SuspenseWrap><CompanyTasksPage /></SuspenseWrap>,
       },
       {
         path: 'configuracoes',
