@@ -695,6 +695,7 @@ export default function FinanceDashboard() {
   // Estados de Ciclo Financeiro (Regra 14 -> 13 no fuso America/Sao_Paulo)
   const [currentCycle, setCurrentCycle] = useState<CycleDefinition>(getCurrentCycle());
   const [monthlyCycles, setMonthlyCycles] = useState<CycleFinancialMetrics[]>([]);
+  const [partnerTransactions, setPartnerTransactions] = useState<any[]>([]);
   const [quarterlyPeriods, setQuarterlyPeriods] = useState<ConsolidatedPeriod[]>([]);
   const [semiannualPeriods, setSemiannualPeriods] = useState<ConsolidatedPeriod[]>([]);
   const [annualPeriods, setAnnualPeriods] = useState<ConsolidatedPeriod[]>([]);
@@ -775,7 +776,7 @@ export default function FinanceDashboard() {
       setFinanceError(null);
 
       // Executa todas as consultas financeiras em paralelo para carregamento ultrarrápido
-      const [persistedCostsRes, ordersRes, productsRes, repurchasesRes] = await Promise.all([
+      const [persistedCostsRes, ordersRes, productsRes, repurchasesRes, partnerTxRes] = await Promise.all([
         fetchProductCostsMap(targetCompanyId).catch(() => ({})),
         supabase
           .from("smoking_orders")
@@ -784,7 +785,7 @@ export default function FinanceDashboard() {
           .neq("delivery_status", "CANCELADO"),
         supabase
           .from("smoking_products")
-          .select("*")
+          .select("id, name, brand, stock, price, cost_price, flavor")
           .eq("company_id", targetCompanyId)
           .eq("is_active", true),
         supabase
@@ -792,6 +793,10 @@ export default function FinanceDashboard() {
           .select("*")
           .eq("company_id", targetCompanyId)
           .order("purchase_date", { ascending: false }),
+        supabase
+          .from("smoking_partner_transactions")
+          .select("*")
+          .eq("company_id", targetCompanyId)
       ]);
 
       // Inspecionar explicitamente se smoking_orders retornou erro
@@ -864,6 +869,9 @@ export default function FinanceDashboard() {
       const validOrders = filterValidOrders(rawOrders);
       setAllValidOrders(validOrders);
       setPersistedProductCosts(persistedCosts);
+      
+      const loadedPartnerTxs = partnerTxRes?.data || [];
+      setPartnerTransactions(loadedPartnerTxs);
 
       // 1. Estoque Físico na Prateleira
       let totalStockCostSum = 0;
@@ -1063,8 +1071,8 @@ export default function FinanceDashboard() {
 
   // ── All-Time Metrics (Histórico Completo para Eficiência Comercial & Caixa Real Atual) ──
   const allTimeMetrics = useMemo(() => {
-    return calculateAllTimeMetrics(allValidOrders, repurchases, persistedProductCosts);
-  }, [allValidOrders, repurchases, persistedProductCosts]);
+    return calculateAllTimeMetrics(allValidOrders, repurchases, persistedProductCosts, partnerTransactions);
+  }, [allValidOrders, repurchases, persistedProductCosts, partnerTransactions]);
 
   // CAIXA REAL ATUAL: Posição patrimonial viva da empresa (NÃO reinicia no dia 14)
   // Conforme regra fundamental: Faturamento total acumulado - total pago em recompras

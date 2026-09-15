@@ -62,7 +62,7 @@ export function NewTransactionModal({
         amount: numAmount,
         date,
         description: desc,
-        destinationCategory: 'ESTOQUE'
+        destinationCategory: 'CAIXA_GERAL'
       });
 
       onTransactionCreated();

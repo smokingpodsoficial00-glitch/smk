@@ -757,8 +757,22 @@ export function calculatePartnersFinancials(params: {
     return sum + (Number(r.stock_purchase_amount) || 0);
   }, 0);
   
+  let capitalInflows = 0;
+  let capitalOutflows = 0;
+
+  for (const tx of (transactions || [])) {
+    const amt = Number(tx.amount) || 0;
+    if (tx.type === 'APORTE' && (tx.destination_category === 'CAIXA' || tx.destination_category === 'CAIXA_GERAL')) {
+      capitalInflows += amt;
+    }
+    if (['RETIRADA_CAPITAL', 'DISTRIBUICAO_LUCRO', 'PRO_LABORE', 'DESPESA_OPERACIONAL'].includes(tx.type)) {
+      capitalOutflows += amt;
+    }
+  }
+  
   // Caixa Operacional / Real
-  const realCash = Number((revenueSum - stockPurchases).toFixed(2));
+  const operationalCash = revenueSum - stockPurchases;
+  const realCash = Number((operationalCash + capitalInflows - capitalOutflows).toFixed(2));
 
   // 5. PATRIMÔNIO REAL TOTAL DA LOJA
   // Caixa Real + Valor de Venda do Estoque Físico

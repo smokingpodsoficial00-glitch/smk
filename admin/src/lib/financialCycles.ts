@@ -616,8 +616,9 @@ export interface AllTimeFinancialMetrics {
  */
 export function calculateAllTimeMetrics(
   orders: any[],
-  repurchases: any[],
-  persistedCosts: Record<string, number> = {}
+  repurchases: any[] = [],
+  persistedCosts: Record<string, number> = {},
+  partnerTransactions: any[] = []
 ): AllTimeFinancialMetrics {
   const validOrders = filterValidOrders(orders);
 
@@ -665,8 +666,31 @@ export function calculateAllTimeMetrics(
   );
   const totalInvestedRepurchases = Number((stockPurchases + freightRepurchases).toFixed(2));
 
-  // CAIXA REAL ATUAL: Posição patrimonial atual da empresa (NÃO reseta no dia 14)
-  const realCash = Number((revenueSum - stockPurchases).toFixed(2));
+  // CAIXA REAL ATUAL (Tesouraria + Operação)
+  // 1. O capital inicial investido no negócio (R$ 1.105) já foi absorvido na compra inicial de estoque
+  //    (não contabilizada no repurchases). Se somarmos ele cegamente, o caixa duplica.
+  //    Portanto, "Aportes" com destination_category === 'ESTOQUE' (que é o caso do aporte inicial)
+  //    não entram aqui para não duplicar patrimônio artificialmente.
+  //    Apenas aportes direcionados explicitamente para 'CAIXA_GERAL' somam dinheiro na conta.
+  // 2. Retiradas de Capital, Distribuição de Lucro, Pró-Labore subtraem do caixa imediatamente.
+  let capitalInflows = 0;
+  let capitalOutflows = 0;
+
+  for (const tx of partnerTransactions) {
+    const amt = Number(tx.amount) || 0;
+    if (tx.type === 'APORTE' && (tx.destination_category === 'CAIXA' || tx.destination_category === 'CAIXA_GERAL')) {
+      capitalInflows += amt;
+    }
+    if (['RETIRADA_CAPITAL', 'DISTRIBUICAO_LUCRO', 'PRO_LABORE', 'DESPESA_OPERACIONAL'].includes(tx.type)) {
+      capitalOutflows += amt;
+    }
+  }
+
+  // Caixa puramente operacional (Vendas - Compras de Reposição)
+  const operationalCash = revenueSum - stockPurchases;
+
+  // Caixa Real (Operacional + Injeções em Caixa - Retiradas)
+  const realCash = Number((operationalCash + capitalInflows - capitalOutflows).toFixed(2));
 
   const averageTicket = totalOrders > 0 ? Number((revenueSum / totalOrders).toFixed(2)) : 0;
   const averagePricePerPod = podsSoldSum > 0 ? Number((revenueSum / podsSoldSum).toFixed(2)) : 0;
