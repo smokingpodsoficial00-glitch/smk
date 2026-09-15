@@ -752,19 +752,16 @@ export function calculatePartnersFinancials(params: {
     totalNetCapitalInvested += net;
   }
 
-  // 4.2 CAIXA REAL: Faturamento Bruto - Total Gasto em Reposições + (Aportes - Retiradas)
+  // 4.2 CAIXA REAL (Idêntico ao FinanceDashboard.tsx)
   const stockPurchases = (repurchases || []).reduce((sum: number, r: any) => {
     return sum + (Number(r.stock_purchase_amount) || 0);
   }, 0);
   
-  // Caixa Operacional
-  const operationalCash = revenueSum - stockPurchases;
-  
-  // Caixa da Tesouraria (Inclui Capital Social injetado e retirado)
-  const realCash = Number((operationalCash + totalNetCapitalInvested).toFixed(2));
+  // Caixa Operacional / Real
+  const realCash = Number((revenueSum - stockPurchases).toFixed(2));
 
   // 5. PATRIMÔNIO REAL TOTAL DA LOJA
-  // Caixa Real da Tesouraria + Valor de Venda do Estoque Físico
+  // Caixa Real + Valor de Venda do Estoque Físico
   const companyEconomicEquity = (realCash || 0) + (totalStockRetailSum || 0);
 
   // 6. DISTRIBUIÇÃO DAS FATIAS DE EQUITY
