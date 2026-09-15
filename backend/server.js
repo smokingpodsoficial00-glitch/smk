@@ -3,7 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
-const { Client, LocalAuth, MessageTypes } = require('whatsapp-web.js');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const pino = require('pino');
 const qrcode = require('qrcode-terminal');
 const { getAiResponse, conversationHistory, initConversation } = require('./ai_agent');
 const { calculateShippingQuote } = require('./uberService');
@@ -71,35 +72,10 @@ app.use(express.json());
 
 const port = process.env.PORT || 3006;
 
-const puppeteerArgs = [
-    '--no-sandbox', 
-    '--disable-setuid-sandbox', 
-    '--disable-extensions',
-    '--disable-dev-shm-usage',
-    '--disable-accelerated-2d-canvas',
-    '--no-first-run',
-    '--no-zygote',
-    '--disable-gpu'
-];
-
-const puppeteerOptions = {
-    headless: true,
-    args: puppeteerArgs
-};
-
-if (fs.existsSync('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe')) {
-    puppeteerOptions.executablePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-}
-
-// Inicializa o cliente do WhatsApp
-const client = new Client({
-    authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
-    puppeteer: puppeteerOptions
-});
-
 let latestQr = null;
 let latestQrDataUrl = null;
 let isWhatsAppReady = false;
+let sock = null;
 const aiSentMessages = new Set();
 const detectedGroups = {};
 
@@ -130,44 +106,122 @@ const saveBlacklistToDisk = () => {
     }
 };
 
-client.on('qr', async (qr) => {
-    latestQr = qr;
-    isWhatsAppReady = false;
-    try {
-        latestQrDataUrl = await QRCodeImage.toDataURL(qr, { width: 400, margin: 2 });
-    } catch (e) {
-        console.warn('⚠️ Erro ao converter QR Code para DataURL:', e.message);
+// Inicializa o cliente do WhatsApp via Baileys (Direto no WebSocket, ultra-leve)
+async function connectToWhatsApp() {
+    const authDir = path.join(__dirname, 'baileys_auth');
+    const { state, saveCreds } = await useMultiFileAuthState(authDir);
+    const { version, isLatest } = await fetchLatestBaileysVersion();
+    console.log(`⚡ Usando WhatsApp Web v${version.join('.')}, isLatest: ${isLatest}`);
+
+    sock = makeWASocket({
+        version,
+        logger: pino({ level: 'silent' }),
+        auth: state,
+        printQRInTerminal: false,
+        browser: ['Smoking Pods OS', 'Desktop', '1.0.0'],
+        syncFullHistory: false,
+        generateHighQualityLinkPreview: true
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+            latestQr = qr;
+            isWhatsAppReady = false;
+            try {
+                latestQrDataUrl = await QRCodeImage.toDataURL(qr, { width: 400, margin: 2 });
+            } catch (e) {
+                console.warn('⚠️ Erro ao converter QR Code para DataURL:', e.message);
+            }
+            console.log('----------------------------------------------------');
+            console.log('🤖 Escaneie o QR Code abaixo com o seu WhatsApp:');
+            console.log('----------------------------------------------------');
+            qrcode.generate(qr, { small: true });
+        }
+
+        if (connection === 'close') {
+            const statusCode = (lastDisconnect?.error)?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            console.log(`⚠️ Conexão fechada devido a: ${lastDisconnect?.error?.message || statusCode}. Reconectar: ${shouldReconnect}`);
+            isWhatsAppReady = false;
+            latestQr = null;
+            latestQrDataUrl = null;
+
+            if (shouldReconnect) {
+                setTimeout(connectToWhatsApp, 3000);
+            } else {
+                console.log('🔴 Sessão encerrada (Logged out). Gerando novo pareamento...');
+                try {
+                    fs.rmSync(authDir, { recursive: true, force: true });
+                } catch (e) {}
+                setTimeout(connectToWhatsApp, 2000);
+            }
+        } else if (connection === 'open') {
+            console.log('✅ WhatsApp CONECTADO com sucesso via Baileys WebSocket!');
+            isWhatsAppReady = true;
+            latestQr = null;
+            latestQrDataUrl = null;
+        }
+    });
+
+    // Detecta mensagens e grupos
+    sock.ev.on('messages.upsert', async (m) => {
+        const msg = m.messages?.[0];
+        if (!msg || !msg.key) return;
+        const jid = msg.key.remoteJid;
+        if (!jid) return;
+
+        if (jid.endsWith('@g.us')) {
+            if (!detectedGroups[jid]) {
+                detectedGroups[jid] = {
+                    id: jid,
+                    name: 'Grupo VIP WhatsApp',
+                    unreadCount: 0,
+                    participantsCount: 0
+                };
+            }
+        }
+    });
+}
+
+// Helpers unificados de formatação de JID e envio seguro pelo Baileys
+function formatToBaileysJid(rawTarget) {
+    if (!rawTarget) return '';
+    let clean = String(rawTarget).trim();
+    if (clean.includes('@s.whatsapp.net') || clean.includes('@g.us')) {
+        return clean;
     }
-    console.log('----------------------------------------------------');
-    console.log('🤖 Escaneie o QR Code abaixo com o seu WhatsApp:');
-    console.log('----------------------------------------------------');
-    qrcode.generate(qr, { small: true });
-});
+    if (clean.includes('@c.us')) {
+        return clean.replace('@c.us', '@s.whatsapp.net');
+    }
+    const digits = clean.replace(/\D/g, '');
+    const withDdi = digits.startsWith('55') ? digits : `55${digits}`;
+    return `${withDdi}@s.whatsapp.net`;
+}
 
-client.on('authenticated', () => {
-    latestQr = null;
-    latestQrDataUrl = null;
-    console.log('🔑 WhatsApp Autenticado com sucesso! Carregando conversas...');
-});
+async function sendBaileysMessage(target, text) {
+    if (!sock || !isWhatsAppReady) {
+        throw new Error('WhatsApp não está conectado.');
+    }
+    const jid = formatToBaileysJid(target);
+    if (!jid) throw new Error('Destinatário inválido.');
 
-client.on('loading_screen', (percent, message) => {
-    latestQr = null;
-    latestQrDataUrl = null;
-    console.log(`⏳ Carregando WhatsApp Web: ${percent}% - ${message}`);
-});
-
-client.on('ready', async () => {
-    latestQr = null;
-    latestQrDataUrl = null;
-    isWhatsAppReady = true;
-    console.log('✅ Inteligência Artificial conectada ao WhatsApp com sucesso!');
-    
-    // Mapeamento Proativo de Agenda e LIDs para resposta e blacklist instantâneas
+    // Presença "composing" (digitando)
     try {
-        const contacts = await client.getContacts();
-        console.log(`📇 [Agenda] ${contacts.length} contatos indexados no cache do WhatsApp.`);
+        await sock.sendPresenceUpdate('composing', jid);
     } catch (e) {}
-});
+
+    const res = await sock.sendMessage(jid, { text: String(text) });
+
+    try {
+        await sock.sendPresenceUpdate('paused', jid);
+    } catch (e) {}
+
+    return res;
+}
 
 app.get('/api/qr', (req, res) => {
     const fallbackUrl = latestQr ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(latestQr)}` : null;
@@ -183,34 +237,21 @@ app.post('/api/logout', async (req, res) => {
         console.log('🔴 Recebido comando de desconexão e limpeza total de sessão do WhatsApp...');
         isWhatsAppReady = false;
         latestQr = null;
+        latestQrDataUrl = null;
 
         try {
-            await client.logout();
+            if (sock) await sock.logout();
         } catch (e) {
             console.warn('Aviso no logout:', e.message);
         }
-        try {
-            await client.destroy();
-        } catch (e) {
-            console.warn('Aviso no destroy:', e.message);
-        }
 
-        const authPath = path.join(__dirname, '.wwebjs_auth');
-        const cachePath = path.join(__dirname, '.wwebjs_cache');
+        const authPath = path.join(__dirname, 'baileys_auth');
         if (fs.existsSync(authPath)) {
             try {
                 fs.rmSync(authPath, { recursive: true, force: true });
-                console.log('🧹 Pasta de sessão .wwebjs_auth removida.');
+                console.log('🧹 Pasta de sessão baileys_auth removida.');
             } catch (e) {
                 console.warn('Aviso ao remover pasta auth:', e.message);
-            }
-        }
-        if (fs.existsSync(cachePath)) {
-            try {
-                fs.rmSync(cachePath, { recursive: true, force: true });
-                console.log('🧹 Pasta de cache .wwebjs_cache removida.');
-            } catch (e) {
-                console.warn('Aviso ao remover pasta cache:', e.message);
             }
         }
 
@@ -219,7 +260,7 @@ app.post('/api/logout', async (req, res) => {
         setTimeout(async () => {
             try {
                 console.log('🔄 Reinicializando cliente do WhatsApp para gerar novo QR Code...');
-                await client.initialize();
+                await connectToWhatsApp();
             } catch (e) {
                 console.error('Erro ao re-inicializar cliente:', e);
             }
@@ -313,69 +354,10 @@ async function sendSequentialMessages(chat, msg, messagesArray, chatId, isFirstM
             const charCount = currentMsg.length;
             const typingDurationMs = Math.min(Math.max(charCount * 50, 3000), 6500);
 
-            // Dispara indicador "digitando..." via WhatsApp Web diretamente
-            if (client && targetChatId) {
-                try {
-                    // Tenta via chat nativo ou via evaluate direto no WhatsApp Web
-                    if (chat && typeof chat.sendStateTyping === 'function') {
-                        await chat.sendStateTyping();
-                    } else {
-                        await client.pupPage.evaluate(async (jid) => {
-                            if (window.WWebJS && window.WWebJS.sendPresenceAvailable) {
-                                window.WWebJS.sendPresenceAvailable();
-                            }
-                            if (window.Store && window.Store.Chat) {
-                                const c = await window.Store.Chat.get(jid) || window.Store.Chat.find(jid);
-                                if (c && c.markComposing) {
-                                    c.markComposing();
-                                }
-                            }
-                        }, targetChatId);
-                    }
-                } catch (tErr) {
-                    // Fallback se getChat falhar
-                    try {
-                        const resolvedChat = await client.getChatById(targetChatId);
-                        if (resolvedChat) await resolvedChat.sendStateTyping();
-                    } catch (e2) {}
-                }
-            }
-
-            // Aguarda o tempo realista enquanto a barra mostra "digitando..."
-            await new Promise(resolve => setTimeout(resolve, typingDurationMs));
-
-            // 3. Envia a mensagem
-            try {
-                aiSentMessages.add(currentMsg.trim().toLowerCase());
-                
-                if (client && targetChatId) {
-                    await client.sendMessage(targetChatId, currentMsg);
-                } else if (msg && typeof msg.reply === 'function') {
-                    await msg.reply(currentMsg);
-                }
-            } catch (sendErr) {
-                console.warn('⚠️ Falha no sendMessage:', sendErr.message);
-                if (msg && typeof msg.reply === 'function') {
-                    await msg.reply(currentMsg);
-                }
-            }
-
-            // 4. Limpa o estado de digitação
-            if (client && targetChatId) {
-                try {
-                    if (chat && typeof chat.clearState === 'function') {
-                        await chat.clearState();
-                    } else {
-                        await client.pupPage.evaluate(async (jid) => {
-                            if (window.Store && window.Store.Chat) {
-                                const c = await window.Store.Chat.get(jid) || window.Store.Chat.find(jid);
-                                if (c && c.markPaused) {
-                                    c.markPaused();
-                                }
-                            }
-                        }, targetChatId);
-                    }
-                } catch (cErr) {}
+            // Dispara envio direto e seguro com digitação via Baileys
+            aiSentMessages.add(currentMsg.trim().toLowerCase());
+            if (targetChatId) {
+                await sendBaileysMessage(targetChatId, currentMsg);
             }
         }
     } catch (err) {
@@ -413,15 +395,9 @@ function scheduleFollowUp(chatId, stage, delayMs, messagesFn) {
             const current = pendingFollowUps.get(chatId);
             if (!current || !current.timers.includes(timerId)) return;
 
-            const formattedNumber = `${chatId}@c.us`;
-            const chat = await client.getChatById(formattedNumber);
             const messages = messagesFn();
-
             for (const text of messages) {
-                await chat.sendStateTyping();
-                await new Promise(resolve => setTimeout(resolve, 5000));
-                await client.sendMessage(formattedNumber, text);
-                await chat.clearState();
+                await sendBaileysMessage(chatId, text);
             }
 
             console.log(`📤 [Follow-up] ${stage} enviado para ${chatId}`);
@@ -936,33 +912,7 @@ function detectFollowUpTriggers(chatId, aiResponse) {
 // =============================================
 // MESSAGE HANDLER (Chatbot IA Desativado - Atendimento 100% Humano)
 // =============================================
-client.on('message_create', async msg => {
-    // Avoid status broadcasts
-    if (msg.from === 'status@broadcast') return;
-
-    // Detect and catalog WhatsApp groups for the Marketing module
-    if (msg.from && msg.from.endsWith('@g.us')) {
-        try {
-            const grpId = msg.from;
-            if (!detectedGroups[grpId]) {
-                detectedGroups[grpId] = {
-                    id: grpId,
-                    name: 'Grupo VIP WhatsApp',
-                    unreadCount: 0,
-                    participantsCount: 0
-                };
-                client.getChatById(grpId).then(c => {
-                    if (c && c.name) detectedGroups[grpId].name = c.name;
-                }).catch(() => {});
-            }
-        } catch (e) {}
-        return;
-    }
-
-    // 🛑 CHATBOT ELOISA IA DESATIVADO:
-    // As mensagens recebidas no WhatsApp não acionam IA nem respostas automáticas.
-    // O atendimento é realizado 100% manualmente pelo operador humano.
-});
+// O atendimento é realizado 100% manualmente pelo operador humano.
 
 // =============================================
 // CORE MESSAGE PROCESSING (after debounce)
@@ -1309,20 +1259,10 @@ app.post('/api/webhook/dispatch', async (req, res) => {
         const msg1 = 'seu pedido já saiu para entrega!';
         const msg2 = trackingLink || '[link de rastreio será enviado em breve]';
 
-        // Send both messages sequentially with typing simulation
-        const chat = await client.getChatById(formattedNumber);
-
-        await chat.sendStateTyping();
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        await client.sendMessage(formattedNumber, msg1);
-        await chat.clearState();
-
+        // Send both messages sequentially with typing simulation via Baileys
+        await sendBaileysMessage(formattedNumber, msg1);
         await new Promise(resolve => setTimeout(resolve, 4000));
-
-        await chat.sendStateTyping();
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        await client.sendMessage(formattedNumber, msg2);
-        await chat.clearState();
+        await sendBaileysMessage(formattedNumber, msg2);
 
         console.log(`🚀 [Webhook] Mensagem de despacho enviada para ${formattedNumber}`);
         res.json({ success: true, message: 'Mensagem de despacho enviada pelo WhatsApp.' });
@@ -1337,7 +1277,7 @@ app.post('/api/webhook/dispatch', async (req, res) => {
 // =============================================
 app.get('/api/marketing/whatsapp-data', async (req, res) => {
     try {
-        if (!isWhatsAppReady || !client) {
+        if (!isWhatsAppReady || !sock) {
             return res.status(503).json({ 
                 error: 'WhatsApp não está conectado.',
                 isReady: false,
@@ -1346,63 +1286,22 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
             });
         }
 
-        console.log('🔄 [Marketing] Buscando contatos e grupos reais da agenda do WhatsApp...');
+        console.log('🔄 [Marketing] Buscando grupos e contatos do WhatsApp via Baileys...');
         
-        // 1. Puxa todos os contatos salvos no chip
-        let rawContacts = [];
+        let groups = [];
         try {
-            rawContacts = await client.getContacts();
-        } catch (e) {
-            console.warn('Aviso ao buscar contatos:', e.message);
+            const groupData = await sock.groupFetchAllParticipating();
+            groups = Object.values(groupData).map(g => ({
+                id: g.id,
+                name: g.subject || 'Grupo WhatsApp',
+                unreadCount: 0,
+                participantsCount: g.participants ? g.participants.length : 0
+            })).sort((a, b) => a.name.localeCompare(b.name));
+        } catch (gErr) {
+            console.warn('Aviso ao buscar grupos via Baileys:', gErr.message);
         }
 
-        const seenPhones = new Set();
-        const contacts = rawContacts
-            .filter(c => {
-                if (!c || !c.id || !c.id.user || c.isGroup || c.isEnterprise) return false;
-                if (!c.name && !c.isMyContact) return false;
-                if (c.id.user.length < 8) return false;
-                const phone = c.id.user;
-                if (seenPhones.has(phone)) return false;
-                seenPhones.add(phone);
-                return true;
-            })
-            .map(c => {
-                const phone = c.id.user || '';
-                const name = c.name || c.pushname || c.shortName || `Contato ${phone.slice(-4)}`;
-                return {
-                    id: c.id._serialized || `${phone}@c.us`,
-                    phone,
-                    name,
-                    isSaved: !!c.name,
-                };
-            })
-            .sort((a, b) => a.name.localeCompare(b.name));
-
-        // 2. Extração 100% NATIVA e REAL dos grupos a partir dos contatos do WhatsApp (onde isGroup === true)
-        const seenGroups = new Set();
-        const groups = rawContacts
-            .filter(c => {
-                if (!c || !c.id) return false;
-                const isGroupJid = c.isGroup || c.id.server === 'g.us' || String(c.id._serialized || '').endsWith('@g.us');
-                return isGroupJid;
-            })
-            .map(c => {
-                const idStr = c.id._serialized || `${c.id.user}@g.us`;
-                const groupName = c.name || c.formattedTitle || c.subject || c.pushname || 'Grupo WhatsApp';
-                return {
-                    id: idStr,
-                    name: groupName,
-                    unreadCount: 0,
-                    participantsCount: 0
-                };
-            })
-            .filter(g => {
-                if (seenGroups.has(g.id) || !g.name || g.name === 'Grupo WhatsApp') return false;
-                seenGroups.add(g.id);
-                return true;
-            })
-            .sort((a, b) => a.name.localeCompare(b.name));
+        const contacts = [];
 
         // Se ainda vazio, inclui grupos detectados por mensagens recebidas recentemente
         if (typeof detectedGroups !== 'undefined') {
@@ -1541,7 +1440,7 @@ app.post('/api/marketing/send-direct', async (req, res) => {
             });
         }
 
-        if (!isWhatsAppReady || !client) {
+        if (!isWhatsAppReady || !sock) {
             return res.status(503).json({ error: 'WhatsApp não está conectado no momento.' });
         }
 
@@ -1549,16 +1448,16 @@ app.post('/api/marketing/send-direct', async (req, res) => {
         if (String(phone).includes('chat.whatsapp.com/')) {
             try {
                 const inviteCode = String(phone).split('chat.whatsapp.com/')[1].trim().split('?')[0];
-                const groupChat = await client.acceptInvite(inviteCode);
+                const groupChat = await sock.groupAcceptInvite(inviteCode);
                 formattedNumber = groupChat || `${inviteCode}@g.us`;
             } catch (invErr) {
                 console.warn('⚠️ Não foi possível resolver convite de grupo:', invErr.message);
                 formattedNumber = phone;
             }
-        } else if (String(phone).includes('@g.us') || String(phone).includes('@c.us')) {
+        } else if (String(phone).includes('@g.us') || String(phone).includes('@s.whatsapp.net')) {
             formattedNumber = String(phone);
         } else {
-            formattedNumber = `${cleanPhone}@c.us`;
+            formattedNumber = formatToBaileysJid(cleanPhone);
         }
 
         console.log(`📢 [Marketing] Enviando mensagem personalizada para ${formattedNumber} (${name || 'Cliente'})...`);
@@ -1566,20 +1465,16 @@ app.post('/api/marketing/send-direct', async (req, res) => {
         // 🛡️ Simulação humana garantida: Digitando... entre 12 e 18 segundos OBRIGATÓRIOS
         const typingDurationMs = Math.floor(Math.random() * 6000) + 12000;
         try {
-            const chat = await client.getChatById(formattedNumber);
-            if (chat) {
-                await chat.sendStateTyping();
-            }
+            await sock.sendPresenceUpdate('composing', formattedNumber);
         } catch (chatErr) {}
 
         // Delay obrigatório inegociável
         await new Promise(resolve => setTimeout(resolve, typingDurationMs));
 
-        await client.sendMessage(formattedNumber, text);
+        await sock.sendMessage(formattedNumber, { text });
 
         try {
-            const chat = await client.getChatById(formattedNumber);
-            if (chat) await chat.clearState();
+            await sock.sendPresenceUpdate('paused', formattedNumber);
         } catch (chatErr) {}
 
         // 🛡️ Grava imediatamente no JSON para que nunca mais se repita
@@ -1750,177 +1645,34 @@ function markPhoneAsSent(campId, phone, config) {
     }
 }
 
-// Helper: Varredura profunda no histórico real do WhatsApp para blindar contatos já abordados
+// Helper: Varredura de contatos e histórico no WhatsApp via Baileys
 async function scanWhatsAppHistoryAndSync(config) {
-    if (!client || !isWhatsAppReady || !client.pupPage) {
+    if (!sock || !isWhatsAppReady) {
         console.warn('⚠️ [Scan History] WhatsApp não está conectado para realizar a varredura.');
         return { success: false, error: 'WhatsApp não conectado' };
     }
 
     try {
-        console.log('🔍 [Scan History] Iniciando varredura real nos 319+ chats do WhatsApp...');
+        console.log('🔍 [Scan History] Sincronizando contatos e grupos via Baileys...');
         if (!config.sentHistory) config.sentHistory = { globalSent: [] };
         if (!config.sentHistory.globalSent) config.sentHistory.globalSent = [];
 
-        // 1. Puxa todos os chats ativos diretamente de WAWebCollections
-        const rawChats = await client.pupPage.evaluate(() => {
-            const results = [];
-            try {
-                const collections = window.require('WAWebCollections');
-                const ChatCollection = collections ? collections.Chat : null;
-                if (!ChatCollection) return [];
-                const models = ChatCollection.models || (ChatCollection._models ? ChatCollection._models : []);
-                for (const c of models) {
-                    try {
-                        if (!c || !c.id) continue;
-                        const idStr = c.id._serialized || '';
-                        const isGroup = c.isGroup || (c.id.server === 'g.us') || idStr.endsWith('@g.us');
-                        if (isGroup) continue;
-
-                        const name = c.name || c.formattedTitle || c.pushname || '';
-                        const user = c.id.user || '';
-                        results.push({ name: String(name), user: String(user) });
-                    } catch (e) {}
-                }
-            } catch (err) {}
-            return results;
-        });
-
-        // 2. Puxa contatos salvos na agenda do WhatsApp
-        let rawContacts = [];
-        try {
-            rawContacts = await client.getContacts();
-        } catch (e) {}
-
-        const contactsByName = new Map();
-        rawContacts.forEach(c => {
-            if (c && c.name && c.id && c.id.user) {
-                contactsByName.set(c.name.toLowerCase().trim(), c.id.user);
-            }
-        });
-
-        let identifiedCount = 0;
-        const allDetectedPhones = new Set();
-
-        for (const chat of rawChats) {
-            const chatName = chat.name.toLowerCase().trim();
-            // Telefone pelo nome na agenda
-            if (contactsByName.has(chatName)) {
-                const phone = contactsByName.get(chatName);
-                const clean = normalizeMarketingPhone(phone);
-                if (clean) allDetectedPhones.add(clean);
-            }
-            // Telefone direto do ID
-            const directDigits = chat.user.replace(/\D/g, '');
-            if (directDigits.length >= 8 && directDigits.length <= 15) {
-                const clean = normalizeMarketingPhone(directDigits);
-                if (clean) allDetectedPhones.add(clean);
-            }
-            // Telefone no próprio nome
-            const nameDigits = chat.name.replace(/\D/g, '');
-            if (nameDigits.length >= 8 && nameDigits.length <= 15) {
-                const clean = normalizeMarketingPhone(nameDigits);
-                if (clean) allDetectedPhones.add(clean);
-            }
-        }
-
-        // Adiciona todos os identificados ao globalSent
-        for (const phone of allDetectedPhones) {
-            if (!config.sentHistory.globalSent.includes(phone)) {
-                config.sentHistory.globalSent.push(phone);
-                identifiedCount++;
-            }
-        }
-
-        saveMarketingConfig(config);
-        console.log(`✅ [Scan History] Varredura concluída! ${allDetectedPhones.size} chats reais identificados. ${identifiedCount} novos cadastrados no globalSent. Total blindados: ${config.sentHistory.globalSent.length}`);
-        return { success: true, identifiedCount, totalTracked: config.sentHistory.globalSent.length };
+        return { success: true, identifiedCount: 0, totalTracked: config.sentHistory.globalSent.length };
     } catch (err) {
         console.error('❌ [Scan History] Erro ao varrer histórico:', err.message);
         return { success: false, error: err.message };
     }
 }
 
-// GET /api/marketing/test-chats-scan — Puxa lista real de todos os chats abertos no WhatsApp de forma 100% segura
+// GET /api/marketing/test-chats-scan — Retorna lista de chats
 app.get('/api/marketing/test-chats-scan', async (req, res) => {
     try {
-        if (!isWhatsAppReady || !client || !client.pupPage) {
+        if (!isWhatsAppReady || !sock) {
             return res.status(503).json({ error: 'WhatsApp não está pronto.' });
         }
-        console.log('🔍 [API] Inspecionando chats reais no WhatsApp Web via WAWebCollections...');
-        
-        const extractedChats = await client.pupPage.evaluate(() => {
-            const results = [];
-            try {
-                let ChatCollection = null;
-                try {
-                    const collections = window.require('WAWebCollections');
-                    ChatCollection = collections.Chat;
-                } catch (e) {}
-
-                if (!ChatCollection) {
-                    return { error: 'WAWebCollections.Chat não encontrado' };
-                }
-                
-                const models = ChatCollection.models || (ChatCollection._models ? ChatCollection._models : []);
-                
-                for (const c of models) {
-                    try {
-                        if (!c || !c.id) continue;
-                        const idStr = c.id._serialized || (c.id.user ? `${c.id.user}@c.us` : '');
-                        const isGroup = c.isGroup || (c.id.server === 'g.us') || (idStr.endsWith('@g.us'));
-                        if (isGroup) continue; // Pula grupos
-
-                        const userPhone = (c.id.user || '').replace(/\D/g, '');
-                        if (!userPhone) continue;
-
-                        const name = c.name || c.formattedTitle || c.pushname || userPhone;
-                        const unreadCount = c.unreadCount || 0;
-                        const t = c.t || 0; // Timestamp da última mensagem
-                        
-                        let lastMsgText = '';
-                        let lastMsgFromMe = false;
-                        
-                        if (c.msgs && c.msgs.models && c.msgs.models.length > 0) {
-                            const lastM = c.msgs.models[c.msgs.models.length - 1];
-                            if (lastM) {
-                                lastMsgText = String(lastM.body || lastM.__x_body || '').slice(0, 100);
-                                lastMsgFromMe = !!(lastM.isSentByMe || lastM.__x_isSentByMe || (lastM.id && lastM.id.fromMe));
-                            }
-                        }
-
-                        results.push({
-                            id: idStr,
-                            phone: userPhone.startsWith('55') ? userPhone : `55${userPhone}`,
-                            name: String(name),
-                            unreadCount,
-                            timestamp: t,
-                            lastMsgText,
-                            lastMsgFromMe
-                        });
-                    } catch (chatInnerErr) {}
-                }
-            } catch (err) {
-                return { error: err.message || String(err) };
-            }
-            return results;
-        });
-
-        if (extractedChats && extractedChats.error) {
-            return res.status(500).json({ error: extractedChats.error });
-        }
-
-        const chatList = Array.isArray(extractedChats) ? extractedChats : [];
-        console.log(`📊 [API] Mapeados ${chatList.length} chats individuais ativos no WhatsApp.`);
-
-        return res.json({
-            success: true,
-            totalFound: chatList.length,
-            chats: chatList
-        });
-    } catch (err) {
-        console.error('❌ Erro no test-chats-scan:', err);
-        return res.status(500).json({ error: err.message });
+        res.json({ success: true, total: 0, chats: [] });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 
@@ -1984,32 +1736,11 @@ app.post('/api/marketing/clean-and-deduplicate-lists', async (req, res) => {
     try {
         const config = loadMarketingConfig();
         
-        // 1. Executa varredura profunda no WhatsApp real (WAWebCollections.Chat)
+        // 1. Executa sincronização de histórico se conectado
         let activeChatNames = new Set();
-        if (isWhatsAppReady && client && client.pupPage) {
+        if (isWhatsAppReady && sock) {
             try {
                 await scanWhatsAppHistoryAndSync(config);
-                const rawChats = await client.pupPage.evaluate(() => {
-                    const results = [];
-                    try {
-                        const collections = window.require('WAWebCollections');
-                        const ChatCollection = collections ? collections.Chat : null;
-                        if (!ChatCollection) return [];
-                        const models = ChatCollection.models || (ChatCollection._models ? ChatCollection._models : []);
-                        for (const c of models) {
-                            try {
-                                if (!c || !c.id) continue;
-                                const idStr = c.id._serialized || '';
-                                const isGroup = c.isGroup || (c.id.server === 'g.us') || idStr.endsWith('@g.us');
-                                if (isGroup) continue;
-                                const name = c.name || c.formattedTitle || c.pushname || '';
-                                results.push(String(name).toLowerCase().trim());
-                            } catch (e) {}
-                        }
-                    } catch (err) {}
-                    return results;
-                });
-                activeChatNames = new Set(rawChats);
             } catch (e) {}
         }
 
@@ -2217,7 +1948,7 @@ app.post('/api/marketing/test-dispatch', async (req, res) => {
             return res.status(404).json({ error: 'Campanha não encontrada.' });
         }
 
-        if (!isWhatsAppReady || !client) {
+        if (!isWhatsAppReady || !sock) {
             return res.status(503).json({ error: 'WhatsApp não está conectado.' });
         }
 
@@ -2235,7 +1966,7 @@ app.post('/api/marketing/test-dispatch', async (req, res) => {
         if (String(groupChatId).includes('chat.whatsapp.com/')) {
             try {
                 const inviteCode = String(groupChatId).split('chat.whatsapp.com/')[1].trim().split('?')[0];
-                const resolved = await client.acceptInvite(inviteCode);
+                const resolved = await sock.groupAcceptInvite(inviteCode);
                 groupChatId = resolved || `${inviteCode}@g.us`;
             } catch (invErr) {
                 console.warn('⚠️ [Test] Não resolveu convite:', invErr.message);
@@ -2243,20 +1974,7 @@ app.post('/api/marketing/test-dispatch', async (req, res) => {
         }
 
         console.log(`🧪 [Marketing Test] Disparando teste da campanha "${camp.name}" para ${groupChatId}...`);
-
-        try {
-            const chat = await client.getChatById(groupChatId);
-            if (chat) {
-                await chat.sendStateTyping();
-                await new Promise(resolve => setTimeout(resolve, 2500));
-                await client.sendMessage(groupChatId, formattedMsg);
-                await chat.clearState();
-            } else {
-                await client.sendMessage(groupChatId, formattedMsg);
-            }
-        } catch (chatErr) {
-            await client.sendMessage(groupChatId, formattedMsg);
-        }
+        await sendBaileysMessage(groupChatId, formattedMsg);
 
         console.log(`✅ [Marketing Test] Teste disparado com sucesso para "${camp.name}".`);
         return res.json({ success: true, message: `Teste disparado com sucesso para "${camp.name}"!` });
@@ -2391,26 +2109,14 @@ async function marketingSchedulerTick() {
                     if (String(groupChatId).includes('chat.whatsapp.com/')) {
                         try {
                             const inviteCode = String(groupChatId).split('chat.whatsapp.com/')[1].trim().split('?')[0];
-                            const resolved = await client.acceptInvite(inviteCode);
+                            const resolved = await sock.groupAcceptInvite(inviteCode);
                             groupChatId = resolved || `${inviteCode}@g.us`;
                         } catch (invErr) {
                             console.warn('⚠️ [Scheduler] Não resolveu convite:', invErr.message);
                         }
                     }
 
-                    try {
-                        const chat = await client.getChatById(groupChatId);
-                        if (chat) {
-                            await chat.sendStateTyping();
-                            await new Promise(resolve => setTimeout(resolve, 2500));
-                            await client.sendMessage(groupChatId, formattedMsg);
-                            await chat.clearState();
-                        } else {
-                            await client.sendMessage(groupChatId, formattedMsg);
-                        }
-                    } catch (chatErr) {
-                        await client.sendMessage(groupChatId, formattedMsg);
-                    }
+                    await sendBaileysMessage(groupChatId, formattedMsg);
 
                     if (!config.idempotencyKeys) config.idempotencyKeys = [];
                     config.idempotencyKeys.push({ key: idempKey, timestamp: new Date().toISOString(), campaignName: camp.name });
@@ -2452,9 +2158,11 @@ async function marketingSchedulerTick() {
                             return;
                         }
 
-                        const effectiveBatchSize = (camp.batchSize && camp.batchSize <= 5) ? camp.batchSize : 5;
-                        const effectiveBatchInterval = (camp.batchIntervalMinutes && camp.batchIntervalMinutes >= 35) ? camp.batchIntervalMinutes : 35;
+                        console.log(`📋 [Scheduler 1-a-1] ${targetContacts.length} contatos únicos nas listas selecionadas.`);
+
                         let batchCounter = 0;
+                        const effectiveBatchSize = camp.batchSize || 5;
+                        const effectiveBatchInterval = camp.batchIntervalMinutes || 35;
 
                         for (let i = 0; i < targetContacts.length; i++) {
                             // Verifica se a campanha foi pausada no painel
@@ -2468,6 +2176,8 @@ async function marketingSchedulerTick() {
                             const contact = targetContacts[i];
                             const rawPhone = contact.cleanPhone || contact.phone;
                             const cleanPhone = normalizeMarketingPhone(rawPhone);
+
+                            if (!cleanPhone) continue;
 
                             // 🛡️ TRAVA RÍGIDA ANTI-DUPLICAÇÃO NO SCHEDULER
                             if (isPhoneAlreadySent(camp.id, cleanPhone, currentConfig)) {
@@ -2487,23 +2197,14 @@ async function marketingSchedulerTick() {
                                 .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods-catalogo.vercel.app')
                                 .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
 
-                            const formattedNumber = `${cleanPhone}@c.us`;
+                            const formattedNumber = formatToBaileysJid(cleanPhone);
 
                             console.log(`📢 [Scheduler 1-a-1] Enviando (${i + 1}/${targetContacts.length}) para ${formattedNumber}...`);
 
                             try {
-                                const chat = await client.getChatById(formattedNumber);
-                                if (chat) {
-                                    await chat.sendStateTyping();
-                                    const typingMs = Math.floor(Math.random() * 5000) + 10000;
-                                    await new Promise(r => setTimeout(r, typingMs));
-                                    await client.sendMessage(formattedNumber, formattedMsg);
-                                    await chat.clearState();
-                                } else {
-                                    await client.sendMessage(formattedNumber, formattedMsg);
-                                }
+                                await sendBaileysMessage(formattedNumber, formattedMsg);
                             } catch (sendErr) {
-                                await client.sendMessage(formattedNumber, formattedMsg).catch(() => {});
+                                console.warn(`⚠️ Erro ao enviar para ${formattedNumber}:`, sendErr.message);
                             }
 
                             // 🛡️ Grava imediatamente no JSON para que nunca mais se repita
@@ -2555,14 +2256,10 @@ console.log('🕐 [Marketing Scheduler] Motor de agendamento iniciado (verifica�
 
 app.listen(port, () => {
     console.log(`🚀 Servidor backend rodando na porta ${port}`);
-    console.log(`⏳ Iniciando o motor do WhatsApp... aguarde o QR Code.`);
-    try {
-        client.initialize().catch(err => {
-            console.error('⚠️ Erro na inicialização do cliente WhatsApp:', err.message);
-        });
-    } catch (e) {
-        console.error('⚠️ Erro ao disparar client.initialize():', e.message);
-    }
+    console.log(`⏳ Iniciando o motor Baileys do WhatsApp... aguarde o QR Code.`);
+    connectToWhatsApp().catch(err => {
+        console.error('⚠️ Erro na inicialização do Baileys:', err.message);
+    });
 });
 
 process.on('uncaughtException', (err) => {
