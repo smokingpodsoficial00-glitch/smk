@@ -86,6 +86,8 @@ export interface CompanyFinancialOverview {
 
   // 4. Tesouraria & Caixa
   netCashAvailable: number; // Saldo em Conta / Caixa Disponível Oficial
+  realCash: number; // Caixa Real = Faturamento Bruto - Total Gasto em Reposições de Estoque
+  stockPurchases: number; // Total acumulado gasto em reposições de estoque
 
   // 5. Patrimônio Oficial da Loja (FONTE DE VERDADE: Caixa em Conta + Venda Total do Estoque)
   companyEconomicEquity: number;
@@ -600,6 +602,7 @@ export function calculatePartnersFinancials(params: {
   products: any[];
   persistedCosts: Record<string, number>;
   operationalExpenses?: number;
+  repurchases?: any[];
 }): CompanyFinancialOverview {
   const {
     partners,
@@ -607,7 +610,8 @@ export function calculatePartnersFinancials(params: {
     orders,
     products,
     persistedCosts,
-    operationalExpenses = 0
+    operationalExpenses = 0,
+    repurchases = []
   } = params;
 
   // 1. DRE OFICIAL: Processar Vendas, CMV e Frete (Idêntico ao FinanceDashboard.tsx)
@@ -705,9 +709,17 @@ export function calculatePartnersFinancials(params: {
   // 4. TESOURARIA & CAIXA OFICIAL (Idêntico ao FinanceDashboard.tsx)
   const netCashAvailable = Math.max(0, revenueSum - shippingSum - operationalExpenses);
 
-  // 5. PATRIMÔNIO REAL TOTAL DA LOJA (FONTE DE VERDADE: FinanceDashboard.tsx linha 306)
-  // totalCompanyEquity = Caixa em Conta (grossRevenue) + Venda Total do Estoque (stockAssetRetail)
-  const companyEconomicEquity = revenueSum + totalStockRetailSum;
+  // 4.1 CAIXA REAL: Faturamento Bruto Acumulado - Total Gasto em Reposições de Estoque
+  // Regra idêntica à do FinanceDashboard.tsx / financialCycles.ts (calculateAllTimeMetrics)
+  const stockPurchases = (repurchases || []).reduce((sum: number, r: any) => {
+    return sum + (Number(r.stock_purchase_amount) || 0);
+  }, 0);
+  const realCash = Number((revenueSum - stockPurchases).toFixed(2));
+
+  // 5. PATRIMÔNIO REAL TOTAL DA LOJA (FONTE DE VERDADE: FinanceDashboard.tsx)
+  // Regra oficial auditada: Caixa Real Calculado + Valor de Venda do Estoque Físico Atual
+  // NÃO utiliza Faturamento Bruto (faturamento é volume histórico, não patrimônio)
+  const companyEconomicEquity = (realCash || 0) + (totalStockRetailSum || 0);
 
   // 6. APURAÇÃO DOS SÓCIOS: Capital Líquido -> % de Participação -> Projeção de Lucro & Patrimônio
   const activePartners = (partners || []).filter(p => p.is_active !== false);
@@ -821,6 +833,8 @@ export function calculatePartnersFinancials(params: {
 
   return {
     grossRevenue: revenueSum,
+    realCash,
+    stockPurchases,
     cmv: cmvSum,
     logisticsFee: shippingSum,
     operationalExpenses,

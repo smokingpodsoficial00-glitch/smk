@@ -39,6 +39,7 @@ export default function PartnersDashboard() {
   const [products, setProducts] = useState<any[]>([]);
   const [persistedCosts, setPersistedCosts] = useState<Record<string, number>>({});
   const [operationalExpenses, setOperationalExpenses] = useState<number>(0);
+  const [repurchases, setRepurchases] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Modals
@@ -94,6 +95,13 @@ export default function PartnersDashboard() {
         setOperationalExpenses(mkt);
       } catch (e) {}
 
+      // F. Reposições de Estoque (para cálculo do Caixa Real = Faturamento - Reposições)
+      const { data: rawRepurchases } = await supabase
+        .from("smoking_stock_repurchases")
+        .select("*")
+        .or("company_id.eq." + targetCompanyId + ",company_id.is.null");
+      setRepurchases(rawRepurchases || []);
+
     } catch (err) {
       console.error("Erro ao carregar dados do módulo de sócios:", err);
     } finally {
@@ -125,11 +133,17 @@ export default function PartnersDashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partner_transactions" }, () => loadAllData())
       .subscribe();
 
+    const subRepurchases = supabase
+      .channel(`partners_repurchases_${targetCompanyId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_stock_repurchases" }, () => loadAllData())
+      .subscribe();
+
     return () => {
       supabase.removeChannel(subOrders);
       supabase.removeChannel(subProducts);
       supabase.removeChannel(subPartners);
       supabase.removeChannel(subTx);
+      supabase.removeChannel(subRepurchases);
     };
   }, [targetCompanyId]);
 
@@ -141,9 +155,10 @@ export default function PartnersDashboard() {
       orders,
       products,
       persistedCosts,
-      operationalExpenses
+      operationalExpenses,
+      repurchases
     });
-  }, [partners, transactions, orders, products, persistedCosts, operationalExpenses]);
+  }, [partners, transactions, orders, products, persistedCosts, operationalExpenses, repurchases]);
 
   // 3. Filtragem de Transações
   const filteredTransactions = useMemo(() => {
@@ -372,7 +387,7 @@ export default function PartnersDashboard() {
             {formatBRL(financials.companyEconomicEquity)}
           </div>
           <p className="text-[10px] text-white/50">
-            Caixa ({formatBRL(financials.grossRevenue)}) + Estoque a Venda ({formatBRL(financials.stockAssetRetail)})
+            Caixa Real ({formatBRL(financials.realCash)}) + Estoque ({formatBRL(financials.stockAssetRetail)})
           </p>
         </div>
       </div>
@@ -442,29 +457,29 @@ export default function PartnersDashboard() {
                   </div>
                 </div>
 
-                {/* Patrimônio Econômico Projetado (Capital + Lucro Projetado) */}
+                {/* Patrimônio Econômico Real (Fatia proporcional do Patrimônio da Loja) */}
                 <div className="bg-[#141416] p-4 rounded-xl border border-white/5 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] text-white/50 uppercase font-bold tracking-wider">
-                      Patrimônio Econômico Projetado
+                      Patrimônio Econômico Real
                     </span>
                     <span className="text-[10px] text-emerald-400 font-mono font-bold">
                       {pm.equityPercentage.toFixed(2)}% da empresa
                     </span>
                   </div>
                   <div className="text-2xl font-extrabold text-white font-mono tracking-tight">
-                    {formatBRL(pm.projectedEconomicEquity)}
+                    {formatBRL(pm.partnerEconomicEquity)}
                   </div>
 
-                  {/* Lucro Projetado & ROI Projetado */}
+                  {/* Ganho Econômico Real & ROI Real */}
                   <div className="flex items-center justify-between pt-1.5 border-t border-white/5 text-xs">
-                    <span className="text-white/50 text-[11px]">Lucro Projetado:</span>
+                    <span className="text-white/50 text-[11px]">Ganho Econômico Real:</span>
                     <div className="flex items-center gap-1.5">
-                      <span className="font-mono font-bold text-emerald-400">
-                        +{formatBRL(pm.projectedProfit)}
+                      <span className={`font-mono font-bold ${pm.economicGain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {pm.economicGain >= 0 ? '+' : ''}{formatBRL(pm.economicGain)}
                       </span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        {pm.projectedROI.toFixed(1)}% ROI Projetado
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${pm.simplifiedROI >= 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                        {pm.simplifiedROI.toFixed(1)}% ROI Real
                       </span>
                     </div>
                   </div>
