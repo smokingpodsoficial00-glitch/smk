@@ -655,12 +655,37 @@ export default function MarketingModule() {
       }
     } catch {}
 
+    // Verifica se os contatos já constam como enviados (blindagem)
+    let forceSend = false;
+    if (camp.targetType === 'lists') {
+      const pendingContacts = targetContacts.filter(c => {
+        const raw = c.cleanPhone || c.phone;
+        const clean = String(raw).replace(/\D/g, '');
+        const norm = clean.startsWith('55') ? clean : `55${clean}`;
+        return !alreadySentPhones.includes(norm) && !alreadySentPhones.includes(raw);
+      });
+
+      if (pendingContacts.length === 0 && targetContacts.length > 0) {
+        const wantForce = confirm(
+          `⚠️ ATENÇÃO: Todos os ${targetContacts.length} contatos desta lista já constam como enviados no histórico de segurança (blindagem anti-duplicação).\n\n` +
+          `Deseja FORÇAR o envio mesmo assim (Modo Teste / Reenvio)?`
+        );
+        if (!wantForce) {
+          setExecutingCampaignId(null);
+          return;
+        }
+        forceSend = true;
+      }
+    }
+
     setDispatchProgress({ 
-      current: alreadySentPhones.length, 
+      current: forceSend ? 0 : alreadySentPhones.length, 
       total: targetContacts.length || 1, 
-      status: alreadySentPhones.length > 0 
-        ? `Retomando disparos... (${alreadySentPhones.length} já enviados e blindados)` 
-        : 'Iniciando disparos com cadência Anti-Ban...' 
+      status: forceSend 
+        ? '🚀 Modo Forçado / Teste ativado: disparando para a lista selecionada...' 
+        : (alreadySentPhones.length > 0 
+          ? `Retomando disparos... (${alreadySentPhones.length} já enviados e blindados)` 
+          : 'Iniciando disparos com cadência Anti-Ban...') 
     });
 
     try {
@@ -684,8 +709,8 @@ export default function MarketingModule() {
           const cleanDigits = String(rawPhone).replace(/\D/g, '');
           const normalizedPhone = cleanDigits.startsWith('55') ? cleanDigits : `55${cleanDigits}`;
 
-          // Pula contatos que já receberam esta campanha anteriormente
-          if (alreadySentPhones.includes(normalizedPhone) || alreadySentPhones.includes(rawPhone)) {
+          // Pula contatos que já receberam esta campanha anteriormente (a não ser em modo force/teste)
+          if (!forceSend && (alreadySentPhones.includes(normalizedPhone) || alreadySentPhones.includes(rawPhone))) {
             continue;
           }
 
@@ -714,6 +739,7 @@ export default function MarketingModule() {
                 text: formattedMsg,
                 campaignId: camp.id,
                 companyId: company?.id,
+                force: forceSend,
               })
             });
             const resData = await res.json();
@@ -940,6 +966,28 @@ export default function MarketingModule() {
           </button>
         </div>
       </header>
+
+      {/* Alerta Compacto e Elegante de WhatsApp Desconectado */}
+      {!whatsAppConnected && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2 flex items-center justify-between text-xs text-amber-300">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            <span className="font-semibold">
+              WhatsApp Desconectado:
+            </span>
+            <span className="text-white/70">
+              O robô precisa estar conectado para disparar campanhas e sincronizar contatos.
+            </span>
+          </div>
+          <button
+            onClick={() => setIsQrModalOpen(true)}
+            className="px-3 py-1 bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/30 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+          >
+            <QrCode className="size-3.5" />
+            <span>Conectar Agora</span>
+          </button>
+        </div>
+      )}
 
       {/* Conteúdo Principal por Aba */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">

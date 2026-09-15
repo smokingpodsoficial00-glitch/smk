@@ -520,7 +520,7 @@ export async function ensureBuyerInBroadcastList(params: {
         .select('id, name')
         .eq('company_id', companyId);
 
-      let targetDbList = (dbLists || []).find((l: any) => 
+      let targetDbList: { id: any; name: any; } | null | undefined = (dbLists || []).find((l: any) => 
         l.name.trim().toLowerCase() === targetListName.toLowerCase() ||
         l.name.toLowerCase().includes('comprador')
       );

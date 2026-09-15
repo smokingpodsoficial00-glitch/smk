@@ -1420,7 +1420,7 @@ app.post('/api/chatbot/blacklist', (req, res) => {
 });
 app.post('/api/marketing/send-direct', async (req, res) => {
     try {
-        const { phone, name, text, campaignId } = req.body;
+        const { phone, name, text, campaignId, force } = req.body;
         
         if (!phone || !text) {
             return res.status(400).json({ error: 'Telefone e texto da mensagem são obrigatórios.' });
@@ -1430,8 +1430,13 @@ app.post('/api/marketing/send-direct', async (req, res) => {
         const rawPhone = String(phone).replace(/\D/g, '');
         const cleanPhone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
-        // 🛡️ TRAVA RÍGIDA ANTI-DUPLICAÇÃO: Checa se o contato já foi enviado
-        if (campaignId && isPhoneAlreadySent(campaignId, cleanPhone, config)) {
+        // 🛡️ TRAVA RÍGIDA ANTI-DUPLICAÇÃO: Checa se o contato já foi enviado (a não ser que force === true)
+        const isTestCampaign = campaignId && (
+            String(campaignId).toLowerCase().includes('teste') || 
+            String(name || '').toLowerCase().includes('teste')
+        );
+
+        if (!force && !isTestCampaign && campaignId && isPhoneAlreadySent(campaignId, cleanPhone, config)) {
             console.warn(`🛑 [Marketing Blindagem] Disparo IGNORADO para ${cleanPhone} (${name || 'Cliente'}). Este contato já recebeu a campanha "${campaignId}".`);
             return res.json({ 
                 success: true, 
@@ -1477,8 +1482,8 @@ app.post('/api/marketing/send-direct', async (req, res) => {
             await sock.sendPresenceUpdate('paused', formattedNumber);
         } catch (chatErr) {}
 
-        // 🛡️ Grava imediatamente no JSON para que nunca mais se repita
-        if (campaignId && cleanPhone) {
+        // 🛡️ Grava no histórico permanente se não for envio de teste forçado
+        if (!force && !isTestCampaign && campaignId && cleanPhone) {
             markPhoneAsSent(campaignId, cleanPhone, config);
             saveMarketingConfig(config);
         }
