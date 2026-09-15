@@ -24,12 +24,24 @@ const defaultDevOrigins = [
   'http://localhost:5174',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
+  'https://smoking-pods-admin.vercel.app',
+  'https://smoking-pods-catalogo.vercel.app',
+  'https://smoking-pods.vercel.app',
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
     // Permite requisições sem header Origin (ex: chamadas diretas servidor-a-servidor, curl, webhooks)
     if (!origin) return callback(null, true);
+
+    // Permite domínios da Vercel (painel admin, catálogo e previews) e localhost
+    if (
+      origin.endsWith('.vercel.app') ||
+      origin.startsWith('http://localhost') ||
+      origin.startsWith('http://127.0.0.1')
+    ) {
+      return callback(null, true);
+    }
 
     if (configuredOrigins.includes(origin)) {
       return callback(null, true);
@@ -43,8 +55,7 @@ const corsOptions = {
     });
     if (matchesPattern) return callback(null, true);
 
-    // Em ambiente de desenvolvimento local, permite as portas locais do Vite
-    if (process.env.NODE_ENV !== 'production' && defaultDevOrigins.includes(origin)) {
+    if (defaultDevOrigins.includes(origin)) {
       return callback(null, true);
     }
 
