@@ -6,7 +6,7 @@ import { CartSheet } from "@/components/CartSheet";
 import { FlavorSheet } from "@/components/FlavorSheet";
 import { CartProvider } from "@/lib/cart";
 import type { SortOption } from "@/components/SortDropdown";
-import { fetchProductsFromSupabase, type Product, type PodModel } from "@/lib/products";
+import { fetchProductsFromSupabase, getCatalogCompanyId, type Product, type PodModel } from "@/lib/products";
 import { fetchCategories, fetchProductCategoryMappings, DEFAULT_CATEGORIES, type Category } from "@/lib/categories";
 import { supabase } from "@/lib/supabase";
 import { Loader2, Star } from "lucide-react";
@@ -93,10 +93,16 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
   const [selectedModel, setSelectedModel] = useState<PodModel | null>(null);
 
   const loadProducts = async () => {
+    let companyId: string | undefined;
+    try {
+      companyId = getCatalogCompanyId();
+    } catch (e) {
+      console.error(e);
+    }
     const [data, cats, catMap] = await Promise.all([
-      fetchProductsFromSupabase(),
-      fetchCategories(),
-      fetchProductCategoryMappings()
+      fetchProductsFromSupabase(companyId),
+      fetchCategories(companyId),
+      fetchProductCategoryMappings(companyId)
     ]);
     setProductList(data);
     setCategories(cats);
@@ -112,13 +118,10 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
       loadProducts();
     }, 20000);
 
-    // Inscrição em tempo real para atualizações no Supabase (produtos e pedidos)
+    // Inscrição em tempo real para atualizações no estoque e catálogo (smoking_products)
     const subscription = supabase
       .channel("public:realtime_menu")
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => {
-        loadProducts();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, () => {
         loadProducts();
       })
       .subscribe();

@@ -2,20 +2,25 @@ import { useState, useRef, useEffect } from "react";
 import {
   Store, Upload, Palette, Phone, Key, MapPin, Globe,
   Save, CheckCircle2, AlertCircle, Loader2, ImagePlus,
-  Trash2, Eye, Type, X, Smartphone, CreditCard, Copy, ExternalLink, Check
+  Trash2, Eye, Type, X, Smartphone, CreditCard, Copy, ExternalLink, Check,
+  ShieldCheck
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { runStorageValidationSuite, type StorageTestReport } from "@/lib/storageTester";
+import { validateAndNormalizeBrazilianPhone, formatBrazilianPhone } from "@/lib/phoneUtils";
 
 export default function SettingsPage() {
-  const { config, loading, saving, saveStatus, updateConfig, uploadLogo } = useStoreConfig();
+  const { config, loading, saving, saveStatus, updateConfig, updateStoreWhatsApp, uploadLogo } = useStoreConfig();
   const { company, refreshCompany } = useAuth() as any || {};
 
   // Form state local
   const [storeName, setStoreName] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#10b981");
   const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [waSaving, setWaSaving] = useState(false);
+  const [waFeedback, setWaFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [pixKey, setPixKey] = useState("");
   const [address, setAddress] = useState("");
   const [originCep, setOriginCep] = useState("");
@@ -32,6 +37,10 @@ export default function SettingsPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Storage Testing (Bloco 7)
+  const [storageTesting, setStorageTesting] = useState(false);
+  const [storageTestReport, setStorageTestReport] = useState<StorageTestReport | null>(null);
 
   // Slugifier seguro com suporte a acentos e caracteres especiais em Português
   const generateSlug = (str: string) => {
@@ -65,7 +74,7 @@ export default function SettingsPage() {
       if (!storeName && !whatsappNumber && !pixKey && !address) {
         setStoreName(config.store_name || "");
         setPrimaryColor(config.primary_color || "#10b981");
-        setWhatsappNumber(config.whatsapp_number || "");
+        setWhatsappNumber(formatBrazilianPhone(config.whatsapp_number || ""));
         setPixKey(config.pix_key || "");
         setLogoPreview(config.logo_url || null);
         setAddress(config.address || "Rua Alexandra Lunardi Fanani, 57 - Assunção, São Bernardo do Campo - SP, 09810-200");
@@ -76,6 +85,27 @@ export default function SettingsPage() {
       }
     }
   }, [config, loading]);
+
+  const handleSaveWhatsAppOnly = async () => {
+    setWaFeedback(null);
+    const validation = validateAndNormalizeBrazilianPhone(whatsappNumber);
+    if (!validation.valid) {
+      setWaFeedback({ type: 'error', message: validation.error || 'Número de WhatsApp inválido.' });
+      return;
+    }
+
+    setWaSaving(true);
+    const res = await updateStoreWhatsApp(validation.normalized, company?.id);
+    setWaSaving(false);
+
+    if (res.success) {
+      setWhatsappNumber(validation.formatted);
+      setWaFeedback({ type: 'success', message: 'WhatsApp do catálogo salvo com sucesso no Supabase!' });
+      setTimeout(() => setWaFeedback(null), 4000);
+    } else {
+      setWaFeedback({ type: 'error', message: res.error || 'Erro ao salvar WhatsApp no banco.' });
+    }
+  };
 
   const handleLogoSelect = (file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -124,12 +154,15 @@ export default function SettingsPage() {
       return isNaN(num) ? fallback : num;
     };
 
+    const waVal = validateAndNormalizeBrazilianPhone(whatsappNumber);
+    const normalizedWhatsApp = waVal.valid ? waVal.normalized : (whatsappNumber ? whatsappNumber.replace(/\D/g, "") : "");
+
     const success = await updateConfig({
       store_name: finalStoreName,
       store_slug: generateSlug(finalStoreName),
       description: "",
       primary_color: primaryColor,
-      whatsapp_number: whatsappNumber.replace(/\D/g, ""),
+      whatsapp_number: normalizedWhatsApp,
       pix_key: pixKey,
       logo_url: logoUrl,
       address: address.trim(),
@@ -147,7 +180,7 @@ export default function SettingsPage() {
           logo_url: logoUrl,
           address: address.trim(),
           pix_key: pixKey,
-          phone: whatsappNumber.replace(/\D/g, "")
+          phone: normalizedWhatsApp
         }).eq('id', company.id);
         if (refreshCompany) await refreshCompany();
       } catch (e) {
@@ -162,7 +195,7 @@ export default function SettingsPage() {
         logo_url: logoUrl,
         primary_color: primaryColor,
         pix_key: pixKey,
-        whatsapp_number: whatsappNumber.replace(/\D/g, ""),
+        whatsapp_number: normalizedWhatsApp,
         address: address.trim(),
       });
       await supabase
@@ -184,7 +217,7 @@ export default function SettingsPage() {
     return (
       storeName !== (config.store_name || "") ||
       primaryColor !== (config.primary_color || "#10b981") ||
-      whatsappNumber !== (config.whatsapp_number || "") ||
+      whatsappNumber.replace(/\D/g, "") !== (config.whatsapp_number || "").replace(/\D/g, "") ||
       pixKey !== (config.pix_key || "") ||
       address !== (config.address || "") ||
       originCep !== (config.origin_cep || "") ||
@@ -219,41 +252,136 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <button
-            onClick={handleSave}
-            disabled={saving || uploadingLogo || !hasChanges()}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all duration-300 cursor-pointer ${
-              saveStatus === "success"
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={async () => {
+                setStorageTesting(true);
+                try {
+                  const rep = await runStorageValidationSuite();
+                  setStorageTestReport(rep);
+                } finally {
+                  setStorageTesting(false);
+                }
+              }}
+              disabled={storageTesting}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer shadow-sm hover:shadow-emerald-500/10"
+              title="Testa upload, leitura pública e remoção nos buckets products e store-assets"
+            >
+              {storageTesting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <ShieldCheck className="size-4 text-emerald-400" />
+              )}
+              <span>{storageTesting ? "Testando..." : "Validar Storage (Bloco 7)"}</span>
+            </button>
+
+            <button
+              onClick={handleSave}
+              disabled={saving || uploadingLogo || !hasChanges()}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all duration-300 cursor-pointer ${
+                saveStatus === "success"
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                  : saveStatus === "error"
+                  ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                  : hasChanges()
+                  ? "bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_20px_rgba(16,185,129,0.2)] active:scale-[0.97]"
+                  : "bg-white/5 text-white/30 cursor-not-allowed"
+              }`}
+            >
+              {saving || uploadingLogo ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : saveStatus === "success" ? (
+                <CheckCircle2 className="size-4" />
+              ) : saveStatus === "error" ? (
+                <AlertCircle className="size-4" />
+              ) : (
+                <Save className="size-4" />
+              )}
+              {saving || uploadingLogo
+                ? "Salvando..."
+                : saveStatus === "success"
+                ? "Salvo com sucesso!"
                 : saveStatus === "error"
-                ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                : hasChanges()
-                ? "bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_20px_rgba(16,185,129,0.2)] active:scale-[0.97]"
-                : "bg-white/5 text-white/30 cursor-not-allowed"
-            }`}
-          >
-            {saving || uploadingLogo ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : saveStatus === "success" ? (
-              <CheckCircle2 className="size-4" />
-            ) : saveStatus === "error" ? (
-              <AlertCircle className="size-4" />
-            ) : (
-              <Save className="size-4" />
-            )}
-            {saving || uploadingLogo
-              ? "Salvando..."
-              : saveStatus === "success"
-              ? "Salvo com sucesso!"
-              : saveStatus === "error"
-              ? "Erro ao salvar"
-              : "Salvar Alterações"}
-          </button>
+                ? "Erro ao salvar"
+                : "Salvar Alterações"}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Content */}
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+        {/* Painel de Resultados do Teste de Storage (Bloco 7) */}
+        {storageTestReport && (
+          <div className={`p-5 rounded-2xl border transition-all ${
+            storageTestReport.allPassed
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+              : "bg-red-500/10 border-red-500/30 text-red-400"
+          }`}>
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2 font-bold text-sm">
+                {storageTestReport.allPassed ? (
+                  <CheckCircle2 className="size-5 text-emerald-400" />
+                ) : (
+                  <AlertCircle className="size-5 text-red-400" />
+                )}
+                <span>
+                  {storageTestReport.allPassed
+                    ? "BLOCO 7 — SUPABASE STORAGE VALIDADO COM SUCESSO!"
+                    : "BLOCO 7 — FALHA NA VALIDAÇÃO DO STORAGE"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStorageTestReport(null)}
+                className="text-white/40 hover:text-white text-xs p-1"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 text-xs">
+              {/* Bucket products */}
+              <div className="bg-black/30 p-3.5 rounded-xl border border-white/5 space-y-2">
+                <div className="font-bold text-white flex items-center justify-between">
+                  <span>📦 Bucket: products</span>
+                  <span className={storageTestReport.productsTest.uploadAccepted ? "text-emerald-400" : "text-red-400"}>
+                    {storageTestReport.productsTest.uploadAccepted ? "OK" : "Erro"}
+                  </span>
+                </div>
+                <div className="space-y-1 text-white/70">
+                  <p>• Upload temporário: {storageTestReport.productsTest.uploadAccepted ? "✅ Aceito" : "❌ Falhou"}</p>
+                  <p>• Confirmação na listagem: {storageTestReport.productsTest.objectExists ? "✅ Presente" : "❌ Ausente"}</p>
+                  <p>• Leitura pública (HTTP {storageTestReport.productsTest.publicReadStatus}): {storageTestReport.productsTest.publicReadOk ? "✅ 200 OK" : "❌ Erro"}</p>
+                  <p>• Atualização (UPDATE): {storageTestReport.productsTest.updateAccepted ? "✅ Aceita" : "❌ Falhou"}</p>
+                  <p>• Remoção do teste: {storageTestReport.productsTest.removalConfirmed ? "✅ Removido" : "❌ Não removido"}</p>
+                </div>
+              </div>
+
+              {/* Bucket store-assets */}
+              <div className="bg-black/30 p-3.5 rounded-xl border border-white/5 space-y-2">
+                <div className="font-bold text-white flex items-center justify-between">
+                  <span>🖼️ Bucket: store-assets</span>
+                  <span className={storageTestReport.storeAssetsTest.uploadAccepted ? "text-emerald-400" : "text-red-400"}>
+                    {storageTestReport.storeAssetsTest.uploadAccepted ? "OK" : "Erro"}
+                  </span>
+                </div>
+                <div className="space-y-1 text-white/70">
+                  <p>• Upload temporário: {storageTestReport.storeAssetsTest.uploadAccepted ? "✅ Aceito" : "❌ Falhou"}</p>
+                  <p>• Confirmação na listagem: {storageTestReport.storeAssetsTest.objectExists ? "✅ Presente" : "❌ Ausente"}</p>
+                  <p>• Leitura pública (HTTP {storageTestReport.storeAssetsTest.publicReadStatus}): {storageTestReport.storeAssetsTest.publicReadOk ? "✅ 200 OK" : "❌ Erro"}</p>
+                  <p>• Atualização (UPDATE): {storageTestReport.storeAssetsTest.updateAccepted ? "✅ Aceita" : "❌ Falhou"}</p>
+                  <p>• Remoção do teste: {storageTestReport.storeAssetsTest.removalConfirmed ? "✅ Removido" : "❌ Não removido"}</p>
+                </div>
+              </div>
+            </div>
+
+            <p className="mt-3 text-[11px] text-white/50 text-right">
+              Sessão autenticada: {storageTestReport.authenticatedUser || "Anônimo"} • {new Date(storageTestReport.timestamp).toLocaleTimeString()}
+            </p>
+          </div>
+        )}
         {/* ─── Seção 1: Identidade da Loja (Nome e Logo) ─── */}
         <section className="bg-card border border-border rounded-2xl p-6 space-y-6">
           <div className="flex items-center gap-2.5 pb-3 border-b border-border">
@@ -465,37 +593,86 @@ export default function SettingsPage() {
         <section className="bg-card border border-border rounded-2xl p-6 space-y-6">
           <div className="flex items-center gap-2.5 pb-3 border-b border-border">
             <Phone className="size-4 text-emerald-400" />
-            <h2 className="font-bold text-base text-white">Contato & Pagamentos</h2>
+            <div>
+              <h2 className="font-bold text-base text-white">Contato & Pagamentos</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Configure o WhatsApp que recebe os pedidos e os dados para pagamento</p>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* WhatsApp */}
-            <div className="space-y-2">
-              <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-2">
-                <Smartphone className="size-3.5 text-emerald-400" />
-                WhatsApp de Vendas
-              </label>
-              <input
-                type="text"
-                value={whatsappNumber}
-                onChange={(e) => setWhatsappNumber(e.target.value)}
-                placeholder="5511999999999"
-                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 font-semibold"
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            {/* WhatsApp do Catálogo */}
+            <div className="space-y-3 bg-[#0a0a0a] border border-emerald-500/20 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs uppercase font-semibold text-emerald-400 tracking-wider flex items-center gap-2">
+                  <Smartphone className="size-3.5 text-emerald-400" />
+                  WhatsApp do Catálogo *
+                </label>
+                {config?.whatsapp_number ? (
+                  <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                    <CheckCircle2 className="size-3" />
+                    Ativo: {formatBrazilianPhone(config.whatsapp_number)}
+                  </span>
+                ) : (
+                  <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                    <AlertCircle className="size-3" />
+                    Não configurado
+                  </span>
+                )}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                WhatsApp que receberá os pedidos do catálogo
+              </p>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={whatsappNumber}
+                  onChange={(e) => {
+                    setWhatsappNumber(formatBrazilianPhone(e.target.value));
+                    setWaFeedback(null);
+                  }}
+                  placeholder="(11) 95171-1181"
+                  className="flex-1 bg-[#121212] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 font-semibold"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveWhatsAppOnly}
+                  disabled={waSaving}
+                  className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer shrink-0"
+                >
+                  {waSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+                  Salvar Número
+                </button>
+              </div>
+
+              {waFeedback && (
+                <div className={`text-xs px-3 py-2 rounded-lg flex items-center gap-2 ${
+                  waFeedback.type === 'success' 
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                }`}>
+                  {waFeedback.type === 'success' ? <CheckCircle2 className="size-3.5 shrink-0" /> : <AlertCircle className="size-3.5 shrink-0" />}
+                  <span>{waFeedback.message}</span>
+                </div>
+              )}
             </div>
 
             {/* Chave Pix */}
-            <div className="space-y-2">
+            <div className="space-y-3 bg-[#0a0a0a] border border-white/5 rounded-xl p-4">
               <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-2">
                 <CreditCard className="size-3.5 text-amber-400" />
                 Chave Pix
               </label>
+              <p className="text-xs text-muted-foreground">
+                Chave Pix para pagamentos informada no fechamento
+              </p>
               <input
                 type="text"
                 value={pixKey}
                 onChange={(e) => setPixKey(e.target.value)}
                 placeholder="Chave Pix para pagamentos"
-                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-amber-500/50 font-semibold"
+                className="w-full bg-[#121212] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-amber-500/50 font-semibold"
               />
             </div>
           </div>

@@ -17,6 +17,7 @@ interface NewFollowUpModalProps {
   onClose: () => void;
   onFollowUpCreated: () => void;
   initialClient?: {
+    id?: string;
     name: string;
     phone: string;
     product?: string;
@@ -35,7 +36,7 @@ export function NewFollowUpModal({
 
   const [clients, setClients] = useState<RealClient[]>([]);
   const [clientSearch, setClientSearch] = useState('');
-  const [selectedClient, setSelectedClient] = useState<{ name: string; phone: string } | null>(null);
+  const [selectedClient, setSelectedClient] = useState<{ id?: string; name: string; phone: string } | null>(null);
 
   // Form states
   const [customName, setCustomName] = useState('');
@@ -56,7 +57,7 @@ export function NewFollowUpModal({
     if (isOpen) {
       fetchLiveClients(company?.id).then(setClients);
       if (initialClient) {
-        setSelectedClient({ name: initialClient.name, phone: initialClient.phone });
+        setSelectedClient({ id: initialClient.id, name: initialClient.name, phone: initialClient.phone });
         setCustomName(initialClient.name);
         setCustomPhone(initialClient.phone);
         if (initialClient.product) setTargetProduct(initialClient.product);
@@ -115,10 +116,24 @@ export function NewFollowUpModal({
       return;
     }
 
+    // Busca o client_id correspondente de smoking_clients
+    let clientId = selectedClient?.id || initialClient?.id || null;
+    if (!clientId && phone) {
+      const cleanP = phone.replace(/\D/g, '');
+      const matched = clients.find(c => {
+        const cClean = String(c.phone || '').replace(/\D/g, '');
+        return cClean === cleanP || c.cleanPhone === cleanP;
+      });
+      if (matched) {
+        clientId = matched.id;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       await createFollowUp({
         company_id: company?.id,
+        client_id: clientId,
         client_phone: phone,
         client_name: name,
         reason_category: reasonCategory,
@@ -198,7 +213,7 @@ export function NewFollowUpModal({
                       <div
                         key={c.id}
                         onClick={() => {
-                          setSelectedClient({ name: c.name, phone: c.phone });
+                          setSelectedClient({ id: c.id, name: c.name, phone: c.phone });
                           setCustomName(c.name);
                           setCustomPhone(c.phone);
                           setClientSearch('');

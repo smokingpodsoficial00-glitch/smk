@@ -28,11 +28,36 @@ export function saveLocalProductPromotions(promos: Record<string, PromoData>) {
   }
 }
 
+/**
+ * Busca promoções oficiais do banco Supabase.
+ * FONTE PRIMÁRIA: Tabela 'smoking_products' no Supabase.
+ */
 export async function fetchProductPromotionsMap(companyId?: string): Promise<Record<string, PromoData>> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
   const result: Record<string, PromoData> = {};
 
   try {
+    // 1. SUPABASE COMO FONTE PRIMÁRIA: busca direta da tabela smoking_products
+    const { data: products, error: prodErr } = await supabase
+      .from("smoking_products")
+      .select("id, promo_price, is_promotional, discount_pct")
+      .eq("company_id", targetCompanyId)
+      .eq("is_promotional", true);
+
+    if (!prodErr && products && products.length > 0) {
+      products.forEach((p: any) => {
+        result[p.id] = {
+          productId: p.id,
+          isPromotional: true,
+          promoPrice: parseFloat(p.promo_price) || 0,
+          discountPct: parseFloat(p.discount_pct) || 0,
+        };
+      });
+      saveLocalProductPromotions(result);
+      return result;
+    }
+
+    // 2. Transição/Contingência: lê de smoking_orders se ainda não migrado
     const { data: orderConfig, error: configErr } = await supabase
       .from("smoking_orders")
       .select("items")
@@ -56,8 +81,9 @@ export async function fetchProductPromotionsMap(companyId?: string): Promise<Rec
       return result;
     }
   } catch (e) {
-    console.warn("Erro ao buscar promoções no Supabase DB:", e);
+    console.warn("Aviso: Falha ao buscar promoções no Supabase DB. Usando cache de contingência.", e);
   }
 
+  console.warn("Aviso: Operando com cache local secundário de promoções.");
   return getLocalProductPromotions();
 }

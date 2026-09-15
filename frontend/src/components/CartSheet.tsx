@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Minus, Plus, X, Trash2 } from "lucide-react";
 import { buildWhatsAppUrl, formatBRL, useCart } from "@/lib/cart";
+import { useStoreConfig } from "@/lib/useStoreConfig";
 
 const vapeIgnite = "https://placehold.co/400x500/121212/ffffff.jpg?text=Ignite";
 const vapeElfbar = "https://placehold.co/400x500/121212/ffffff.jpg?text=ElfBar";
@@ -12,6 +13,10 @@ const brandImages: Record<string, string> = {
 
 export function CartSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { items, increment, decrement, remove, totalPrice, totalItems } = useCart();
+  const { config, loading: configLoading } = useStoreConfig();
+
+  const whatsappNumber = config?.whatsapp_number?.trim();
+  const isWhatsAppConfigured = Boolean(whatsappNumber && whatsappNumber.replace(/\D/g, "").length >= 10);
 
   useEffect(() => {
     if (!open) return;
@@ -22,7 +27,14 @@ export function CartSheet({ open, onClose }: { open: boolean; onClose: () => voi
 
   const handleCheckout = () => {
     if (!items.length) return;
-    window.open(buildWhatsAppUrl(items, totalPrice), "_blank", "noopener,noreferrer");
+    if (!isWhatsAppConfigured || !whatsappNumber) {
+      alert("WhatsApp de atendimento não configurado.");
+      return;
+    }
+    const url = buildWhatsAppUrl(items, totalPrice, whatsappNumber, config?.store_name);
+    if (url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
   };
 
   return (
@@ -83,10 +95,18 @@ export function CartSheet({ open, onClose }: { open: boolean; onClose: () => voi
               <span className="text-sm text-muted-foreground">Total</span>
               <span className="text-xl font-semibold tracking-tight">{formatBRL(totalPrice)}</span>
             </div>
-            <button onClick={handleCheckout} disabled={items.length === 0}
-              className="w-full rounded-full bg-primary text-primary-foreground py-4 text-sm font-semibold tracking-wide transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed">
-              Finalizar via WhatsApp
+            <button 
+              onClick={handleCheckout} 
+              disabled={items.length === 0 || !isWhatsAppConfigured}
+              className="w-full rounded-full bg-primary text-primary-foreground py-4 text-sm font-semibold tracking-wide transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {isWhatsAppConfigured ? "Finalizar via WhatsApp" : "WhatsApp Indisponível"}
             </button>
+            {!isWhatsAppConfigured && !configLoading && (
+              <p className="mt-2 text-center text-xs text-amber-400 font-medium">
+                WhatsApp de atendimento não configurado.
+              </p>
+            )}
             <p className="mt-3 text-center text-[11px] text-muted-foreground">
               Endereço, frete e PIX são finalizados com nossa IA no WhatsApp.
             </p>

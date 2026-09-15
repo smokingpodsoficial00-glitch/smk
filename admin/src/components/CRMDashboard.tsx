@@ -1,5 +1,5 @@
 import React, { Component, type ReactNode, useState } from "react";
-import { Users, Crown, RefreshCw, AlertTriangle, Target, Receipt } from "lucide-react";
+import { Users, Crown, RefreshCw, AlertTriangle, Target, Receipt, UserPlus } from "lucide-react";
 import type { RealClient } from "@/lib/crm";
 
 // Componentes do CRM
@@ -8,6 +8,7 @@ import { PredictiveReplenishment } from "./crm/PredictiveReplenishment";
 import { FollowUpsTab } from "./crm/FollowUpsTab";
 import { SalesHistoryTab } from "./crm/SalesHistoryTab";
 import { ClientProfileModal } from "./crm/ClientProfileModal";
+import { NewClientModal } from "./crm/NewClientModal";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -57,6 +58,8 @@ class CRMErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
 export default function CRMDashboard() {
   const [activeSubTab, setActiveSubTab] = useState<'rfm' | 'replenishment' | 'followups' | 'sales_history'>('rfm');
   const [selectedClient, setSelectedClient] = useState<RealClient | null>(null);
+  const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const tabs = [
     { id: 'rfm', label: 'Ranking & Fidelidade', icon: <Crown className="size-4 text-amber-400" /> },
@@ -80,9 +83,19 @@ export default function CRMDashboard() {
             </p>
           </div>
           
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 self-start sm:self-auto">
-            <div className="size-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>Base Conectada</span>
+          <div className="flex items-center gap-3 self-start sm:self-auto">
+            <button
+              onClick={() => setIsNewClientModalOpen(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-black shadow-lg shadow-emerald-500/20 transition-all cursor-pointer select-none"
+            >
+              <UserPlus className="size-4" />
+              <span>Novo Cliente</span>
+            </button>
+
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+              <div className="size-2 rounded-full bg-emerald-400 animate-ping" />
+              <span>Base Conectada</span>
+            </div>
           </div>
         </header>
 
@@ -107,12 +120,21 @@ export default function CRMDashboard() {
         {/* ━━━ CONTEÚDO DA ABA ATIVA ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         <div className="space-y-6">
           <CRMErrorBoundary>
-            {activeSubTab === 'rfm' && <RFMMatrix onSelectClient={setSelectedClient} />}
-            {activeSubTab === 'replenishment' && <PredictiveReplenishment onSelectClient={setSelectedClient} />}
-            {activeSubTab === 'followups' && <FollowUpsTab />}
-            {activeSubTab === 'sales_history' && <SalesHistoryTab />}
+            {activeSubTab === 'rfm' && <RFMMatrix key={`rfm-${refreshKey}`} onSelectClient={setSelectedClient} />}
+            {activeSubTab === 'replenishment' && <PredictiveReplenishment key={`rep-${refreshKey}`} onSelectClient={setSelectedClient} />}
+            {activeSubTab === 'followups' && <FollowUpsTab key={`fol-${refreshKey}`} />}
+            {activeSubTab === 'sales_history' && <SalesHistoryTab key={`sal-${refreshKey}`} />}
           </CRMErrorBoundary>
         </div>
+
+        {/* Modal Novo Cliente */}
+        <NewClientModal 
+          isOpen={isNewClientModalOpen}
+          onClose={() => setIsNewClientModalOpen(false)}
+          onClientCreated={() => {
+            setRefreshKey(prev => prev + 1);
+          }}
+        />
 
         {/* Modal 360 do Cliente */}
         {selectedClient && (
@@ -122,6 +144,7 @@ export default function CRMDashboard() {
               onClose={() => setSelectedClient(null)} 
               onClientUpdated={() => {
                 setSelectedClient(null);
+                setRefreshKey(prev => prev + 1);
               }}
             />
           </CRMErrorBoundary>

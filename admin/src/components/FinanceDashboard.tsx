@@ -27,6 +27,9 @@ import {
   PackagePlus,
   Boxes,
   Calendar,
+  CalendarDays,
+  Clock,
+  ChevronRight,
   Trash2,
   Plus,
   X,
@@ -45,6 +48,24 @@ import {
   deleteStockRepurchase,
   type StockRepurchase,
 } from "../lib/stockRepurchases";
+import {
+  type CycleDefinition,
+  type CycleFinancialMetrics,
+  type ConsolidatedPeriod,
+  type AllTimeFinancialMetrics,
+  type PeriodEvolution,
+  type GroupedPeriodEvolution,
+  getCurrentCycle,
+  getCycleForDate,
+  calculateMetricsForCycle,
+  calculateAllTimeMetrics,
+  calculatePeriodEvolutions,
+  generateHistoricalMonthlyCycles,
+  generateHistoricalQuarters,
+  generateHistoricalSemesters,
+  generateHistoricalYears,
+  filterValidOrders,
+} from "../lib/financialCycles";
 
 interface OrderItem {
   id?: string;
@@ -86,11 +107,609 @@ const DEFAULT_MODEL_COSTS: Record<string, number> = {
   "elfbar__te30k": 65,
 };
 
+/**
+ * Componente visual discreto de indicador de evolução percentual
+ */
+function EvolutionBadge({
+  evolution,
+  invertColors = false,
+}: {
+  evolution?: PeriodEvolution | null;
+  invertColors?: boolean;
+}) {
+  if (!evolution || !evolution.hasComparison) {
+    return (
+      <div className="flex items-center gap-1 text-[11px] text-white/40">
+        <span className="italic">Sem comparação</span>
+        <span className="text-[10px] text-white/30">vs. período anterior</span>
+      </div>
+    );
+  }
+
+  let color = "text-white/60";
+  if (evolution.direction === "up") {
+    color = invertColors ? "text-red-400" : "text-emerald-400";
+  } else if (evolution.direction === "down") {
+    color = invertColors ? "text-emerald-400" : "text-red-400";
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 text-xs font-semibold">
+      <span className={color}>
+        {evolution.arrow} {evolution.text}
+      </span>
+      <span className="text-[11px] text-white/40 font-normal">
+        {evolution.labelVs}
+      </span>
+    </div>
+  );
+}
+
+interface EvolutionPoint {
+  id: string;
+  label: string;
+  fullTitle: string;
+  periodLabel: string;
+  revenue: number;
+  cmv: number;
+  netProfit: number;
+  orders: number;
+  pods: number;
+  isCurrent?: boolean;
+}
+
+/**
+ * Componente de visualização gráfica da evolução do faturamento (Aba Evolução)
+ */
+function RevenueEvolutionChart({
+  data,
+  periodType,
+}: {
+  data: EvolutionPoint[];
+  periodType: "mensal" | "trimestral" | "semestral" | "anual";
+}) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="p-8 text-center text-white/40 text-xs italic">
+        Nenhum dado disponível para o período selecionado.
+      </div>
+    );
+  }
+
+  // Separação de ciclos concluídos vs ciclo em andamento
+  const completedPoints = data.filter((d) => !d.isCurrent);
+  const currentPoint = data.find((d) => d.isCurrent);
+
+  // Faturamento total no recorte histórico
+  const totalRevenue = data.reduce((sum, d) => sum + d.revenue, 0);
+
+  // Média por ciclo: considera apenas ciclos CONCLUÍDOS para não diluir a média
+  const completedRevenue = completedPoints.reduce((sum, d) => sum + d.revenue, 0);
+  const avgRevenue =
+    completedPoints.length > 0
+      ? completedRevenue / completedPoints.length
+      : totalRevenue / (data.length || 1);
+
+  // Pico histórico de vendas
+  const maxPoint = [...data].sort((a, b) => b.revenue - a.revenue)[0];
+
+  // Tendência recente: compara ESTRITAMENTE os dois últimos ciclos CONCLUÍDOS
+  const lastCompleted =
+    completedPoints.length > 0 ? completedPoints[completedPoints.length - 1] : null;
+  const prevCompleted =
+    completedPoints.length > 1 ? completedPoints[completedPoints.length - 2] : null;
+  const trendDiff = lastCompleted && prevCompleted ? lastCompleted.revenue - prevCompleted.revenue : 0;
+  const trendPct =
+    lastCompleted && prevCompleted && prevCompleted.revenue > 0
+      ? (trendDiff / prevCompleted.revenue) * 100
+      : null;
+  const trendSubtitle =
+    lastCompleted && prevCompleted
+      ? `${lastCompleted.label.replace(" — em andamento", "").replace(" (em andamento)", "")} vs. ${prevCompleted.label.replace(" — em andamento", "").replace(" (em andamento)", "")} (concluídos)`
+      : completedPoints.length === 1
+      ? "1º ciclo concluído"
+      : "Em apuração";
+
+  const width = 800;
+  const height = 285;
+  const padLeft = 65;
+  const padRight = 45;
+  const padTop = 35;
+  const padBottom = 55;
+  const chartWidth = width - padLeft - padRight;
+  const chartHeight = height - padTop - padBottom;
+
+  const rawMax = Math.max(...data.map((d) => d.revenue), 100);
+  const yMax = Math.ceil(rawMax * 1.18);
+
+  const points = data.map((d, i) => {
+    const x =
+      data.length === 1
+        ? padLeft + chartWidth / 2
+        : padLeft + (i / (data.length - 1)) * chartWidth;
+    const y = padTop + chartHeight - (d.revenue / yMax) * chartHeight;
+    return { ...d, x, y, index: i };
+  });
+
+  const completedPointsWithCoords = points.filter((p) => !p.isCurrent);
+  const currentPointWithCoords = points.find((p) => p.isCurrent);
+  const lastCompletedPoint =
+    completedPointsWithCoords.length > 0
+      ? completedPointsWithCoords[completedPointsWithCoords.length - 1]
+      : null;
+
+  // Caminho da linha sólida dos ciclos concluídos
+  const completedLinePath =
+    completedPointsWithCoords.length === 1
+      ? `M ${completedPointsWithCoords[0].x - 30} ${completedPointsWithCoords[0].y} L ${completedPointsWithCoords[0].x + 30} ${completedPointsWithCoords[0].y}`
+      : completedPointsWithCoords.length > 1
+      ? completedPointsWithCoords.reduce(
+          (acc, p, i) => `${acc} ${i === 0 ? "M" : "L"} ${p.x} ${p.y}`,
+          ""
+        )
+      : "";
+
+  // Caminho da área preenchida dos ciclos concluídos
+  const completedAreaPath =
+    completedPointsWithCoords.length === 1
+      ? `M ${completedPointsWithCoords[0].x - 30} ${padTop + chartHeight} L ${completedPointsWithCoords[0].x - 30} ${completedPointsWithCoords[0].y} L ${completedPointsWithCoords[0].x + 30} ${completedPointsWithCoords[0].y} L ${completedPointsWithCoords[0].x + 30} ${padTop + chartHeight} Z`
+      : completedPointsWithCoords.length > 1
+      ? `M ${completedPointsWithCoords[0].x} ${padTop + chartHeight} ${completedPointsWithCoords.reduce(
+          (acc, p) => `${acc} L ${p.x} ${p.y}`,
+          ""
+        )} L ${completedPointsWithCoords[completedPointsWithCoords.length - 1].x} ${padTop + chartHeight} Z`
+      : "";
+
+  // Segmento em andamento (linha pontilhada do último concluído até o ciclo atual)
+  const inProgressLinePath =
+    lastCompletedPoint && currentPointWithCoords
+      ? `M ${lastCompletedPoint.x} ${lastCompletedPoint.y} L ${currentPointWithCoords.x} ${currentPointWithCoords.y}`
+      : "";
+
+  // Área sob o segmento em andamento
+  const inProgressAreaPath =
+    lastCompletedPoint && currentPointWithCoords
+      ? `M ${lastCompletedPoint.x} ${padTop + chartHeight} L ${lastCompletedPoint.x} ${lastCompletedPoint.y} L ${currentPointWithCoords.x} ${currentPointWithCoords.y} L ${currentPointWithCoords.x} ${padTop + chartHeight} Z`
+      : "";
+
+  // Fallback caso todos os pontos sejam abertos
+  const fallbackLinePath =
+    completedPointsWithCoords.length === 0
+      ? points.reduce((acc, p, i) => `${acc} ${i === 0 ? "M" : "L"} ${p.x} ${p.y}`, "")
+      : "";
+
+  const gridLevels = [0, 0.33, 0.66, 1];
+  const activePoint = hoveredIdx !== null ? points[hoveredIdx] : points[points.length - 1];
+
+  return (
+    <div className="space-y-4">
+      {/* Barra Resumo / KPIs de Evolução */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-black/40 border border-white/10 rounded-2xl p-4 text-xs">
+        <div>
+          <span className="text-white/40 block text-[10px] uppercase font-semibold">Faturamento no Recorte</span>
+          <span className="text-white font-extrabold text-sm sm:text-base">{formatBRL(totalRevenue)}</span>
+        </div>
+        <div>
+          <span className="text-white/40 block text-[10px] uppercase font-semibold">Pico de Vendas</span>
+          <span className="text-emerald-400 font-extrabold text-sm sm:text-base">
+            {maxPoint ? `${formatBRL(maxPoint.revenue)}` : "—"}
+          </span>
+          {maxPoint && maxPoint.revenue > 0 && (
+            <span className="text-[10px] text-white/40 block truncate">
+              {maxPoint.label.replace(" — em andamento", "").replace(" (em andamento)", "")}
+            </span>
+          )}
+        </div>
+        <div>
+          <span className="text-white/40 block text-[10px] uppercase font-semibold">Média por Ciclo</span>
+          <span className="text-white/90 font-extrabold text-sm sm:text-base">{formatBRL(avgRevenue)}</span>
+          <span className="text-[10px] text-white/40 block truncate">
+            {completedPoints.length > 0
+              ? `${completedPoints.length} ${completedPoints.length === 1 ? "ciclo concluído" : "ciclos concluídos"}`
+              : "Ciclo vigente"}
+          </span>
+        </div>
+        <div>
+          <span className="text-white/40 block text-[10px] uppercase font-semibold">Tendência Recente</span>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {trendDiff > 0 ? (
+              <span className="text-emerald-400 font-extrabold text-sm sm:text-base flex items-center gap-0.5">
+                <span>↑</span>
+                <span>{trendPct !== null ? `+${trendPct.toFixed(1)}%` : "Crescimento"}</span>
+              </span>
+            ) : trendDiff < 0 ? (
+              <span className="text-red-400 font-extrabold text-sm sm:text-base flex items-center gap-0.5">
+                <span>↓</span>
+                <span>{trendPct !== null ? `${trendPct.toFixed(1)}%` : "Queda"}</span>
+              </span>
+            ) : (
+              <span className="text-white/60 font-extrabold text-sm sm:text-base flex items-center gap-0.5">
+                <span>→</span>
+                <span>Estável (0%)</span>
+              </span>
+            )}
+          </div>
+          {trendSubtitle && (
+            <span className="text-[10px] text-white/40 block truncate">
+              {trendSubtitle}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Gráfico SVG Principal */}
+      <div className="bg-black/60 border border-white/15 rounded-3xl p-4 sm:p-6 space-y-3 relative overflow-hidden shadow-2xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs font-bold text-white uppercase tracking-wider">
+              Curva de Evolução do Faturamento
+            </span>
+            <span className="text-[10px] text-white/40 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
+              {periodType === "mensal"
+                ? "Ciclos 14 → 13"
+                : periodType === "trimestral"
+                ? "Blocos de 3 ciclos"
+                : periodType === "semestral"
+                ? "Blocos de 6 ciclos"
+                : "Anual"}
+            </span>
+          </div>
+          <span className="text-[11px] text-white/40 hidden sm:inline-block">
+            Passe o mouse ou toque nos pontos para ver os detalhes
+          </span>
+        </div>
+
+        {/* ViewBox SVG Responsivo */}
+        <div className="w-full overflow-x-auto">
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            className="w-full h-auto min-w-[550px] select-none"
+          >
+            <defs>
+              <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
+                <stop offset="80%" stopColor="#10b981" stopOpacity="0.05" />
+                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+              </linearGradient>
+              <linearGradient id="currentSegmentGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity="0.16" />
+                <stop offset="100%" stopColor="#10b981" stopOpacity="0.01" />
+              </linearGradient>
+              <filter id="emeraldGlow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            {/* Linhas de Grade Horizontais */}
+            {gridLevels.map((lvl) => {
+              const yVal = padTop + chartHeight - lvl * chartHeight;
+              const val = lvl * yMax;
+              return (
+                <g key={lvl}>
+                  <line
+                    x1={padLeft}
+                    y1={yVal}
+                    x2={width - padRight}
+                    y2={yVal}
+                    stroke="rgba(255, 255, 255, 0.08)"
+                    strokeDasharray="3 3"
+                  />
+                  <text
+                    x={padLeft - 8}
+                    y={yVal + 3}
+                    textAnchor="end"
+                    fill="rgba(255, 255, 255, 0.4)"
+                    fontSize="10"
+                    fontFamily="monospace"
+                  >
+                    {formatBRL(val).replace(",00", "")}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Área Preenchida dos Ciclos Concluídos */}
+            {completedAreaPath && <path d={completedAreaPath} fill="url(#revenueGradient)" />}
+
+            {/* Área Suave do Ciclo em Andamento */}
+            {inProgressAreaPath && <path d={inProgressAreaPath} fill="url(#currentSegmentGradient)" />}
+
+            {/* Linha Principal Sólida dos Ciclos Concluídos */}
+            {completedLinePath && (
+              <path
+                d={completedLinePath}
+                fill="none"
+                stroke="#10b981"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                filter="url(#emeraldGlow)"
+              />
+            )}
+
+            {/* Linha Pontilhada do Segmento em Andamento */}
+            {inProgressLinePath && (
+              <path
+                d={inProgressLinePath}
+                fill="none"
+                stroke="#34d399"
+                strokeWidth="2.5"
+                strokeDasharray="6 4"
+                strokeLinecap="round"
+              />
+            )}
+
+            {/* Fallback caso não haja ciclos concluídos */}
+            {fallbackLinePath && (
+              <path
+                d={fallbackLinePath}
+                fill="none"
+                stroke="#10b981"
+                strokeWidth="3"
+                strokeDasharray="4 4"
+              />
+            )}
+
+            {/* Indicadores nos Segmentos:
+                - Entre ciclos concluídos: setas normais (↗ / ↘ / →)
+                - Ligação para ciclo em andamento: pill neutro 'em andamento' (sem seta falsa de queda) */}
+            {points.map((p, i) => {
+              if (i === 0) return null;
+              const prev = points[i - 1];
+              const midX = (prev.x + p.x) / 2;
+              const midY = (prev.y + p.y) / 2;
+
+              // Transição para ciclo em andamento
+              if (p.isCurrent) {
+                return (
+                  <g key={`inprogress-pill-${i}`}>
+                    <rect
+                      x={midX - 44}
+                      y={midY - 10}
+                      width="88"
+                      height="20"
+                      rx="10"
+                      fill="#0e0e10"
+                      stroke="rgba(52, 211, 153, 0.45)"
+                      strokeWidth="1"
+                    />
+                    <circle cx={midX - 32} cy={midY} r="3" fill="#34d399" />
+                    <text
+                      x={midX + 6}
+                      y={midY + 3.5}
+                      textAnchor="middle"
+                      fill="#34d399"
+                      fontSize="8.5"
+                      fontWeight="bold"
+                    >
+                      em andamento
+                    </text>
+                  </g>
+                );
+              }
+
+              // Segmento normal entre dois ciclos concluídos
+              const isUp = p.revenue > prev.revenue;
+              const isDown = p.revenue < prev.revenue;
+              const arrowSymbol = isUp ? "↗" : isDown ? "↘" : "→";
+              const arrowColor = isUp ? "#34d399" : isDown ? "#f87171" : "rgba(255,255,255,0.4)";
+
+              return (
+                <g key={`arrow-${i}`}>
+                  <circle cx={midX} cy={midY} r="8" fill="#0e0e10" stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
+                  <text
+                    x={midX}
+                    y={midY + 3.5}
+                    textAnchor="middle"
+                    fill={arrowColor}
+                    fontSize="10"
+                    fontWeight="bold"
+                  >
+                    {arrowSymbol}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Pontos de Dados & Rótulos */}
+            {points.map((p, i) => {
+              const isHovered = hoveredIdx === i;
+              const isPeak = p.revenue === maxPoint?.revenue && p.revenue > 0 && !p.isCurrent;
+
+              return (
+                <g
+                  key={p.id}
+                  className="cursor-pointer transition-transform"
+                  onMouseEnter={() => setHoveredIdx(i)}
+                  onClick={() => setHoveredIdx(i)}
+                >
+                  {/* Linha Guia Vertical no Hover */}
+                  {isHovered && (
+                    <line
+                      x1={p.x}
+                      y1={padTop}
+                      x2={p.x}
+                      y2={padTop + chartHeight}
+                      stroke={p.isCurrent ? "rgba(52, 211, 153, 0.4)" : "rgba(16, 185, 129, 0.4)"}
+                      strokeWidth="1.5"
+                      strokeDasharray="2 2"
+                    />
+                  )}
+
+                  {/* Halo Pulsante no Ponto Selecionado / Hover */}
+                  {isHovered && (
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={12}
+                      fill={p.isCurrent ? "rgba(52, 211, 153, 0.25)" : "rgba(16, 185, 129, 0.25)"}
+                    />
+                  )}
+
+                  {/* Círculo do Ponto */}
+                  {p.isCurrent ? (
+                    <g>
+                      <circle
+                        cx={p.x}
+                        cy={p.y}
+                        r={10}
+                        fill="rgba(52, 211, 153, 0.12)"
+                        stroke="rgba(52, 211, 153, 0.5)"
+                        strokeWidth="1"
+                        strokeDasharray="3 2"
+                      />
+                      <circle
+                        cx={p.x}
+                        cy={p.y}
+                        r={isHovered ? 6 : 5}
+                        fill="#0e0e10"
+                        stroke="#34d399"
+                        strokeWidth="2.5"
+                      />
+                      <circle cx={p.x} cy={p.y} r="2" fill="#34d399" />
+                    </g>
+                  ) : (
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={isHovered ? 6.5 : isPeak ? 5.5 : 4.5}
+                      fill={isPeak ? "#34d399" : "#10b981"}
+                      stroke="#0e0e10"
+                      strokeWidth="2.5"
+                    />
+                  )}
+
+                  {/* Rótulo de Valor Flutuante Acima do Ponto */}
+                  <text
+                    x={p.x}
+                    y={p.y - 12}
+                    textAnchor="middle"
+                    fill={p.isCurrent ? "#34d399" : p.revenue > 0 ? (isPeak ? "#34d399" : "#ffffff") : "rgba(255,255,255,0.35)"}
+                    fontSize={isHovered ? "11" : "10"}
+                    fontWeight={isHovered || isPeak || p.isCurrent ? "bold" : "600"}
+                  >
+                    {formatBRL(p.revenue).replace(",00", "")}
+                  </text>
+
+                  {/* Rótulo do Eixo X (Nome do Período) */}
+                  <text
+                    x={p.x}
+                    y={padTop + chartHeight + 20}
+                    textAnchor="middle"
+                    fill={p.isCurrent ? "#34d399" : isHovered ? "#ffffff" : "rgba(255,255,255,0.8)"}
+                    fontSize="11"
+                    fontWeight={p.isCurrent || isHovered ? "bold" : "500"}
+                  >
+                    {p.label.replace(" — em andamento", "").replace(" (em andamento)", "")}
+                  </text>
+
+                  {/* Sub-rótulo com Datas dos Ciclos 14 → 13 ou status em andamento */}
+                  <text
+                    x={p.x}
+                    y={padTop + chartHeight + 35}
+                    textAnchor="middle"
+                    fill={p.isCurrent ? "#34d399" : "rgba(255,255,255,0.35)"}
+                    fontSize="9"
+                    fontWeight={p.isCurrent ? "bold" : "normal"}
+                    fontFamily={p.isCurrent ? "sans-serif" : "monospace"}
+                  >
+                    {p.isCurrent
+                      ? "em andamento"
+                      : p.periodLabel.includes("→")
+                      ? p.periodLabel.replace(/\/2026/g, "").slice(0, 11)
+                      : p.periodLabel.slice(0, 10)}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+
+        {/* Card Detalhado do Ponto em Foco */}
+        {activePoint && (
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-white text-sm">{activePoint.fullTitle}</span>
+                {activePoint.isCurrent && (
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Ciclo Vigente (Em Andamento)</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-white/50 text-[11px]">
+                {activePoint.periodLabel}
+                {activePoint.isCurrent && " · Faturamento apurado até o momento (ciclo aberto)"}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4 flex-wrap">
+              <div>
+                <span className="text-white/40 block text-[10px] uppercase font-semibold">Faturamento</span>
+                <span className="text-white font-extrabold text-sm">{formatBRL(activePoint.revenue)}</span>
+              </div>
+              <div>
+                <span className="text-white/40 block text-[10px] uppercase font-semibold">CMV (Custo)</span>
+                <span className="text-red-400 font-bold text-sm">{formatBRL(activePoint.cmv)}</span>
+              </div>
+              <div>
+                <span className="text-white/40 block text-[10px] uppercase font-semibold">Lucro Líquido</span>
+                <span className="text-emerald-400 font-extrabold text-sm">{formatBRL(activePoint.netProfit)}</span>
+              </div>
+              <div>
+                <span className="text-white/40 block text-[10px] uppercase font-semibold">Volume</span>
+                <span className="text-white/80 font-semibold">{activePoint.orders} ped ({activePoint.pods} pods)</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function FinanceDashboard() {
-  const { company } = useAuth();
+  const { user, company, companyUser, loading: authLoading, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
 
-  // Financial Metrics State
+  // Estados de Controle de Erro e Ciclo de Vida da Consulta
+  const [financeError, setFinanceError] = useState<{
+    message: string;
+    code?: string;
+    isAuthError?: boolean;
+  } | null>(null);
+  const [repurchasesError, setRepurchasesError] = useState<{
+    message: string;
+    code?: string;
+  } | null>(null);
+  const [hasLoadedSuccessfully, setHasLoadedSuccessfully] = useState(false);
+
+  // Estados de Ciclo Financeiro (Regra 14 -> 13 no fuso America/Sao_Paulo)
+  const [currentCycle, setCurrentCycle] = useState<CycleDefinition>(getCurrentCycle());
+  const [monthlyCycles, setMonthlyCycles] = useState<CycleFinancialMetrics[]>([]);
+  const [quarterlyPeriods, setQuarterlyPeriods] = useState<ConsolidatedPeriod[]>([]);
+  const [semiannualPeriods, setSemiannualPeriods] = useState<ConsolidatedPeriod[]>([]);
+  const [annualPeriods, setAnnualPeriods] = useState<ConsolidatedPeriod[]>([]);
+  const [allValidOrders, setAllValidOrders] = useState<any[]>([]);
+  const [persistedProductCosts, setPersistedProductCosts] = useState<Record<string, number>>({});
+
+  // Seletores da Área: Faturamento a Longo Prazo (2 Abas: Histórico e Evolução)
+  const [longTermTab, setLongTermTab] = useState<"historico" | "evolucao">("historico");
+  const [historyTab, setHistoryTab] = useState<"mensal" | "trimestral" | "semestral" | "anual">("mensal");
+  const [selectedMonthCycleId, setSelectedMonthCycleId] = useState<string>("");
+  const [selectedQuarterId, setSelectedQuarterId] = useState<string>("");
+  const [selectedSemesterId, setSelectedSemesterId] = useState<string>("");
+  const [selectedYearId, setSelectedYearId] = useState<string>("");
+
+  // Financial Metrics State (Correspondente ao Ciclo Vigente)
   const [grossRevenue, setGrossRevenue] = useState(0);
   const [cmv, setCmv] = useState(0);
   const [logisticsFee, setLogisticsFee] = useState(0);
@@ -101,7 +720,7 @@ export default function FinanceDashboard() {
   const [brandSales, setBrandSales] = useState<Array<{ brand: string; count: number; revenue: number }>>([]);
   const [modelProfits, setModelProfits] = useState<ModelProfitItem[]>([]);
 
-  // Stock Asset State
+  // Stock Asset State (Inventário Físico na Prateleira)
   const [stockAssetCost, setStockAssetCost] = useState(0);
   const [stockAssetRetail, setStockAssetRetail] = useState(0);
   const [stockAssetUnits, setStockAssetUnits] = useState(0);
@@ -138,38 +757,115 @@ export default function FinanceDashboard() {
     } catch (e) {}
   };
 
-  const fetchFinanceData = async () => {
-    const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+  const fetchFinanceData = async (isRetry = false) => {
+    if (authLoading) return;
+
+    if (!user || !company?.id || !companyUser) {
+      setFinanceError({
+        message: "Sessão não autenticada ou empresa não identificada. Por favor, realize o login novamente.",
+        isAuthError: true,
+      });
+      setLoading(false);
+      return;
+    }
+
+    const targetCompanyId = company.id;
     try {
       setLoading(true);
+      setFinanceError(null);
 
       // Executa todas as consultas financeiras em paralelo para carregamento ultrarrápido
-      const [persistedCostsRes, ordersRes, productsRes] = await Promise.all([
+      const [persistedCostsRes, ordersRes, productsRes, repurchasesRes] = await Promise.all([
         fetchProductCostsMap(targetCompanyId).catch(() => ({})),
         supabase
           .from("smoking_orders")
           .select("*")
-          .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
+          .eq("company_id", targetCompanyId)
           .neq("delivery_status", "CANCELADO"),
         supabase
           .from("smoking_products")
           .select("*")
-          .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
-          .eq("is_active", true)
+          .eq("company_id", targetCompanyId)
+          .eq("is_active", true),
+        supabase
+          .from("smoking_stock_repurchases")
+          .select("*")
+          .eq("company_id", targetCompanyId)
+          .order("purchase_date", { ascending: false }),
       ]);
+
+      // Inspecionar explicitamente se smoking_orders retornou erro
+      if (ordersRes.error) {
+        console.error("[FinanceDashboard] Erro ao consultar smoking_orders:", ordersRes.error.message);
+        const isAuth = ordersRes.error.code === "42501" ||
+          ordersRes.error.message?.includes("permission denied") ||
+          ordersRes.error.message?.includes("JWT") ||
+          ordersRes.error.message?.includes("token");
+
+        // Tentativa de recuperação única se for erro de permissão/token
+        if (isAuth && !isRetry) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData?.session?.user) {
+            console.log("[FinanceDashboard] Sessão Supabase confirmada. Executando retry único...");
+            return fetchFinanceData(true);
+          }
+        }
+
+        setFinanceError({
+          message: isAuth
+            ? "Não foi possível carregar os dados financeiros. Sua sessão pode ter expirado ou houve um problema de permissão no acesso aos pedidos."
+            : `Erro ao carregar pedidos: ${ordersRes.error.message}`,
+          code: ordersRes.error.code,
+          isAuthError: isAuth,
+        });
+        setLoading(false);
+        return; // NUNCA transforma erro em array vazio nem calcula zero!
+      }
+
+      // Inspecionar explicitamente se smoking_products retornou erro
+      if (productsRes.error) {
+        console.error("[FinanceDashboard] Erro ao consultar smoking_products:", productsRes.error.message);
+        setFinanceError({
+          message: `Erro ao carregar catálogo de produtos: ${productsRes.error.message}`,
+          code: productsRes.error.code,
+        });
+        setLoading(false);
+        return;
+      }
 
       const persistedCosts = persistedCostsRes || {};
       const rawOrders = ordersRes.data;
       const productsData = productsRes.data;
 
-      const validOrders = (rawOrders || []).filter(
-        (o) =>
-          o.client_phone !== "__SYSTEM_SMK_BEST_SELLERS__" &&
-          (!o.client_phone || !o.client_phone.startsWith("__SYSTEM_")) &&
-          (!o.client_name || !o.client_name.toLowerCase().includes("system config"))
-      );
+      if (!rawOrders) {
+        setFinanceError({
+          message: "Resposta do banco de dados não retornou lista de pedidos válida.",
+        });
+        setLoading(false);
+        return;
+      }
 
+      // Mapear recompras oficiais da empresa
+      let loadedRepurchases: StockRepurchase[] = [];
+      if (Array.isArray(repurchasesRes.data)) {
+        loadedRepurchases = repurchasesRes.data.map((row: any) => ({
+          id: row.id,
+          company_id: row.company_id || targetCompanyId,
+          stock_purchase_amount: Number(row.stock_purchase_amount) || 0,
+          freight_amount: Number(row.freight_amount) || 0,
+          total_repurchase_amount: Number(row.total_repurchase_amount) || (Number(row.stock_purchase_amount) || 0) + (Number(row.freight_amount) || 0),
+          purchase_date: row.purchase_date || new Date().toISOString().split("T")[0],
+          notes: row.notes || "",
+          created_at: row.created_at || new Date().toISOString(),
+        }));
+        setRepurchases(loadedRepurchases);
+      }
 
+      const validOrders = filterValidOrders(rawOrders);
+      setAllValidOrders(validOrders);
+      setPersistedProductCosts(persistedCosts);
+
+      // 1. Estoque Físico na Prateleira
       let totalStockCostSum = 0;
       let totalStockRetailSum = 0;
       let totalUnitsSum = 0;
@@ -207,85 +903,34 @@ export default function FinanceDashboard() {
       setStockAssetRetail(totalStockRetailSum);
       setStockAssetUnits(totalUnitsSum);
 
-      // 4. Processar Métricas DRE & Campeões de Venda
-      let revenueSum = 0;
-      let cmvSum = 0;
-      let shippingSum = 0;
-      let podsSoldSum = 0;
+      // 2. Identificar e Apurar o Ciclo Atual Vigente (Regra 14 -> 13 em America/Sao_Paulo)
+      const curCycle = getCurrentCycle();
+      setCurrentCycle(curCycle);
+
+      const curCycleMetrics = calculateMetricsForCycle(curCycle, validOrders, loadedRepurchases, persistedCosts);
+      setGrossRevenue(curCycleMetrics.grossRevenue);
+      setCmv(curCycleMetrics.cmv);
+      setLogisticsFee(curCycleMetrics.logisticsFee);
+      setNetProfit(curCycleMetrics.netProfit);
+      setProfitMargin(curCycleMetrics.profitMargin);
+      setTotalOrders(curCycleMetrics.totalOrders);
+      setTotalPodsSold(curCycleMetrics.totalPodsSold);
+
+      // 3. Vendas por Marca no Ciclo Vigente
       const brandMap: Record<string, { count: number; revenue: number }> = {};
-      const modelMap: Record<
-        string,
-        { brand: string; name: string; unitsSold: number; revenue: number; totalCost: number }
-      > = {};
-
-      const pCosts = (persistedCosts || {}) as Record<string, number>;
-      const dCosts = (DEFAULT_MODEL_COSTS || {}) as Record<string, number>;
-
-      for (const order of validOrders) {
-        const shippingFee = parseFloat(order.shipping_fee || 0);
-        shippingSum += shippingFee;
-
+      for (const order of curCycleMetrics.orders) {
         const items: OrderItem[] = Array.isArray(order.items) ? order.items : [];
         for (const item of items) {
           const qty = Number(item.quantity) || 1;
           const brand = (item.brand || "OUTROS").toUpperCase();
-          const modelName = (item.name || "POD").toUpperCase();
           const itemPrice = Number(item.price || item.unit_price) || 0;
-          const modelKey = (item.modelKey || `${brand}__${modelName}`).toLowerCase();
-
-          // Custo unitário do item
-          let itemCost = Number(item.cost_price || item.costPrice) || 0;
-          if (!itemCost && item.product_id && pCosts[item.product_id]) {
-            itemCost = pCosts[item.product_id];
-          }
-          if (!itemCost && modelKey && dCosts[modelKey]) {
-            itemCost = dCosts[modelKey];
-          }
-          if (!itemCost) itemCost = 65;
-
-          const itemTotalRevenue = qty * itemPrice;
-          const itemTotalCost = qty * itemCost;
-
-          // Faturamento Bruto Real calcula estritamente a receita dos pods (sem o frete)
-          revenueSum += itemTotalRevenue;
-          cmvSum += itemTotalCost;
-          podsSoldSum += qty;
-
-          // Marca
           if (!brandMap[brand]) {
             brandMap[brand] = { count: 0, revenue: 0 };
           }
           brandMap[brand].count += qty;
-          brandMap[brand].revenue += itemTotalRevenue;
-
-          // Modelo
-          if (!modelMap[modelKey]) {
-            modelMap[modelKey] = {
-              brand,
-              name: modelName,
-              unitsSold: 0,
-              revenue: 0,
-              totalCost: 0,
-            };
-          }
-          modelMap[modelKey].unitsSold += qty;
-          modelMap[modelKey].revenue += itemTotalRevenue;
-          modelMap[modelKey].totalCost += itemTotalCost;
+          brandMap[brand].revenue += qty * itemPrice;
         }
       }
-
-      // Lucro Líquido Real = Faturamento dos Pods (Sem Frete) - Custo CMV
-      const net = revenueSum - cmvSum;
-      const margin = revenueSum > 0 ? (net / revenueSum) * 100 : 0;
-
-      setGrossRevenue(revenueSum);
-      setCmv(cmvSum);
-      setLogisticsFee(shippingSum);
-      setNetProfit(net);
-      setProfitMargin(parseFloat(margin.toFixed(1)));
-      setTotalOrders(validOrders.length);
-      setTotalPodsSold(podsSoldSum);
-
       const brandList = Object.entries(brandMap).map(([brand, data]) => ({
         brand,
         count: data.count,
@@ -293,26 +938,40 @@ export default function FinanceDashboard() {
       }));
       setBrandSales(brandList);
 
-      // Mapear Campeões de Lucro
-      const modelProfitList: ModelProfitItem[] = Object.entries(modelMap).map(([modelKey, data]) => {
-        const profit = data.revenue - data.totalCost;
-        const marginPct = data.revenue > 0 ? (profit / data.revenue) * 100 : 0;
-        return {
-          modelKey,
-          brand: data.brand,
-          name: data.name,
-          unitsSold: data.unitsSold,
-          revenue: data.revenue,
-          totalCost: data.totalCost,
-          profit,
-          marginPct: parseFloat(marginPct.toFixed(1)),
-        };
-      });
+      // 4. Gerar Histórico de Longo Prazo (Mensal, Trimestral, Semestral e Anual)
+      const historicalMonths = generateHistoricalMonthlyCycles(validOrders, loadedRepurchases, persistedCosts);
+      setMonthlyCycles(historicalMonths);
 
-      modelProfitList.sort((a, b) => b.profit - a.profit);
-      setModelProfits(modelProfitList);
-    } catch (err) {
-      console.error("Erro ao calcular inteligência financeira:", err);
+      // Selecionar o ciclo mensal fechado mais recente (ex: Agosto/2026) por padrão para consulta imediata
+      const firstClosed = historicalMonths.find((m) => m.cycle.isClosed);
+      const defaultCycleId = firstClosed ? firstClosed.cycle.id : (historicalMonths[0]?.cycle.id || curCycle.id);
+      setSelectedMonthCycleId((prev) => prev || defaultCycleId);
+
+      const quarters = generateHistoricalQuarters(historicalMonths);
+      setQuarterlyPeriods(quarters);
+      if (quarters.length > 0) {
+        setSelectedQuarterId((prev) => prev || quarters[0].id);
+      }
+
+      const semesters = generateHistoricalSemesters(historicalMonths);
+      setSemiannualPeriods(semesters);
+      if (semesters.length > 0) {
+        setSelectedSemesterId((prev) => prev || semesters[0].id);
+      }
+
+      const years = generateHistoricalYears(historicalMonths);
+      setAnnualPeriods(years);
+      if (years.length > 0) {
+        setSelectedYearId((prev) => prev || years[0].id);
+      }
+
+      setHasLoadedSuccessfully(true);
+      setFinanceError(null);
+    } catch (err: any) {
+      console.error("[FinanceDashboard] Erro ao calcular inteligência financeira:", err);
+      setFinanceError({
+        message: err?.message || "Erro inesperado ao processar os indicadores financeiros.",
+      });
     } finally {
       setLoading(false);
     }
@@ -321,17 +980,56 @@ export default function FinanceDashboard() {
   const loadRepurchasesData = async (targetCompanyId: string) => {
     try {
       setLoadingRepurchases(true);
-      const data = await fetchStockRepurchases(targetCompanyId);
-      setRepurchases(data);
-    } catch (e) {
-      console.warn("Erro ao carregar dados de recompras:", e);
+      setRepurchasesError(null);
+      const { data, error } = await supabase
+        .from("smoking_stock_repurchases")
+        .select("*")
+        .eq("company_id", targetCompanyId)
+        .order("purchase_date", { ascending: false });
+
+      if (error) {
+        console.error("[FinanceDashboard] Erro na consulta de smoking_stock_repurchases:", error.message);
+        setRepurchasesError({
+          message: error.message,
+          code: error.code,
+        });
+        return;
+      }
+
+      if (Array.isArray(data)) {
+        const mapped: StockRepurchase[] = data.map((row: any) => ({
+          id: row.id,
+          company_id: row.company_id || targetCompanyId,
+          stock_purchase_amount: Number(row.stock_purchase_amount) || 0,
+          freight_amount: Number(row.freight_amount) || 0,
+          total_repurchase_amount: Number(row.total_repurchase_amount) || (Number(row.stock_purchase_amount) || 0) + (Number(row.freight_amount) || 0),
+          purchase_date: row.purchase_date || new Date().toISOString().split("T")[0],
+          notes: row.notes || "",
+          created_at: row.created_at || new Date().toISOString(),
+        }));
+        setRepurchases(mapped);
+      }
+    } catch (e: any) {
+      console.error("[FinanceDashboard] Exceção ao carregar recompras:", e?.message || e);
+      setRepurchasesError({ message: e?.message || "Erro inesperado ao carregar recompras" });
     } finally {
       setLoadingRepurchases(false);
     }
   };
 
   useEffect(() => {
-    const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+    if (authLoading) return;
+
+    if (!user || !company?.id || !companyUser) {
+      setFinanceError({
+        message: "Sessão não autenticada ou empresa não identificada. Faça login novamente.",
+        isAuthError: true,
+      });
+      setLoading(false);
+      return;
+    }
+
+    const targetCompanyId = company.id;
     fetchFinanceData();
     loadRepurchasesData(targetCompanyId);
 
@@ -345,13 +1043,14 @@ export default function FinanceDashboard() {
 
     const subProducts = supabase
       .channel("finance_products_changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, fetchFinanceData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => fetchFinanceData())
       .subscribe();
 
     const subRepurchases = supabase
       .channel("finance_stock_repurchases_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_stock_repurchases" }, () => {
         loadRepurchasesData(targetCompanyId);
+        fetchFinanceData();
       })
       .subscribe();
 
@@ -360,26 +1059,175 @@ export default function FinanceDashboard() {
       supabase.removeChannel(subProducts);
       supabase.removeChannel(subRepurchases);
     };
-  }, [company?.id]);
+  }, [user, company?.id, companyUser, authLoading]);
 
-  // ── Cálculos Recompra de Estoque & Caixa Real (Módulo Independente) ─────────────
-  const totalStockPurchases = useMemo(() => {
-    return repurchases.reduce((sum, r) => sum + (Number(r.stock_purchase_amount) || 0), 0);
-  }, [repurchases]);
+  // ── All-Time Metrics (Histórico Completo para Eficiência Comercial & Caixa Real Atual) ──
+  const allTimeMetrics = useMemo(() => {
+    return calculateAllTimeMetrics(allValidOrders, repurchases, persistedProductCosts);
+  }, [allValidOrders, repurchases, persistedProductCosts]);
 
-  const totalFreightRepurchases = useMemo(() => {
-    return repurchases.reduce((sum, r) => sum + (Number(r.freight_amount) || 0), 0);
-  }, [repurchases]);
+  // CAIXA REAL ATUAL: Posição patrimonial viva da empresa (NÃO reinicia no dia 14)
+  // Conforme regra fundamental: Faturamento total acumulado - total pago em recompras
+  const realCash = allTimeMetrics.realCash;
+  const totalStockPurchases = allTimeMetrics.stockPurchases;
+  const totalFreightRepurchases = allTimeMetrics.freightRepurchases;
+  const totalInvestedRepurchases = allTimeMetrics.totalInvestedRepurchases;
 
-  const totalInvestedRepurchases = useMemo(() => {
-    return totalStockPurchases + totalFreightRepurchases;
-  }, [totalStockPurchases, totalFreightRepurchases]);
+  // Seletores Memoizados para a Área de Faturamento a Longo Prazo
+  const selectedMonthlyMetric = useMemo(() => {
+    return (
+      monthlyCycles.find((m) => m.cycle.id === selectedMonthCycleId) ||
+      monthlyCycles.find((m) => m.cycle.isClosed) ||
+      monthlyCycles[0] ||
+      null
+    );
+  }, [monthlyCycles, selectedMonthCycleId]);
 
-  // CAIXA REAL = Faturamento Bruto Real (Acumulado) - Total Pago em Recompras de Estoque
-  // REGRA FINANCEIRA: O FRETE NÃO ENTRA NO CÁLCULO DO CAIXA REAL
-  const realCash = useMemo(() => {
-    return (grossRevenue || 0) - totalStockPurchases;
-  }, [grossRevenue, totalStockPurchases]);
+  // Comparação Mensal: ciclo financeiro imediatamente anterior (14 -> 13)
+  const previousMonthlyMetric = useMemo(() => {
+    if (!selectedMonthlyMetric) return null;
+    const { year, month } = selectedMonthlyMetric.cycle;
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
+    const prevId = `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
+    return monthlyCycles.find((m) => m.cycle.id === prevId) || null;
+  }, [selectedMonthlyMetric, monthlyCycles]);
+
+  const monthlyEvolution = useMemo(() => {
+    return calculatePeriodEvolutions(selectedMonthlyMetric, previousMonthlyMetric, "ciclo anterior");
+  }, [selectedMonthlyMetric, previousMonthlyMetric]);
+
+  const selectedQuarter = useMemo(() => {
+    return quarterlyPeriods.find((q) => q.id === selectedQuarterId) || quarterlyPeriods[0] || null;
+  }, [quarterlyPeriods, selectedQuarterId]);
+
+  // Comparação Trimestral: trimestre imediatamente anterior (os 3 ciclos anteriores)
+  const previousQuarter = useMemo(() => {
+    if (!selectedQuarter) return null;
+    const idx = quarterlyPeriods.findIndex((q) => q.id === selectedQuarter.id);
+    if (idx >= 0 && idx < quarterlyPeriods.length - 1) {
+      return quarterlyPeriods[idx + 1];
+    }
+    return null;
+  }, [selectedQuarter, quarterlyPeriods]);
+
+  const quarterlyEvolution = useMemo(() => {
+    return calculatePeriodEvolutions(selectedQuarter, previousQuarter, "período anterior");
+  }, [selectedQuarter, previousQuarter]);
+
+  const selectedSemester = useMemo(() => {
+    return semiannualPeriods.find((s) => s.id === selectedSemesterId) || semiannualPeriods[0] || null;
+  }, [semiannualPeriods, selectedSemesterId]);
+
+  // Comparação Semestral: semestre imediatamente anterior (os 6 ciclos anteriores)
+  const previousSemester = useMemo(() => {
+    if (!selectedSemester) return null;
+    const idx = semiannualPeriods.findIndex((s) => s.id === selectedSemester.id);
+    if (idx >= 0 && idx < semiannualPeriods.length - 1) {
+      return semiannualPeriods[idx + 1];
+    }
+    return null;
+  }, [selectedSemester, semiannualPeriods]);
+
+  const semiannualEvolution = useMemo(() => {
+    return calculatePeriodEvolutions(selectedSemester, previousSemester, "período anterior");
+  }, [selectedSemester, previousSemester]);
+
+  const selectedYear = useMemo(() => {
+    return annualPeriods.find((y) => y.id === selectedYearId) || annualPeriods[0] || null;
+  }, [annualPeriods, selectedYearId]);
+
+  // Comparação Anual: ano financeiro imediatamente anterior (os 12 ciclos anteriores)
+  const previousYear = useMemo(() => {
+    if (!selectedYear) return null;
+    const idx = annualPeriods.findIndex((y) => y.id === selectedYear.id);
+    if (idx >= 0 && idx < annualPeriods.length - 1) {
+      return annualPeriods[idx + 1];
+    }
+    return null;
+  }, [selectedYear, annualPeriods]);
+
+  const annualEvolution = useMemo(() => {
+    return calculatePeriodEvolutions(selectedYear, previousYear, "período anterior");
+  }, [selectedYear, previousYear]);
+
+  // Dados Reais da Aba Evolução (Curva de Faturamento ao Longo dos Períodos)
+  const evolutionData = useMemo<EvolutionPoint[]>(() => {
+    if (historyTab === "mensal") {
+      // Ordena cronologicamente: do ciclo mais antigo para o mais recente
+      const sorted = [...monthlyCycles].sort((a, b) => a.cycle.id.localeCompare(b.cycle.id));
+      return sorted.map((m) => ({
+        id: m.cycle.id,
+        label: m.cycle.isCurrent ? `${m.cycle.monthName} — em andamento` : m.cycle.monthName,
+        fullTitle: `${m.cycle.name}${m.cycle.isCurrent ? " — em andamento" : ""} (${m.cycle.label})`,
+        periodLabel: m.cycle.label,
+        revenue: m.grossRevenue,
+        cmv: m.cmv,
+        netProfit: m.netProfit,
+        orders: m.totalOrders,
+        pods: m.totalPodsSold,
+        isCurrent: m.cycle.isCurrent,
+      }));
+    }
+    if (historyTab === "trimestral") {
+      const sorted = [...quarterlyPeriods].reverse();
+      return sorted.map((q) => {
+        const parts = q.name.split(" ");
+        const shortName = parts.length >= 2 ? `${parts[0]} ${parts[1]}` : q.name;
+        const hasCurrent = q.includedCycles?.some((c) => c.cycle.isCurrent);
+        return {
+          id: q.id,
+          label: hasCurrent ? `${shortName} — em andamento` : shortName,
+          fullTitle: `${q.name}${hasCurrent ? " — em andamento" : ""} (${q.label})`,
+          periodLabel: q.label,
+          revenue: q.grossRevenue,
+          cmv: q.cmv,
+          netProfit: q.netProfit,
+          orders: q.totalOrders,
+          pods: q.totalPodsSold,
+          isCurrent: Boolean(hasCurrent),
+        };
+      });
+    }
+    if (historyTab === "semestral") {
+      const sorted = [...semiannualPeriods].reverse();
+      return sorted.map((s) => {
+        const parts = s.name.split(" ");
+        const shortName = parts.length >= 2 ? `${parts[0]} ${parts[1]}` : s.name;
+        const hasCurrent = s.includedCycles?.some((c) => c.cycle.isCurrent);
+        return {
+          id: s.id,
+          label: hasCurrent ? `${shortName} — em andamento` : shortName,
+          fullTitle: `${s.name}${hasCurrent ? " — em andamento" : ""} (${s.label})`,
+          periodLabel: s.label,
+          revenue: s.grossRevenue,
+          cmv: s.cmv,
+          netProfit: s.netProfit,
+          orders: s.totalOrders,
+          pods: s.totalPodsSold,
+          isCurrent: Boolean(hasCurrent),
+        };
+      });
+    }
+    // Anual
+    const sorted = [...annualPeriods].reverse();
+    return sorted.map((y) => {
+      const hasCurrent = y.includedCycles?.some((c) => c.cycle.isCurrent);
+      const shortName = y.name.replace("Ano Financeiro · ", "Ano ");
+      return {
+        id: y.id,
+        label: hasCurrent ? `${shortName} — em andamento` : shortName,
+        fullTitle: `${y.name}${hasCurrent ? " — em andamento" : ""} (${y.label})`,
+        periodLabel: y.label,
+        revenue: y.grossRevenue,
+        cmv: y.cmv,
+        netProfit: y.netProfit,
+        orders: y.totalOrders,
+        pods: y.totalPodsSold,
+        isCurrent: Boolean(hasCurrent),
+      };
+    });
+  }, [historyTab, monthlyCycles, quarterlyPeriods, semiannualPeriods, annualPeriods]);
 
   // Modal Handlers de Recompra
   const handleOpenRepurchaseModal = () => {
@@ -414,7 +1262,11 @@ export default function FinanceDashboard() {
 
     try {
       setIsSavingRepurchase(true);
-      const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+      if (!company?.id) {
+        setRepurchaseError("Empresa não identificada na sessão atual.");
+        return;
+      }
+      const targetCompanyId = company.id;
 
       const res = await createStockRepurchase({
         companyId: targetCompanyId,
@@ -443,9 +1295,9 @@ export default function FinanceDashboard() {
   };
 
   const handleConfirmDeleteRepurchase = async () => {
-    if (!repurchaseToDelete) return;
+    if (!repurchaseToDelete || !company?.id) return;
     try {
-      const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+      const targetCompanyId = company.id;
       const res = await deleteStockRepurchase(repurchaseToDelete.id, targetCompanyId);
       if (res.error) {
         alert("Erro ao excluir: " + res.error.message);
@@ -463,17 +1315,19 @@ export default function FinanceDashboard() {
   const netCashAvailable = Math.max(0, (grossRevenue || 0) - (logisticsFee || 0) - numericMarketingSpent);
   const realNetProfitPostMarketing = (netProfit || 0) - numericMarketingSpent;
   
-  // Patrimônio Real Total da Loja = Caixa em Conta + Valor de Venda do Estoque (Custo dos Pods + Lucro Potencial)
-  const totalCompanyEquity = (grossRevenue || 0) + (stockAssetRetail || 0);
+  // Patrimônio Real Total da Loja = Caixa Real Calculado Atual + Valor de Venda do Estoque Físico Atual
+  // Regra oficial: NÃO utiliza Faturamento Bruto Acumulado (faturamento é volume histórico, não patrimônio)
+  const totalCompanyEquity = (realCash || 0) + (stockAssetRetail || 0);
   const stockAssetProfit = (stockAssetRetail || 0) - (stockAssetCost || 0);
 
-  // Métricas de Eficiência Comercial & Ticket Médio
-  const averageTicket = totalOrders > 0 ? grossRevenue / totalOrders : 0;
-  const averageNetProfitPerOrder = totalOrders > 0 ? realNetProfitPostMarketing / totalOrders : 0;
-  const averageNetMarginPercent = grossRevenue > 0 ? (realNetProfitPostMarketing / grossRevenue) * 100 : 0;
-  const averagePricePerPod = totalPodsSold > 0 ? grossRevenue / totalPodsSold : 0;
+  // Métricas de Eficiência Comercial & Ticket Médio (HISTÓRICO COMPLETO)
+  const averageTicket = allTimeMetrics.averageTicket;
+  const averageNetProfitPerOrder = allTimeMetrics.averageNetProfitPerOrder;
+  const averageNetMarginPercent = allTimeMetrics.profitMargin;
+  const averagePricePerPod = allTimeMetrics.averagePricePerPod;
 
-  if (loading) {
+  // Estado A: Carregando
+  if (loading || authLoading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-background min-h-screen">
         <Loader2 className="size-8 text-emerald-400 animate-spin mb-2" />
@@ -482,6 +1336,64 @@ export default function FinanceDashboard() {
     );
   }
 
+  // Estado D: Erro de Consulta (NUNCA exibe cards com R$ 0,00 falsos)
+  if (financeError) {
+    return (
+      <div className="flex-1 flex flex-col h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+              <Sparkles className="size-6 text-emerald-400" />
+              <span>Inteligência Financeira & Estratégia de Vendas</span>
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Métricas de Vendas, Tesouraria, Campeões de Lucro por Pod e DRE Executivo.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/30 self-start sm:self-auto">
+            <AlertCircle className="size-3.5" />
+            <span>Falha de Comunicação</span>
+          </div>
+        </header>
+
+        <div className="bg-[#0e0e10] border border-red-500/30 rounded-3xl p-8 sm:p-12 text-center space-y-6 max-w-2xl mx-auto my-12 shadow-2xl">
+          <div className="size-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto text-red-400">
+            <AlertCircle className="size-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-xl font-bold text-white">Não foi possível carregar os dados financeiros</h3>
+            <p className="text-sm text-white/60 max-w-lg mx-auto leading-relaxed">
+              {financeError.message || "Sua sessão pode ter expirado ou houve um problema de conexão com o banco de dados."}
+            </p>
+            {financeError.code && (
+              <p className="text-[11px] font-mono text-white/40">Código do banco: {financeError.code}</p>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
+            {financeError.isAuthError && (
+              <button
+                onClick={() => signOut()}
+                className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-6 py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95 text-xs sm:text-sm cursor-pointer"
+              >
+                Fazer Login Novamente
+              </button>
+            )}
+
+            <button
+              onClick={() => fetchFinanceData(false)}
+              className="bg-white/10 hover:bg-white/20 text-white font-bold px-6 py-3 rounded-xl border border-white/15 transition-all active:scale-95 text-xs sm:text-sm cursor-pointer"
+            >
+              Tentar Novamente
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Estado B (com dados) e Estado C (dados legítimos vazios)
   return (
     <div className="flex-1 flex flex-col h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
       {/* Cabeçalho */}
@@ -489,128 +1401,136 @@ export default function FinanceDashboard() {
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
             <Sparkles className="size-6 text-emerald-400" />
-            <span>Inteligência Financeira & Estratégia de Vendas</span>
+            <span>Financeiro</span>
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Métricas de Vendas, Tesouraria, Campeões de Lucro por Pod e DRE Executivo.
+          <p className="text-xs text-white/50 mt-0.5">
+            Visão consolidada do ciclo atual, caixa disponível e inteligência comercial.
           </p>
         </div>
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 self-start sm:self-auto">
-          <div className="size-2 rounded-full bg-emerald-400 animate-ping" />
-          <span>Supabase Realtime Conectado</span>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/5 text-white/90 border border-white/10">
+            <Calendar className="size-3.5 text-emerald-400" />
+            <span>Ciclo atual: {currentCycle.startDateStr.slice(0, 5)} → {currentCycle.endDateStr.slice(0, 5)}</span>
+          </div>
         </div>
       </header>
 
-      {/* ━━━ BLOCO 1: KPIs PRINCIPAIS DE VENDAS REALIZADAS ━━━━━━━━━━━━━━ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. Faturamento Bruto Real (Sem o Frete) */}
-        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
-              Faturamento Bruto Real (Sem o Frete)
-            </span>
-            <div className="size-9 rounded-xl bg-white/5 border border-white/15 flex items-center justify-center text-white">
-              <DollarSign className="size-5" />
-            </div>
-          </div>
+      {/* Aviso caso consulta de recompras tenha falhado */}
+      {repurchasesError && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-center gap-3">
+          <AlertCircle className="size-5 shrink-0 text-amber-400" />
+          <span>Aviso: Não foi possível sincronizar o histórico de recompras ({repurchasesError.message}).</span>
+        </div>
+      )}
 
-          <div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-white">
-              {formatBRL(grossRevenue)}
-            </div>
-            <p className="text-xs font-medium text-white/60 mt-1 flex items-center gap-1.5">
-              <ShoppingBag className="size-3.5 text-white/60" />
-              <span>{totalOrders} pedidos ({totalPodsSold} pods vendidos)</span>
-            </p>
-          </div>
-
-          {/* Marcas vendidas */}
-          {brandSales.length > 0 && (
-            <div className="pt-2 border-t border-white/10 flex flex-wrap gap-1.5">
-              {brandSales.map((b) => (
-                <span
-                  key={b.brand}
-                  className="text-[10px] font-semibold bg-white/5 border border-white/10 text-white/80 px-2 py-0.5 rounded-full"
-                >
-                  {b.brand}: {b.count} un
-                </span>
-              ))}
-            </div>
-          )}
+      {/* ━━━ BLOCO 1: CICLO ATUAL (14 → 13) ━━━━━━━━━━━━━━ */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-white/60 uppercase tracking-wider">
+            Ciclo Atual ({currentCycle.startDateStr.slice(0, 5)} → {currentCycle.endDateStr.slice(0, 5)})
+          </span>
+          <span className="text-xs text-white/40">
+            {totalOrders} {totalOrders === 1 ? "pedido" : "pedidos"} · {totalPodsSold} pods
+          </span>
         </div>
 
-        {/* 2. Custo de Reposição (CMV) */}
-        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
-              Custo Reposição (CMV)
-            </span>
-            <div className="size-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
-              <TrendingDown className="size-5" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* 1. Faturamento Bruto Real (Sem o Frete) */}
+          <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
+                Faturamento Bruto
+              </span>
+              <div className="size-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/80">
+                <DollarSign className="size-4" />
+              </div>
+            </div>
+
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-white">
+                {formatBRL(grossRevenue)}
+              </div>
+              <p className="text-xs font-medium text-white/50 mt-1">
+                Sem o frete
+              </p>
+            </div>
+
+            {/* Marcas vendidas */}
+            {brandSales.length > 0 && (
+              <div className="pt-2 border-t border-white/10 flex flex-wrap gap-1.5">
+                {brandSales.map((b) => (
+                  <span
+                    key={b.brand}
+                    className="text-[10px] font-semibold bg-white/5 border border-white/10 text-white/80 px-2 py-0.5 rounded-full"
+                  >
+                    {b.brand}: {b.count} un
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 2. Custo de Reposição (CMV) */}
+          <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
+                Custo de Reposição (CMV)
+              </span>
+              <div className="size-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+                <TrendingDown className="size-4" />
+              </div>
+            </div>
+
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-red-400">
+                {formatBRL(cmv)}
+              </div>
+              <p className="text-xs font-medium text-white/50 mt-1">
+                Custo dos pods vendidos
+              </p>
             </div>
           </div>
 
-          <div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-red-400">
-              {formatBRL(cmv)}
+          {/* 3. Logística & Frete */}
+          <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
+                Frete e Logística
+              </span>
+              <div className="size-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/80">
+                <Truck className="size-4" />
+              </div>
             </div>
-            <p className="text-xs font-medium text-white/50 mt-1">
-              {grossRevenue > 0 ? ((cmv / grossRevenue) * 100).toFixed(1) : 0}% do faturamento em reposição
-            </p>
-          </div>
 
-          <div className="pt-2 border-t border-white/10 text-[10px] text-white/40">
-            Custo pago ao fornecedor pelos {totalPodsSold} pods vendidos
-          </div>
-        </div>
-
-        {/* 3. Logística & Frete */}
-        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
-              Frete Total (Logística)
-            </span>
-            <div className="size-9 rounded-xl bg-white/5 border border-white/15 flex items-center justify-center text-white/80">
-              <Truck className="size-5" />
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-white">
+                {formatBRL(logisticsFee)}
+              </div>
+              <p className="text-xs font-medium text-white/50 mt-1">
+                Fretes das entregas
+              </p>
             </div>
           </div>
 
-          <div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-white">
-              {formatBRL(logisticsFee)}
+          {/* 4. Lucro Líquido Real */}
+          <div className="bg-[#0e0e10] border border-emerald-500/40 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-xl bg-gradient-to-b from-emerald-500/5 to-transparent hover:border-emerald-400 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider">
+                Lucro Líquido Real
+              </span>
+              <div className="size-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-300">
+                <TrendingUp className="size-4" />
+              </div>
             </div>
-            <p className="text-xs font-medium text-white/50 mt-1">
-              Total registrado nas entregas efetuadas
-            </p>
-          </div>
 
-          <div className="pt-2 border-t border-white/10 text-[10px] text-white/40">
-            Fretes cobrados/gastos na expedição dos pedidos
-          </div>
-        </div>
-
-        {/* 4. Lucro Líquido Real */}
-        <div className="bg-[#0e0e10] border border-emerald-500/40 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-xl bg-gradient-to-b from-emerald-500/5 to-transparent hover:border-emerald-400 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider">
-              Lucro Líquido Real
-            </span>
-            <div className="size-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-300">
-              <TrendingUp className="size-5" />
+            <div>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-300">
+                {formatBRL(netProfit)}
+              </div>
+              <p className="text-xs font-semibold text-emerald-400 mt-1">
+                Margem: {profitMargin}%
+              </p>
             </div>
-          </div>
-
-          <div>
-            <div className="text-2xl sm:text-3xl font-black text-emerald-300">
-              {formatBRL(realNetProfitPostMarketing)}
-            </div>
-            <p className="text-xs font-extrabold text-emerald-400 mt-1">
-              Margem Líquida Real: {profitMargin}%
-            </p>
-          </div>
-
-          <div className="pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
-            Fat. Pods (R$ {(grossRevenue || 0).toFixed(2)}) - CMV (R$ {(cmv || 0).toFixed(2)})
           </div>
         </div>
       </div>
@@ -641,14 +1561,14 @@ export default function FinanceDashboard() {
 
         {/* 4 Cards de Indicadores de Recompra */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: CAIXA REAL (Destaque Principal) */}
+          {/* Card 1: CAIXA REAL CALCULADO (Posição Atual Viva - Não Reinicia no Dia 14) */}
           <div className="bg-gradient-to-b from-emerald-500/15 via-emerald-500/5 to-black/60 border-2 border-emerald-500/50 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-xl shadow-emerald-950/20 hover:border-emerald-400 transition-all">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Wallet className="size-4 text-emerald-400" /> Caixa Real
+                <Wallet className="size-4 text-emerald-400" /> Caixa Real Calculado
               </span>
               <span className="text-[10px] font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 px-2 py-0.5 rounded-full">
-                Disponível
+                Posição Atual
               </span>
             </div>
 
@@ -657,13 +1577,13 @@ export default function FinanceDashboard() {
                 {formatBRL(realCash)}
               </div>
               <p className="text-xs font-semibold text-emerald-400/90 mt-1">
-                Faturamento acumulado − recompras de estoque
+                Posição financeira atual calculada pelo sistema
               </p>
             </div>
 
-            <div className="pt-2.5 border-t border-emerald-500/20 text-[10px] text-white/50 flex flex-col gap-0.5">
-              <span>Fat: {formatBRL(grossRevenue)} − Estoque: {formatBRL(totalStockPurchases)}</span>
-              <span className="text-emerald-400/70 font-medium">⚡ Fretes de reposição não são descontados</span>
+            <div className="pt-2.5 border-t border-emerald-500/20 text-[10px] text-white/50 flex flex-col gap-1">
+              <span className="text-white/70">Fat. total ({formatBRL(allTimeMetrics.grossRevenue)}) − Recompras ({formatBRL(totalStockPurchases)})</span>
+              <span className="text-emerald-400/80 font-medium">⚡ Calculado pelo sistema (não é saldo bancário direto). Não reinicia no dia 14.</span>
             </div>
           </div>
 
@@ -828,75 +1748,75 @@ export default function FinanceDashboard() {
         </div>
       </div>
 
-      {/* ━━━ BLOCO DEDICADO: 🎯 EFICIÊNCIA COMERCIAL, TICKET MÉDIO & MARGENS MÉDIAS ━━━━━━━━━━━━━━ */}
+      {/* ━━━ BLOCO DEDICADO: 🎯 EFICIÊNCIA COMERCIAL (HISTÓRICO COMPLETO) ━━━━━━━━━━━━━━ */}
       <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <Target className="size-5 text-white" />
-              <span>Eficiência Comercial, Ticket Médio & Margens Médias por Venda</span>
+              <span>Eficiência Comercial</span>
             </h3>
             <p className="text-xs text-white/50 mt-0.5">
-              Análise dinâmica de valor médio por carrinho, lucro limpo gerado por pedido e margem média líquida real.
+              Médias acumuladas de venda e rentabilidade no histórico completo ({allTimeMetrics.totalOrders} pedidos).
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-white bg-white/10 px-3 py-1 rounded-xl border border-white/15">
-              ⚡ Métricas por Pedido
+            <span className="text-xs font-semibold text-white/70 bg-white/5 px-3 py-1 rounded-xl border border-white/10">
+              Histórico Completo
             </span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Ticket Médio por Pedido */}
+          {/* Card 1: Ticket Médio */}
           <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
             <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <ReceiptText className="size-4 text-white/70" /> Ticket Médio por Pedido
+              <ReceiptText className="size-4 text-white/70" /> Ticket Médio
             </span>
             <div className="text-2xl sm:text-3xl font-extrabold text-white">
               {formatBRL(averageTicket)}
             </div>
             <p className="text-xs text-white/50">
-              Valor médio gasto por cliente a cada compra realizada.
+              Valor médio por compra no histórico.
             </p>
             <div className="pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
-              Faturamento Bruto ({formatBRL(grossRevenue)}) ÷ {totalOrders} pedidos
+              Fat. total ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalOrders} pedidos
             </div>
           </div>
 
           {/* Card 2: Margem Média Líquida (%) */}
           <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
             <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <Percent className="size-4 text-emerald-400" /> Margem Média Líquida
+              <Percent className="size-4 text-emerald-400" /> Margem Média
             </span>
             <div className="text-2xl sm:text-3xl font-extrabold text-emerald-400">
               {averageNetMarginPercent.toFixed(1)}%
             </div>
             <p className="text-xs text-white/50">
-              Porcentagem líquida que sobra limpa no bolso de cada venda.
+              Margem líquida média da operação.
             </p>
             <div className="pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
-              Lucro Líquido Real ÷ Faturamento Bruto
+              Lucro Líquido total ÷ Faturamento total
             </div>
           </div>
 
-          {/* Card 3: Lucro Médio Líquido por Pedido */}
+          {/* Card 3: Margem por Pedido */}
           <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
             <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <TrendingUp className="size-4 text-emerald-400" /> Lucro Líquido por Pedido
+              <TrendingUp className="size-4 text-emerald-400" /> Margem por Pedido
             </span>
             <div className="text-2xl sm:text-3xl font-extrabold text-emerald-300">
               {formatBRL(averageNetProfitPerOrder)}
             </div>
             <p className="text-xs text-white/50">
-              Ganho líquido médio embolsado a cada checkout finalizado.
+              Ganho líquido médio por pedido entregue.
             </p>
             <div className="pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
-              Lucro Líquido ({formatBRL(realNetProfitPostMarketing)}) ÷ {totalOrders} pedidos
+              Lucro Líquido ({formatBRL(allTimeMetrics.netProfit)}) ÷ {allTimeMetrics.totalOrders} pedidos
             </div>
           </div>
 
-          {/* Card 4: Ticket Médio por Pod Vendido */}
+          {/* Card 4: Preço Médio por Pod */}
           <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
             <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
               <Box className="size-4 text-white/70" /> Preço Médio por Pod
@@ -905,53 +1825,74 @@ export default function FinanceDashboard() {
               {formatBRL(averagePricePerPod)}
             </div>
             <p className="text-xs text-white/50">
-              Preço médio de venda praticado por unidade entregue.
+              Preço médio por unidade vendida.
             </p>
             <div className="pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
-              Faturamento ({formatBRL(grossRevenue)}) ÷ {totalPodsSold} pods
+              Faturamento ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalPodsSold} pods
             </div>
           </div>
         </div>
       </div>
 
-      {/* ━━━ BLOCO 2: GESTÃO UNIFICADA DE TESOURARIA, FLUXO DE CAIXA & ESTOQUE ━━━━━━━━━━━━━━ */}
+      {/* ━━━ BLOCO 2: PATRIMÔNIO & ESTOQUE NA PRATELEIRA ━━━━━━━━━━━━━━ */}
       <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Wallet className="size-5 text-white" />
-              <span>Gestão de Tesouraria, Fluxo de Caixa & Patrimônio em Estoque</span>
+              <Landmark className="size-5 text-white" />
+              <span>Patrimônio & Estoque na Prateleira</span>
             </h3>
             <p className="text-xs text-white/50 mt-0.5">
-              Visão unificada 360° do caixa bancário, investimentos em tráfego e mercadorias na prateleira.
+              Capital imobilizado em mercadorias no armazém e investimentos em tráfego.
             </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-white bg-white/10 px-3 py-1 rounded-xl border border-white/15">
-              ⚡ Tesouraria & Patrimônio
-            </span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Card 1: Saldo Bruto em Conta */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Card 1: Custo dos Pods na Prateleira */}
           <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
             <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider block flex items-center gap-1.5">
-              <PiggyBank className="size-4 text-white" /> Saldo Bruto em Conta (PIX/Caixa)
+              <Box className="size-4 text-white/70" /> Custo Prateleira
             </span>
             <div className="text-2xl font-extrabold text-white">
-              {formatBRL(grossRevenue)}
+              {formatBRL(stockAssetCost)}
             </div>
             <p className="text-xs text-white/50">
-              Dinheiro bruto total em conta para giro e recompra de estoque.
+              {stockAssetUnits} pods no armazém.
             </p>
           </div>
 
-          {/* Card 2: Investimento em Marketing (Editável) */}
+          {/* Card 2: Valor Potencial de Venda */}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider block flex items-center gap-1.5">
+              <DollarSign className="size-4 text-white/70" /> Venda do Estoque
+            </span>
+            <div className="text-2xl font-extrabold text-white">
+              {formatBRL(stockAssetRetail)}
+            </div>
+            <p className="text-xs text-white/50">
+              Valor bruto na venda dos {stockAssetUnits} pods.
+            </p>
+          </div>
+
+          {/* Card 3: Lucro Potencial do Estoque */}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider block flex items-center gap-1.5">
+              <TrendingUp className="size-4 text-emerald-400" /> Lucro Potencial
+            </span>
+            <div className="text-2xl font-extrabold text-emerald-400">
+              {formatBRL(stockAssetProfit)}
+            </div>
+            <p className="text-xs text-white/50">
+              Lucro ao liquidar o estoque.
+            </p>
+          </div>
+
+          {/* Card 4: Investimento em Marketing (Editável) */}
           <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 relative hover:border-white/30 transition-all">
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
-                <Megaphone className="size-4 text-white/70" /> Anúncios / Marketing (Meta Ads)
+                <Megaphone className="size-4 text-white/70" /> Anúncios / Ads
               </span>
               <button
                 type="button"
@@ -986,50 +1927,11 @@ export default function FinanceDashboard() {
             )}
 
             <p className="text-xs text-white/50">
-              Total investido em anúncios Meta/Insta e tráfego pago.
+              Total investido em tráfego pago.
             </p>
           </div>
 
-          {/* Card 3: Custo dos Pods na Prateleira */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider block flex items-center gap-1.5">
-              <Box className="size-4 text-white/70" /> Custo dos Pods na Prateleira
-            </span>
-            <div className="text-2xl font-extrabold text-white">
-              {formatBRL(stockAssetCost)}
-            </div>
-            <p className="text-xs text-white/50">
-              Capital imobilizado nos {stockAssetUnits} pods parados no armazém.
-            </p>
-          </div>
-
-          {/* Card 4: Valor Potencial de Venda */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider block flex items-center gap-1.5">
-              <DollarSign className="size-4 text-white/70" /> Valor de Venda do Estoque
-            </span>
-            <div className="text-2xl font-extrabold text-white">
-              {formatBRL(stockAssetRetail)}
-            </div>
-            <p className="text-xs text-white/50">
-              Faturamento bruto total se os {stockAssetUnits} pods forem vendidos.
-            </p>
-          </div>
-
-          {/* Card 5: Lucro Potencial do Estoque */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider block flex items-center gap-1.5">
-              <TrendingUp className="size-4 text-emerald-400" /> Lucro Potencial do Estoque
-            </span>
-            <div className="text-2xl font-extrabold text-emerald-400">
-              {formatBRL(stockAssetProfit)}
-            </div>
-            <p className="text-xs text-white/50">
-              Lucro bruto futuro ao zerar os {stockAssetUnits} pods parados.
-            </p>
-          </div>
-
-          {/* Card 6: Patrimônio Total da Empresa */}
+          {/* Card 5: Patrimônio Total da Loja (Caixa Real + Estoque) */}
           <div className="bg-gradient-to-br from-white/10 to-emerald-500/10 border border-white/30 rounded-2xl p-5 space-y-2 hover:border-white/50 transition-all">
             <span className="text-[11px] text-white uppercase font-extrabold tracking-wider block flex items-center gap-1.5">
               <Landmark className="size-4 text-white" /> Patrimônio Total da Loja
@@ -1038,81 +1940,772 @@ export default function FinanceDashboard() {
               {formatBRL(totalCompanyEquity)}
             </div>
             <p className="text-xs text-white/70 font-medium">
-              Caixa em Conta ({formatBRL(grossRevenue)}) + Venda Total do Estoque ({formatBRL(stockAssetRetail)})
+              Caixa Real ({formatBRL(realCash)}) + Estoque ({formatBRL(stockAssetRetail)})
             </p>
           </div>
         </div>
       </div>
 
-      {/* ━━━ BLOCO 3: 🏆 CAMPEÕES DE VENDA & ANÁLISE DE LUCRO POR POD (SEÇÃO ESTRATÉGICA) ━━━━━━━━━━━━━━ */}
-      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+      {/* ━━━ NOVO BLOCO: 📈 FATURAMENTO A LONGO PRAZO (2 ABAS: HISTÓRICO & EVOLUÇÃO) ━━━━━━━━━━━━━━ */}
+      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
+        {/* Cabeçalho do Bloco: Duas Abas Principais [ Histórico ] [ Evolução ] */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
           <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Trophy className="size-5 text-white" />
-              <span>Campeões de Venda & Lucro por Produto (Direcionador Estratégico)</span>
+            <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <TrendingUp className="size-5 text-emerald-400" />
+              <span>Faturamento a Longo Prazo</span>
             </h3>
             <p className="text-xs text-white/50 mt-0.5">
-              Descubra exatamente quais modelos geram maior lucro líquido para direcionar seus investimentos de tráfego.
+              Consulta de períodos anteriores e acompanhamento visual da evolução de receitas.
             </p>
           </div>
-          <span className="text-xs font-bold bg-white/10 text-white px-3 py-1 rounded-xl border border-white/15 self-start sm:self-auto">
-            🔥 Estratégia de Crescimento
-          </span>
+
+          {/* Abas Principais: [ Histórico ] [ Evolução ] */}
+          <div className="inline-flex p-1 rounded-2xl bg-black/60 border border-white/15 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setLongTermTab("historico")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                longTermTab === "historico"
+                  ? "bg-white text-black shadow-md font-extrabold"
+                  : "text-white/70 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <History className="size-4" />
+              <span>Histórico</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setLongTermTab("evolucao")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                longTermTab === "evolucao"
+                  ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 font-extrabold"
+                  : "text-white/70 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <TrendingUp className="size-4" />
+              <span>Evolução</span>
+            </button>
+          </div>
         </div>
 
-        {modelProfits.length === 0 ? (
-          <p className="text-xs text-white/40 py-6 text-center italic">
-            Nenhuma venda registrada ainda para calcular o ranking estratégico.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {modelProfits.map((item, idx) => (
-              <div
-                key={item.modelKey}
-                className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-3 hover:border-white/30 transition-all relative"
-              >
-                {/* Badge de Posição */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-white bg-white/10 px-2.5 py-0.5 rounded-full border border-white/20 flex items-center gap-1">
-                    {idx === 0 ? "🥇 1º Lugar" : idx === 1 ? "🥈 2º Lugar" : idx === 2 ? "🥉 3º Lugar" : `#${idx + 1}`}
-                  </span>
-                  <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                    Margem: {item.marginPct}%
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* ABA 1 — HISTÓRICO                                                 */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {longTermTab === "historico" && (
+          <div className="space-y-6">
+            {/* Seletor de Modalidade: Mensal / Trimestral / Semestral / Anual */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="inline-flex p-1 rounded-2xl bg-black/60 border border-white/15">
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab("mensal")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    historyTab === "mensal"
+                      ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+                      : "text-white/70 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Calendar className="size-3.5" />
+                  <span>Mensal (14 → 13)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab("trimestral")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    historyTab === "trimestral"
+                      ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+                      : "text-white/70 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <BarChart3 className="size-3.5" />
+                  <span>Trimestral</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab("semestral")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    historyTab === "semestral"
+                      ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+                      : "text-white/70 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Layers className="size-3.5" />
+                  <span>Semestral</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab("anual")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    historyTab === "anual"
+                      ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+                      : "text-white/70 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Award className="size-3.5" />
+                  <span>Anual</span>
+                </button>
+              </div>
+
+              <span className="text-[11px] text-white/40">
+                Comparativo com período anterior: ↑ crescimento · ↓ queda · → estável
+              </span>
+            </div>
+
+        {/* ─── ABA 1: VISÃO MENSAL (CICLOS 14 -> 13) ─── */}
+        {historyTab === "mensal" && (
+          <div className="space-y-5">
+            {/* Barra de Seleção do Ciclo Mensal */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3.5 rounded-2xl">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="text-xs font-bold text-white/70 flex items-center gap-1.5">
+                  <CalendarDays className="size-4 text-emerald-400" />
+                  <span>Selecionar Ciclo Mensal:</span>
+                </span>
+                <select
+                  value={selectedMonthCycleId}
+                  onChange={(e) => setSelectedMonthCycleId(e.target.value)}
+                  className="bg-black/80 border border-white/20 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+                >
+                  {monthlyCycles.map((m) => (
+                    <option key={m.cycle.id} value={m.cycle.id} className="bg-[#121214] text-white">
+                      {m.cycle.name} ({m.cycle.label}) {m.cycle.isCurrent ? "· Vigente" : "· Encerrado"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedMonthlyMetric && (
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-[10px] font-extrabold px-3 py-1 rounded-full border ${
+                      selectedMonthlyMetric.cycle.isCurrent
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                        : "bg-white/5 text-white/70 border-white/10"
+                    }`}
+                  >
+                    {selectedMonthlyMetric.cycle.isCurrent ? "🟢 Ciclo Vigente em Andamento" : "🔒 Ciclo Financeiro Encerrado"}
                   </span>
                 </div>
+              )}
+            </div>
 
-                {/* Nome do Produto */}
-                <div>
-                  <h4 className="font-extrabold text-sm text-white">
-                    {item.brand} {item.name}
-                  </h4>
-                  <p className="text-xs text-white/50">
-                    {item.unitsSold} {item.unitsSold === 1 ? "unidade vendida" : "unidades vendidas"}
-                  </p>
+            {selectedMonthlyMetric ? (
+              <div className="space-y-4">
+                {/* 4 Cards Principais do Ciclo Selecionado */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Card 1: Faturamento */}
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                      Faturamento Bruto Real
+                    </span>
+                    <div className="text-2xl font-extrabold text-white">
+                      {formatBRL(selectedMonthlyMetric.grossRevenue)}
+                    </div>
+                    <EvolutionBadge evolution={monthlyEvolution.grossRevenue} />
+                    <p className="text-[11px] text-white/50">
+                      {selectedMonthlyMetric.totalOrders} pedidos ({selectedMonthlyMetric.totalPodsSold} pods)
+                    </p>
+                  </div>
+
+                  {/* Card 2: CMV */}
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                      Custo Reposição (CMV)
+                    </span>
+                    <div className="text-2xl font-extrabold text-red-400">
+                      {formatBRL(selectedMonthlyMetric.cmv)}
+                    </div>
+                    <EvolutionBadge evolution={monthlyEvolution.cmv} invertColors={true} />
+                    <p className="text-[11px] text-white/50">
+                      Custo de mercadoria do ciclo
+                    </p>
+                  </div>
+
+                  {/* Card 3: Frete */}
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                      Frete Logística (Cobrado)
+                    </span>
+                    <div className="text-2xl font-extrabold text-white/80">
+                      {formatBRL(selectedMonthlyMetric.logisticsFee)}
+                    </div>
+                    <EvolutionBadge evolution={monthlyEvolution.logisticsFee} invertColors={true} />
+                    <p className="text-[11px] text-white/50">
+                      Diluído nas entregas do ciclo
+                    </p>
+                  </div>
+
+                  {/* Card 4: Lucro Líquido */}
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block">
+                      Lucro Líquido Real
+                    </span>
+                    <div className="text-2xl font-black text-emerald-300">
+                      {formatBRL(selectedMonthlyMetric.netProfit)}
+                    </div>
+                    <EvolutionBadge evolution={monthlyEvolution.netProfit} />
+                    <p className="text-[11px] font-bold text-emerald-400">
+                      Margem Líquida: {selectedMonthlyMetric.profitMargin}%
+                    </p>
+                  </div>
                 </div>
 
-                {/* Métricas de Lucro */}
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10 text-xs">
+                {/* 4 Indicadores Secundários do Ciclo Selecionado */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-black/30 border border-white/10 rounded-2xl p-4 text-xs">
                   <div>
-                    <span className="text-[10px] text-white/50 font-medium block">Receita Gerada</span>
-                    <span className="font-bold text-white">{formatBRL(item.revenue)}</span>
+                    <span className="text-white/50 block text-[10px] uppercase font-semibold">Ticket Médio</span>
+                    <span className="text-white font-extrabold text-sm">{formatBRL(selectedMonthlyMetric.averageTicket)}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-emerald-400 font-medium block">Lucro Gerado</span>
-                    <span className="font-extrabold text-emerald-400">{formatBRL(item.profit)}</span>
+                    <span className="text-white/50 block text-[10px] uppercase font-semibold">Preço Médio / Pod</span>
+                    <span className="text-white font-extrabold text-sm">{formatBRL(selectedMonthlyMetric.averagePricePerPod)}</span>
                   </div>
-                </div>
-
-                {/* Recomendação Estratégica */}
-                <div className="pt-2 border-t border-white/10 text-[10px] text-white/70 font-semibold flex items-center gap-1">
-                  <Flame className="size-3.5 text-emerald-400 shrink-0" />
-                  <span>
-                    {item.marginPct > 20 ? "Alta Margem - Escalar Tráfego Pago" : "Produto Relevante no Volume"}
-                  </span>
+                  <div>
+                    <span className="text-white/50 block text-[10px] uppercase font-semibold">Recompras de Estoque</span>
+                    <span className="text-amber-300 font-extrabold text-sm">{formatBRL(selectedMonthlyMetric.stockPurchases)}</span>
+                  </div>
+                  <div>
+                    <span className="text-white/50 block text-[10px] uppercase font-semibold">Geração Líquida Caixa</span>
+                    <span className="text-emerald-300 font-extrabold text-sm">{formatBRL(selectedMonthlyMetric.realCash)}</span>
+                  </div>
                 </div>
               </div>
-            ))}
+            ) : (
+              <p className="text-xs text-white/40 italic text-center py-4">Nenhum ciclo selecionado.</p>
+            )}
+
+            {/* Tabela Comparativa de Todos os Ciclos Mensais */}
+            <div className="space-y-2.5 pt-2">
+              <h4 className="text-xs font-bold text-white/80 uppercase tracking-wider flex items-center gap-2">
+                <History className="size-4 text-white/60" />
+                <span>Histórico Completo de Ciclos Mensais (14 → 13)</span>
+                <span className="text-[10px] bg-white/10 text-white/70 px-2 py-0.5 rounded-full">
+                  {monthlyCycles.length} ciclos
+                </span>
+              </h4>
+
+              <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/40">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/5 text-white/60 font-bold uppercase tracking-wider text-[11px]">
+                      <th className="py-3 px-4">Ciclo Financeiro</th>
+                      <th className="py-3 px-4">Período Oficial</th>
+                      <th className="py-3 px-4 text-right">Faturamento</th>
+                      <th className="py-3 px-4 text-right">CMV</th>
+                      <th className="py-3 px-4 text-right">Lucro Líquido</th>
+                      <th className="py-3 px-4 text-right">Margem</th>
+                      <th className="py-3 px-4 text-center">Pedidos</th>
+                      <th className="py-3 px-4 text-center">Pods</th>
+                      <th className="py-3 px-4 text-right">Recompras</th>
+                      <th className="py-3 px-4 text-right">Saldo do Ciclo</th>
+                      <th className="py-3 px-4 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 font-medium">
+                    {monthlyCycles.map((m) => {
+                      const isSelected = selectedMonthlyMetric?.cycle.id === m.cycle.id;
+                      return (
+                        <tr
+                          key={m.cycle.id}
+                          onClick={() => setSelectedMonthCycleId(m.cycle.id)}
+                          className={`hover:bg-white/5 transition-colors cursor-pointer ${
+                            isSelected ? "bg-emerald-500/10 border-l-2 border-emerald-400" : ""
+                          }`}
+                        >
+                          <td className="py-3 px-4 font-bold text-white flex items-center gap-2">
+                            <span>{m.cycle.name}</span>
+                            {isSelected && <span className="text-[10px] text-emerald-400 font-bold">● Ativo</span>}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-white/70 text-[11px]">{m.cycle.label}</td>
+                          <td className="py-3 px-4 text-right font-bold text-white">{formatBRL(m.grossRevenue)}</td>
+                          <td className="py-3 px-4 text-right font-medium text-red-400">{formatBRL(m.cmv)}</td>
+                          <td className="py-3 px-4 text-right font-extrabold text-emerald-400">{formatBRL(m.netProfit)}</td>
+                          <td className="py-3 px-4 text-right font-bold text-emerald-300">{m.profitMargin}%</td>
+                          <td className="py-3 px-4 text-center font-semibold text-white/80">{m.totalOrders}</td>
+                          <td className="py-3 px-4 text-center font-semibold text-white/80">{m.totalPodsSold} un</td>
+                          <td className="py-3 px-4 text-right font-medium text-amber-300">
+                            {m.stockPurchases > 0 ? formatBRL(m.stockPurchases) : "R$ 0,00"}
+                          </td>
+                          <td className="py-3 px-4 text-right font-black text-emerald-300">{formatBRL(m.realCash)}</td>
+                          <td className="py-3 px-4 text-center">
+                            <span
+                              className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+                                m.cycle.isCurrent
+                                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                  : "bg-white/10 text-white/60 border-white/10"
+                              }`}
+                            >
+                              {m.cycle.isCurrent ? "Vigente" : "Encerrado"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── ABA 2: VISÃO TRIMESTRAL (CONSOLIDAÇÃO DE 3 CICLOS) ─── */}
+        {historyTab === "trimestral" && (
+          <div className="space-y-5">
+            {/* Seletor de Trimestre */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3.5 rounded-2xl">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="text-xs font-bold text-white/70 flex items-center gap-1.5">
+                  <BarChart3 className="size-4 text-emerald-400" />
+                  <span>Selecionar Trimestre (3 Ciclos Consolidados):</span>
+                </span>
+                <select
+                  value={selectedQuarterId}
+                  onChange={(e) => setSelectedQuarterId(e.target.value)}
+                  className="bg-black/80 border border-white/20 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+                >
+                  {quarterlyPeriods.map((q) => (
+                    <option key={q.id} value={q.id} className="bg-[#121214] text-white">
+                      {q.name} ({q.label})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedQuarter && (
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-white/5 text-white/80 border border-white/10">
+                  {selectedQuarter.includedCycles.length} ciclos mensais consolidados
+                </span>
+              )}
+            </div>
+
+            {selectedQuarter ? (
+              <div className="space-y-4">
+                {/* 4 KPIs Consolidados do Trimestre */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                      Faturamento Trimestral
+                    </span>
+                    <div className="text-2xl font-extrabold text-white">
+                      {formatBRL(selectedQuarter.grossRevenue)}
+                    </div>
+                    <EvolutionBadge evolution={quarterlyEvolution.grossRevenue} />
+                    <p className="text-[11px] text-white/50">
+                      {selectedQuarter.totalOrders} pedidos ({selectedQuarter.totalPodsSold} pods)
+                    </p>
+                  </div>
+
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                      CMV Trimestral
+                    </span>
+                    <div className="text-2xl font-extrabold text-red-400">
+                      {formatBRL(selectedQuarter.cmv)}
+                    </div>
+                    <EvolutionBadge evolution={quarterlyEvolution.cmv} invertColors={true} />
+                    <p className="text-[11px] text-white/50">
+                      Custo total de reposição nos 3 ciclos
+                    </p>
+                  </div>
+
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                      Frete Logística Trimestral
+                    </span>
+                    <div className="text-2xl font-extrabold text-white/80">
+                      {formatBRL(selectedQuarter.logisticsFee)}
+                    </div>
+                    <EvolutionBadge evolution={quarterlyEvolution.logisticsFee} invertColors={true} />
+                    <p className="text-[11px] text-white/50">
+                      Fretes cobrados nos 3 ciclos
+                    </p>
+                  </div>
+
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block">
+                      Lucro Líquido Trimestral
+                    </span>
+                    <div className="text-2xl font-black text-emerald-300">
+                      {formatBRL(selectedQuarter.netProfit)}
+                    </div>
+                    <EvolutionBadge evolution={quarterlyEvolution.netProfit} />
+                    <p className="text-[11px] font-bold text-emerald-400">
+                      Margem Média: {selectedQuarter.profitMargin}%
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tabela dos 3 Ciclos Componentes */}
+                <div className="space-y-2 pt-2">
+                  <h5 className="text-xs font-bold text-white/70 uppercase tracking-wider">
+                    Ciclos que Compõem este Trimestre
+                  </h5>
+                  <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/40">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-white/10 bg-white/5 text-white/60 font-bold uppercase text-[10px]">
+                          <th className="py-2.5 px-4">Ciclo</th>
+                          <th className="py-2.5 px-4">Período (14 a 13)</th>
+                          <th className="py-2.5 px-4 text-right">Faturamento</th>
+                          <th className="py-2.5 px-4 text-right">CMV</th>
+                          <th className="py-2.5 px-4 text-right">Lucro Líquido</th>
+                          <th className="py-2.5 px-4 text-right">Margem</th>
+                          <th className="py-2.5 px-4 text-center">Pedidos</th>
+                          <th className="py-2.5 px-4 text-right">Recompras</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 font-medium">
+                        {selectedQuarter.includedCycles.map((c) => (
+                          <tr key={c.cycle.id} className="hover:bg-white/5 transition-colors">
+                            <td className="py-3 px-4 font-bold text-white">{c.cycle.name}</td>
+                            <td className="py-3 px-4 font-mono text-white/70 text-[11px]">{c.cycle.label}</td>
+                            <td className="py-3 px-4 text-right font-bold text-white">{formatBRL(c.grossRevenue)}</td>
+                            <td className="py-3 px-4 text-right font-medium text-red-400">{formatBRL(c.cmv)}</td>
+                            <td className="py-3 px-4 text-right font-extrabold text-emerald-400">{formatBRL(c.netProfit)}</td>
+                            <td className="py-3 px-4 text-right font-bold text-emerald-300">{c.profitMargin}%</td>
+                            <td className="py-3 px-4 text-center text-white/80">{c.totalOrders}</td>
+                            <td className="py-3 px-4 text-right text-amber-300">{formatBRL(c.stockPurchases)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-white/40 italic text-center py-4">Nenhum trimestre disponível.</p>
+            )}
+          </div>
+        )}
+
+        {/* ─── ABA 3: VISÃO SEMESTRAL (CONSOLIDAÇÃO DE 6 CICLOS) ─── */}
+        {historyTab === "semestral" && (
+          <div className="space-y-5">
+            {/* Seletor de Semestre */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3.5 rounded-2xl">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="text-xs font-bold text-white/70 flex items-center gap-1.5">
+                  <Layers className="size-4 text-emerald-400" />
+                  <span>Selecionar Semestre (6 Ciclos Consolidados):</span>
+                </span>
+                <select
+                  value={selectedSemesterId}
+                  onChange={(e) => setSelectedSemesterId(e.target.value)}
+                  className="bg-black/80 border border-white/20 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+                >
+                  {semiannualPeriods.map((s) => (
+                    <option key={s.id} value={s.id} className="bg-[#121214] text-white">
+                      {s.name} ({s.label})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedSemester && (
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-white/5 text-white/80 border border-white/10">
+                  {selectedSemester.includedCycles.length} ciclos mensais consolidados
+                </span>
+              )}
+            </div>
+
+            {selectedSemester ? (
+              <div className="space-y-4">
+                {/* 4 KPIs Consolidados do Semestre */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                      Faturamento Semestral
+                    </span>
+                    <div className="text-2xl font-extrabold text-white">
+                      {formatBRL(selectedSemester.grossRevenue)}
+                    </div>
+                    <EvolutionBadge evolution={semiannualEvolution.grossRevenue} />
+                    <p className="text-[11px] text-white/50">
+                      {selectedSemester.totalOrders} pedidos ({selectedSemester.totalPodsSold} pods)
+                    </p>
+                  </div>
+
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                      CMV Semestral
+                    </span>
+                    <div className="text-2xl font-extrabold text-red-400">
+                      {formatBRL(selectedSemester.cmv)}
+                    </div>
+                    <EvolutionBadge evolution={semiannualEvolution.cmv} invertColors={true} />
+                    <p className="text-[11px] text-white/50">
+                      Custo total de reposição nos 6 ciclos
+                    </p>
+                  </div>
+
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                      Frete Logística Semestral
+                    </span>
+                    <div className="text-2xl font-extrabold text-white/80">
+                      {formatBRL(selectedSemester.logisticsFee)}
+                    </div>
+                    <EvolutionBadge evolution={semiannualEvolution.logisticsFee} invertColors={true} />
+                    <p className="text-[11px] text-white/50">
+                      Fretes cobrados nos 6 ciclos
+                    </p>
+                  </div>
+
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block">
+                      Lucro Líquido Semestral
+                    </span>
+                    <div className="text-2xl font-black text-emerald-300">
+                      {formatBRL(selectedSemester.netProfit)}
+                    </div>
+                    <EvolutionBadge evolution={semiannualEvolution.netProfit} />
+                    <p className="text-[11px] font-bold text-emerald-400">
+                      Margem Média: {selectedSemester.profitMargin}%
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tabela dos 6 Ciclos Componentes */}
+                <div className="space-y-2 pt-2">
+                  <h5 className="text-xs font-bold text-white/70 uppercase tracking-wider">
+                    Ciclos que Compõem este Semestre
+                  </h5>
+                  <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/40">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-white/10 bg-white/5 text-white/60 font-bold uppercase text-[10px]">
+                          <th className="py-2.5 px-4">Ciclo</th>
+                          <th className="py-2.5 px-4">Período (14 a 13)</th>
+                          <th className="py-2.5 px-4 text-right">Faturamento</th>
+                          <th className="py-2.5 px-4 text-right">CMV</th>
+                          <th className="py-2.5 px-4 text-right">Lucro Líquido</th>
+                          <th className="py-2.5 px-4 text-right">Margem</th>
+                          <th className="py-2.5 px-4 text-center">Pedidos</th>
+                          <th className="py-2.5 px-4 text-right">Recompras</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 font-medium">
+                        {selectedSemester.includedCycles.map((c) => (
+                          <tr key={c.cycle.id} className="hover:bg-white/5 transition-colors">
+                            <td className="py-3 px-4 font-bold text-white">{c.cycle.name}</td>
+                            <td className="py-3 px-4 font-mono text-white/70 text-[11px]">{c.cycle.label}</td>
+                            <td className="py-3 px-4 text-right font-bold text-white">{formatBRL(c.grossRevenue)}</td>
+                            <td className="py-3 px-4 text-right font-medium text-red-400">{formatBRL(c.cmv)}</td>
+                            <td className="py-3 px-4 text-right font-extrabold text-emerald-400">{formatBRL(c.netProfit)}</td>
+                            <td className="py-3 px-4 text-right font-bold text-emerald-300">{c.profitMargin}%</td>
+                            <td className="py-3 px-4 text-center text-white/80">{c.totalOrders}</td>
+                            <td className="py-3 px-4 text-right text-amber-300">{formatBRL(c.stockPurchases)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-white/40 italic text-center py-4">Nenhum semestre disponível.</p>
+            )}
+          </div>
+        )}
+
+        {/* ─── ABA 4: VISÃO ANUAL (CONSOLIDAÇÃO DE 12 CICLOS) ─── */}
+        {historyTab === "anual" && (
+          <div className="space-y-5">
+            {/* Seletor de Ano */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3.5 rounded-2xl">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="text-xs font-bold text-white/70 flex items-center gap-1.5">
+                  <Award className="size-4 text-emerald-400" />
+                  <span>Selecionar Ano Financeiro (12 Ciclos Consolidados):</span>
+                </span>
+                <select
+                  value={selectedYearId}
+                  onChange={(e) => setSelectedYearId(e.target.value)}
+                  className="bg-black/80 border border-white/20 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+                >
+                  {annualPeriods.map((y) => (
+                    <option key={y.id} value={y.id} className="bg-[#121214] text-white">
+                      {y.name} ({y.label})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedYear && (
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-white/5 text-white/80 border border-white/10">
+                  {selectedYear.includedCycles.length} ciclos mensais no ano
+                </span>
+              )}
+            </div>
+
+            {selectedYear ? (
+              <div className="space-y-4">
+                {/* 4 KPIs Consolidados do Ano */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                      Faturamento Anual
+                    </span>
+                    <div className="text-2xl font-extrabold text-white">
+                      {formatBRL(selectedYear.grossRevenue)}
+                    </div>
+                    <EvolutionBadge evolution={annualEvolution.grossRevenue} />
+                    <p className="text-[11px] text-white/50">
+                      {selectedYear.totalOrders} pedidos ({selectedYear.totalPodsSold} pods)
+                    </p>
+                  </div>
+
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                      CMV Anual
+                    </span>
+                    <div className="text-2xl font-extrabold text-red-400">
+                      {formatBRL(selectedYear.cmv)}
+                    </div>
+                    <EvolutionBadge evolution={annualEvolution.cmv} invertColors={true} />
+                    <p className="text-[11px] text-white/50">
+                      Custo total de reposição no ano
+                    </p>
+                  </div>
+
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                      Frete Logística Anual
+                    </span>
+                    <div className="text-2xl font-extrabold text-white/80">
+                      {formatBRL(selectedYear.logisticsFee)}
+                    </div>
+                    <EvolutionBadge evolution={annualEvolution.logisticsFee} invertColors={true} />
+                    <p className="text-[11px] text-white/50">
+                      Fretes cobrados no ano
+                    </p>
+                  </div>
+
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
+                    <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block">
+                      Lucro Líquido Anual
+                    </span>
+                    <div className="text-2xl font-black text-emerald-300">
+                      {formatBRL(selectedYear.netProfit)}
+                    </div>
+                    <EvolutionBadge evolution={annualEvolution.netProfit} />
+                    <p className="text-[11px] font-bold text-emerald-400">
+                      Margem Média: {selectedYear.profitMargin}%
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tabela de Todos os Ciclos do Ano */}
+                <div className="space-y-2 pt-2">
+                  <h5 className="text-xs font-bold text-white/70 uppercase tracking-wider">
+                    Evolução Mensal do Ano Financeiro
+                  </h5>
+                  <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/40">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-white/10 bg-white/5 text-white/60 font-bold uppercase text-[10px]">
+                          <th className="py-2.5 px-4">Ciclo</th>
+                          <th className="py-2.5 px-4">Período (14 a 13)</th>
+                          <th className="py-2.5 px-4 text-right">Faturamento</th>
+                          <th className="py-2.5 px-4 text-right">CMV</th>
+                          <th className="py-2.5 px-4 text-right">Lucro Líquido</th>
+                          <th className="py-2.5 px-4 text-right">Margem</th>
+                          <th className="py-2.5 px-4 text-center">Pedidos</th>
+                          <th className="py-2.5 px-4 text-right">Recompras</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 font-medium">
+                        {selectedYear.includedCycles.map((c) => (
+                          <tr key={c.cycle.id} className="hover:bg-white/5 transition-colors">
+                            <td className="py-3 px-4 font-bold text-white">{c.cycle.name}</td>
+                            <td className="py-3 px-4 font-mono text-white/70 text-[11px]">{c.cycle.label}</td>
+                            <td className="py-3 px-4 text-right font-bold text-white">{formatBRL(c.grossRevenue)}</td>
+                            <td className="py-3 px-4 text-right font-medium text-red-400">{formatBRL(c.cmv)}</td>
+                            <td className="py-3 px-4 text-right font-extrabold text-emerald-400">{formatBRL(c.netProfit)}</td>
+                            <td className="py-3 px-4 text-right font-bold text-emerald-300">{c.profitMargin}%</td>
+                            <td className="py-3 px-4 text-center text-white/80">{c.totalOrders}</td>
+                            <td className="py-3 px-4 text-right text-amber-300">{formatBRL(c.stockPurchases)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-white/40 italic text-center py-4">Nenhum ano disponível.</p>
+            )}
+          </div>
+        )}
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* ABA 2 — EVOLUÇÃO                                                  */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {longTermTab === "evolucao" && (
+          <div className="space-y-6">
+            {/* Seletor de Modalidade da Evolução: Mensal / Trimestral / Semestral / Anual */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="inline-flex p-1 rounded-2xl bg-black/60 border border-white/15">
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab("mensal")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    historyTab === "mensal"
+                      ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+                      : "text-white/70 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Calendar className="size-3.5" />
+                  <span>Mensal (14 → 13)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab("trimestral")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    historyTab === "trimestral"
+                      ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+                      : "text-white/70 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <BarChart3 className="size-3.5" />
+                  <span>Trimestral</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab("semestral")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    historyTab === "semestral"
+                      ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+                      : "text-white/70 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Layers className="size-3.5" />
+                  <span>Semestral</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab("anual")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    historyTab === "anual"
+                      ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+                      : "text-white/70 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Award className="size-3.5" />
+                  <span>Anual</span>
+                </button>
+              </div>
+
+              <span className="text-[11px] text-white/40">
+                Gráfico dinâmico alimentado 100% pelos dados reais do banco
+              </span>
+            </div>
+
+            {/* O Gráfico como elemento principal */}
+            <RevenueEvolutionChart data={evolutionData} periodType={historyTab} />
           </div>
         )}
       </div>

@@ -15,7 +15,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requiredPermission,
   requireSuperAdmin,
 }) => {
-  const { user, company, loading, isSuperAdmin } = useAuth();
+  const { user, company, companyUser, loading, isSuperAdmin, signOut } = useAuth();
   const { canAccess } = usePermissions();
   const location = useLocation();
 
@@ -30,9 +30,34 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Se não estiver autenticado, vai para o login
+  // Se não estiver autenticado no Supabase Auth, vai para o login
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Se estiver autenticado no Supabase Auth mas NÃO possuir vínculo válido/ativo em company_users
+  if (!companyUser || !company || !companyUser.is_active) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-6 text-white text-center">
+        <div className="max-w-md w-full bg-[#111111] border border-red-500/30 rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4">
+          <div className="size-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 text-2xl font-bold">
+            ⚠️
+          </div>
+          <h2 className="text-xl font-bold text-white tracking-tight">Acesso Administrativo Negado</h2>
+          <p className="text-sm text-white/60 leading-relaxed">
+            Sua conta autenticada (<span className="text-white/80 font-mono text-xs">{user.email}</span>) não possui permissão de acesso vinculada a nenhuma empresa ativa neste painel.
+          </p>
+          <div className="w-full pt-4 border-t border-white/10 flex flex-col gap-2">
+            <button
+              onClick={() => signOut()}
+              className="w-full py-2.5 px-4 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 text-sm font-medium transition-colors cursor-pointer"
+            >
+              Sair da Conta
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Se precisar de super admin e o usuário não for

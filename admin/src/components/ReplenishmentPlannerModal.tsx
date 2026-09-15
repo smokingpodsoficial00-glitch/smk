@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { updateProductCost, fetchProductCostsMap } from "../lib/productCosts";
+import { executeStockEntryRpc } from "../lib/stockRepurchases";
 
 export interface OrderItem {
   id: string;
@@ -184,6 +185,7 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
   const [showConfirmStockEntryModal, setShowConfirmStockEntryModal] = useState(false);
   const [isProcessingStockEntry, setIsProcessingStockEntry] = useState(false);
   const [stockEntryCompleted, setStockEntryCompleted] = useState(false);
+  const [operationIdempotencyKey, setOperationIdempotencyKey] = useState<string | null>(null);
   const [stockEntryResult, setStockEntryResult] = useState<{
     processedUnits: number;
     existingUpdatedCount: number;
@@ -543,7 +545,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
     }
   };
 
-  // Execução da Entrada de Estoque Automática (Isolada por company_id)
+  // Execução da Entrada de Estoque Automática (100% Atômica via RPC PostgreSQL)
   const handleExecuteStockEntry = async () => {
     if (isProcessingStockEntry || stockEntryCompleted || orderItems.length === 0) return;
 
@@ -551,146 +553,92 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
     setShowConfirmStockEntryModal(false);
 
     const targetCompanyId = companyId || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
-
-    let processedUnits = 0;
-    let existingUpdatedCount = 0;
-    let newProductsCreatedCount = 0;
-    let variationsUpdatedCount = 0;
+    let idempotencyKey = operationIdempotencyKey;
+    if (!idempotencyKey) {
+      idempotencyKey = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+            const r = (Math.random() * 16) | 0;
+            const v = c === "x" ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          });
+      setOperationIdempotencyKey(idempotencyKey);
+    }
 
     try {
-      // 1. Buscar todos os produtos existentes no Supabase DB para a empresa
-      const { data: dbProducts, error: fetchErr } = await supabase
-        .from("smoking_products")
-        .select("*")
-        .or(`company_id.eq.${targetCompanyId},company_id.is.null`);
+      // 1. Desmembrar itens e variações de sabores
+      const rpcItems: Array<{
+        brand: string;
+        model: string;
+        flavor: string;
+        qty: number;
+        unit_cost: number;
+        unit_sell: number;
+        puffs?: number;
+      }> = [];
 
-      if (fetchErr) {
-        console.error("Erro ao buscar produtos existentes para entrada de estoque:", fetchErr);
-        alert("Erro de conexão ao acessar o banco de dados. Tente novamente.");
-        setIsProcessingStockEntry(false);
-        return;
-      }
-
-      const currentDbProducts = dbProducts || [];
-
-      // 2. Processar cada item da lista de compras
       for (const item of orderItems) {
         const itemBrand = item.brand.trim();
         const itemModel = item.model.trim();
         const itemQty = Math.max(1, item.qty);
         const itemCost = item.unitCost;
         const itemSell = item.unitSell;
+        const extractedPuffs = extractPuffsFromModel(itemModel);
 
-        // Processar os sabores especificados no item
         const flavorBreakdown = parseFlavorsString(item.flavors, itemQty);
-
         for (const subItem of flavorBreakdown) {
-          const subFlavor = subItem.flavor;
-          const subQty = subItem.qty;
-
-          const normBrand = itemBrand.toLowerCase();
-          const normModel = itemModel.toLowerCase();
-          const normFlavor = subFlavor.toLowerCase();
-
-          // Tentar encontrar produto/variação idêntica já existente no Supabase
-          const match = currentDbProducts.find(p => {
-            const pBrand = (p.brand || "").toLowerCase().trim();
-            const pModel = (p.name || "").toLowerCase().trim();
-            const pFlavor = (p.flavor || "").toLowerCase().trim();
-            return pBrand === normBrand && pModel === normModel && (pFlavor === normFlavor || normFlavor === "padrao");
+          rpcItems.push({
+            brand: itemBrand,
+            model: itemModel,
+            flavor: subItem.flavor,
+            qty: subItem.qty,
+            unit_cost: itemCost,
+            unit_sell: itemSell,
+            puffs: extractedPuffs
           });
-
-          if (match) {
-            // PRODUTO JÁ EXISTE NO ESTOQUE: REGRA DE OURO - UPDATE PARCIAL SOMENTE EM ESTOQUE
-            const currentStock = match.stock || 0;
-            const newStock = currentStock + subQty;
-
-            const { error: updateErr } = await supabase
-              .from("smoking_products")
-              .update({ stock: newStock })
-              .eq("id", match.id)
-              .eq("company_id", targetCompanyId);
-
-            if (!updateErr) {
-              match.stock = newStock; // Atualiza a referência em memória local
-              existingUpdatedCount++;
-              variationsUpdatedCount++;
-              processedUnits += subQty;
-            } else {
-              console.error("Erro ao atualizar estoque do produto existente:", updateErr);
-            }
-          } else {
-            // PRODUTO NOVO: CADASTRAR AUTOMATICAMENTE SEM FOTO E COM DADOS DA LISTA
-            const extractedPuffs = extractPuffsFromModel(itemModel);
-
-            const newPayload = {
-              company_id: targetCompanyId,
-              brand: itemBrand,
-              name: itemModel,
-              flavor: subFlavor,
-              puffs: extractedPuffs,
-              price: itemSell,
-              stock: subQty,
-              image_url: "", // Foto vazia conforme especificação
-              is_active: true
-            };
-
-            const { data: inserted, error: insertErr } = await supabase
-              .from("smoking_products")
-              .insert(newPayload)
-              .select();
-
-            if (!insertErr && inserted && inserted.length > 0) {
-              const createdId = inserted[0].id;
-              currentDbProducts.push(inserted[0]);
-
-              // Salvar o Custo Oficial do Novo Produto no Supabase DB
-              if (itemCost > 0) {
-                const groupKey = `${normBrand}__${normModel}`;
-                await updateProductCost({
-                  modelKey: groupKey,
-                  productIds: [createdId],
-                  costPrice: itemCost,
-                  companyId: targetCompanyId
-                });
-              }
-
-              newProductsCreatedCount++;
-              variationsUpdatedCount++;
-              processedUnits += subQty;
-            } else {
-              console.error("Erro ao cadastrar novo produto da lista:", insertErr);
-            }
-          }
         }
       }
 
-      // 3. Registrar a Operação no Histórico do Supabase DB
-      await supabase.from("smoking_orders").insert({
-        client_phone: "__SYSTEM_STOCK_ENTRY__",
-        client_name: "Entrada de Estoque - Lista de Compras",
-        shipping_address: "ENTRADA DE ESTOQUE AUTOMÁTICA",
-        items: orderItems.map(i => ({
-          id: i.id,
-          brand: i.brand,
-          model: i.model,
-          qty: i.qty,
-          unitCost: i.unitCost,
-          unitSell: i.unitSell,
-          flavors: i.flavors,
-          entry_date: new Date().toISOString()
-        })),
-        total_amount: totalSpentWithShipping,
-        company_id: targetCompanyId
+      if (rpcItems.length === 0) {
+        alert("A lista de compras não contém itens válidos para dar entrada.");
+        setIsProcessingStockEntry(false);
+        return;
+      }
+
+      // 2. Executar operação transacional atômica via RPC PostgreSQL
+      const rpcResult = await executeStockEntryRpc({
+        companyId: targetCompanyId,
+        idempotencyKey,
+        purchaseDate: new Date().toISOString().split("T")[0],
+        stockPurchaseAmount: totalCostOfOrder,
+        freightAmount: supplierShippingFee,
+        notes: `Entrada via Planejador de Reposição — ${totalUnitsInOrder} pods (${orderItems.length} modelos)`,
+        items: rpcItems
       });
+
+      if (!rpcResult.success) {
+        console.error("Erro ao executar entrada de estoque atômica:", rpcResult.error);
+        alert(`Erro ao processar entrada de estoque: ${rpcResult.error || "Tente novamente."}`);
+        setIsProcessingStockEntry(false);
+        return;
+      }
+
+      // 3. Limpeza do rascunho apenas após confirmação atômica com sucesso no banco
+      try {
+        localStorage.removeItem(LOCAL_STORAGE_ORDER_KEY);
+      } catch (e) {
+        console.warn("Aviso ao limpar rascunho local:", e);
+      }
+      setOrderItems([]);
+      setOperationIdempotencyKey(null);
 
       // 4. Conclusão e Resumo
       setStockEntryCompleted(true);
       setStockEntryResult({
-        processedUnits,
-        existingUpdatedCount,
-        newProductsCreatedCount,
-        variationsUpdatedCount,
+        processedUnits: rpcResult.total_units || totalUnitsInOrder,
+        existingUpdatedCount: rpcResult.updated_products || 0,
+        newProductsCreatedCount: rpcResult.created_products || 0,
+        variationsUpdatedCount: (rpcResult.updated_products || 0) + (rpcResult.created_products || 0),
         totalInvested: totalSpentWithShipping
       });
 
@@ -704,6 +652,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
       setIsProcessingStockEntry(false);
     }
   };
+
 
   if (!isOpen) return null;
 

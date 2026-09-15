@@ -7,47 +7,27 @@ import {
   ToggleLeft, ToggleRight, Zap, QrCode, Smartphone, LogOut
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { getBackendUrl } from '@/lib/backend';
 import { fetchLiveClients, type RealClient } from '@/lib/crm';
+import { 
+  fetchMarketingLists, 
+  createMarketingList, 
+  updateMarketingList, 
+  deleteMarketingList, 
+  type BroadcastList, 
+  type ContactItem 
+} from '@/lib/marketingLists';
+import { 
+  fetchMarketingCampaigns, 
+  createMarketingCampaign, 
+  updateMarketingCampaign, 
+  deleteMarketingCampaign, 
+  setMarketingCampaignStatus, 
+  type Campaign 
+} from '@/lib/marketingCampaigns';
 
-// Interfaces de Estrutura de Marketing
-export interface ContactItem {
-  id: string;
-  name: string;
-  phone: string;
-  cleanPhone: string;
-  isSaved?: boolean;
-}
-
-export interface BroadcastList {
-  id: string;
-  name: string;
-  description: string;
-  contacts: ContactItem[];
-  color: string;
-  createdAt: string;
-}
-
-export interface Campaign {
-  id: string;
-  name: string;
-  message: string;
-  variations?: string[]; // Variações dinâmicas de texto para alternar automaticamente
-  useVariations?: boolean;
-  targetType: 'lists' | 'group' | 'all';
-  selectedListIds: string[]; // Suporte a múltiplas listas
-  targetGroupId?: string;
-  targetGroupName?: string;
-  frequencyDays: number; // 0 = Disparo Único, 7 = Semanal, 14 = Quinzenal, etc.
-  scheduledWeekday?: string; // 'QUARTA', 'SEXTA', 'SABADO', 'DOMINGO', etc.
-  scheduledTime?: string; // Ex: '15:00', '18:30', etc.
-  startDate?: string; // Ex: '2026-08-17' (Data de Início da Campanha)
-  batchSize: number;
-  batchIntervalMinutes: number;
-  status: 'active' | 'paused' | 'completed';
-  lastRunDate?: string;
-  totalRecipients: number;
-  createdAt: string;
-}
+export type { ContactItem, BroadcastList, Campaign };
 
 interface WhatsAppGroup {
   id: string;
@@ -210,7 +190,7 @@ export default function MarketingModule() {
 
   const fetchDiagnostic = async () => {
     try {
-      const res = await fetch('http://localhost:3006/api/marketing/lists-diagnostic');
+      const res = await fetch(`${getBackendUrl()}/api/marketing/lists-diagnostic`);
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -229,7 +209,7 @@ export default function MarketingModule() {
     if (!confirm('Iniciar Varredura e Blindagem no WhatsApp?\n\nO sistema vai escanear o histórico de conversas para identificar todos os contatos que já receberam mensagens e garantir que NUNCA MAIS sejam repetidos.')) return;
     setLoadingScan(true);
     try {
-      const res = await fetch('http://localhost:3006/api/marketing/scan-chats', { method: 'POST' });
+      const res = await fetch(`${getBackendUrl()}/api/marketing/scan-chats`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         await fetchDiagnostic();
@@ -249,7 +229,7 @@ export default function MarketingModule() {
 
     setLoadingSanitize(true);
     try {
-      const res = await fetch('http://localhost:3006/api/marketing/clean-and-deduplicate-lists', { method: 'POST' });
+      const res = await fetch(`${getBackendUrl()}/api/marketing/clean-and-deduplicate-lists`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         setBroadcastLists(data.lists);
@@ -257,7 +237,7 @@ export default function MarketingModule() {
         await fetchDiagnostic();
         // Recarrega campanhas atualizadas
         try {
-          const campRes = await fetch('http://localhost:3006/api/marketing/campaigns');
+          const campRes = await fetch(`${getBackendUrl()}/api/marketing/campaigns`);
           const campData = await campRes.json();
           if (campData.success && campData.campaigns) {
             setCampaigns(campData.campaigns);
@@ -276,122 +256,36 @@ export default function MarketingModule() {
     }
   };
 
-  // Carrega Listas e Campanhas salvas (localStorage + backend)
+  // Carrega Listas e Campanhas canônicas do Supabase (Fonte Única de Verdade)
   useEffect(() => {
     fetchDiagnostic();
-    try {
-      const savedLists = localStorage.getItem(LOCAL_STORAGE_LISTS);
-      if (savedLists) {
-        setBroadcastLists(JSON.parse(savedLists));
-      } else {
-        // Cria listas iniciais padrão
-        const initialLists: BroadcastList[] = [
-          {
-            id: 'list_antigos_smk',
-            name: 'Base Antiga (~300 SMK)',
-            description: 'Contatos antigos de São Bernardo do Campo recuperados para reativação',
-            contacts: [],
-            color: '#10b981',
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: 'list_vips_semanais',
-            name: 'Clientes VIPs (Semanais)',
-            description: 'Clientes de alta frequência para ofertas relâmpago',
-            contacts: [],
-            color: '#8b5cf6',
-            createdAt: new Date().toISOString(),
-          }
-        ];
-        setBroadcastLists(initialLists);
-        localStorage.setItem(LOCAL_STORAGE_LISTS, JSON.stringify(initialLists));
+
+    if (!company?.id) return;
+
+    let isMounted = true;
+
+    const loadMarketingData = async () => {
+      try {
+        const [lists, camps] = await Promise.all([
+          fetchMarketingLists(company.id),
+          fetchMarketingCampaigns(company.id)
+        ]);
+
+        if (isMounted) {
+          setBroadcastLists(lists);
+          setCampaigns(camps);
+        }
+      } catch (e: any) {
+        console.warn('[MarketingModule] Erro ao carregar dados canônicos do Supabase:', e?.message || e);
       }
+    };
 
-      // Carrega campanhas do localStorage primeiro (carregamento instantâneo)
-      const savedCampaigns = localStorage.getItem(LOCAL_STORAGE_CAMPAIGNS);
-      let localCampaigns: Campaign[] = [];
-      if (savedCampaigns) {
-        localCampaigns = JSON.parse(savedCampaigns);
-        setCampaigns(localCampaigns);
-      } else {
-        const initialCampaign: Campaign = {
-          id: 'camp_reativacao_fds',
-          name: 'Reativação FDS + Convite Grupo VIP',
-          message: OFFICIAL_TEMPLATES[0].text,
-          targetType: 'lists',
-          selectedListIds: ['list_antigos_smk'],
-          frequencyDays: 7,
-          batchSize: 20,
-          batchIntervalMinutes: 45,
-          status: 'active',
-          totalRecipients: 0,
-          createdAt: new Date().toISOString(),
-        };
-        localCampaigns = [initialCampaign];
-        setCampaigns(localCampaigns);
-        localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(localCampaigns));
-      }
+    loadMarketingData();
 
-      // Tenta buscar do backend (sync bidirecional)
-      fetch('http://localhost:3006/api/marketing/campaigns')
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && Array.isArray(data.campaigns) && data.campaigns.length > 0) {
-            // Backend tem campanhas: usa elas (fonte de verdade do scheduler)
-            setCampaigns(data.campaigns);
-            localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(data.campaigns));
-          } else if (localCampaigns.length > 0) {
-            // Backend vazio mas localStorage tem: sincroniza para o backend
-            fetch('http://localhost:3006/api/marketing/campaigns', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ campaigns: localCampaigns })
-            }).catch(() => {});
-          }
-        })
-        .catch(() => {
-          // Backend offline: usa localStorage normalmente
-          console.warn('⚠️ Backend offline, usando campanhas do localStorage.');
-        });
-
-      // Tenta buscar listas atualizadas do backend
-      fetch('http://localhost:3006/api/marketing/lists')
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && Array.isArray(data.lists) && data.lists.length > 0) {
-            setBroadcastLists(data.lists);
-            localStorage.setItem(LOCAL_STORAGE_LISTS, JSON.stringify(data.lists));
-          }
-        })
-        .catch(() => {});
-
-    } catch (e) {
-      console.warn('Erro ao carregar storage local de marketing:', e);
-    }
-  }, []);
-
-  // Salva no localStorage e sincroniza com backend
-  const saveListsToStorage = (lists: BroadcastList[]) => {
-    setBroadcastLists(lists);
-    localStorage.setItem(LOCAL_STORAGE_LISTS, JSON.stringify(lists));
-    // Sincroniza listas com backend para o scheduler autônomo
-    fetch('http://localhost:3006/api/marketing/lists', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lists })
-    }).catch(err => console.warn('⚠️ Falha ao sincronizar listas com backend:', err.message));
-  };
-
-  const saveCampaignsToStorage = (camps: Campaign[]) => {
-    setCampaigns(camps);
-    localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(camps));
-    // Sincroniza com backend para persistência do scheduler
-    fetch('http://localhost:3006/api/marketing/campaigns', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaigns: camps })
-    }).catch(err => console.warn('⚠️ Falha ao sincronizar campanhas com backend:', err.message));
-  };
+    return () => {
+      isMounted = false;
+    };
+  }, [company?.id]);
 
   // Sincroniza Contatos e Grupos do WhatsApp via backend
   const syncWhatsAppContactsAndGroups = async () => {
@@ -403,7 +297,7 @@ export default function MarketingModule() {
       let fetchedGroups: WhatsAppGroup[] = [];
 
       try {
-        const res = await fetch('http://localhost:3006/api/marketing/whatsapp-data');
+        const res = await fetch(`${getBackendUrl()}/api/marketing/whatsapp-data`);
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.contacts)) {
@@ -488,8 +382,12 @@ export default function MarketingModule() {
     setIsListModalOpen(true);
   };
 
-  // Salva Lista
-  const handleSaveList = () => {
+  // Salva Lista no Supabase (com diffing cirúrgico e compensação segura)
+  const handleSaveList = async () => {
+    if (!company?.id) {
+      alert('Sessão inválida: nenhuma empresa selecionada.');
+      return;
+    }
     if (!listFormName.trim()) {
       alert('Por favor, informe o nome da Lista de Transmissão.');
       return;
@@ -497,32 +395,38 @@ export default function MarketingModule() {
 
     const selectedMembers = allContacts.filter(c => listFormSelectedContacts.has(c.id));
 
-    if (editingList) {
-      const updated = broadcastLists.map(l => 
-        l.id === editingList.id 
-          ? { ...l, name: listFormName, description: listFormDesc, contacts: selectedMembers }
-          : l
-      );
-      saveListsToStorage(updated);
-    } else {
-      const newList: BroadcastList = {
-        id: `list_${Date.now()}`,
-        name: listFormName.trim(),
-        description: listFormDesc.trim() || 'Lista personalizada de contatos',
-        contacts: selectedMembers,
-        color: '#10b981',
-        createdAt: new Date().toISOString(),
-      };
-      saveListsToStorage([...broadcastLists, newList]);
+    try {
+      if (editingList) {
+        const updated = await updateMarketingList(company.id, editingList.id, {
+          name: listFormName.trim(),
+          description: listFormDesc.trim() || undefined,
+          contacts: selectedMembers
+        });
+        setBroadcastLists(prev => prev.map(l => l.id === updated.id ? updated : l));
+      } else {
+        const newList = await createMarketingList(company.id, {
+          name: listFormName.trim(),
+          description: listFormDesc.trim() || 'Lista personalizada de contatos',
+          contacts: selectedMembers,
+          color: '#10b981',
+        });
+        setBroadcastLists(prev => [...prev, newList]);
+      }
+      setIsListModalOpen(false);
+    } catch (err: any) {
+      alert(`Erro ao salvar lista no Supabase: ${err?.message || err}`);
     }
-
-    setIsListModalOpen(false);
   };
 
-  const handleDeleteList = (id: string) => {
+  const handleDeleteList = async (id: string) => {
+    if (!company?.id) return;
     if (confirm('Tem certeza que deseja excluir esta Lista de Transmissão?')) {
-      const updated = broadcastLists.filter(l => l.id !== id);
-      saveListsToStorage(updated);
+      try {
+        await deleteMarketingList(company.id, id);
+        setBroadcastLists(prev => prev.filter(l => l.id !== id));
+      } catch (err: any) {
+        alert(`Erro ao excluir lista no Supabase: ${err?.message || err}`);
+      }
     }
   };
 
@@ -563,8 +467,12 @@ export default function MarketingModule() {
     setIsCampaignModalOpen(true);
   };
 
-  // Salva Campanha
-  const handleSaveCampaign = () => {
+  // Salva Campanha no Supabase (com Optimistic Locking mandatório e compensação segura)
+  const handleSaveCampaign = async () => {
+    if (!company?.id) {
+      alert('Sessão inválida: nenhuma empresa selecionada.');
+      return;
+    }
     if (!campaignFormName.trim()) {
       alert('Por favor, informe o nome da Campanha.');
       return;
@@ -577,11 +485,11 @@ export default function MarketingModule() {
     // Calcula total de destinatários únicos combinando as listas selecionadas
     let totalCount = 0;
     if (campaignFormTargetType === 'lists') {
-      const uniqueContactIds = new Set<string>();
+      const uniqueContactPhones = new Set<string>();
       broadcastLists
         .filter(l => campaignFormSelectedLists.has(l.id))
-        .forEach(l => l.contacts.forEach(c => uniqueContactIds.add(c.id)));
-      totalCount = uniqueContactIds.size;
+        .forEach(l => l.contacts.forEach(c => uniqueContactPhones.add(c.cleanPhone || c.phone)));
+      totalCount = uniqueContactPhones.size;
     } else {
       const selectedGroup = whatsAppGroups.find(g => g.id === campaignFormTargetGroup);
       totalCount = selectedGroup?.participantsCount || 1;
@@ -589,69 +497,94 @@ export default function MarketingModule() {
 
     const selectedGroupName = whatsAppGroups.find(g => g.id === campaignFormTargetGroup)?.name;
 
-    if (editingCampaign) {
-      const updated = campaigns.map(c => 
-        c.id === editingCampaign.id 
-          ? {
-              ...c,
-              name: campaignFormName.trim(),
-              message: campaignFormMessage,
-              variations: campaignFormVariations.filter(v => v.trim().length > 0),
-              useVariations: campaignFormUseVariations,
-              targetType: campaignFormTargetType,
-              selectedListIds: Array.from(campaignFormSelectedLists),
-              targetGroupId: campaignFormTargetGroup,
-              targetGroupName: selectedGroupName,
-              frequencyDays: campaignFormFrequency,
-              scheduledWeekday: campaignFormWeekday,
-              scheduledTime: campaignFormTime,
-              startDate: campaignFormStartDate,
-              batchSize: campaignFormBatchSize,
-              batchIntervalMinutes: campaignFormInterval,
-              totalRecipients: totalCount,
-            }
-          : c
-      );
-      saveCampaignsToStorage(updated);
-    } else {
-      const newCamp: Campaign = {
-        id: `camp_${Date.now()}`,
-        name: campaignFormName.trim(),
-        message: campaignFormMessage,
-        variations: campaignFormVariations.filter(v => v.trim().length > 0),
-        useVariations: campaignFormUseVariations,
-        targetType: campaignFormTargetType,
-        selectedListIds: Array.from(campaignFormSelectedLists),
-        targetGroupId: campaignFormTargetGroup,
-        targetGroupName: selectedGroupName,
-        frequencyDays: campaignFormFrequency,
-        scheduledWeekday: campaignFormWeekday,
-        scheduledTime: campaignFormTime,
-        startDate: campaignFormStartDate,
-        batchSize: campaignFormBatchSize,
-        batchIntervalMinutes: campaignFormInterval,
-        status: 'active',
-        totalRecipients: totalCount,
-        createdAt: new Date().toISOString(),
-      };
-      saveCampaignsToStorage([...campaigns, newCamp]);
+    try {
+      if (editingCampaign) {
+        const expectedUpdatedAt = editingCampaign.updatedAt || editingCampaign.createdAt;
+        const updated = await updateMarketingCampaign(
+          company.id,
+          editingCampaign.id,
+          {
+            name: campaignFormName.trim(),
+            message: campaignFormMessage,
+            variations: campaignFormVariations.filter(v => v.trim().length > 0),
+            useVariations: campaignFormUseVariations,
+            targetType: campaignFormTargetType,
+            selectedListIds: Array.from(campaignFormSelectedLists),
+            targetGroupId: campaignFormTargetGroup,
+            targetGroupName: selectedGroupName,
+            frequencyDays: campaignFormFrequency,
+            scheduledWeekday: campaignFormWeekday,
+            scheduledTime: campaignFormTime,
+            startDate: campaignFormStartDate,
+            batchSize: campaignFormBatchSize,
+            batchIntervalMinutes: campaignFormInterval,
+            totalRecipients: totalCount,
+          },
+          expectedUpdatedAt
+        );
+        setCampaigns(prev => prev.map(c => c.id === updated.id ? updated : c));
+        setIsCampaignModalOpen(false);
+      } else {
+        const newCamp = await createMarketingCampaign(company.id, {
+          name: campaignFormName.trim(),
+          message: campaignFormMessage,
+          variations: campaignFormVariations.filter(v => v.trim().length > 0),
+          useVariations: campaignFormUseVariations,
+          targetType: campaignFormTargetType,
+          selectedListIds: Array.from(campaignFormSelectedLists),
+          targetGroupId: campaignFormTargetGroup,
+          targetGroupName: selectedGroupName,
+          frequencyDays: campaignFormFrequency,
+          scheduledWeekday: campaignFormWeekday,
+          scheduledTime: campaignFormTime,
+          startDate: campaignFormStartDate,
+          batchSize: campaignFormBatchSize,
+          batchIntervalMinutes: campaignFormInterval,
+          status: 'active',
+          totalRecipients: totalCount,
+        });
+        setCampaigns(prev => [...prev, newCamp]);
+        setIsCampaignModalOpen(false);
+      }
+    } catch (err: any) {
+      if (err?.isConflict) {
+        alert(err.message);
+        // Recarrega campanhas mais recentes e atualiza o modal
+        const reloaded = await fetchMarketingCampaigns(company.id);
+        setCampaigns(reloaded);
+        const current = reloaded.find(c => c.id === editingCampaign?.id);
+        if (current) {
+          handleOpenCampaignModal(current);
+        }
+      } else {
+        alert(`Erro ao salvar campanha no Supabase: ${err?.message || err}`);
+      }
     }
-
-    setIsCampaignModalOpen(false);
   };
 
-  const handleDeleteCampaign = (id: string) => {
+  const handleDeleteCampaign = async (id: string) => {
+    if (!company?.id) return;
     if (confirm('Tem certeza que deseja excluir esta Campanha?')) {
-      const updated = campaigns.filter(c => c.id !== id);
-      saveCampaignsToStorage(updated);
+      try {
+        await deleteMarketingCampaign(company.id, id);
+        setCampaigns(prev => prev.filter(c => c.id !== id));
+      } catch (err: any) {
+        alert(`Erro ao excluir campanha no Supabase: ${err?.message || err}`);
+      }
     }
   };
 
-  const toggleCampaignStatus = (id: string) => {
-    const updated = campaigns.map(c => 
-      c.id === id ? { ...c, status: c.status === 'active' ? ('paused' as const) : ('active' as const) } : c
-    );
-    saveCampaignsToStorage(updated);
+  const toggleCampaignStatus = async (id: string) => {
+    if (!company?.id) return;
+    const current = campaigns.find(c => c.id === id);
+    if (!current) return;
+    const newStatus = current.status === 'active' ? 'paused' : 'active';
+    try {
+      await setMarketingCampaignStatus(company.id, id, newStatus);
+      setCampaigns(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c));
+    } catch (err: any) {
+      alert(`Erro ao alterar status da campanha: ${err?.message || err}`);
+    }
   };
 
   // Disparar Campanha Agora
@@ -690,7 +623,7 @@ export default function MarketingModule() {
 
     // Sincroniza e herda a blindagem central do servidor
     try {
-      const resp = await fetch('http://localhost:3006/api/marketing/sent-history');
+      const resp = await fetch(`${getBackendUrl()}/api/marketing/sent-history`);
       if (resp.ok) {
         const data = await resp.json();
         const serverCampSent = data.sentHistory?.[camp.id] || [];
@@ -751,7 +684,7 @@ export default function MarketingModule() {
           if (isAbortingRef.current) break;
 
           try {
-            const res = await fetch('http://localhost:3006/api/marketing/send-direct', {
+            const res = await fetch(`${getBackendUrl()}/api/marketing/send-direct`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -832,7 +765,7 @@ export default function MarketingModule() {
           .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, cardapioUrl)
           .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, grupoVipUrl || '');
 
-        await fetch('http://localhost:3006/api/marketing/send-direct', {
+        await fetch(`${getBackendUrl()}/api/marketing/send-direct`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -850,7 +783,15 @@ export default function MarketingModule() {
       const updated = campaigns.map(c => 
         c.id === camp.id ? { ...c, lastRunDate: new Date().toLocaleDateString('pt-BR') } : c
       );
-      saveCampaignsToStorage(updated);
+      setCampaigns(updated);
+      if (company?.id) {
+        supabase
+          .from('smoking_marketing_campaigns')
+          .update({ last_run_at: new Date().toISOString() })
+          .eq('id', camp.id)
+          .eq('company_id', company.id)
+          .then(() => {});
+      }
       if (!isAbortingRef.current) {
         alert('Disparo da campanha finalizado com sucesso!');
       }

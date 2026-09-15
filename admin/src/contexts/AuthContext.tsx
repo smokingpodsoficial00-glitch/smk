@@ -32,6 +32,7 @@ export interface CompanyUser {
   role: UserRole;
   is_super_admin?: boolean;
   auth_password?: string;
+  is_active?: boolean;
 }
 
 interface RegisterData {
@@ -68,7 +69,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [companyUser, setCompanyUser] = useState<CompanyUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Auxiliar para persistir sessão local atômica
+  // Auxiliar para limpar completamente o estado e o cache local
+  const clearSession = () => {
+    setUser(null);
+    setCompany(null);
+    setCompanyUser(null);
+    try {
+      localStorage.removeItem(LOCAL_SESSION_KEY);
+    } catch (e) {
+      console.warn('Erro ao remover sessão local:', e);
+    }
+    setLoading(false);
+  };
+
+  // Auxiliar para persistir cache local secundário
   const saveLocalSession = (usr: User, comp: Company, compUser: CompanyUser) => {
     try {
       localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify({ user: usr, company: comp, companyUser: compUser }));
@@ -80,110 +94,102 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchUserData = async (authUser: User) => {
     try {
       // 1. Busca os dados do usuário em company_users
-      const { data: compUserData } = await supabase
+      const { data: compUserData, error: compUserError } = await supabase
         .from('company_users')
         .select('*')
         .eq('auth_user_id', authUser.id)
         .eq('is_active', true)
         .maybeSingle();
 
-      if (compUserData) {
-        setCompanyUser(compUserData as CompanyUser);
+      if (compUserError) {
+        console.warn('[AuthContext] Erro ao consultar company_users:', compUserError.message);
+      }
 
-        const { data: companyData } = await supabase
+      if (compUserData && compUserData.company_id) {
+        const { data: companyData, error: companyError } = await supabase
           .from('companies')
           .select('*')
           .eq('id', compUserData.company_id)
           .maybeSingle();
 
+        if (companyError) {
+          console.warn('[AuthContext] Erro ao consultar companies:', companyError.message);
+        }
+
         if (companyData) {
+          setUser(authUser);
           setCompany(companyData as Company);
+          setCompanyUser(compUserData as CompanyUser);
           saveLocalSession(authUser, companyData as Company, compUserData as CompanyUser);
           setLoading(false);
           return;
         }
       }
 
-      // 2. Se o usuário não possui vínculo direto, conecta à empresa principal existente da loja
-      const { data: mainComp } = await supabase
-        .from('companies')
-        .select('*')
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      if (mainComp) {
-        const activeCompUser: CompanyUser = {
-          id: `cuser-${authUser.id}`,
-          company_id: mainComp.id,
-          auth_user_id: authUser.id,
-          name: authUser.user_metadata?.full_name || 'Administrador',
-          email: authUser.email || '',
-          role: 'admin',
-        };
-
-        // Garante vínculo no banco de dados
-        await supabase.from('company_users').upsert({
-          company_id: mainComp.id,
-          auth_user_id: authUser.id,
-          name: activeCompUser.name,
-          email: activeCompUser.email,
-          role: 'admin',
-          is_active: true
-        }, { onConflict: 'auth_user_id' });
-
-        setCompany(mainComp as Company);
-        setCompanyUser(activeCompUser);
-        saveLocalSession(authUser, mainComp as Company, activeCompUser);
-        setLoading(false);
-        return;
-      }
+      // 2. Acesso Negado: Usuário autenticado no Supabase Auth mas sem vínculo ativo em company_users
+      console.warn('[AuthContext] Acesso administrativo negado: Usuário autenticado não possui vínculo ativo em company_users.');
+      setUser(authUser);
+      setCompany(null);
+      setCompanyUser(null);
+      try {
+        localStorage.removeItem(LOCAL_SESSION_KEY);
+      } catch (e) {}
     } catch (err) {
       console.error('Erro ao carregar dados do usuário:', err);
+      clearSession();
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // 1. Tenta recuperar sessão salva no localStorage
-    try {
-      const savedSessionStr = localStorage.getItem(LOCAL_SESSION_KEY);
-      if (savedSessionStr) {
-        const saved = JSON.parse(savedSessionStr);
-        if (saved?.user && saved?.company) {
-          setUser(saved.user);
-          setCompany(saved.company);
-          setCompanyUser(saved.companyUser);
-          setLoading(false);
-        }
-      }
-    } catch (e) {
-      console.warn('Erro ao ler sessão local:', e);
-    }
+    let isMounted = true;
 
-    // 2. Sincroniza com Supabase Auth
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const activeUser = session?.user ?? null;
-      if (activeUser) {
-        setUser(activeUser);
-        fetchUserData(activeUser);
+    // 1. O Supabase Auth é a autoridade absoluta da sessão.
+    // getSession() valida com precisão se há sessão ativa e JWT válido.
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (!isMounted) return;
+      if (error || !session || !session.user) {
+        clearSession();
       } else {
-        if (!localStorage.getItem(LOCAL_SESSION_KEY)) {
-          setLoading(false);
+        setUser(session.user);
+        fetchUserData(session.user);
+      }
+    }).catch((err) => {
+      console.warn('[AuthContext] Falha ao verificar getSession():', err);
+      if (isMounted) clearSession();
+    });
+
+    // 2. Listener de mudanças de estado de autenticação nativo do Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+
+      if (event === 'SIGNED_OUT' || (event as string) === 'USER_DELETED' || !session || !session.user) {
+        clearSession();
+        return;
+      }
+
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        setUser(session.user);
+        await fetchUserData(session.user);
+        return;
+      }
+
+      if (event === 'TOKEN_REFRESHED') {
+        setUser(session.user);
+        if (!company || !companyUser) {
+          await fetchUserData(session.user);
+        } else {
+          saveLocalSession(session.user, company, companyUser);
         }
+        return;
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const currentUser = session?.user ?? null;
-      if (currentUser) {
-        setUser(currentUser);
-        await fetchUserData(currentUser);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const refreshCompany = async () => {
@@ -196,20 +202,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const completeOnboarding = (updatedData: Partial<Company>) => {
+    if (!company || !companyUser || !user) {
+      console.warn('[AuthContext] Impossível completar onboarding sem empresa e usuário autenticados.');
+      return;
+    }
+
     const updatedCompany: Company = {
-      ...(company || { id: `comp-${Date.now()}`, name: updatedData.name || 'Minha Loja' }),
+      ...company,
       ...updatedData,
       onboarding_done: true,
     };
 
     setCompany(updatedCompany);
-
-    const activeUser = user || ({ id: `usr-${Date.now()}`, email: updatedCompany.email || 'admin@saas.com' } as User);
-    const activeCompUser = companyUser || ({ id: 'cuser-1', company_id: updatedCompany.id, auth_user_id: activeUser.id, name: 'Admin', email: activeUser.email || '', role: 'admin' } as CompanyUser);
-
-    setUser(activeUser);
-    setCompanyUser(activeCompUser);
-    saveLocalSession(activeUser, updatedCompany, activeCompUser);
+    saveLocalSession(user, updatedCompany, companyUser);
   };
 
   // LOGIN (Funciona em QUALQUER DISPOSITIVO / NAVEGADOR)
@@ -327,10 +332,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await supabase.auth.signOut();
     } catch (e) {}
-    localStorage.removeItem(LOCAL_SESSION_KEY);
-    setUser(null);
-    setCompany(null);
-    setCompanyUser(null);
+    clearSession();
   };
 
   const resetPassword = async (email: string) => {

@@ -21,12 +21,45 @@ export function saveLocalProductCosts(costs: Record<string, number>) {
   }
 }
 
+/**
+ * Busca o mapa de custos dos produtos.
+ * FONTE PRIMÁRIA: Tabela 'smoking_products' no Supabase.
+ * Contingência: Cache local de segurança.
+ */
 export async function fetchProductCostsMap(companyId?: string): Promise<Record<string, number>> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
   const result: Record<string, number> = {};
 
   try {
-    // 1. Busca os custos oficiais salvos no Supabase DB para a empresa
+    // 1. SUPABASE COMO FONTE PRIMÁRIA: busca direta da tabela smoking_products
+    const { data: products, error: prodErr } = await supabase
+      .from("smoking_products")
+      .select("id, brand, name, cost_price")
+      .eq("company_id", targetCompanyId);
+
+    if (!prodErr && products && products.length > 0) {
+      let populatedFromProducts = 0;
+      products.forEach((p: any) => {
+        const cost = parseFloat(p.cost_price);
+        if (!isNaN(cost) && cost > 0) {
+          result[p.id] = cost;
+          populatedFromProducts++;
+          if (p.brand && p.name) {
+            const b = p.brand.trim().toLowerCase();
+            const n = p.name.trim().toLowerCase();
+            result[`${b}__${n}`] = cost;
+            result[`${b.replace(/\s+/g, '')}__${n.replace(/\s+/g, '')}`] = cost;
+          }
+        }
+      });
+
+      if (populatedFromProducts > 0) {
+        saveLocalProductCosts(result);
+        return result;
+      }
+    }
+
+    // 2. Transição/Contingência: Se smoking_products ainda não possui cost_price, lê de smoking_orders
     const { data: orderConfig, error: configErr } = await supabase
       .from("smoking_orders")
       .select("items")
@@ -40,18 +73,22 @@ export async function fetchProductCostsMap(companyId?: string): Promise<Record<s
         if (!isNaN(cost) && cost > 0) {
           if (item.product_id) result[item.product_id] = cost;
           if (item.id) result[item.id] = cost;
-          if (item.modelKey) result[item.modelKey] = cost;
+          if (item.modelKey) {
+            const mk = item.modelKey.trim().toLowerCase();
+            result[mk] = cost;
+            result[mk.replace(/\s+/g, '')] = cost;
+          }
         }
       });
-      // Sincroniza o cache local com os custos oficiais do banco
       saveLocalProductCosts(result);
       return result;
     }
   } catch (e) {
-    console.warn("Erro ao buscar custos em smoking_orders no Supabase DB:", e);
+    console.warn("Aviso: Falha ao buscar custos no Supabase. Usando cache de segurança.", e);
   }
 
-  // Fallback para cache local apenas se a rede falhar
+  // Fallback secundário (com warning explícito, sem inventar custos fictícios)
+  console.warn("Aviso: Operando com cache local secundário de custos.");
   return getLocalProductCosts();
 }
 
@@ -66,19 +103,40 @@ export async function updateProductCost(params: {
 
   if (isNaN(costPrice) || costPrice <= 0) return false;
 
-  // 1. Atualizar cache local imediatamente
-  const currentLocal = getLocalProductCosts();
   const parts = modelKey.split('__');
   const bStr = (parts[0] || '').trim();
   const nStr = (parts[1] || '').trim();
   const cleanKey = `${bStr.toLowerCase().replace(/\s+/g, '')}__${nStr.toLowerCase().replace(/\s+/g, '')}`;
 
+  // 1. Atualizar cache local imediatamente
+  const currentLocal = getLocalProductCosts();
   currentLocal[modelKey] = costPrice;
   currentLocal[cleanKey] = costPrice;
   productIds.forEach(pid => { currentLocal[pid] = costPrice; });
-  saveLocalCategoryMappings(currentLocal);
+  saveLocalProductCosts(currentLocal);
 
-  // 2. Persistir no Supabase DB sem apagar outros custos de produtos da empresa!
+  // 2. Persistir no Supabase na tabela oficial smoking_products (FONTE PRIMÁRIA)
+  try {
+    let updateQuery = supabase
+      .from("smoking_products")
+      .update({ cost_price: costPrice })
+      .eq("company_id", targetCompanyId);
+
+    if (productIds && productIds.length > 0) {
+      updateQuery = updateQuery.in("id", productIds);
+    } else if (bStr && nStr) {
+      updateQuery = updateQuery.ilike("brand", bStr).ilike("name", nStr);
+    }
+
+    const { error: prodUpdateErr } = await updateQuery;
+    if (prodUpdateErr) {
+      console.warn("Aviso ao atualizar cost_price em smoking_products:", prodUpdateErr.message);
+    }
+  } catch (e) {
+    console.warn("Erro ao persistir cost_price em smoking_products:", e);
+  }
+
+  // 3. Sincronizar também no Shadow Metastore (smoking_orders) para compatibilidade retroativa
   try {
     const { data: existingRows } = await supabase
       .from("smoking_orders")
@@ -97,7 +155,6 @@ export async function updateProductCost(params: {
       }
     }
 
-    // Preserva os custos dos outros produtos e atualiza somente este modelo e suas variantes
     const preservedItems = currentItems.filter((item: any) => {
       if (item.modelKey === modelKey || item.modelKey === cleanKey) return false;
       if (productIds.includes(item.product_id) || productIds.includes(item.id)) return false;
@@ -138,25 +195,10 @@ export async function updateProductCost(params: {
         .from("smoking_orders")
         .update({ items: preservedItems })
         .eq("id", existingRowId);
-    } else {
-      await supabase
-        .from("smoking_orders")
-        .insert({
-          client_phone: SYSTEM_COST_KEY,
-          client_name: "System Config Product Costs",
-          shipping_address: "CONFIG",
-          items: preservedItems,
-          total_amount: 0,
-          company_id: targetCompanyId
-        });
     }
   } catch (e) {
-    console.warn("Erro ao salvar custo em smoking_orders no Supabase DB:", e);
+    console.warn("Erro ao sincronizar shadow metastore em smoking_orders:", e);
   }
 
   return true;
-}
-
-function saveLocalCategoryMappings(currentLocal: Record<string, number>) {
-  saveLocalProductCosts(currentLocal);
 }

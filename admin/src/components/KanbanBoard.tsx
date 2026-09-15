@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+import { getBackendUrl } from "@/lib/backend";
 import { ManualSaleModal } from "./ManualSaleModal";
 // stockSync: trigger SQL trg_stock_on_order_delete cuida da devolução automática
 
@@ -58,6 +59,10 @@ export default function KanbanBoard() {
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
 
   const fetchOrders = async () => {
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 4000);
+
     try {
       let query = supabase
         .from('smoking_orders')
@@ -69,9 +74,15 @@ export default function KanbanBoard() {
         query = query.or(`company_id.eq.${company.id},company_id.is.null`);
       }
 
-      const { data, error } = await query;
-      if (error) {
-        console.error("Erro na busca do Kanban:", error);
+      let { data, error } = await query;
+      if (error && company?.id) {
+        console.warn("Erro na busca com company_id, buscando todos os pedidos:", error);
+        const fallbackRes = await supabase
+          .from('smoking_orders')
+          .select('*')
+          .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
+          .order('created_at', { ascending: false });
+        data = fallbackRes.data;
       }
 
       if (data) {
@@ -108,6 +119,7 @@ export default function KanbanBoard() {
     } catch (err) {
       console.error("Erro ao buscar pedidos no Supabase:", err);
     } finally {
+      clearTimeout(safetyTimer);
       setLoading(false);
     }
   };
@@ -196,7 +208,7 @@ export default function KanbanBoard() {
       if (newDeliveryStatus === 'EM_ROTA') {
         const order = orders.find(o => o.realId === realId);
         if (order) {
-          fetch('http://localhost:3006/api/webhook/dispatch', {
+          fetch(`${getBackendUrl()}/api/webhook/dispatch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
