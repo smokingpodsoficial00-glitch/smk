@@ -1567,8 +1567,8 @@ export default function FinanceDashboard() {
           </div>
         </div>
 
-        {/* 4 Cards de Indicadores de Recompra */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 3 Cards de Indicadores de Recompra */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Card 1: CAIXA REAL CALCULADO (Posição Atual Viva - Não Reinicia no Dia 14) */}
           <div className="bg-gradient-to-b from-emerald-500/15 via-emerald-500/5 to-black/60 border-2 border-emerald-500/50 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-xl shadow-emerald-950/20 hover:border-emerald-400 transition-all">
             <div className="flex items-center justify-between">
@@ -1620,32 +1620,7 @@ export default function FinanceDashboard() {
             </div>
           </div>
 
-          {/* Card 3: TOTAL INVESTIDO EM REPOSIÇÃO */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-3 hover:border-white/30 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Layers className="size-4 text-amber-400" /> Total Investido Reposição
-              </span>
-              <div className="size-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                <DollarSign className="size-4" />
-              </div>
-            </div>
-
-            <div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-amber-300">
-                {formatBRL(totalInvestedRepurchases)}
-              </div>
-              <p className="text-xs font-medium text-white/50 mt-1">
-                Produtos + fretes de reposição
-              </p>
-            </div>
-
-            <div className="pt-2.5 border-t border-white/10 text-[10px] text-white/40">
-              Estoque ({formatBRL(totalStockPurchases)}) + Frete ({formatBRL(totalFreightRepurchases)})
-            </div>
-          </div>
-
-          {/* Card 4: FRETES DE REPOSIÇÃO */}
+          {/* Card 3: FRETES DE REPOSIÇÃO */}
           <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-3 hover:border-white/30 transition-all">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider flex items-center gap-1.5">
