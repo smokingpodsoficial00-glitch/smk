@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
+import { ensureBuyerInBroadcastList } from "@/lib/marketingLists";
 import {
   ShoppingCart,
   User,
@@ -9,6 +10,7 @@ import {
   Loader2,
   Plus,
   Trash2,
+  Megaphone,
 } from "lucide-react";
 
 interface ManualSaleModalProps {
@@ -39,6 +41,7 @@ export function ManualSaleModal({
   const [paymentMethod, setPaymentMethod] = useState("PIX");
   const [shippingFee, setShippingFee] = useState<string>("0"); // Cobrado do cliente
   const [shippingCost, setShippingCost] = useState<string>("0"); // Custo real pago ao motoboy/Uber
+  const [autoAddToMarketingList, setAutoAddToMarketingList] = useState(true);
 
   // Lista de Itens no Pedido
   const [items, setItems] = useState<
@@ -382,14 +385,27 @@ export function ManualSaleModal({
         insertedOrderId = insertedData.id;
       }
 
-      // 4. A baixa de estoque em smoking_products é realizada automaticamente
-      // pela Trigger SQL no Supabase (decrement_stock_on_payment) ao inserir o pedido com payment_status = 'PAGO'.
-      // Não fazemos segundo update em JS para evitar baixa duplicada!
+      // 4. Inserir automaticamente na Lista de Transmissão de Compradores do Marketing
+      let marketingListNote = "";
+      if (autoAddToMarketingList && cleanPhone) {
+        try {
+          const mktRes = await ensureBuyerInBroadcastList({
+            companyId,
+            clientName: clientName.trim(),
+            clientPhone: formattedPhone,
+          });
+          if (mktRes.success) {
+            marketingListNote = ` e ${mktRes.listName}`;
+          }
+        } catch (mktErr) {
+          console.warn("Aviso ao incluir cliente na lista de marketing:", mktErr);
+        }
+      }
 
       if (clientSaveWarning) {
         setSuccessMessage(`✅ Venda registrada com sucesso! (${clientSaveWarning})`);
       } else {
-        setSuccessMessage("✅ Venda registrada com sucesso! Estoque abatido, ranking e CRM atualizados.");
+        setSuccessMessage(`✅ Venda registrada com sucesso! Estoque abatido, ranking, CRM${marketingListNote} atualizados.`);
       }
 
       setTimeout(() => {
@@ -505,6 +521,22 @@ export function ManualSaleModal({
                     placeholder="Ex: 11943856234"
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400/50 font-semibold"
                   />
+                </div>
+
+                {/* Checkbox: Adicionar automaticamente à Lista de Compradores */}
+                <div className="sm:col-span-2 pt-1">
+                  <label className="flex items-center gap-2.5 text-xs font-semibold text-white/90 cursor-pointer select-none bg-black/40 border border-white/10 hover:border-emerald-500/40 p-2.5 rounded-xl transition-all">
+                    <input
+                      type="checkbox"
+                      checked={autoAddToMarketingList}
+                      onChange={(e) => setAutoAddToMarketingList(e.target.checked)}
+                      className="size-4 rounded accent-emerald-500 cursor-pointer"
+                    />
+                    <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                      <Megaphone className="size-3.5 text-emerald-400" />
+                      Incluir automaticamente na Lista de Compradores (Marketing)
+                    </span>
+                  </label>
                 </div>
               </div>
             </div>

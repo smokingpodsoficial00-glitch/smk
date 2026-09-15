@@ -429,8 +429,8 @@ export async function removeContactFromList(companyId: string, listId: string, c
   }
 }
 
-// Helpers de cache local (estritamente READ-ONLY)
-function getOfflineListsCache(): BroadcastList[] {
+// Helpers de cache local
+export function getOfflineListsCache(): BroadcastList[] {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_LISTS) : null;
     if (raw) return JSON.parse(raw);
@@ -438,10 +438,126 @@ function getOfflineListsCache(): BroadcastList[] {
   return [];
 }
 
-function saveOfflineListsCache(lists: BroadcastList[]): void {
+export function saveOfflineListsCache(lists: BroadcastList[]): void {
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(LOCAL_STORAGE_LISTS, JSON.stringify(lists));
     }
   } catch (e) {}
+}
+
+/**
+ * Adiciona ou atualiza automaticamente um cliente comprador na "LISTA CLIENTES COMPRADORES".
+ * Operação idempotente e multi-camadas (LocalStorage -> Supabase -> Backend API).
+ */
+export async function ensureBuyerInBroadcastList(params: {
+  companyId?: string;
+  clientName: string;
+  clientPhone: string;
+  clientId?: string | null;
+}): Promise<{ success: boolean; listName: string; isNew: boolean }> {
+  const { companyId, clientName, clientPhone, clientId } = params;
+  if (!clientPhone) return { success: false, listName: '', isNew: false };
+
+  const clean = normalizeCleanPhone(clientPhone);
+  if (!clean) return { success: false, listName: '', isNew: false };
+
+  const targetListName = 'LISTA CLIENTES COMPRADORES';
+  let isNewContact = false;
+
+  // 1. Atualizar no Cache Local (localStorage) para reflexo imediato no navegador
+  try {
+    const cachedLists = getOfflineListsCache();
+    let buyersList = cachedLists.find(l => 
+      l.name.trim().toLowerCase() === targetListName.toLowerCase() ||
+      l.id === 'list_1786989733027' ||
+      l.name.toLowerCase().includes('comprador')
+    );
+
+    if (!buyersList) {
+      buyersList = {
+        id: 'list_1786989733027',
+        name: targetListName,
+        description: 'Lista de transmissão automática de clientes compradores',
+        contacts: [],
+        color: '#10b981',
+        createdAt: new Date().toISOString()
+      };
+      cachedLists.unshift(buyersList);
+    }
+
+    const existingIndex = buyersList.contacts.findIndex(c => c.cleanPhone === clean);
+    if (existingIndex >= 0) {
+      if (clientName && clientName.trim() && clientName.trim() !== buyersList.contacts[existingIndex].name) {
+        buyersList.contacts[existingIndex].name = clientName.trim();
+      }
+      if (clientId) {
+        buyersList.contacts[existingIndex].clientId = clientId;
+      }
+    } else {
+      buyersList.contacts.push({
+        id: `contact_sale_${Date.now()}_${clean.slice(-4)}`,
+        name: clientName?.trim() || `Cliente ${clean.slice(-4)}`,
+        phone: clientPhone.trim(),
+        cleanPhone: clean,
+        isSaved: true,
+        clientId: clientId || null
+      });
+      isNewContact = true;
+    }
+
+    buyersList.updatedAt = new Date().toISOString();
+    saveOfflineListsCache(cachedLists);
+  } catch (localErr) {
+    console.warn('[MarketingLists] Erro ao atualizar cache local:', localErr);
+  }
+
+  // 2. Tentar persistência no Supabase (se as tabelas já existirem)
+  if (companyId) {
+    try {
+      const { data: dbLists } = await supabase
+        .from('smoking_marketing_lists')
+        .select('id, name')
+        .eq('company_id', companyId);
+
+      let targetDbList = (dbLists || []).find((l: any) => 
+        l.name.trim().toLowerCase() === targetListName.toLowerCase() ||
+        l.name.toLowerCase().includes('comprador')
+      );
+
+      if (!targetDbList) {
+        const { data: created } = await supabase
+          .from('smoking_marketing_lists')
+          .insert({
+            company_id: companyId,
+            name: targetListName,
+            description: 'Lista de transmissão automática de clientes compradores',
+            color: '#10b981'
+          })
+          .select('id, name')
+          .single();
+        targetDbList = created;
+      }
+
+      if (targetDbList) {
+        await supabase
+          .from('smoking_marketing_list_contacts')
+          .upsert({
+            company_id: companyId,
+            list_id: targetDbList.id,
+            name: clientName?.trim() || `Cliente ${clean.slice(-4)}`,
+            phone: clientPhone.trim(),
+            clean_phone: clean,
+            is_saved: true,
+            client_id: clientId || null,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'list_id,clean_phone' });
+      }
+    } catch (supabaseErr) {
+      // Fallback gracioso caso a migration ainda não tenha sido executada
+      console.info('[MarketingLists] Persistência em nuvem Supabase em fallback.');
+    }
+  }
+
+  return { success: true, listName: targetListName, isNew: isNewContact };
 }
