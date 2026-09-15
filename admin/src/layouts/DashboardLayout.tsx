@@ -152,33 +152,6 @@ export function DashboardLayout() {
 
           <div className="h-px bg-white/5 my-2 w-[85%] mx-auto" />
 
-          {/* Aba Chatbot IA */}
-          {canAccess('chatbot') && (
-            <NavLink 
-              to="/chatbot"
-              title={sidebarCollapsed ? "Chatbot IA" : undefined}
-              className={({ isActive }) =>
-                `flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
-                  sidebarCollapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
-                } ${
-                  isActive 
-                    ? 'bg-white/5 text-emerald-400 font-bold border-l-2 border-emerald-500 pl-3.5' 
-                    : 'text-muted-foreground hover:bg-white/5 hover:text-white border-l-2 border-transparent pl-4'
-                }`
-              }
-            >
-              <Bot className="size-4 shrink-0 text-emerald-400" />
-              {!sidebarCollapsed && (
-                <span className="truncate flex items-center gap-2">
-                  Chatbot
-                  <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold">
-                    IA
-                  </span>
-                </span>
-              )}
-            </NavLink>
-          )}
-
           {/* Aba Exclusiva de Marketing (Smoking Pods) */}
           {canAccess('marketing') && (
             <NavLink 

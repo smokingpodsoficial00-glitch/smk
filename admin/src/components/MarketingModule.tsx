@@ -4,7 +4,7 @@ import {
   AlertTriangle, RefreshCw, MessageSquare, Play, Pause, ExternalLink,
   Flame, Lock, Copy, Check, Plus, Trash2, Edit3, ArrowRight, CheckSquare,
   Square, Calendar, Layers, ShieldCheck, HelpCircle, ChevronRight,
-  ToggleLeft, ToggleRight, Zap
+  ToggleLeft, ToggleRight, Zap, QrCode, Smartphone, LogOut
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchLiveClients, type RealClient } from '@/lib/crm';
@@ -155,6 +155,46 @@ export default function MarketingModule() {
   const [executingCampaignId, setExecutingCampaignId] = useState<string | null>(null);
   const [dispatchProgress, setDispatchProgress] = useState<{ current: number; total: number; status: string } | null>(null);
   const isAbortingRef = React.useRef(false);
+
+  // Estado da Conexão do WhatsApp Oficial
+  const [whatsAppConnected, setWhatsAppConnected] = useState<boolean>(false);
+  const [qrCodeImageUrl, setQrCodeImageUrl] = useState<string | null>(null);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+
+  useEffect(() => {
+    const checkWhatsAppStatus = async () => {
+      try {
+        const res = await fetch('http://localhost:3006/api/qr');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.isReady) {
+            setWhatsAppConnected(true);
+            setQrCodeImageUrl(null);
+          } else if (data.qrImageUrl) {
+            setWhatsAppConnected(false);
+            setQrCodeImageUrl(data.qrImageUrl);
+          } else {
+            setWhatsAppConnected(false);
+          }
+        }
+      } catch (e) {}
+    };
+
+    checkWhatsAppStatus();
+    const interval = setInterval(checkWhatsAppStatus, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleLogoutWhatsApp = async () => {
+    if (!confirm('Deseja realmente desconectar a sessão do WhatsApp?')) return;
+    try {
+      await fetch('http://localhost:3006/api/logout', { method: 'POST' });
+      setWhatsAppConnected(false);
+      setQrCodeImageUrl(null);
+    } catch (e) {
+      alert('Erro ao tentar desconectar.');
+    }
+  };
 
   const [loadingScan, setLoadingScan] = useState(false);
   const [loadingSanitize, setLoadingSanitize] = useState(false);
@@ -845,6 +885,20 @@ export default function MarketingModule() {
 
           {/* Botões de Ação do Header */}
           <div className="flex flex-wrap items-center gap-3">
+            {/* Status & Conexão do WhatsApp */}
+            <button
+              onClick={() => setIsQrModalOpen(true)}
+              className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all ${
+                whatsAppConnected
+                  ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                  : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300 animate-pulse'
+              }`}
+              title={whatsAppConnected ? "WhatsApp Conectado e Pronto para Disparos" : "Clique para escanear o QR Code"}
+            >
+              <Smartphone className={`size-3.5 ${whatsAppConnected ? 'text-emerald-400' : 'text-amber-400'}`} />
+              <span>{whatsAppConnected ? '🟢 WhatsApp Conectado' : '🟡 Conectar WhatsApp (QR)'}</span>
+            </button>
+
             <button
               onClick={handleScanWhatsAppHistory}
               disabled={loadingScan}
@@ -1990,6 +2044,99 @@ export default function MarketingModule() {
                 className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold"
               >
                 Salvar Campanha
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Conexão WhatsApp & QR Code */}
+      {isQrModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e0e] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-2.5">
+                <Smartphone className="size-5 text-emerald-400" />
+                <h3 className="text-base font-bold text-white">Conexão Oficial do WhatsApp</h3>
+              </div>
+              <button
+                onClick={() => setIsQrModalOpen(false)}
+                className="text-white/40 hover:text-white text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {whatsAppConnected ? (
+              <div className="space-y-4 text-center py-4">
+                <div className="size-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
+                  <CheckCircle2 className="size-8" />
+                </div>
+                <div>
+                  <h4 className="text-base font-bold text-white">WhatsApp Conectado com Sucesso!</h4>
+                  <p className="text-xs text-white/50 mt-1 max-w-xs mx-auto">
+                    A sessão está ativa e pronta para leitura de contatos, grupos e disparos de campanhas em massa.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-white/5 rounded-xl border border-white/5 text-xs text-white/70 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Contatos na base:</span>
+                    <strong className="text-white">{allContacts.length}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Grupos detectados:</span>
+                    <strong className="text-white">{whatsAppGroups.length}</strong>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-center gap-3">
+                  <button
+                    onClick={() => {
+                      syncWhatsAppContactsAndGroups();
+                      setIsQrModalOpen(false);
+                    }}
+                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold rounded-xl"
+                  >
+                    Sincronizar Agora
+                  </button>
+                  <button
+                    onClick={handleLogoutWhatsApp}
+                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-bold rounded-xl flex items-center gap-1.5"
+                  >
+                    <LogOut className="size-3.5" />
+                    Desconectar Sessão
+                  </button>
+                </div>
+              </div>
+            ) : qrCodeImageUrl ? (
+              <div className="space-y-4 text-center py-2">
+                <p className="text-xs text-white/70">
+                  Abra o WhatsApp no seu celular, vá em <strong>Aparelhos Conectados ➔ Conectar Aparelho</strong> e aponte para o QR Code abaixo:
+                </p>
+                <div className="bg-white p-4 rounded-2xl inline-block mx-auto shadow-xl">
+                  <img src={qrCodeImageUrl} alt="QR Code WhatsApp" className="size-60 object-contain mx-auto" />
+                </div>
+                <div className="text-[11px] text-white/40 flex items-center justify-center gap-1 font-mono animate-pulse">
+                  <RefreshCw className="size-3 animate-spin" />
+                  Aguardando leitura do QR Code...
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 text-center py-8">
+                <RefreshCw className="size-8 text-amber-400 animate-spin mx-auto" />
+                <p className="text-xs text-white/60">
+                  Iniciando motor do WhatsApp e gerando QR Code no backend...
+                </p>
+              </div>
+            )}
+
+            <div className="border-t border-white/10 pt-3 flex justify-end">
+              <button
+                onClick={() => setIsQrModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold"
+              >
+                Fechar
               </button>
             </div>
           </div>

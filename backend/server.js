@@ -53,8 +53,8 @@ let isWhatsAppReady = false;
 const aiSentMessages = new Set();
 const detectedGroups = {};
 
-// 🛡️ CONTROLE DE SEGURANÇA E ATENDIMENTO DA IA ELOISA
-let isEloisaAiActive = true; // Master Switch (Liga/Desliga Geral)
+// 🛡️ CONTROLE DE ATENDIMENTO (IA ELOISA DESATIVADA)
+let isEloisaAiActive = false; // Chatbot Desativado (Atendimento 100% Humano)
 const silencedChatsMap = new Map(); // Human Takeover: { [phoneOrChatId]: expireTimestamp }
 const blacklistPhonesSet = new Set(); // Blacklist de números ignorados permanentemente
 
@@ -856,7 +856,7 @@ function detectFollowUpTriggers(chatId, aiResponse) {
     const lower = aiResponse.toLowerCase();
     
     // Detect table/cardápio sent
-    if (lower.includes('smokingproject01.vercel.app')) {
+    if (lower.includes('smoking-pods-catalogo.vercel.app')) {
         scheduleTableFollowUp(chatId);
     }
     
@@ -883,39 +883,14 @@ function detectFollowUpTriggers(chatId, aiResponse) {
 }
 
 // =============================================
-// MAIN MESSAGE HANDLER
+// MESSAGE HANDLER (Chatbot IA Desativado - Atendimento 100% Humano)
 // =============================================
 client.on('message_create', async msg => {
     // Avoid status broadcasts
     if (msg.from === 'status@broadcast') return;
 
-    // --- SEGURANÇA 1: HUMAN TAKEOVER (Se o operador humano digitar pelo celular/painel) ---
-    if (msg.fromMe) {
-        const bodyLower = (msg.body || '').trim().toLowerCase();
-        if (aiSentMessages.has(bodyLower)) {
-            aiSentMessages.delete(bodyLower);
-            return; // Resposta enviada pela própria Eloísa, ignora para evitar loop
-        }
-
-        // Se uma pessoa real digitou pelo WhatsApp Web ou celular, silencia a Eloisa para este cliente por 4 horas
-        const targetRecipient = msg.to ? msg.to.split('@')[0] : '';
-        if (targetRecipient && !targetRecipient.endsWith('@g.us')) {
-            const silenceExpiry = Date.now() + (4 * 60 * 60 * 1000); // 4 horas
-            silencedChatsMap.set(targetRecipient, silenceExpiry);
-            const cleanTarget = targetRecipient.replace(/\D/g, '');
-            silencedChatsMap.set(cleanTarget, silenceExpiry);
-            console.log(`👤 [Human Takeover] Atendente humano respondeu para ${targetRecipient}. Eloisa silenciada neste chat por 4h.`);
-        }
-        return; // Não processa mensagens enviadas por humanos como entrada da IA
-    }
-
-    // --- SEGURANÇA 2: MASTER SWITCH (Botão Liga/Desliga Geral) ---
-    if (!isEloisaAiActive) {
-        return; // IA pausada pelo lojista no painel
-    }
-
-    // Ignore groups completely for AI chatbot, but register for Marketing module
-    if (msg.from.endsWith('@g.us')) {
+    // Detect and catalog WhatsApp groups for the Marketing module
+    if (msg.from && msg.from.endsWith('@g.us')) {
         try {
             const grpId = msg.from;
             if (!detectedGroups[grpId]) {
@@ -925,7 +900,6 @@ client.on('message_create', async msg => {
                     unreadCount: 0,
                     participantsCount: 0
                 };
-                // Tenta puxar o nome real do grupo
                 client.getChatById(grpId).then(c => {
                     if (c && c.name) detectedGroups[grpId].name = c.name;
                 }).catch(() => {});
@@ -934,265 +908,9 @@ client.on('message_create', async msg => {
         return;
     }
 
-    // 🔍 RESOLUÇÃO OFICIAL DE LID (WWebJS getContactLidAndPhone & getContactById)
-    let senderNumber = msg.from ? msg.from.split('@')[0] : '';
-    let contactNumber = senderNumber;
-    let contactName = '';
-    let resolvedPhone = null;
-
-    // Se a mensagem vier com formato LID (ex: 206494142341307@lid ou msg.from LID)
-    if (msg.from && (msg.from.includes('@lid') || senderNumber.length > 13)) {
-        try {
-            // 1. Tenta método nativo oficial do WWebJS para resolver LID -> PN (Phone Number)
-            if (typeof client.getContactLidAndPhone === 'function') {
-                const lidInfos = await client.getContactLidAndPhone([msg.from]);
-                if (lidInfos && lidInfos.length > 0 && lidInfos[0].pn) {
-                    resolvedPhone = String(lidInfos[0].pn).replace(/\D/g, '');
-                    contactNumber = resolvedPhone;
-                    console.log(`🔗 [LID Oficial] ${msg.from} mapeado com sucesso para o Telefone: ${resolvedPhone}`);
-                }
-            }
-        } catch (lidErr) {
-            console.warn('⚠️ Aviso ao resolver LID via getContactLidAndPhone:', lidErr.message);
-        }
-    }
-
-    // 2. Tenta obter o objeto Contact completo
-    try {
-        const contact = await msg.getContact();
-        if (contact) {
-            contactName = contact.name || contact.pushname || contact.shortName || '';
-            if (contact.number) {
-                contactNumber = contact.number;
-            }
-        }
-    } catch (cErr) {}
-
-    const cleanSender = senderNumber.replace(/\D/g, '');
-    const cleanContact = contactNumber.replace(/\D/g, '');
-    const cleanResolved = resolvedPhone ? resolvedPhone.replace(/\D/g, '') : '';
-
-    // --- SEGURANÇA 3: BLACKLIST / CONTATOS IGNORADOS (TRAVA BLINDADA) ---
-    let isBlacklisted = false;
-
-    // 1. Checagem direta em memória
-    if (blacklistPhonesSet.has(senderNumber) || 
-        blacklistPhonesSet.has(cleanSender) || 
-        blacklistPhonesSet.has(contactNumber) || 
-        blacklistPhonesSet.has(cleanContact) ||
-        (cleanResolved && blacklistPhonesSet.has(cleanResolved))) {
-        isBlacklisted = true;
-    }
-
-    // 2. Checagem de sufixos numéricos (DDD + 8 ou 9 dígitos do Brasil)
-    if (!isBlacklisted && blacklistPhonesSet.size > 0) {
-        for (const bp of blacklistPhonesSet) {
-            const cleanBp = bp.replace(/\D/g, '');
-            if (!cleanBp) continue;
-
-            const bpLast8 = cleanBp.slice(-8);
-            const senderLast8 = cleanSender.slice(-8);
-            const contactLast8 = cleanContact.slice(-8);
-            const resolvedLast8 = cleanResolved ? cleanResolved.slice(-8) : '';
-
-            if ((cleanBp.length >= 8 && (senderLast8 === bpLast8 || contactLast8 === bpLast8 || resolvedLast8 === bpLast8)) ||
-                cleanSender.includes(cleanBp) || cleanBp.includes(cleanSender) ||
-                cleanContact.includes(cleanBp) || cleanBp.includes(cleanContact) ||
-                (cleanResolved && (cleanResolved.includes(cleanBp) || cleanBp.includes(cleanResolved)))) {
-                isBlacklisted = true;
-                break;
-            }
-        }
-    }
-
-    if (isBlacklisted) {
-        console.log(`🚫 [Blacklist Ativa] Mensagem de "${contactName}" (Tel: ${contactNumber} | LID: ${senderNumber}) BLOQUEADA COM SUCESSO! A Eloisa NÃO responderá.`);
-        return; // ABORTA IMEDIATAMENTE NA RAIZ
-    }
-
-    // --- SEGURANÇA 4: CHECAGEM DE SILENCIAMENTO ATIVO (Human Takeover) ---
-    const isSilenced = silencedChatsMap.has(senderNumber) || silencedChatsMap.has(cleanSender) || silencedChatsMap.has(cleanContact);
-    if (isSilenced) {
-        const expiry = silencedChatsMap.get(senderNumber) || silencedChatsMap.get(cleanSender) || silencedChatsMap.get(cleanContact);
-        if (Date.now() < expiry) {
-            const remainingMins = Math.ceil((expiry - Date.now()) / 60000);
-            console.log(`🤫 [Silenciada] Eloisa em pausa para ${contactNumber || senderNumber} (restam ${remainingMins} min de Human Takeover).`);
-            return;
-        } else {
-            silencedChatsMap.delete(senderNumber);
-            silencedChatsMap.delete(cleanSender);
-            silencedChatsMap.delete(cleanContact);
-        }
-    }
-
-    // Ignore old messages (WhatsApp Web sync backlog)
-    const now = Math.floor(Date.now() / 1000);
-    if (now - msg.timestamp > 60) {
-        return;
-    }
-
-    // --- MESSAGE TYPE FILTERS ---
-    if (msg.type === 'sticker' || msg.type === MessageTypes.STICKER) {
-        return;
-    }
-
-    let messageText = msg.body || '';
-    const chatId = `${senderNumber}`;
-
-    // --- AUDIO TRANSCRIPTION ---
-    if (msg.hasMedia && (msg.type === 'ptt' || msg.type === 'audio')) {
-        try {
-            console.log(`🎙️ Áudio recebido de ${senderNumber}, baixando e transcrevendo...`);
-            const media = await msg.downloadMedia();
-            if (media && media.data) {
-                const transcribedText = await transcribeAudio(media.data, media.mimetype);
-                if (transcribedText) {
-                    messageText = `[ÁUDIO TRANSCRITO]: ${transcribedText}`;
-                    console.log(`✅ Áudio transcrito: ${transcribedText}`);
-                } else {
-                    // P51 fallback
-                    const chat = await msg.getChat();
-                    await chat.sendStateTyping();
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                    await msg.reply('eu infelizmente não consigo ouvir áudios amg, consegue me enviar por escrito oque mandou?');
-                    await chat.clearState();
-                    return;
-                }
-            }
-        } catch (err) {
-            console.error(`❌ Erro no processamento de áudio de ${senderNumber}:`, err);
-            try {
-                const chat = await msg.getChat();
-                await chat.sendStateTyping();
-                await new Promise(resolve => setTimeout(resolve, 5000));
-                await msg.reply('eu infelizmente não consigo ouvir áudios amg, consegue me enviar por escrito oque mandou?');
-                await chat.clearState();
-            } catch (fallbackErr) {
-                console.error(`❌ Falha ao tentar responder o erro de áudio para ${senderNumber}:`, fallbackErr);
-            }
-            return;
-        }
-    }
-    // --- PERSONAL CONTACT FILTER ---
-    try {
-        const contact = await msg.getContact();
-
-        let rawPhone = (contact && contact.number && contact.number.length <= 15) ? contact.number : senderNumber;
-        const cleanDigits = rawPhone.replace(/\D/g, '');
-        let formattedPhone = cleanDigits;
-
-        if (cleanDigits.length === 11) {
-            formattedPhone = `(${cleanDigits.substring(0, 2)}) ${cleanDigits.substring(2, 7)}-${cleanDigits.substring(7)}`;
-        } else if (cleanDigits.length === 13 && cleanDigits.startsWith('55')) {
-            formattedPhone = `+55 (${cleanDigits.substring(2, 4)}) ${cleanDigits.substring(4, 9)}-${cleanDigits.substring(9)}`;
-        }
-
-        latestFormattedPhones[senderNumber] = formattedPhone;
-
-        let realWhatsAppName = contact.pushname || contact.name || '';
-        if (/^[\d\s+\-()]+$/.test(realWhatsAppName.trim())) {
-            realWhatsAppName = '';
-        }
-
-        if (realWhatsAppName) {
-            latestContactNames[senderNumber] = realWhatsAppName;
-        }
-        const contactName = (realWhatsAppName || '').toLowerCase();
-
-        const personalContacts = [
-            'leo pinheiro',
-            'ruan',
-            'rafael',
-            'olguinha',
-            'gata',
-            'palominha'
-        ];
-
-        const isPersonal = personalContacts.some(name => contactName.includes(name));
-
-        if (isPersonal) {
-            console.log(`👤 [Filtro Pessoal] Ignorando contato: ${contact.name || contact.pushname} (${senderNumber})`);
-            return;
-        }
-
-        console.log(`📩 Mensagem recebida de ${senderNumber}: ${messageText}`);
-    } catch (err) {
-        console.error('⚠️ Erro ao checar contato pessoal:', err);
-    }
-
-    // --- SPAM DETECTION ---
-    if (messageText && isSpamMessage(messageText)) {
-        console.log(`🚫 [Spam] Ignorando mensagem de ${senderNumber}: ${messageText.substring(0, 50)}...`);
-        return;
-    }
-
-    // P34: Location messages — ask for written address
-    if (msg.type === 'location' || msg.type === MessageTypes.LOCATION) {
-        console.log(`📍 Localização recebida de ${senderNumber}, pedindo endereço escrito`);
-        try {
-            const chat = await msg.getChat();
-            await chat.sendStateTyping();
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            await msg.reply('poderia me enviar por escrito?');
-            await chat.clearState();
-            await new Promise(resolve => setTimeout(resolve, 4000));
-            await chat.sendStateTyping();
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            await msg.reply('para evitar erros na hora do motoboy levar o seu pedido');
-            await chat.clearState();
-        } catch (err) {
-            console.error('❌ Erro ao responder localização:', err);
-        }
-        return;
-    }
-
-    // --- Cancel any pending follow-ups (client responded) ---
-    cancelFollowUps(chatId);
-
-    // =============================================
-    // CODE-007: DEBOUNCE SYSTEM (8 seconds)
-    // =============================================
-    // Accumulate messages. After 8s of silence, process them all as one.
-    
-    // If there's an existing debounce timer, clear it and accumulate
-    if (debounceTimers.has(chatId)) {
-        clearTimeout(debounceTimers.get(chatId));
-    }
-
-    // Store/accumulate message data
-    if (!pendingMessages.has(chatId)) {
-        pendingMessages.set(chatId, { messages: [], msg: msg, hasMedia: false });
-    }
-    const pending = pendingMessages.get(chatId);
-    if (messageText) {
-        pending.messages.push(messageText);
-    }
-    // Track if ANY message in this batch had media (photo, pdf, document)
-    if (msg.hasMedia) {
-        pending.hasMedia = true;
-    }
-    // Always keep the latest msg reference (for reply)
-    pending.msg = msg;
-
-    // Set debounce timer for 8 seconds
-    const timerId = setTimeout(async () => {
-        debounceTimers.delete(chatId);
-        
-        // Grab and clear pending messages
-        const data = pendingMessages.get(chatId);
-        pendingMessages.delete(chatId);
-        
-        if (!data || (data.messages.length === 0 && !data.hasMedia)) return;
-
-        // Combine all accumulated messages into one
-        const combinedMessage = data.messages.join('\n');
-        const latestMsg = data.msg;
-
-        // Process the combined message, passing the accumulated hasMedia flag
-        await processMessage(latestMsg, senderNumber, chatId, combinedMessage, data.hasMedia);
-    }, 8000);
-
-    debounceTimers.set(chatId, timerId);
+    // 🛑 CHATBOT ELOISA IA DESATIVADO:
+    // As mensagens recebidas no WhatsApp não acionam IA nem respostas automáticas.
+    // O atendimento é realizado 100% manualmente pelo operador humano.
 });
 
 // =============================================
@@ -2457,7 +2175,7 @@ app.post('/api/marketing/test-dispatch', async (req, res) => {
 
         const formattedMsg = camp.message
             .replace(/\[Nome\]/gi, 'Pessoal')
-            .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app')
+            .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods-catalogo.vercel.app')
             .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
 
         // Resolve o ID do grupo
@@ -2614,7 +2332,7 @@ async function marketingSchedulerTick() {
                 try {
                     const formattedMsg = camp.message
                         .replace(/\[Nome\]/gi, 'Pessoal')
-                        .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app')
+                        .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods-catalogo.vercel.app')
                         .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
 
                     let groupChatId = camp.targetGroupId;
@@ -2714,7 +2432,7 @@ async function marketingSchedulerTick() {
 
                             const formattedMsg = chosenText
                                 .replace(/\[Nome\]/gi, contact.name || 'Cliente')
-                                .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app')
+                                .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods-catalogo.vercel.app')
                                 .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
 
                             const formattedNumber = `${cleanPhone}@c.us`;

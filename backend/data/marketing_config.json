@@ -3,7 +3,7 @@
     {
       "id": "camp_1786810305844",
       "name": "Campanha de reativação 1",
-      "message": "Fala, tudo bem? De boa? 🤝\nPassando pra avisar que organizamos a casa e voltamos oficialmente com as entregas no ABC!\n\nPra comemorar a volta com quem é das antigas: seu frete hoje sai pela metade do preço (50% OFF no motoboy)! 🔥\n\nSalva nosso número aí nos contatos pra não sumir da sua lista. Posso te mandar o link do cardápio pra você dar uma olhada? 📲",
+      "message": "Opa, tudo bem? \nTô organizando os pedidos do dia aqui e separei um lote promocional com pod a partir de R$ 64,90.\nLembrei de você que é cliente antigo da casa. Quer que eu te mande a listinha dos sabores que sobraram antes de acabar?\"",
       "targetType": "lists",
       "selectedListIds": [
         "list_base_virgem_oficial"
@@ -18,10 +18,10 @@
       "createdAt": "2026-08-15T16:11:45.844Z",
       "lastRunDate": "25/08/2026",
       "variations": [
-        "Opa, tudo bem contigo? 🔥\nComo você é da nossa base antiga, tô te avisando em primeira mão: nosso delivery tá de volta à ativa em SBC!\n\nPra essa reabertura, liberamos 50% DE DESCONTO NO SEU FRETE pra você pedir hoje sem pressa. 🛵\n\nDá uma salvada no nosso contato aí na sua agenda! Quer que eu te envie o link do catálogo novo pra você ver o que chegou?",
-        "Oii, quanto tempo! Tudo certo por aí? 💨\nOrganizamos tudo por aqui e reabrimos o nosso atendimento oficial com entregas rápidas!\n\nDe presente de volta pra nossa base, seu primeiro frete de hoje sai com 50% de desconto! 🎁\n\nSalva nosso contato aí no celular pra acompanhar os Status. Se quiser dar uma olhada nas opções, me avisa aqui que te mando o link!",
-        "Salve, beleza? 🤝\nPassando pra avisar quem é de casa: estamos com o delivery 100% ativo de novo no ABC!\n\nChegaram vários lotes novos e você tem 50% OFF NO FRETE do motoboy pra garantir hoje com prioridade. ⚡\n\nSalva nosso número aí no seu aparelho! Quer que eu te mande o link do cardápio completo pra você conferir?",
-        "E aí, tudo na paz? 🔥\nNotícia boa pra quem já é de casa: a loja tá aberta de novo e os motoboys já estão na pista!\n\nPra marcar esse retorno, o seu frete hoje sai com 50% DE DESCONTO! 🚀\n\nJá salva nosso contato aí na agenda pra não perder nada. Me dá um alô se posso te mandar o link do Cardápio Digital! 🥇"
+        "Fala, beleza?\nTô separando as entregas de hoje aqui e separei algumas unidades com valor promocional a partir de R$ 64,90.\nComo você já é cliente antigo, lembrei de te avisar primeiro. Posso te mandar os sabores disponíveis?",
+        "E aí, beleza? \nChegou reposição aqui e abri um lote especial saindo a partir de R$ 64,90 pra nossa base antiga.\nQuer dar uma olhada na lista de sabores antes que esgote?",
+        "Oii, de boa?\nTava arrumando os pedidos aqui e reservei umas opções em promoção a partir de R$ 64,90.\nLembrei de você! Posso te passar os modelos e sabores que temos pra hoje?",
+        "Opa, tudo certo?\nTô fechando a rota de entregas de hoje e separei um lote promocional saindo por apenas R$ 64,90.\nComo você já é cliente da casa, passei pra te dar preferência. Quer que eu te envie os sabores disponíveis?"
       ],
       "useVariations": true,
       "scheduledWeekday": "QUARTA",
@@ -31,7 +31,7 @@
     {
       "id": "camp_1786812557221",
       "name": "CPM GRUPO ESTOQUE SEMANAL",
-      "message": "ACESSO ANTECIPADO VIP — REPOSIÇÃO DA SEMANA! 💨\n\nFala pessoal do VIP! Passando pra avisar que o nosso estoque pro final de semana acabou de ser 100% abastecido.\n\nVocês têm prioridade total: estamos liberando o Cardápio Digital primeiro aqui no grupo antes de soltar o aviso geral no Instagram!\n\n📦 Garanta seu modelo e sabor favorito antes de esgotar:\n🔗 https://smokingproject01.vercel.app/\n\n🚚 Delivery Uber (25 a 35 min em SBC) | Atendimento até 23h",
+      "message": "ACESSO ANTECIPADO VIP — REPOSIÇÃO DA SEMANA! 💨\n\nFala pessoal do VIP! Passando pra avisar que o nosso estoque pro final de semana acabou de ser 100% abastecido.\n\nVocês têm prioridade total: estamos liberando o Cardápio Digital primeiro aqui no grupo antes de soltar o aviso geral no Instagram!\n\n📦 Garanta seu modelo e sabor favorito antes de esgotar:\n🔗 https://smoking-pods-catalogo.vercel.app/\n\n🚚 Delivery Uber (25 a 35 min em SBC) | Atendimento até 23h",
       "targetType": "group",
       "selectedListIds": [
         "list_1786807808763"
@@ -70,12 +70,12 @@
       "createdAt": "2026-08-15T17:26:08.806Z",
       "variations": [],
       "useVariations": false,
-      "lastRunDate": "18/08/2026"
+      "lastRunDate": "05/09/2026"
     },
     {
       "id": "camp_1786815404807",
       "name": "REATIVAÇÃO SEXTOU/ESCASSEZ",
-      "message": "SEXTOU NO ABC FÁMILIA, NÃO FIQUE NA MÃO NO ROLÊ 🥇\n\nAs entregas de hoje já estão on! não espere esgotar..\n\nDelivery Expresso rápido de sempre 25 a 35 min pelo Uber. Prioridade VIP: Pedidos feitos pelo grupo entram no topo da fila de despacho do motoboy.\n\n📦 Cardápio Digital no ar:\n🔗 https://smokingproject01.vercel.app/",
+      "message": "SEXTOU NO ABC FÁMILIA, NÃO FIQUE NA MÃO NO ROLÊ 🥇\n\nAs entregas de hoje já estão on! não espere esgotar..\n\nDelivery Expresso rápido de sempre 25 a 35 min pelo Uber. Prioridade VIP: Pedidos feitos pelo grupo entram no topo da fila de despacho do motoboy.\n\n📦 Cardápio Digital no ar:\n🔗 https://smoking-pods-catalogo.vercel.app/",
       "targetType": "group",
       "selectedListIds": [
         "list_1786807808763"
@@ -97,7 +97,7 @@
     {
       "id": "camp_1786815888015",
       "name": "CPM SEXTOU 2",
-      "message": "SAÍDA DO TRAMPO & PRÉ-ROLÊ — MOTOBOYS NA PISTA! 💨\n\nSalve turma do VIP! se ainda não separou seu pod, não deixa pra depois que vocês sabem que acaba rápido! os motoboys da Smoking Pods já estão nas ruas do ABC!\n\nSe você tá saindo do trampo ou se arrumando pro rolê, peça agora pra receber no conforto de casa antes de sair!\n\n⏱️ Tempo médio: 25 a 35 min pelo Uber Direct.\n📦 Cardápio Digital completo:\n🔗 https://smokingproject01.vercel.app/\n\nFila de despacho aberta! 🚀",
+      "message": "SAÍDA DO TRAMPO & PRÉ-ROLÊ — MOTOBOYS NA PISTA! 💨\n\nSalve turma do VIP! se ainda não separou seu pod, não deixa pra depois que vocês sabem que acaba rápido! os motoboys da Smoking Pods já estão nas ruas do ABC!\n\nSe você tá saindo do trampo ou se arrumando pro rolê, peça agora pra receber no conforto de casa antes de sair!\n\n⏱️ Tempo médio: 25 a 35 min pelo Uber Direct.\n📦 Cardápio Digital completo:\n🔗 https://smoking-pods-catalogo.vercel.app/\n\nFila de despacho aberta! 🚀",
       "targetType": "group",
       "selectedListIds": [
         "list_1786807808763"
@@ -114,12 +114,12 @@
       "createdAt": "2026-08-15T17:44:48.015Z",
       "variations": [],
       "useVariations": false,
-      "lastRunDate": "21/08/2026"
+      "lastRunDate": "28/08/2026"
     },
     {
       "id": "camp_1786816065551",
       "name": "CPM GRUPO SEXTOU NOTURNO 3",
-      "message": "PLANTÃO NOTURNO ATIVO — SMOKING PODS 💨\n\nSalve galera da noite! Faltou pod no rolê ou acabou o seu no meio da resenha?\n\nPlantão de Sexta rolando até as 23:30!\nEntregamos direto na sua casa, na adega, no bar ou onde você estiver NO ABC e região!\n\n📦 Escolha seu modelo e receba rápido:\n🔗 https://smokingproject01.vercel.app/\n\nAtendimento jajá vai ser encerrado pessoal!",
+      "message": "PLANTÃO NOTURNO ATIVO — SMOKING PODS 💨\n\nSalve galera da noite! Faltou pod no rolê ou acabou o seu no meio da resenha?\n\nPlantão de Sexta rolando até as 23:30!\nEntregamos direto na sua casa, na adega, no bar ou onde você estiver NO ABC e região!\n\n📦 Escolha seu modelo e receba rápido:\n🔗 https://smoking-pods-catalogo.vercel.app/\n\nAtendimento jajá vai ser encerrado pessoal!",
       "targetType": "group",
       "selectedListIds": [
         "list_1786807808763"
@@ -136,12 +136,12 @@
       "createdAt": "2026-08-15T17:47:45.551Z",
       "variations": [],
       "useVariations": false,
-      "lastRunDate": "21/08/2026"
+      "lastRunDate": "04/09/2026"
     },
     {
       "id": "camp_1786816420999",
       "name": "CPM SABADÃO 1",
-      "message": "SÁBADO NA SMOKING PODS — DELIVERIES ABERTOS! 💨\n\nSalve time do VIP! O plantão de sábado já tá rodando a todo vapor em São Bernardo e região!\n\n\nNão fica na mão: peça seu pod original direto no conforto de onde você estiver!\n\n⚡ Tempo de entrega: 25 a 35 min via Uber Direct.\n📦 Cardápio Digital no ar:\n🔗 https://smokingproject01.vercel.app/\n\n",
+      "message": "SÁBADO NA SMOKING PODS — DELIVERIES ABERTOS! 💨\n\nSalve time do VIP! O plantão de sábado já tá rodando a todo vapor em São Bernardo e região!\n\n\nNão fica na mão: peça seu pod original direto no conforto de onde você estiver!\n\n⚡ Tempo de entrega: 25 a 35 min via Uber Direct.\n📦 Cardápio Digital no ar:\n🔗 https://smoking-pods-catalogo.vercel.app/\n\n",
       "targetType": "group",
       "selectedListIds": [
         "list_1786807808763"
@@ -158,12 +158,12 @@
       "createdAt": "2026-08-15T17:53:40.999Z",
       "variations": [],
       "useVariations": false,
-      "lastRunDate": "22/08/2026"
+      "lastRunDate": "05/09/2026"
     },
     {
       "id": "camp_1786816513199",
       "name": "CPM SABADÃO 2",
-      "message": "⚠️ ALERTA DE ESTOQUE DE SÁBADO — ÚLTIMAS UNIDADES! 🔥\n\nFala pessoal do VIP! Passando pra avisar que a saída de pedidos hoje tá monstra e alguns dos sabores mais pedidos já estão nas últimas unidades!\n\n🚀 Se você vai sair pro rolê hoje à noite, garanta o seu agora pra não ter que ficar com sabor que você não curte depois!\n\n🔒 Prioridade VIP: Fila de despacho expressa pra quem pedir pelo link abaixo:\n🔗 https://smokingproject01.vercel.app/\n\nMotoboys prontos para entrega imediata! 💨",
+      "message": "⚠️ ALERTA DE ESTOQUE DE SÁBADO — ÚLTIMAS UNIDADES! 🔥\n\nFala pessoal do VIP! Passando pra avisar que a saída de pedidos hoje tá monstra e alguns dos sabores mais pedidos já estão nas últimas unidades!\n\n🚀 Se você vai sair pro rolê hoje à noite, garanta o seu agora pra não ter que ficar com sabor que você não curte depois!\n\n🔒 Prioridade VIP: Fila de despacho expressa pra quem pedir pelo link abaixo:\n🔗 https://smoking-pods-catalogo.vercel.app/\n\nMotoboys prontos para entrega imediata! 💨",
       "targetType": "group",
       "selectedListIds": [
         "list_1786807808763"
@@ -180,7 +180,7 @@
       "createdAt": "2026-08-15T17:55:13.199Z",
       "variations": [],
       "useVariations": false,
-      "lastRunDate": "22/08/2026"
+      "lastRunDate": "05/09/2026"
     },
     {
       "id": "camp_1786817784280",
@@ -200,7 +200,7 @@
       "status": "active",
       "totalRecipients": 1,
       "createdAt": "2026-08-15T18:16:24.280Z",
-      "lastRunDate": "22/08/2026",
+      "lastRunDate": "05/09/2026",
       "variations": [],
       "useVariations": false,
       "startDate": "2026-08-26"
@@ -208,7 +208,7 @@
     {
       "id": "camp_1786818802616",
       "name": "CPM DOMINGO 1",
-      "message": "🛋️ DOMINGO OFF — AGENDAMENTO PARA SEGUNDA-FEIRA! 💨\n\nSalve turma do VIP! Passando pra avisar que aos domingos nossa operação de delivery fica fechada para descanso do time.\n\n📦 Quer garantir seu pod pro início da semana?\nO nosso Cardápio Digital fica aberto normalmente para você agendar seu pedido! Deixando seu pedido feito hoje, o motoboy já sai com a sua entrega logo no primeiro horário de segunda-feira!\n\n📲 Agende seu pedido no Cardápio:\n🔗 https://smokingproject01.vercel.app/\n\nBom descanso a todos! 🥇",
+      "message": "🛋️ DOMINGO OFF — AGENDAMENTO PARA SEGUNDA-FEIRA! 💨\n\nSalve turma do VIP! Passando pra avisar que aos domingos nossa operação de delivery fica fechada para descanso do time.\n\n📦 Quer garantir seu pod pro início da semana?\nO nosso Cardápio Digital fica aberto normalmente para você agendar seu pedido! Deixando seu pedido feito hoje, o motoboy já sai com a sua entrega logo no primeiro horário de segunda-feira!\n\n📲 Agende seu pedido no Cardápio:\n🔗 https://smoking-pods-catalogo.vercel.app/\n\nBom descanso a todos! 🥇",
       "targetType": "group",
       "selectedListIds": [
         "list_1786807808763"
@@ -223,7 +223,7 @@
       "status": "active",
       "totalRecipients": 1,
       "createdAt": "2026-08-15T18:33:22.616Z",
-      "lastRunDate": "23/08/2026",
+      "lastRunDate": "30/08/2026",
       "variations": [],
       "useVariations": false,
       "startDate": "2026-08-26"
@@ -231,7 +231,7 @@
     {
       "id": "camp_1786819959793",
       "name": "CPM DOMINGO 2",
-      "message": "🚀 AMANHÃ ESTAMOS DE VOLTA + REPOSIÇÃO DE ESTOQUE! 📦\n\nSalve galera! Passando pra avisar que amanhã (segunda-feira) as entregas voltam a todo vapor logo pela manhã em SBC e região!\n\n⚡ Aviso de Estoque: Segunda-feira também é dia de chegada de novos lotes e reposição dos modelos mais pedidos!\n\nSe você já quiser deixar o seu sabor separado para o motoboy despachar amanhã cedo, acesse o link abaixo:\n\n🔗 https://smokingproject01.vercel.app/\nUma ótima semana a todos e nos vemos amanhã! 🤝",
+      "message": "🚀 AMANHÃ ESTAMOS DE VOLTA + REPOSIÇÃO DE ESTOQUE! 📦\n\nSalve galera! Passando pra avisar que amanhã (segunda-feira) as entregas voltam a todo vapor logo pela manhã em SBC e região!\n\n⚡ Aviso de Estoque: Segunda-feira também é dia de chegada de novos lotes e reposição dos modelos mais pedidos!\n\nSe você já quiser deixar o seu sabor separado para o motoboy despachar amanhã cedo, acesse o link abaixo:\n\n🔗 https://smoking-pods-catalogo.vercel.app/\nUma ótima semana a todos e nos vemos amanhã! 🤝",
       "targetType": "group",
       "selectedListIds": [
         "list_1786807808763"
@@ -246,7 +246,7 @@
       "status": "active",
       "totalRecipients": 1,
       "createdAt": "2026-08-15T18:52:39.793Z",
-      "lastRunDate": "23/08/2026",
+      "lastRunDate": "30/08/2026",
       "variations": [],
       "useVariations": false,
       "startDate": "2026-08-26"
@@ -277,7 +277,7 @@
     {
       "id": "camp_1786821475258",
       "name": "CPM  LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!",
-      "message": "⏳ LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS! 💨\n\nSalve galera do VIP! Passando pra avisar quem gosta de se planejar com calma:\n\nSexta e sábado a fila de despacho do Uber Direct costuma ser bem cheia. Se você já quiser garantir seu pod agora no meio da semana, seu pedido sai na hora e sem correria!\n\n📦 Cardápio 100% atualizado com os novos lotes:\n🔗 https://smokingproject01.vercel.app/\n\n⚡ Entregas em 25 a 35 min em SBC e região!\n\nGaranta seu sabor favorito antes da correria do fds! 🥇",
+      "message": "⏳ LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS! 💨\n\nSalve galera do VIP! Passando pra avisar quem gosta de se planejar com calma:\n\nSexta e sábado a fila de despacho do Uber Direct costuma ser bem cheia. Se você já quiser garantir seu pod agora no meio da semana, seu pedido sai na hora e sem correria!\n\n📦 Cardápio 100% atualizado com os novos lotes:\n🔗 https://smoking-pods-catalogo.vercel.app/\n\n⚡ Entregas em 25 a 35 min em SBC e região!\n\nGaranta seu sabor favorito antes da correria do fds! 🥇",
       "targetType": "group",
       "selectedListIds": [
         "list_1786807808763"
@@ -324,84 +324,31 @@
       "createdAt": "2026-08-17T18:44:21.357Z",
       "startDate": "2026-08-17",
       "lastRunDate": "19/08/2026"
+    },
+    {
+      "id": "camp_1787852897092",
+      "name": "CPM GRUPO BENEFÍCIOS",
+      "message": "👑 *TABELA OFICIAL DE BENEFÍCIOS SMOKING PODS* 👑\n*(Exclusivo para membros do Clube VIP)*\n\nFala, pessoal! Sabia que você pode garantir descontos no frete e até **ganhar Pods 100% de graça** apenas compartilhando sua experiência com os amigos?\n\nSe liga no nosso programa de vantagens:\n\n━━━━━━━━━━━━━━━━━━━━\n🎁 **COMO RESGATAR SEUS BENEFÍCIOS:**\n━━━━━━━━━━━━━━━━━━━━\n\n1️⃣ 📸 **POSTOU NOS STORIES (50% OFF NO FRETE):**\nPostou uma foto ou vídeo do seu pod recebido nos Stories marcando o `@smokingpods`?\n👉 **Garante 50% de desconto no frete** do seu próximo pedido!\n\n2️⃣ 🗣️ **INDICOU 1 AMIGO (DESCONTO CUMULATIVO):**\nIndicou um amigo do ABC que fez um pedido com a gente falando o seu nome?\n👉 **Você ganha R$ 10 de crédito/desconto** no seu próximo pod!\n\n3️⃣ 🏆 **META VIP (1 POD 100% GRÁTIS):**\nAcumulou **5 amigos indicados** que compraram na loja?\n👉 **Você ganha 1 POD LACRADO 100% DE GRAÇA** entregue na sua porta via Uber Direct!\n\n━━━━━━━━━━━━━━━━━━━━\n\n📦 *Acesse nosso Cardápio Digital atualizado:*\n🔗 https://smoking-pods-catalogo.vercel.app/\n\n💬 *Para fazer pedidos ou validar seus bônus, chame a gente no privado:*\n\n💨 *Delivery Rápido no ABC (25 a 35 min) | Atendimento: 11h às 23h*",
+      "variations": [],
+      "useVariations": false,
+      "targetType": "group",
+      "selectedListIds": [
+        "list_base_virgem_oficial"
+      ],
+      "targetGroupId": "120363429733361752@g.us",
+      "targetGroupName": "Clientes Smoking Vip",
+      "frequencyDays": 7,
+      "scheduledWeekday": "TERCA",
+      "scheduledTime": "14:30",
+      "startDate": "2026-08-27",
+      "batchSize": 10,
+      "batchIntervalMinutes": 25,
+      "status": "active",
+      "totalRecipients": 1,
+      "createdAt": "2026-08-27T17:48:17.092Z"
     }
   ],
   "idempotencyKeys": [
-    {
-      "key": "camp_1786812557221_2026_W34_SEGUNDA-FEIRA",
-      "timestamp": "2026-08-17T17:05:11.144Z",
-      "campaignName": "CPM GRUPO ESTOQUE SEMANAL"
-    },
-    {
-      "key": "camp_1786992261357_2026-08-17_16:45",
-      "timestamp": "2026-08-17T19:45:04.400Z",
-      "campaignName": "FERMENTAÇÃO DE BASE ATIVA ( RELACIONAMENTO )"
-    },
-    {
-      "key": "camp_1786810305844_2026-08-18_15:00",
-      "timestamp": "2026-08-18T18:00:14.472Z",
-      "campaignName": "Campanha de reativação 1"
-    },
-    {
-      "key": "camp_1786814768806_2026-08-18_15:00",
-      "timestamp": "2026-08-18T18:00:19.141Z",
-      "campaignName": "CPM GRUPO INSTAGRAM"
-    },
-    {
-      "key": "camp_1786820824361_2026-08-18_16:00",
-      "timestamp": "2026-08-18T19:00:14.940Z",
-      "campaignName": "AVISO SALVAR CONTATO"
-    },
-    {
-      "key": "camp_1786992261357_2026-08-18_16:45",
-      "timestamp": "2026-08-18T19:45:15.253Z",
-      "campaignName": "FERMENTAÇÃO DE BASE ATIVA ( RELACIONAMENTO )"
-    },
-    {
-      "key": "camp_1786810305844_2026-08-19_15:00",
-      "timestamp": "2026-08-19T18:00:19.081Z",
-      "campaignName": "Campanha de reativação 1"
-    },
-    {
-      "key": "camp_1786821475258_2026-08-19_16:00",
-      "timestamp": "2026-08-19T19:00:26.733Z",
-      "campaignName": "CPM  LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!"
-    },
-    {
-      "key": "camp_1786992261357_2026-08-19_16:45",
-      "timestamp": "2026-08-19T19:45:19.911Z",
-      "campaignName": "FERMENTAÇÃO DE BASE ATIVA ( RELACIONAMENTO )"
-    },
-    {
-      "key": "camp_1786815404807_2026-08-21_13:00",
-      "timestamp": "2026-08-21T16:00:36.376Z",
-      "campaignName": "REATIVAÇÃO SEXTOU/ESCASSEZ"
-    },
-    {
-      "key": "camp_1786815888015_2026-08-21_17:30",
-      "timestamp": "2026-08-21T20:30:35.951Z",
-      "campaignName": "CPM SEXTOU 2"
-    },
-    {
-      "key": "camp_1786816065551_2026-08-22_21:30",
-      "timestamp": "2026-08-22T00:30:31.094Z",
-      "campaignName": "CPM GRUPO SEXTOU NOTURNO 3"
-    },
-    {
-      "key": "camp_1786816420999_2026-08-22_14:00",
-      "timestamp": "2026-08-22T17:00:38.651Z",
-      "campaignName": "CPM SABADÃO 1"
-    },
-    {
-      "key": "camp_1786816513199_2026-08-22_17:30",
-      "timestamp": "2026-08-22T20:30:40.088Z",
-      "campaignName": "CPM SABADÃO 2"
-    },
-    {
-      "key": "camp_1786817784280_2026-08-22_19:30",
-      "timestamp": "2026-08-22T22:30:48.156Z",
-      "campaignName": "CPM SABADÃO 3"
-    },
     {
       "key": "camp_1786818802616_2026-08-23_12:00",
       "timestamp": "2026-08-23T15:00:41.676Z",
@@ -421,9 +368,69 @@
       "key": "camp_1786821475258_2026-08-26_16:00",
       "timestamp": "2026-08-26T19:00:28.102Z",
       "campaignName": "CPM  LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!"
+    },
+    {
+      "key": "camp_1786815888015_2026-08-28_17:30",
+      "timestamp": "2026-08-28T20:30:48.778Z",
+      "campaignName": "CPM SEXTOU 2"
+    },
+    {
+      "key": "camp_1786816065551_2026-08-29_21:30",
+      "timestamp": "2026-08-29T00:30:45.580Z",
+      "campaignName": "CPM GRUPO SEXTOU NOTURNO 3"
+    },
+    {
+      "key": "camp_1786816420999_2026-08-29_14:00",
+      "timestamp": "2026-08-29T17:00:55.125Z",
+      "campaignName": "CPM SABADÃO 1"
+    },
+    {
+      "key": "camp_1786816513199_2026-08-29_17:30",
+      "timestamp": "2026-08-29T20:30:57.182Z",
+      "campaignName": "CPM SABADÃO 2"
+    },
+    {
+      "key": "camp_1786817784280_2026-08-29_19:30",
+      "timestamp": "2026-08-29T22:30:58.224Z",
+      "campaignName": "CPM SABADÃO 3"
+    },
+    {
+      "key": "camp_1786818802616_2026-08-30_12:00",
+      "timestamp": "2026-08-30T15:00:59.648Z",
+      "campaignName": "CPM DOMINGO 1"
+    },
+    {
+      "key": "camp_1786819959793_2026-08-30_19:30",
+      "timestamp": "2026-08-30T22:31:03.272Z",
+      "campaignName": "CPM DOMINGO 2"
+    },
+    {
+      "key": "camp_1786816065551_2026-09-05_21:30",
+      "timestamp": "2026-09-05T00:30:54.304Z",
+      "campaignName": "CPM GRUPO SEXTOU NOTURNO 3"
+    },
+    {
+      "key": "camp_1786816420999_2026-09-05_14:00",
+      "timestamp": "2026-09-05T17:00:54.677Z",
+      "campaignName": "CPM SABADÃO 1"
+    },
+    {
+      "key": "camp_1786814768806_2026-09-05_15:00",
+      "timestamp": "2026-09-05T18:00:55.179Z",
+      "campaignName": "CPM GRUPO INSTAGRAM"
+    },
+    {
+      "key": "camp_1786816513199_2026-09-05_17:30",
+      "timestamp": "2026-09-05T20:30:56.307Z",
+      "campaignName": "CPM SABADÃO 2"
+    },
+    {
+      "key": "camp_1786817784280_2026-09-05_19:30",
+      "timestamp": "2026-09-05T22:30:57.281Z",
+      "campaignName": "CPM SABADÃO 3"
     }
   ],
-  "lastUpdated": "2026-08-26T20:37:49.712Z",
+  "lastUpdated": "2026-09-05T22:30:57.281Z",
   "lists": [
     {
       "id": "list_base_virgem_oficial",
@@ -3415,6 +3422,13 @@
       "description": "Lista personalizada de contatos",
       "contacts": [
         {
+          "id": "5511948129740@c.us",
+          "name": "bea queiroz cliente smk",
+          "phone": "5511948129740",
+          "cleanPhone": "5511948129740",
+          "isSaved": true
+        },
+        {
           "id": "5511999109136@c.us",
           "name": "Carolina Vieira Smk",
           "phone": "5511999109136",
@@ -3422,10 +3436,24 @@
           "isSaved": true
         },
         {
+          "id": "5511945846937@c.us",
+          "name": "eduarda gisbert",
+          "phone": "5511945846937",
+          "cleanPhone": "5511945846937",
+          "isSaved": true
+        },
+        {
           "id": "5511913425376@c.us",
           "name": "Gustavo Cliente Smk",
           "phone": "5511913425376",
           "cleanPhone": "5511913425376",
+          "isSaved": true
+        },
+        {
+          "id": "5511962000873@c.us",
+          "name": "Igor cliente smk",
+          "phone": "5511962000873",
+          "cleanPhone": "5511962000873",
           "isSaved": true
         },
         {
@@ -3440,6 +3468,13 @@
           "name": "Pedro Cliente Smk",
           "phone": "5511960560727",
           "cleanPhone": "5511960560727",
+          "isSaved": true
+        },
+        {
+          "id": "5513996949386@c.us",
+          "name": "Renan CLIENTE SMK",
+          "phone": "5513996949386",
+          "cleanPhone": "5513996949386",
           "isSaved": true
         },
         {
@@ -3466,14 +3501,6 @@
       ],
       "color": "#10b981",
       "createdAt": "2026-08-17T18:02:13.027Z"
-    },
-    {
-      "id": "list_1786992631910",
-      "name": "lista teste",
-      "description": "Lista personalizada de contatos",
-      "contacts": [],
-      "color": "#10b981",
-      "createdAt": "2026-08-17T18:50:31.910Z"
     },
     {
       "id": "list_base_blindada_enviados",
@@ -4682,7 +4709,78 @@
       "5511950753363",
       "5511985910141",
       "5511987081951",
-      "5511992372463"
+      "5511992372463",
+      "5511951017158",
+      "5511994492755",
+      "5511982138328",
+      "5511943614844",
+      "555499053439",
+      "5511992145881",
+      "5511940346522",
+      "5511991926566",
+      "5511964412365",
+      "5511999796118",
+      "5511972750904",
+      "5511982278179",
+      "5511910168381",
+      "5511958259349",
+      "5511955848911",
+      "5511956022898",
+      "5511956086123",
+      "5511956580742",
+      "5511956656214",
+      "5511956696556",
+      "5511956751381",
+      "5511958307144",
+      "5511957487425",
+      "5511958452949",
+      "5511957632186",
+      "5511958650301",
+      "5511959181080",
+      "5511959861395",
+      "5511960627331",
+      "5511960549837",
+      "5511960982558",
+      "5511961028567",
+      "5511961748375",
+      "5511961831864",
+      "5511962018156",
+      "5511962055402",
+      "5511916911348",
+      "5511962152158",
+      "5511962342678",
+      "5511963085947",
+      "5511963169391",
+      "5511963180049",
+      "5511963493229",
+      "5511963588542",
+      "5511963645893",
+      "5511917310769",
+      "5511917881312",
+      "5511963841957",
+      "5511964923145",
+      "5511965351947",
+      "5511965751562",
+      "5511966353726",
+      "5511966402015",
+      "5511966464464",
+      "5511967061776",
+      "5511967258710",
+      "5511967701078",
+      "5511917931979",
+      "5511968101541",
+      "5511969536619",
+      "5511971999443",
+      "5511969564839",
+      "5511970205672",
+      "5511970427810",
+      "5511972732702",
+      "5511970516137",
+      "5511970754891",
+      "5511970776982",
+      "5511970802254",
+      "5511970956777",
+      "5511921304900"
     ],
     "camp_1786810305844": [
       "5511975800524",
@@ -4703,7 +4801,78 @@
       "5511950753363",
       "5511985910141",
       "5511987081951",
-      "5511992372463"
+      "5511992372463",
+      "5511951017158",
+      "5511994492755",
+      "5511982138328",
+      "5511943614844",
+      "555499053439",
+      "5511992145881",
+      "5511940346522",
+      "5511991926566",
+      "5511964412365",
+      "5511999796118",
+      "5511972750904",
+      "5511982278179",
+      "5511910168381",
+      "5511958259349",
+      "5511955848911",
+      "5511956022898",
+      "5511956086123",
+      "5511956580742",
+      "5511956656214",
+      "5511956696556",
+      "5511956751381",
+      "5511958307144",
+      "5511957487425",
+      "5511958452949",
+      "5511957632186",
+      "5511958650301",
+      "5511959181080",
+      "5511959861395",
+      "5511960627331",
+      "5511960549837",
+      "5511960982558",
+      "5511961028567",
+      "5511961748375",
+      "5511961831864",
+      "5511962018156",
+      "5511962055402",
+      "5511916911348",
+      "5511962152158",
+      "5511962342678",
+      "5511963085947",
+      "5511963169391",
+      "5511963180049",
+      "5511963493229",
+      "5511963588542",
+      "5511963645893",
+      "5511917310769",
+      "5511917881312",
+      "5511963841957",
+      "5511964923145",
+      "5511965351947",
+      "5511965751562",
+      "5511966353726",
+      "5511966402015",
+      "5511966464464",
+      "5511967061776",
+      "5511967258710",
+      "5511967701078",
+      "5511917931979",
+      "5511968101541",
+      "5511969536619",
+      "5511971999443",
+      "5511969564839",
+      "5511970205672",
+      "5511970427810",
+      "5511972732702",
+      "5511970516137",
+      "5511970754891",
+      "5511970776982",
+      "5511970802254",
+      "5511970956777",
+      "5511921304900"
     ]
   }
 }

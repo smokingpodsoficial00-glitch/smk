@@ -39,9 +39,9 @@ async function generatePaymentLink(rawTotal, orderId = "PEDIDO_WHATSAPP") {
             ],
             // Links para onde o cliente será redirecionado após o pagamento
             back_urls: {
-                success: "https://smokingproject01.vercel.app/",
-                failure: "https://smokingproject01.vercel.app/",
-                pending: "https://smokingproject01.vercel.app/"
+                success: "https://smoking-pods-catalogo.vercel.app/",
+                failure: "https://smoking-pods-catalogo.vercel.app/",
+                pending: "https://smoking-pods-catalogo.vercel.app/"
             },
             auto_return: "approved",
             payment_methods: {
