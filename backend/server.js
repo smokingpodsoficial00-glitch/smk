@@ -2033,7 +2033,7 @@ const runningListCampaigns = new Set();
 // Função principal do scheduler que verifica e dispara campanhas
 async function marketingSchedulerTick() {
     try {
-        if (!isWhatsAppReady || !client) {
+        if (!isWhatsAppReady || !sock) {
             return; // WhatsApp não conectado, pula silenciosamente
         }
 
