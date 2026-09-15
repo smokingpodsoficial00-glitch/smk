@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, Users, Settings, CircleDollarSign, 
-  Store, ChevronRight, Bot, LogOut, Shield, User as UserIcon, Megaphone, Scale
+  Store, ChevronRight, Bot, LogOut, Shield, User as UserIcon, Megaphone, Scale, CheckSquare
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
@@ -200,6 +200,33 @@ export function DashboardLayout() {
                   Sócios
                   <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold">
                     EQUITY
+                  </span>
+                </span>
+              )}
+            </NavLink>
+          )}
+
+          {/* Aba de Tarefas & Produtividade dos Sócios */}
+          {canAccess('tarefas') && (
+            <NavLink 
+              to="/tarefas"
+              title={sidebarCollapsed ? "Tarefas dos Sócios" : undefined}
+              className={({ isActive }) =>
+                `flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
+                  sidebarCollapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
+                } ${
+                  isActive 
+                    ? 'bg-white/5 text-emerald-400 font-bold border-l-2 border-emerald-500 pl-3.5' 
+                    : 'text-muted-foreground hover:bg-white/5 hover:text-white border-l-2 border-transparent pl-4'
+                }`
+              }
+            >
+              <CheckSquare className="size-4 shrink-0 text-emerald-400" />
+              {!sidebarCollapsed && (
+                <span className="truncate flex items-center gap-2">
+                  Tarefas
+                  <span className="text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded-full font-bold">
+                    QG
                   </span>
                 </span>
               )}
