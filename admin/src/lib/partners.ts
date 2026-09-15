@@ -499,7 +499,6 @@ export async function createPartnerTransaction(payload: {
     id: newId,
     company_id: targetCompanyId,
     partner_id: payload.partnerId || null,
-    partner_name: payload.partnerName || null,
     type: payload.type,
     amount: Math.max(0, Number(payload.amount) || 0),
     date: payload.date || new Date().toISOString().split("T")[0],
@@ -541,7 +540,6 @@ export async function updatePartnerTransaction(
 ): Promise<boolean> {
   const updateData: any = {};
   if (payload.partner_id !== undefined) updateData.partner_id = payload.partner_id;
-  if (payload.partner_name !== undefined) updateData.partner_name = payload.partner_name;
   if (payload.type !== undefined) updateData.type = payload.type;
   if (payload.amount !== undefined) updateData.amount = payload.amount;
   if (payload.date !== undefined) updateData.date = payload.date;
@@ -706,24 +704,11 @@ export function calculatePartnersFinancials(params: {
     officialProfitMarginPct = 21.0; // Fallback temporário apenas se base estiver 100% zerada
   }
 
-  // 4. TESOURARIA & CAIXA OFICIAL (Idêntico ao FinanceDashboard.tsx)
+  // 4. TESOURARIA & CAIXA OFICIAL
   const netCashAvailable = Math.max(0, revenueSum - shippingSum - operationalExpenses);
 
-  // 4.1 CAIXA REAL: Faturamento Bruto Acumulado - Total Gasto em Reposições de Estoque
-  // Regra idêntica à do FinanceDashboard.tsx / financialCycles.ts (calculateAllTimeMetrics)
-  const stockPurchases = (repurchases || []).reduce((sum: number, r: any) => {
-    return sum + (Number(r.stock_purchase_amount) || 0);
-  }, 0);
-  const realCash = Number((revenueSum - stockPurchases).toFixed(2));
-
-  // 5. PATRIMÔNIO REAL TOTAL DA LOJA (FONTE DE VERDADE: FinanceDashboard.tsx)
-  // Regra oficial auditada: Caixa Real Calculado + Valor de Venda do Estoque Físico Atual
-  // NÃO utiliza Faturamento Bruto (faturamento é volume histórico, não patrimônio)
-  const companyEconomicEquity = (realCash || 0) + (totalStockRetailSum || 0);
-
-  // 6. APURAÇÃO DOS SÓCIOS: Capital Líquido -> % de Participação -> Projeção de Lucro & Patrimônio
+  // 4.1 APURAÇÃO DOS SÓCIOS: Capital Líquido (Aportes - Retiradas)
   const activePartners = (partners || []).filter(p => p.is_active !== false);
-
   const partnerCapitalMap: Record<string, {
     grossContributed: number;
     withdrawn: number;
@@ -749,6 +734,12 @@ export function calculatePartnersFinancials(params: {
       if (tx.type === 'PRO_LABORE') pro += amt;
     }
 
+    // Capital líquido do sócio (aportes - retiradas)
+    // Se retirou mais do que aportou, o netInvested pode ficar negativo? O original limitava a 0 com Math.max
+    // Se um sócio retirar parte do lucro, não deveria ser RETIRADA_CAPITAL, mas DISTRIBUICAO_LUCRO.
+    // Retirada de capital reduz a cota. Vamos permitir ficar negativo temporariamente se esvaziar, mas o original usava Math.max(0, gross - withdr).
+    // Vou manter a regra original do sistema de Math.max(0, ...) para o capital do sócio, 
+    // mas o impacto no CAIXA DA EMPRESA deve somar TODOS os aportes e subtrair TODAS as retiradas de capital.
     const net = Math.max(0, gross - withdr);
     partnerCapitalMap[partner.id] = {
       grossContributed: gross,
@@ -761,6 +752,22 @@ export function calculatePartnersFinancials(params: {
     totalNetCapitalInvested += net;
   }
 
+  // 4.2 CAIXA REAL: Faturamento Bruto - Total Gasto em Reposições + (Aportes - Retiradas)
+  const stockPurchases = (repurchases || []).reduce((sum: number, r: any) => {
+    return sum + (Number(r.stock_purchase_amount) || 0);
+  }, 0);
+  
+  // Caixa Operacional
+  const operationalCash = revenueSum - stockPurchases;
+  
+  // Caixa da Tesouraria (Inclui Capital Social injetado e retirado)
+  const realCash = Number((operationalCash + totalNetCapitalInvested).toFixed(2));
+
+  // 5. PATRIMÔNIO REAL TOTAL DA LOJA
+  // Caixa Real da Tesouraria + Valor de Venda do Estoque Físico
+  const companyEconomicEquity = (realCash || 0) + (totalStockRetailSum || 0);
+
+  // 6. DISTRIBUIÇÃO DAS FATIAS DE EQUITY
   const hasDefinedCapital = totalNetCapitalInvested > 0;
   let totalEquitySum = 0;
   let companyTotalProjectedProfit = 0;
