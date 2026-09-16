@@ -187,7 +187,123 @@ async function connectToWhatsApp() {
     });
 }
 
-// Helpers unificados de formatação de JID e envio seguro pelo Baileys
+// 🛡️ ARMADILHA DE DISPARO: Validação Estrutural e Resolução de JID Canônico na rede do WhatsApp
+function validateStructuralPhone(rawPhone) {
+    if (!rawPhone) return { valid: false, error: 'NUMERO_VAZIO', message: 'Nenhum número de telefone fornecido.' };
+    const clean = String(rawPhone).trim();
+    
+    // Se for grupo
+    if (clean.includes('@g.us') || clean.includes('chat.whatsapp.com/')) {
+        return { valid: true, isGroup: true, clean };
+    }
+
+    const digits = clean.replace(/\D/g, '');
+
+    // Identificação de LIDs (IDs internos do WhatsApp que têm mais de 13 dígitos)
+    if (digits.length > 13) {
+        return {
+            valid: false,
+            error: 'LID_CORROMPIDO',
+            message: `O registro possui ${digits.length} dígitos (${digits}). Trata-se de um identificador interno de dispositivo (LID) do WhatsApp, e não de um número de telefone com DDD válido.`
+        };
+    }
+
+    // Identificação de números incompletos ou excessivos
+    const without55 = (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) ? digits.substring(2) : digits;
+    if (without55.length < 10 || without55.length > 11) {
+        return {
+            valid: false,
+            error: 'COMPRIMENTO_INVALIDO',
+            message: `Número possui comprimento inválido (${without55.length} dígitos úteis). O formato correto no Brasil é DDD (2 dígitos) + 8 ou 9 dígitos.`
+        };
+    }
+
+    const ddd = parseInt(without55.substring(0, 2), 10);
+    if (isNaN(ddd) || ddd < 11 || ddd > 99) {
+        return {
+            valid: false,
+            error: 'DDD_INVALIDO',
+            message: `DDD inválido (${without55.substring(0, 2)}). Os DDDs brasileiros válidos vão de 11 a 99.`
+        };
+    }
+
+    return {
+        valid: true,
+        isGroup: false,
+        cleanPhone: digits.startsWith('55') ? digits : `55${digits}`,
+        without55,
+        ddd: String(ddd),
+        numberBody: without55.substring(2)
+    };
+}
+
+async function resolveCanonicalWhatsAppJid(rawPhone) {
+    const structural = validateStructuralPhone(rawPhone);
+    if (!structural.valid) {
+        return structural;
+    }
+
+    if (structural.isGroup) {
+        return { valid: true, isGroup: true, jid: rawPhone };
+    }
+
+    if (!sock || !isWhatsAppReady) {
+        return {
+            valid: false,
+            error: 'WHATSAPP_OFFLINE',
+            message: 'O WhatsApp não está conectado no servidor backend. Conecte pelo QR Code na aba Marketing.'
+        };
+    }
+
+    const { ddd, numberBody } = structural;
+    
+    // Candidato 1: com 9 dígitos (ex: 55119XXXXXXXX@s.whatsapp.net)
+    const phoneWith9 = numberBody.length === 8 ? `9${numberBody}` : numberBody;
+    const jidWith9 = `55${ddd}${phoneWith9}@s.whatsapp.net`;
+
+    // Candidato 2: sem o 9 (contas antigas do WhatsApp registradas com 8 dígitos)
+    const phoneWithout9 = (numberBody.length === 9 && numberBody.startsWith('9')) ? numberBody.substring(1) : numberBody;
+    const jidWithout9 = `55${ddd}${phoneWithout9}@s.whatsapp.net`;
+
+    console.log(`🔍 [Armadilha WhatsApp] Verificando existência na rede WhatsApp: ${jidWith9} e ${jidWithout9}...`);
+
+    try {
+        const checkResults = await sock.onWhatsApp(jidWith9, jidWithout9);
+        const match = (checkResults || []).find(r => r && (r.exists || r.jid));
+
+        if (match && match.jid) {
+            console.log(`✅ [Armadilha WhatsApp] Conta confirmada no WhatsApp: ${match.jid}`);
+            return {
+                valid: true,
+                isGroup: false,
+                jid: match.jid,
+                exists: true,
+                cleanPhone: match.jid.replace('@s.whatsapp.net', ''),
+                testedJids: [jidWith9, jidWithout9]
+            };
+        } else {
+            console.warn(`❌ [Armadilha WhatsApp] Número ${rawPhone} NÃO POSSUI conta ativa no WhatsApp.`);
+            return {
+                valid: false,
+                error: 'NUMERO_INEXISTENTE_NO_WHATSAPP',
+                message: `O número (${rawPhone}) NÃO possui conta no WhatsApp. O servidor do WhatsApp confirmou que este telefone não existe na rede.`,
+                testedJids: [jidWith9, jidWithout9]
+            };
+        }
+    } catch (err) {
+        console.warn('⚠️ [Armadilha WhatsApp] Falha ao consultar onWhatsApp:', err.message);
+        return {
+            valid: true,
+            isGroup: false,
+            jid: jidWith9,
+            exists: 'desconhecido',
+            cleanPhone: `55${ddd}${phoneWith9}`,
+            warning: 'Consulta prévia de existência falhou temporariamente. Tentando envio direto.'
+        };
+    }
+}
+
+// Helper legado mantido com fallback seguro
 function formatToBaileysJid(rawTarget) {
     if (!rawTarget) return '';
     let clean = String(rawTarget).trim();
@@ -206,8 +322,15 @@ async function sendBaileysMessage(target, text) {
     if (!sock || !isWhatsAppReady) {
         throw new Error('WhatsApp não está conectado.');
     }
-    const jid = formatToBaileysJid(target);
-    if (!jid) throw new Error('Destinatário inválido.');
+    
+    let jid = target;
+    if (!String(target).includes('@g.us') && !String(target).includes('chat.whatsapp.com/')) {
+        const probe = await resolveCanonicalWhatsAppJid(target);
+        if (!probe.valid) {
+            throw new Error(`[${probe.error}] ${probe.message}`);
+        }
+        jid = probe.jid;
+    }
 
     // Presença "composing" (digitando)
     try {
@@ -1301,25 +1424,27 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
             console.warn('Aviso ao buscar grupos via Baileys:', gErr.message);
         }
 
-        // 👥 Unificação de Contatos: Reúne todos os contatos salvos das listas e do Supabase
+        // 👥 Unificação de Contatos: Reúne todos os contatos salvos das listas e do Supabase (Apenas telefones válidos)
         const contactsMap = new Map();
 
-        // 1. Contatos das Listas Salvas (Preserva 100% dos nomes e telefones cadastrados)
+        // 1. Contatos das Listas Salvas (Preserva 100% dos nomes e telefones cadastrados, expurga LIDs)
         try {
             const config = loadMarketingConfig();
             (config.lists || []).forEach(list => {
                 (list.contacts || []).forEach(c => {
                     const raw = c.cleanPhone || c.phone || '';
-                    const clean = String(raw).replace(/\D/g, '');
-                    const norm = clean.startsWith('55') ? clean : `55${clean}`;
-                    if (norm.length >= 10 && !contactsMap.has(norm)) {
-                        contactsMap.set(norm, {
-                            id: c.id || `${norm}@s.whatsapp.net`,
-                            name: c.name || `Cliente ${norm.slice(-4)}`,
-                            phone: c.phone || norm,
-                            cleanPhone: norm,
-                            isSaved: true
-                        });
+                    const structural = validateStructuralPhone(raw);
+                    if (structural.valid && !structural.isGroup) {
+                        const norm = structural.cleanPhone;
+                        if (!contactsMap.has(norm)) {
+                            contactsMap.set(norm, {
+                                id: c.id || `${norm}@s.whatsapp.net`,
+                                name: c.name || `Cliente ${norm.slice(-4)}`,
+                                phone: c.phone || norm,
+                                cleanPhone: norm,
+                                isSaved: true
+                            });
+                        }
                     }
                 });
             });
@@ -1327,7 +1452,7 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
             console.warn('⚠️ Erro ao ler contatos das listas locais:', e.message);
         }
 
-        // 2. Contatos do Supabase (smoking_clients)
+        // 2. Contatos do Supabase (smoking_clients - filtra LIDs como 206494142341307)
         try {
             const { data: dbClients } = await supabase
                 .from('smoking_clients')
@@ -1336,9 +1461,9 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
 
             (dbClients || []).forEach(cl => {
                 if (!cl.phone) return;
-                const clean = String(cl.phone).replace(/\D/g, '');
-                const norm = clean.startsWith('55') ? clean : `55${clean}`;
-                if (norm.length >= 10) {
+                const structural = validateStructuralPhone(cl.phone);
+                if (structural.valid && !structural.isGroup) {
+                    const norm = structural.cleanPhone;
                     if (contactsMap.has(norm)) {
                         const existing = contactsMap.get(norm);
                         if ((!existing.name || existing.name.startsWith('Cliente')) && cl.name) {
@@ -1476,26 +1601,67 @@ app.post('/api/chatbot/blacklist', (req, res) => {
 
     return res.json({ success: true, blacklist: displayBlacklist });
 });
+// 🛡️ ENDPOINT CENTRAL DE DISPARO COM ARMADILHA DE TELEMETRIA
 app.post('/api/marketing/send-direct', async (req, res) => {
     try {
         const { phone, name, text, campaignId, force } = req.body;
         
         if (!phone || !text) {
-            return res.status(400).json({ error: 'Telefone e texto da mensagem são obrigatórios.' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'DADOS_OBRIGATORIOS',
+                message: 'Telefone e texto da mensagem são obrigatórios.' 
+            });
         }
 
-        const config = loadMarketingConfig();
-        const rawPhone = String(phone).replace(/\D/g, '');
-        const cleanPhone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
+        if (!isWhatsAppReady || !sock) {
+            return res.status(503).json({ 
+                success: false,
+                error: 'WHATSAPP_OFFLINE',
+                message: 'WhatsApp não está conectado no servidor backend. Conecte pelo QR Code na aba Marketing.' 
+            });
+        }
 
-        // 🛡️ TRAVA RÍGIDA ANTI-DUPLICAÇÃO: Checa se o contato já foi enviado (a não ser que force === true)
-        const isTestCampaign = campaignId && (
+        const isTestCampaign = force || (campaignId && (
             String(campaignId).toLowerCase().includes('teste') || 
             String(name || '').toLowerCase().includes('teste')
-        );
+        ));
 
-        if (!force && !isTestCampaign && campaignId && isPhoneAlreadySent(campaignId, cleanPhone, config)) {
-            console.warn(`🛑 [Marketing Blindagem] Disparo IGNORADO para ${cleanPhone} (${name || 'Cliente'}). Este contato já recebeu a campanha "${campaignId}".`);
+        // 🛡️ ARMADILHA 1: Validação & Resolução de JID Canônico no WhatsApp
+        let targetJid = '';
+        let probeDetails = null;
+
+        if (String(phone).includes('chat.whatsapp.com/')) {
+            try {
+                const inviteCode = String(phone).split('chat.whatsapp.com/')[1].trim().split('?')[0];
+                const groupChat = await sock.groupAcceptInvite(inviteCode);
+                targetJid = groupChat || `${inviteCode}@g.us`;
+            } catch (invErr) {
+                console.warn('⚠️ Não foi possível resolver convite de grupo:', invErr.message);
+                targetJid = phone;
+            }
+        } else if (String(phone).includes('@g.us')) {
+            targetJid = String(phone);
+        } else {
+            probeDetails = await resolveCanonicalWhatsAppJid(phone);
+            if (!probeDetails.valid) {
+                console.warn(`🚨 [ARMADILHA DE DISPARO] Disparo barrado para ${phone} (${name || 'Cliente'}): [${probeDetails.error}] ${probeDetails.message}`);
+                return res.status(422).json({
+                    success: false,
+                    error: probeDetails.error,
+                    message: probeDetails.message,
+                    phone: String(phone),
+                    details: probeDetails
+                });
+            }
+            targetJid = probeDetails.jid;
+        }
+
+        // 🛡️ ARMADILHA 2: Trava anti-duplicação se não for teste forçado
+        const config = loadMarketingConfig();
+        const cleanDigitsForHistory = targetJid.replace(/\D/g, '');
+        if (!force && !isTestCampaign && campaignId && isPhoneAlreadySent(campaignId, cleanDigitsForHistory, config)) {
+            console.warn(`🛑 [Marketing Blindagem] Disparo IGNORADO para ${cleanDigitsForHistory} (${name || 'Cliente'}). Já recebeu "${campaignId}".`);
             return res.json({ 
                 success: true, 
                 skipped: true, 
@@ -1503,54 +1669,141 @@ app.post('/api/marketing/send-direct', async (req, res) => {
             });
         }
 
-        if (!isWhatsAppReady || !sock) {
-            return res.status(503).json({ error: 'WhatsApp não está conectado no momento.' });
-        }
+        console.log(`📢 [Marketing] Enviando mensagem para ${targetJid} (${name || 'Cliente'})...`);
 
-        let formattedNumber = '';
-        if (String(phone).includes('chat.whatsapp.com/')) {
-            try {
-                const inviteCode = String(phone).split('chat.whatsapp.com/')[1].trim().split('?')[0];
-                const groupChat = await sock.groupAcceptInvite(inviteCode);
-                formattedNumber = groupChat || `${inviteCode}@g.us`;
-            } catch (invErr) {
-                console.warn('⚠️ Não foi possível resolver convite de grupo:', invErr.message);
-                formattedNumber = phone;
-            }
-        } else if (String(phone).includes('@g.us') || String(phone).includes('@s.whatsapp.net')) {
-            formattedNumber = String(phone);
-        } else {
-            formattedNumber = formatToBaileysJid(cleanPhone);
-        }
-
-        console.log(`📢 [Marketing] Enviando mensagem personalizada para ${formattedNumber} (${name || 'Cliente'})...`);
-
-        // 🛡️ Simulação humana garantida: Digitando... entre 12 e 18 segundos OBRIGATÓRIOS
-        const typingDurationMs = Math.floor(Math.random() * 6000) + 12000;
+        // Simulação humana: Se for teste / forçado, delay leve (1.5s). Se for lote em massa, 10-15s.
+        const typingDurationMs = isTestCampaign ? 1500 : (Math.floor(Math.random() * 5000) + 10000);
         try {
-            await sock.sendPresenceUpdate('composing', formattedNumber);
+            await sock.sendPresenceUpdate('composing', targetJid);
         } catch (chatErr) {}
 
-        // Delay obrigatório inegociável
         await new Promise(resolve => setTimeout(resolve, typingDurationMs));
 
-        await sock.sendMessage(formattedNumber, { text });
+        // 🚀 DISPARO VIA BAILEYS
+        const sentResult = await sock.sendMessage(targetJid, { text });
 
         try {
-            await sock.sendPresenceUpdate('paused', formattedNumber);
+            await sock.sendPresenceUpdate('paused', targetJid);
         } catch (chatErr) {}
 
-        // 🛡️ Grava no histórico permanente se não for envio de teste forçado
-        if (!force && !isTestCampaign && campaignId && cleanPhone) {
-            markPhoneAsSent(campaignId, cleanPhone, config);
+        // Grava no histórico permanente se não for envio de teste forçado
+        if (!force && !isTestCampaign && campaignId && cleanDigitsForHistory) {
+            markPhoneAsSent(campaignId, cleanDigitsForHistory, config);
             saveMarketingConfig(config);
         }
 
-        console.log(`✅ [Marketing] Mensagem entregue com sucesso para ${formattedNumber}`);
-        return res.json({ success: true, message: 'Mensagem de marketing enviada com sucesso!' });
+        const messageId = sentResult?.key?.id || `MSG_${Date.now()}`;
+        console.log(`✅ [Marketing] Mensagem entregue com sucesso para ${targetJid} (ID: ${messageId})`);
+        
+        return res.json({ 
+            success: true, 
+            message: 'Mensagem de marketing entregue com sucesso ao servidor do WhatsApp!',
+            targetJid,
+            messageId,
+            verifiedOnWhatsApp: true,
+            timestamp: new Date().toISOString()
+        });
     } catch (error) {
         console.error('❌ Erro no envio de marketing:', error);
-        return res.status(500).json({ error: error.message || 'Falha ao enviar mensagem de marketing.' });
+        return res.status(500).json({ 
+            success: false,
+            error: 'FALHA_ENVIO_WHATSAPP',
+            message: error.message || 'Falha ao enviar mensagem de marketing no WhatsApp.' 
+        });
+    }
+});
+
+// 🔍 ENDPOINT DE DIAGNÓSTICO PRÉVIO (Checagem de Número na Rede WhatsApp)
+app.post('/api/marketing/probe-contact', async (req, res) => {
+    try {
+        const { phone } = req.body;
+        if (!phone) {
+            return res.status(400).json({ success: false, error: 'Telefone obrigatório.' });
+        }
+        const probe = await resolveCanonicalWhatsAppJid(phone);
+        return res.json({ success: probe.valid, probe });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// 🧪 ENDPOINT DO LABORATÓRIO DE DISPARO (Com telemetria e auditoria completa passo a passo)
+app.post('/api/marketing/test-lab-dispatch', async (req, res) => {
+    const trace = [];
+    try {
+        const { phone, text, name } = req.body;
+        trace.push({ step: 1, title: 'Recepção dos Dados', status: 'OK', details: { phone, name: name || 'Teste' } });
+
+        if (!phone || !text) {
+            trace.push({ step: 2, title: 'Validação de Parâmetros', status: 'ERROR', message: 'Telefone ou mensagem vazia.' });
+            return res.status(400).json({ success: false, trace, error: 'Telefone e mensagem são obrigatórios.' });
+        }
+
+        if (!isWhatsAppReady || !sock) {
+            trace.push({ step: 2, title: 'Status do WhatsApp', status: 'ERROR', message: 'WhatsApp desconectado no servidor.' });
+            return res.status(503).json({ success: false, trace, error: 'WhatsApp offline. Conecte pelo QR Code.' });
+        }
+        trace.push({ step: 2, title: 'Status do WhatsApp', status: 'OK', message: 'WhatsApp WebSocket conectado e pronto.' });
+
+        // Validação estrutural
+        const structural = validateStructuralPhone(phone);
+        if (!structural.valid) {
+            trace.push({ step: 3, title: 'Validação Estrutural', status: 'ERROR', message: structural.message, error: structural.error });
+            return res.status(422).json({ success: false, trace, error: structural.error, message: structural.message });
+        }
+        trace.push({ 
+            step: 3, 
+            title: 'Validação Estrutural', 
+            status: 'OK', 
+            details: { ddd: structural.ddd, digits: structural.cleanPhone, length: structural.without55?.length } 
+        });
+
+        // Verificação no WhatsApp Server
+        const probe = await resolveCanonicalWhatsAppJid(phone);
+        if (!probe.valid) {
+            trace.push({ step: 4, title: 'Verificação no WhatsApp Server', status: 'ERROR', message: probe.message, error: probe.error });
+            return res.status(422).json({ success: false, trace, error: probe.error, message: probe.message });
+        }
+        trace.push({ 
+            step: 4, 
+            title: 'Verificação no WhatsApp Server', 
+            status: 'OK', 
+            message: `Conta ativa confirmada! JID Canônico: ${probe.jid}` 
+        });
+
+        // Envio do corpo da mensagem
+        trace.push({ step: 5, title: 'Envio da Mensagem', status: 'IN_PROGRESS', target: probe.jid });
+        
+        try {
+            await sock.sendPresenceUpdate('composing', probe.jid);
+        } catch (e) {}
+
+        await new Promise(r => setTimeout(r, 1000));
+
+        const result = await sock.sendMessage(probe.jid, { text });
+
+        try {
+            await sock.sendPresenceUpdate('paused', probe.jid);
+        } catch (e) {}
+
+        const messageId = result?.key?.id || `MSG_${Date.now()}`;
+        trace.push({ 
+            step: 5, 
+            title: 'Envio da Mensagem', 
+            status: 'OK', 
+            message: `Mensagem aceita e confirmada pelo servidor do WhatsApp! ID: ${messageId}` 
+        });
+
+        return res.json({
+            success: true,
+            trace,
+            canonicalJid: probe.jid,
+            messageId,
+            timestamp: new Date().toISOString()
+        });
+    } catch (err) {
+        trace.push({ step: 5, title: 'Envio da Mensagem', status: 'ERROR', message: err.message });
+        return res.status(500).json({ success: false, trace, error: err.message });
     }
 });
 

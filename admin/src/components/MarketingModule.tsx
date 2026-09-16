@@ -4,7 +4,7 @@ import {
   AlertTriangle, RefreshCw, MessageSquare, Play, Pause, ExternalLink,
   Flame, Lock, Copy, Check, Plus, Trash2, Edit3, ArrowRight, CheckSquare,
   Square, Calendar, Layers, ShieldCheck, HelpCircle, ChevronRight,
-  ToggleLeft, ToggleRight, Zap, QrCode, Smartphone, LogOut
+  ToggleLeft, ToggleRight, Zap, QrCode, Smartphone, LogOut, FlaskConical
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -176,6 +176,53 @@ export default function MarketingModule() {
     setQrLoading(true);
     await checkWhatsAppStatus();
     setQrLoading(false);
+  };
+
+  // 🧪 Laboratório de Teste & Armadilha de Diagnóstico em Tempo Real
+  const [isTestLabOpen, setIsTestLabOpen] = useState<boolean>(false);
+  const [labPhone, setLabPhone] = useState<string>(() => {
+    return localStorage.getItem('SP_LAB_TEST_PHONE') || '11948420071';
+  });
+  const [labName, setLabName] = useState<string>('Leo');
+  const [labMessage, setLabMessage] = useState<string>('Fala parceiro! 💨 Teste de entrega oficial da Smoking Pods via WhatsApp.');
+  const [labExecuting, setLabExecuting] = useState<boolean>(false);
+  const [labResult, setLabResult] = useState<any>(null);
+  const [labError, setLabError] = useState<string | null>(null);
+
+  const handleRunLabTest = async () => {
+    setLabExecuting(true);
+    setLabResult(null);
+    setLabError(null);
+    localStorage.setItem('SP_LAB_TEST_PHONE', labPhone);
+
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/marketing/test-lab-dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: labPhone,
+          name: labName,
+          text: labMessage,
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setLabError(data.message || data.error || 'Falha ao entregar a mensagem.');
+      }
+      setLabResult(data);
+    } catch (err: any) {
+      setLabError(err.message || 'Erro de conexão com o servidor local.');
+    } finally {
+      setLabExecuting(false);
+    }
+  };
+
+  const handleOpenTestLabForCampaign = (camp: Campaign) => {
+    setLabMessage(camp.message);
+    setLabName('Leo');
+    setLabResult(null);
+    setLabError(null);
+    setIsTestLabOpen(true);
   };
 
   const handleLogoutWhatsApp = async () => {
@@ -743,21 +790,48 @@ export default function MarketingModule() {
               })
             });
             const resData = await res.json();
+            
+            if (!res.ok || !resData.success) {
+              console.warn(`❌ [Armadilha] Falha no disparo para ${contact.name} (${normalizedPhone}):`, resData.message || resData.error);
+              setDispatchProgress({
+                current: alreadySentPhones.length,
+                total: targetContacts.length,
+                status: `⚠️ Ignorado: ${contact.name || normalizedPhone} (${resData.message || 'Erro de entrega'}). Avançando para o próximo...`
+              });
+              alreadySentPhones.push(normalizedPhone);
+              localStorage.setItem(sentHistoryKey, JSON.stringify(alreadySentPhones));
+              continue;
+            }
+
             if (resData.skipped) {
-              console.log(`⏩ Contato ${normalizedPhone} pulado por trava do servidor.`);
+              console.log(`⏩ Contato ${normalizedPhone} pulado por trava anti-duplicação.`);
+              setDispatchProgress({
+                current: alreadySentPhones.length,
+                total: targetContacts.length,
+                status: `⏩ Pulado: ${contact.name || normalizedPhone} já recebeu esta campanha. Avançando...`
+              });
             } else {
               sentInThisSession++;
+              alreadySentPhones.push(normalizedPhone);
+              localStorage.setItem(sentHistoryKey, JSON.stringify(alreadySentPhones));
+
+              setDispatchProgress({
+                current: alreadySentPhones.length,
+                total: targetContacts.length,
+                status: `✅ Entregue (${sentInThisSession}/${targetContacts.length}) para ${contact.name || normalizedPhone} (ID: ${resData.messageId || 'OK'}). Aguardando cadência anti-ban...`
+              });
             }
-            alreadySentPhones.push(normalizedPhone);
-            localStorage.setItem(sentHistoryKey, JSON.stringify(alreadySentPhones));
-          } catch (e) {}
+          } catch (e: any) {
+            console.error('Erro de conexão no disparo:', e);
+            setDispatchProgress({
+              current: alreadySentPhones.length,
+              total: targetContacts.length,
+              status: `⚠️ Erro de conexão com o servidor para ${contact.name}. Avançando...`
+            });
+            continue;
+          }
 
           batchCounter++;
-          setDispatchProgress({
-            current: alreadySentPhones.length,
-            total: targetContacts.length,
-            status: `✅ Enviado (${alreadySentPhones.length}/${targetContacts.length}) para ${contact.name || normalizedPhone}. Aguardando intervalo de segurança anti-ban...`
-          });
 
           // Trava 4: Intervalo de descanso individual entre contatos (20 a 35 segundos aleatórios) com cancelamento instantâneo
           const randomDelay = Math.floor(Math.random() * 15000) + 20000;
@@ -1036,6 +1110,15 @@ export default function MarketingModule() {
               >
                 <ShieldCheck className={`size-3.5 text-purple-400 ${loadingScan ? 'animate-spin' : ''}`} />
                 <span>{loadingScan ? 'Varrendo...' : '🔍 Varrer Histórico'}</span>
+              </button>
+
+              <button
+                onClick={() => setIsTestLabOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 text-xs font-bold flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)]"
+                title="Laboratório de Teste: Dispara para seu WhatsApp e rastreia o erro exato na entrega"
+              >
+                <FlaskConical className="size-3.5 text-cyan-400" />
+                <span>🧪 Laboratório de Teste & Armadilha</span>
               </button>
             </div>
           </div>
@@ -1406,13 +1489,24 @@ export default function MarketingModule() {
                                       <span>🛑 Parar Disparos</span>
                                     </button>
                                   ) : (
-                                    <button
-                                      onClick={() => handleExecuteCampaign(camp)}
-                                      className="px-3.5 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md"
-                                    >
-                                      <Send className="size-3" />
-                                      <span>{camp.frequencyDays > 0 ? 'Disparar Lote Agora' : 'Disparar Agora'}</span>
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => handleOpenTestLabForCampaign(camp)}
+                                        className="px-3 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md"
+                                        title="Abrir Laboratório de Teste com Armadilha para esta campanha"
+                                      >
+                                        <FlaskConical className="size-3" />
+                                        <span>🧪 Testar Envio</span>
+                                      </button>
+                                      
+                                      <button
+                                        onClick={() => handleExecuteCampaign(camp)}
+                                        className="px-3.5 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md"
+                                      >
+                                        <Send className="size-3" />
+                                        <span>{camp.frequencyDays > 0 ? 'Disparar Lote' : 'Disparar Tudo'}</span>
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -2246,6 +2340,225 @@ export default function MarketingModule() {
                 Fechar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 🧪 MODAL: LABORATÓRIO DE DISPARO & ARMADILHA DE DIAGNÓSTICO */}
+      {/* ============================================================ */}
+      {isTestLabOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-[#0e1017] border border-cyan-500/30 w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            
+            {/* Topo do Modal */}
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                  <FlaskConical className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white flex items-center gap-2">
+                    Laboratório de Disparo &amp; Armadilha de Diagnóstico
+                  </h3>
+                  <p className="text-xs text-white/50">
+                    Rastreie o percurso exato da mensagem e detecte qualquer falha de entrega em tempo real.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTestLabOpen(false)}
+                className="size-8 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Formulário de Envio de Teste */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-white/80">WhatsApp de Teste (com DDD)</label>
+                  <input
+                    type="text"
+                    value={labPhone}
+                    onChange={e => setLabPhone(e.target.value)}
+                    placeholder="Ex: 11948420071"
+                    className="w-full bg-black/60 border border-white/10 focus:border-cyan-500/50 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-white/30 outline-none font-mono"
+                  />
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setLabPhone('11948420071')}
+                      className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold underline cursor-pointer"
+                    >
+                      Preencher meu número (11 94842-0071)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-white/80">Nome do Contato</label>
+                  <input
+                    type="text"
+                    value={labName}
+                    onChange={e => setLabName(e.target.value)}
+                    placeholder="Ex: Leo"
+                    className="w-full bg-black/60 border border-white/10 focus:border-cyan-500/50 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-white/30 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-white/80">Corpo da Mensagem</label>
+                <textarea
+                  rows={3}
+                  value={labMessage}
+                  onChange={e => setLabMessage(e.target.value)}
+                  placeholder="Escreva a mensagem de teste aqui..."
+                  className="w-full bg-black/60 border border-white/10 focus:border-cyan-500/50 rounded-xl p-3 text-xs text-white placeholder:text-white/30 outline-none leading-relaxed custom-scrollbar"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRunLabTest}
+                disabled={labExecuting}
+                className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 active:scale-[0.99]"
+              >
+                {labExecuting ? (
+                  <>
+                    <RefreshCw className="size-4 animate-spin text-black" />
+                    <span>Executando Armadilha de Diagnóstico no WhatsApp...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="size-4 fill-black text-black" />
+                    <span>⚡ Disparar e Rastrear com Armadilha</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Resultado e Telemetria em Tempo Real */}
+            {labExecuting && (
+              <div className="p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl flex items-center gap-3 text-cyan-300 text-xs animate-pulse">
+                <RefreshCw className="size-5 animate-spin shrink-0" />
+                <div>
+                  <p className="font-bold">Consultando a rede do WhatsApp...</p>
+                  <p className="text-[11px] text-cyan-300/70 mt-0.5">
+                    Validando formato, consultando registro ativo no servidor oficial e preparando envio com confirmação de entrega.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Painel do Erro Diagnosticado */}
+            {labError && !labExecuting && (
+              <div className="p-4 bg-red-500/15 border border-red-500/40 rounded-2xl space-y-2.5 animate-in fade-in">
+                <div className="flex items-start gap-3">
+                  <div className="size-8 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
+                    <ShieldAlert className="size-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-red-300 uppercase tracking-wide">
+                      Armadilha Ativada: Falha Detectada na Entrega
+                    </h4>
+                    <p className="text-xs text-white/90 mt-1 font-medium leading-relaxed">
+                      {labError}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-black/40 border border-red-500/20 rounded-xl text-[11px] text-white/70 space-y-1">
+                  <span className="font-bold text-red-300 block">💡 Diagnóstico Técnico:</span>
+                  {labError.includes('LID') ? (
+                    <p>Este registro contém um identificador interno de dispositivo (LID com 14+ dígitos) e não um número telefônico com DDD. O WhatsApp rejeita envios diretos para LIDs.</p>
+                  ) : labError.includes('NÃO possui conta') || labError.includes('rejeitado') ? (
+                    <p>O servidor oficial do WhatsApp confirmou que este telefone não possui conta ativa. Pode ter sido digitado errado, ser um telefone fixo ou ter sido cancelado na operadora.</p>
+                  ) : labError.includes('offline') || labError.includes('desconectado') ? (
+                    <p>O WhatsApp Web não está conectado ao backend. Conecte pelo botão "Conectar WhatsApp" no topo da página.</p>
+                  ) : (
+                    <p>Verifique se o número possui DDD correto e se o aparelho que enviou está com internet ativa.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Sucesso Confirmado com Recibo */}
+            {labResult?.success && !labExecuting && (
+              <div className="p-4 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl space-y-2.5 animate-in fade-in">
+                <div className="flex items-start gap-3">
+                  <div className="size-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                    <CheckCircle2 className="size-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-emerald-300 uppercase tracking-wide">
+                      Mensagem Entregue e Confirmada pelo Servidor do WhatsApp!
+                    </h4>
+                    <p className="text-xs text-white/90 mt-1">
+                      O corpo da mensagem chegou ao destinatário e o servidor gerou o recibo oficial.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono bg-black/40 p-3 rounded-xl border border-white/5">
+                  <div>
+                    <span className="text-white/40 block">JID Canônico:</span>
+                    <span className="text-emerald-300 font-bold">{labResult.canonicalJid}</span>
+                  </div>
+                  <div>
+                    <span className="text-white/40 block">Message ID:</span>
+                    <span className="text-white font-bold">{labResult.messageId}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Linha do Tempo / Trace Passo a Passo */}
+            {labResult?.trace && Array.isArray(labResult.trace) && (
+              <div className="space-y-2 pt-2 border-t border-white/10">
+                <h5 className="text-[11px] font-mono text-white/50 uppercase tracking-wider">
+                  Trilha de Auditoria do Disparo:
+                </h5>
+                <div className="space-y-1.5 font-mono text-[11px]">
+                  {labResult.trace.map((item: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className={`p-2.5 rounded-xl border flex items-start justify-between gap-3 ${
+                        item.status === 'OK'
+                          ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-300'
+                          : item.status === 'ERROR'
+                          ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                          : 'bg-white/5 border-white/10 text-white/70'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold">
+                          {item.status === 'OK' ? '✓' : item.status === 'ERROR' ? '✕' : '•'} Passo {item.step}:
+                        </span>
+                        <span>{item.title}</span>
+                      </div>
+                      <span className="text-[10px] text-right text-white/60">
+                        {item.message || (item.status === 'OK' ? 'Sucesso' : 'Pendente')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="border-t border-white/10 pt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsTestLabOpen(false)}
+                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold cursor-pointer transition-colors"
+              >
+                Fechar Laboratório
+              </button>
+            </div>
+
           </div>
         </div>
       )}
