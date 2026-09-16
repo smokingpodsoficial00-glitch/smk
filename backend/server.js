@@ -1301,7 +1301,65 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
             console.warn('Aviso ao buscar grupos via Baileys:', gErr.message);
         }
 
-        const contacts = [];
+        // 👥 Unificação de Contatos: Reúne todos os contatos salvos das listas e do Supabase
+        const contactsMap = new Map();
+
+        // 1. Contatos das Listas Salvas (Preserva 100% dos nomes e telefones cadastrados)
+        try {
+            const config = loadMarketingConfig();
+            (config.lists || []).forEach(list => {
+                (list.contacts || []).forEach(c => {
+                    const raw = c.cleanPhone || c.phone || '';
+                    const clean = String(raw).replace(/\D/g, '');
+                    const norm = clean.startsWith('55') ? clean : `55${clean}`;
+                    if (norm.length >= 10 && !contactsMap.has(norm)) {
+                        contactsMap.set(norm, {
+                            id: c.id || `${norm}@s.whatsapp.net`,
+                            name: c.name || `Cliente ${norm.slice(-4)}`,
+                            phone: c.phone || norm,
+                            cleanPhone: norm,
+                            isSaved: true
+                        });
+                    }
+                });
+            });
+        } catch (e) {
+            console.warn('⚠️ Erro ao ler contatos das listas locais:', e.message);
+        }
+
+        // 2. Contatos do Supabase (smoking_clients)
+        try {
+            const { data: dbClients } = await supabase
+                .from('smoking_clients')
+                .select('id, name, phone')
+                .limit(2000);
+
+            (dbClients || []).forEach(cl => {
+                if (!cl.phone) return;
+                const clean = String(cl.phone).replace(/\D/g, '');
+                const norm = clean.startsWith('55') ? clean : `55${clean}`;
+                if (norm.length >= 10) {
+                    if (contactsMap.has(norm)) {
+                        const existing = contactsMap.get(norm);
+                        if ((!existing.name || existing.name.startsWith('Cliente')) && cl.name) {
+                            existing.name = cl.name;
+                        }
+                    } else {
+                        contactsMap.set(norm, {
+                            id: cl.id || `${norm}@s.whatsapp.net`,
+                            name: cl.name || `Cliente ${norm.slice(-4)}`,
+                            phone: cl.phone,
+                            cleanPhone: norm,
+                            isSaved: true
+                        });
+                    }
+                }
+            });
+        } catch (dbErr) {
+            console.warn('⚠️ Erro ao consultar smoking_clients no Supabase:', dbErr.message);
+        }
+
+        const contacts = Array.from(contactsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
         // Se ainda vazio, inclui grupos detectados por mensagens recebidas recentemente
         if (typeof detectedGroups !== 'undefined') {

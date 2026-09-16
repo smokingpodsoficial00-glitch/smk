@@ -188,10 +188,14 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       let displayPhone = rawPhone;
       if (phoneClean.length === 11) {
         displayPhone = `(${phoneClean.substring(0, 2)}) ${phoneClean.substring(2, 7)}-${phoneClean.substring(7)}`;
+      } else if (phoneClean.length === 10) {
+        displayPhone = `(${phoneClean.substring(0, 2)}) ${phoneClean.substring(2, 6)}-${phoneClean.substring(6)}`;
       } else if (phoneClean.length === 13 && phoneClean.startsWith('55')) {
         displayPhone = `+55 (${phoneClean.substring(2, 4)}) ${phoneClean.substring(4, 9)}-${phoneClean.substring(9)}`;
-      } else if (phoneClean.length > 13) {
-        displayPhone = `+55 (11) 95174-1181`;
+      } else if (phoneClean.length === 12 && phoneClean.startsWith('55')) {
+        displayPhone = `+55 (${phoneClean.substring(2, 4)}) ${phoneClean.substring(4, 8)}-${phoneClean.substring(8)}`;
+      } else {
+        displayPhone = rawPhone;
       }
 
       const name = String(client.name || latestOrder?.client_name || `Cliente ${phoneClean.slice(-4)}`).trim();
@@ -297,7 +301,7 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
           prospectingStatus === 'reativado' ? 'Reativado (Ativo)' :
           prospectingStatus === 'contatado' ? 'Em Negociação' : 'Base Antiga';
 
-        const waNumber = phoneClean.length > 13 ? '5511951741181' : (phoneClean.startsWith('55') ? phoneClean : '55' + phoneClean);
+        const waNumber = phoneClean.startsWith('55') ? phoneClean : '55' + phoneClean;
         const whatsappMessage = `E aí ${name}! Tudo certo? 💨 Vi que já faz um tempinho desde o seu ${lastProduct}. Seu pod já tá nas últimas tragadas? Já quer garantir o próximo sabor pra não ficar na mão no fds? Me dá um toque por aqui!`;
         const whatsappUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}`;
 
@@ -341,7 +345,7 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
           ? (flavorProfile === 'ice' ? 'Mentolado / Ice' : flavorProfile === 'tobacco' ? 'Atabacado / Intenso' : flavorProfile === 'dessert' ? 'Sobremesa / Doce' : 'Frutado / Doce')
           : 'Não especificado';
 
-        const waNumber = phoneClean.length > 13 ? '5511951741181' : (phoneClean.startsWith('55') ? phoneClean : '55' + phoneClean);
+        const waNumber = phoneClean.startsWith('55') ? phoneClean : '55' + phoneClean;
         const whatsappMessage = `Oii ${name}! Tudo bem? Seja bem-vindo à Smoking Pods! 💨 Como posso te ajudar a escolher o pod ideal hoje?`;
         const whatsappUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}`;
 
