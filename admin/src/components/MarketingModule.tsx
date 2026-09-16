@@ -911,7 +911,15 @@ export default function MarketingModule() {
           .update({ last_run_at: new Date().toISOString() })
           .eq('id', camp.id)
           .eq('company_id', company.id)
-          .then(() => {});
+          .select('updated_at')
+          .single()
+          .then(({ data }) => {
+            if (data?.updated_at) {
+              setCampaigns(prev => prev.map(c => 
+                c.id === camp.id ? { ...c, updatedAt: data.updated_at } : c
+              ));
+            }
+          });
       }
       if (!isAbortingRef.current) {
         alert('Disparo da campanha finalizado com sucesso!');
