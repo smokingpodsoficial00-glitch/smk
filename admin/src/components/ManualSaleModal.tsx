@@ -42,6 +42,7 @@ export function ManualSaleModal({
   const [shippingFee, setShippingFee] = useState<string>("0"); // Cobrado do cliente
   const [shippingCost, setShippingCost] = useState<string>("0"); // Custo real pago ao motoboy/Uber
   const [autoAddToMarketingList, setAutoAddToMarketingList] = useState(true);
+  const [isNoWhatsApp, setIsNoWhatsApp] = useState(false);
 
   // Lista de Itens no Pedido
   const [items, setItems] = useState<
@@ -267,7 +268,14 @@ export function ManualSaleModal({
     const found = clientsList.find((c) => c.client_phone === phone);
     if (found) {
       setClientName(found.client_name || "");
-      setClientPhone(found.client_phone || "");
+      if (found.client_phone && (found.client_phone.startsWith("INSTA_") || found.client_phone.startsWith("SEM_WPP_") || found.client_phone.includes("Instagram"))) {
+        setIsNoWhatsApp(true);
+        setClientPhone("");
+        setAutoAddToMarketingList(false);
+      } else {
+        setIsNoWhatsApp(false);
+        setClientPhone(found.client_phone || "");
+      }
       setShippingAddress(found.shipping_address || "");
     }
   };
@@ -293,7 +301,14 @@ export function ManualSaleModal({
       // 1. Inserir/Atualizar Cliente no CRM (smoking_clients)
       const rawPhone = clientPhone.trim();
       const cleanPhone = rawPhone.replace(/\D/g, "");
-      const formattedPhone = cleanPhone ? (cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`) : "5511999999999";
+      
+      let formattedPhone = "";
+      if (isNoWhatsApp || (!cleanPhone && !rawPhone)) {
+        const cleanSlug = clientName.trim().toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10) || "cliente";
+        formattedPhone = `INSTA_${cleanSlug}_${Date.now().toString().slice(-6)}`;
+      } else {
+        formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+      }
 
       let clientSaveWarning: string | null = null;
       try {
@@ -387,7 +402,7 @@ export function ManualSaleModal({
 
       // 4. Inserir automaticamente na Lista de Transmissão de Compradores do Marketing
       let marketingListNote = "";
-      if (autoAddToMarketingList && cleanPhone) {
+      if (autoAddToMarketingList && cleanPhone && !isNoWhatsApp && !formattedPhone.startsWith("INSTA_")) {
         try {
           const mktRes = await ensureBuyerInBroadcastList({
             companyId,
@@ -415,6 +430,7 @@ export function ManualSaleModal({
         setItems([]);
         setClientName("");
         setClientPhone("");
+        setIsNoWhatsApp(false);
         setShippingAddress("");
         setSelectedModelKey("");
         setSelectedFlavorId("");
@@ -513,13 +529,34 @@ export function ManualSaleModal({
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-silver font-medium block mb-1">WhatsApp (DDD + Número)</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] text-silver font-medium">WhatsApp (DDD + Número)</label>
+                    <label className="flex items-center gap-1.5 text-[10px] text-white/50 hover:text-white/80 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isNoWhatsApp}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setIsNoWhatsApp(checked);
+                          if (checked) {
+                            setClientPhone("");
+                            setAutoAddToMarketingList(false);
+                          }
+                        }}
+                        className="size-3 rounded accent-amber-500 cursor-pointer"
+                      />
+                      <span>Sem WhatsApp (Insta)</span>
+                    </label>
+                  </div>
                   <input
                     type="text"
-                    value={clientPhone}
+                    disabled={isNoWhatsApp}
+                    value={isNoWhatsApp ? "(Venda Instagram / Sem WhatsApp)" : clientPhone}
                     onChange={(e) => setClientPhone(e.target.value)}
                     placeholder="Ex: 11943856234"
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400/50 font-semibold"
+                    className={`w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400/50 font-semibold ${
+                      isNoWhatsApp ? 'opacity-50 cursor-not-allowed italic text-white/60 bg-white/5' : ''
+                    }`}
                   />
                 </div>
 

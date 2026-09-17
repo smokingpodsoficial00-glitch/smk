@@ -378,86 +378,28 @@
       "legacyMetadata": {}
     },
     {
-      "id": "2bff8070-09d7-4e81-aa54-3b012d8c8f37",
-      "name": "CPM DE TESTEEE",
+      "id": "20167b4e-3524-413c-acfb-e83b598f6432",
+      "name": "CPM TESTE GRUPO",
       "message": "Oii, tudo bem? 💨\nPassando pra te avisar que a *Smoking Pods tá de volta oficialmente à ativa em SBC!*\n\nAs entregas pro final de semana já estão rolando a todo vapor pra você *garantir o seu pod a tempo e não ficar na mão no rolê*. Reabrimos com estoque 100% renovado, produtos originais e o delivery rápido de sempre de *30 a 40 min* pelo Uber Direct.\n\n📦 *Dá uma olhada nos modelos disponíveis no Cardápio Digital:*\n🔗 [LINK_DO_CARDAPIO_VERCEL]\n\n💬 *Também ativamos o Grupo VIP no WhatsApp pra soltar lotes exclusivos e frete promocional pro fds:*\n🔗 [LINK_DO_GRUPO_VIP_WHATSAPP]\n\nQual modelo e sabor posso separar pra você já garantir pro fds?",
       "variations": [],
       "useVariations": false,
-      "targetType": "lists",
-      "selectedListIds": [
-        "c35118f5-38a5-49ce-bb4b-5877c395b520"
-      ],
-      "targetGroupId": "120363283721984620@g.us",
+      "targetType": "group",
+      "selectedListIds": [],
+      "targetGroupId": "120363430820740157@g.us",
+      "targetGroupName": "SMK MATERIAL MKT",
       "frequencyDays": 7,
-      "scheduledWeekday": "QUARTA",
       "scheduledTime": "15:00",
-      "startDate": "2026-09-16",
+      "startDate": "2026-09-17",
       "batchSize": 5,
       "batchIntervalMinutes": 35,
       "status": "active",
-      "lastRunDate": "17/09/2026",
-      "totalRecipients": 1,
-      "createdAt": "2026-09-16T00:28:22.758402+00:00",
-      "updatedAt": "2026-09-17T17:02:05.991715+00:00",
+      "totalRecipients": 3,
+      "createdAt": "2026-09-17T17:43:54.486847+00:00",
+      "updatedAt": "2026-09-17T17:43:54.486847+00:00",
       "legacyMetadata": {}
     }
   ],
   "idempotencyKeys": [
-    {
-      "key": "camp_1786818802616_2026-08-23_12:00",
-      "timestamp": "2026-08-23T15:00:41.676Z",
-      "campaignName": "CPM DOMINGO 1"
-    },
-    {
-      "key": "camp_1786819959793_2026-08-23_19:30",
-      "timestamp": "2026-08-23T22:30:45.144Z",
-      "campaignName": "CPM DOMINGO 2"
-    },
-    {
-      "key": "camp_1786812557221_2026-08-24_14:05",
-      "timestamp": "2026-08-24T17:05:53.614Z",
-      "campaignName": "CPM GRUPO ESTOQUE SEMANAL"
-    },
-    {
-      "key": "camp_1786821475258_2026-08-26_16:00",
-      "timestamp": "2026-08-26T19:00:28.102Z",
-      "campaignName": "CPM  LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!"
-    },
-    {
-      "key": "camp_1786815888015_2026-08-28_17:30",
-      "timestamp": "2026-08-28T20:30:48.778Z",
-      "campaignName": "CPM SEXTOU 2"
-    },
-    {
-      "key": "camp_1786816065551_2026-08-29_21:30",
-      "timestamp": "2026-08-29T00:30:45.580Z",
-      "campaignName": "CPM GRUPO SEXTOU NOTURNO 3"
-    },
-    {
-      "key": "camp_1786816420999_2026-08-29_14:00",
-      "timestamp": "2026-08-29T17:00:55.125Z",
-      "campaignName": "CPM SABADÃO 1"
-    },
-    {
-      "key": "camp_1786816513199_2026-08-29_17:30",
-      "timestamp": "2026-08-29T20:30:57.182Z",
-      "campaignName": "CPM SABADÃO 2"
-    },
-    {
-      "key": "camp_1786817784280_2026-08-29_19:30",
-      "timestamp": "2026-08-29T22:30:58.224Z",
-      "campaignName": "CPM SABADÃO 3"
-    },
-    {
-      "key": "camp_1786818802616_2026-08-30_12:00",
-      "timestamp": "2026-08-30T15:00:59.648Z",
-      "campaignName": "CPM DOMINGO 1"
-    },
-    {
-      "key": "camp_1786819959793_2026-08-30_19:30",
-      "timestamp": "2026-08-30T22:31:03.272Z",
-      "campaignName": "CPM DOMINGO 2"
-    },
     {
       "key": "camp_1786816065551_2026-09-05_21:30",
       "timestamp": "2026-09-05T00:30:54.304Z",
@@ -482,9 +424,24 @@
       "key": "camp_1786817784280_2026-09-05_19:30",
       "timestamp": "2026-09-05T22:30:57.281Z",
       "campaignName": "CPM SABADÃO 3"
+    },
+    {
+      "key": "4e4a393c-5a6b-44cf-9488-ec5e3c025937_2026-09-17_15:00",
+      "timestamp": "2026-09-17T18:00:52.240Z",
+      "campaignName": "CPM GRUPO INSTAGRAM"
+    },
+    {
+      "key": "2bff8070-09d7-4e81-aa54-3b012d8c8f37_2026-09-17_15:00",
+      "timestamp": "2026-09-17T18:00:52.244Z",
+      "campaignName": "CPM DE TESTEEE"
+    },
+    {
+      "key": "camp_1789667033352_2026-09-17_15:00",
+      "timestamp": "2026-09-17T18:00:52.648Z",
+      "campaignName": "CPM TESTE GRUPO"
     }
   ],
-  "lastUpdated": "2026-09-17T17:02:04.881Z",
+  "lastUpdated": "2026-09-17T19:11:52.449Z",
   "lists": [
     {
       "id": "0d925499-da68-4a93-9591-f4b6f78744b1",

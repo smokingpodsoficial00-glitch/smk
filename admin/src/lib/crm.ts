@@ -148,19 +148,24 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       }
     }
 
-    // 2. Agrupar Pedidos por Telefone Normalizado
+    // 2. Agrupar Pedidos por Telefone Normalizado (ou Chave Exclusiva de Instagram)
     const ordersByPhone = new Map<string, any[]>();
     for (const order of orders) {
       if (!order) continue;
-      const phoneRaw = String(order.client_phone || order.customer_phone || order.phone || '');
-      const phoneClean = phoneRaw.replace(/\D/g, '');
-      if (!phoneClean) continue;
-      const normalizedKey = phoneClean.length === 10 || phoneClean.length === 11 ? `55${phoneClean}` : phoneClean;
-
-      if (!ordersByPhone.has(normalizedKey)) {
-        ordersByPhone.set(normalizedKey, []);
+      const phoneRaw = String(order.client_phone || order.customer_phone || order.phone || '').trim();
+      let lookupKey = '';
+      if (phoneRaw.startsWith('INSTA_') || phoneRaw.startsWith('SEM_WPP_') || phoneRaw.includes('Instagram')) {
+        lookupKey = phoneRaw;
+      } else {
+        const phoneClean = phoneRaw.replace(/\D/g, '');
+        if (!phoneClean) continue;
+        lookupKey = phoneClean.length === 10 || phoneClean.length === 11 ? `55${phoneClean}` : phoneClean;
       }
-      ordersByPhone.get(normalizedKey)!.push(order);
+
+      if (!ordersByPhone.has(lookupKey)) {
+        ordersByPhone.set(lookupKey, []);
+      }
+      ordersByPhone.get(lookupKey)!.push(order);
     }
 
     const result: RealClient[] = [];
@@ -172,21 +177,32 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
     for (const client of clientsData) {
       if (!client || !client.phone) continue;
       const rawPhone = String(client.phone).trim();
-      const phoneClean = rawPhone.replace(/\D/g, '');
-      const normalizedKey = phoneClean.length === 10 || phoneClean.length === 11 ? `55${phoneClean}` : phoneClean;
+      let lookupKey = '';
+      let phoneClean = '';
+      const isInsta = rawPhone.startsWith('INSTA_') || rawPhone.startsWith('SEM_WPP_') || rawPhone.includes('Instagram');
       
-      processedPhones.add(normalizedKey);
+      if (isInsta) {
+        lookupKey = rawPhone;
+        phoneClean = '';
+      } else {
+        phoneClean = rawPhone.replace(/\D/g, '');
+        lookupKey = phoneClean.length === 10 || phoneClean.length === 11 ? `55${phoneClean}` : phoneClean;
+      }
+      
+      processedPhones.add(lookupKey);
       if (phoneClean) processedPhones.add(phoneClean);
 
       // Buscar pedidos associados a este cliente
-      const clientOrders = ordersByPhone.get(normalizedKey) || ordersByPhone.get(phoneClean) || [];
+      const clientOrders = ordersByPhone.get(lookupKey) || (phoneClean ? ordersByPhone.get(phoneClean) : []) || [];
       clientOrders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
 
       const latestOrder = clientOrders[0] || null;
 
       // Formatação de telefone para exibição
       let displayPhone = rawPhone;
-      if (phoneClean.length === 11) {
+      if (isInsta) {
+        displayPhone = 'Sem WhatsApp (Instagram)';
+      } else if (phoneClean.length === 11) {
         displayPhone = `(${phoneClean.substring(0, 2)}) ${phoneClean.substring(2, 7)}-${phoneClean.substring(7)}`;
       } else if (phoneClean.length === 10) {
         displayPhone = `(${phoneClean.substring(0, 2)}) ${phoneClean.substring(2, 6)}-${phoneClean.substring(6)}`;
@@ -303,10 +319,10 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
 
         const waNumber = phoneClean.startsWith('55') ? phoneClean : '55' + phoneClean;
         const whatsappMessage = `E aí ${name}! Tudo certo? 💨 Vi que já faz um tempinho desde o seu ${lastProduct}. Seu pod já tá nas últimas tragadas? Já quer garantir o próximo sabor pra não ficar na mão no fds? Me dá um toque por aqui!`;
-        const whatsappUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+        const whatsappUrl = phoneClean ? `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}` : '';
 
         result.push({
-          id: String(client.id || normalizedKey),
+          id: String(client.id || lookupKey),
           phone: String(displayPhone),
           cleanPhone: phoneClean,
           name: String(name),
@@ -347,10 +363,10 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
 
         const waNumber = phoneClean.startsWith('55') ? phoneClean : '55' + phoneClean;
         const whatsappMessage = `Oii ${name}! Tudo bem? Seja bem-vindo à Smoking Pods! 💨 Como posso te ajudar a escolher o pod ideal hoje?`;
-        const whatsappUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+        const whatsappUrl = phoneClean ? `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}` : '';
 
         result.push({
-          id: String(client.id || normalizedKey),
+          id: String(client.id || lookupKey),
           phone: String(displayPhone),
           cleanPhone: phoneClean,
           name: String(name),
@@ -395,8 +411,10 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       clientOrders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
       const latestOrder = clientOrders[0] || {};
       const rawPhone = latestOrder.client_phone || phoneKey;
-      const cleanPhone = phoneKey.replace(/\D/g, '');
-      const name = String(latestOrder.client_name || `Cliente ${cleanPhone.slice(-4)}`).trim();
+      const isInsta = String(rawPhone).startsWith('INSTA_') || String(rawPhone).startsWith('SEM_WPP_') || String(rawPhone).includes('Instagram');
+      const cleanPhone = isInsta ? '' : phoneKey.replace(/\D/g, '');
+      const displayPhone = isInsta ? 'Sem WhatsApp (Instagram)' : rawPhone;
+      const name = String(latestOrder.client_name || (cleanPhone ? `Cliente ${cleanPhone.slice(-4)}` : 'Cliente Instagram')).trim();
       const address = String(latestOrder.shipping_address || 'Atendimento Balcão / WhatsApp').trim();
 
       const validOrders = clientOrders.filter(o => o && o.delivery_status !== 'CANCELADO');
@@ -408,11 +426,11 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
 
       const waNumber = cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone;
       const whatsappMessage = `E aí ${name}! Tudo certo?`;
-      const whatsappUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+      const whatsappUrl = cleanPhone ? `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}` : '';
 
       result.push({
         id: phoneKey,
-        phone: rawPhone,
+        phone: displayPhone,
         cleanPhone,
         name,
         address,
