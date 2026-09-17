@@ -195,14 +195,8 @@ export function useStoreConfig() {
       });
     }
 
-    // Polling a cada 2s
-    const intervalId = setInterval(() => {
-      fetchConfig().then(result => setConfig(result));
-    }, 2000);
-
     return () => {
       listeners.delete(onUpdate);
-      clearInterval(intervalId);
       if (channel) {
         try { supabase.removeChannel(channel); } catch {}
       }

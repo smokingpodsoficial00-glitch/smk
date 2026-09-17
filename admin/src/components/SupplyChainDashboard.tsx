@@ -357,12 +357,8 @@ export default function SupplyChainDashboard() {
       })
       .subscribe();
 
-    // Sincronização em segundo plano suave a cada 15 segundos
-    const intervalId = setInterval(() => fetchData(), 15000);
-
     return () => {
       supabase.removeChannel(channel);
-      clearInterval(intervalId);
     };
   }, [company?.id]);
 

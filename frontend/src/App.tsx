@@ -113,11 +113,6 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
   useEffect(() => {
     loadProducts();
 
-    // Sincronização em segundo plano suave a cada 20 segundos (Realtime já atualiza na hora)
-    const intervalId = setInterval(() => {
-      loadProducts();
-    }, 20000);
-
     // Inscrição em tempo real para atualizações no estoque e catálogo (smoking_products)
     const subscription = supabase
       .channel("public:realtime_menu")
@@ -127,7 +122,6 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
       .subscribe();
 
     return () => {
-      clearInterval(intervalId);
       supabase.removeChannel(subscription);
     };
   }, []);

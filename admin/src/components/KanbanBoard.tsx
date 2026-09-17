@@ -127,11 +127,6 @@ export default function KanbanBoard() {
   useEffect(() => {
     fetchOrders();
 
-    // Sincronização em segundo plano suave a cada 20 segundos (Realtime já atualiza na hora sem sobrecarga)
-    const intervalId = setInterval(() => {
-      fetchOrders();
-    }, 20000);
-
     // Inscrição em tempo real para atualizações no Supabase
     const subscription = supabase
       .channel('public:smoking_orders_kanban')
@@ -141,7 +136,6 @@ export default function KanbanBoard() {
       .subscribe();
 
     return () => {
-      clearInterval(intervalId);
       supabase.removeChannel(subscription);
     };
   }, [company?.id]);
