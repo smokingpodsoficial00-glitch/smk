@@ -604,68 +604,99 @@ export default function MarketingModule() {
 
     const selectedGroupName = whatsAppGroups.find(g => g.id === campaignFormTargetGroup)?.name;
 
-    try {
-      if (editingCampaign) {
-        const expectedUpdatedAt = editingCampaign.updatedAt || editingCampaign.createdAt;
-        const updated = await updateMarketingCampaign(
-          company.id,
-          editingCampaign.id,
-          {
-            name: campaignFormName.trim(),
-            message: campaignFormMessage,
-            variations: campaignFormVariations.filter(v => v.trim().length > 0),
-            useVariations: campaignFormUseVariations,
-            targetType: campaignFormTargetType,
-            selectedListIds: Array.from(campaignFormSelectedLists),
-            targetGroupId: campaignFormTargetGroup,
-            targetGroupName: selectedGroupName,
-            frequencyDays: campaignFormFrequency,
-            scheduledWeekday: campaignFormWeekday,
-            scheduledTime: campaignFormTime,
-            startDate: campaignFormStartDate,
-            batchSize: campaignFormBatchSize,
-            batchIntervalMinutes: campaignFormInterval,
-            totalRecipients: totalCount,
-          },
-          expectedUpdatedAt
-        );
-        setCampaigns(prev => prev.map(c => c.id === updated.id ? updated : c));
-        setIsCampaignModalOpen(false);
-      } else {
-        const newCamp = await createMarketingCampaign(company.id, {
-          name: campaignFormName.trim(),
-          message: campaignFormMessage,
-          variations: campaignFormVariations.filter(v => v.trim().length > 0),
-          useVariations: campaignFormUseVariations,
-          targetType: campaignFormTargetType,
-          selectedListIds: Array.from(campaignFormSelectedLists),
-          targetGroupId: campaignFormTargetGroup,
-          targetGroupName: selectedGroupName,
-          frequencyDays: campaignFormFrequency,
-          scheduledWeekday: campaignFormWeekday,
-          scheduledTime: campaignFormTime,
-          startDate: campaignFormStartDate,
-          batchSize: campaignFormBatchSize,
-          batchIntervalMinutes: campaignFormInterval,
-          status: 'active',
-          totalRecipients: totalCount,
-        });
-        setCampaigns(prev => [...prev, newCamp]);
-        setIsCampaignModalOpen(false);
-      }
-    } catch (err: any) {
-      if (err?.isConflict) {
-        alert(err.message);
-        // Recarrega campanhas mais recentes e atualiza o modal
-        const reloaded = await fetchMarketingCampaigns(company.id);
-        setCampaigns(reloaded);
-        const current = reloaded.find(c => c.id === editingCampaign?.id);
-        if (current) {
-          handleOpenCampaignModal(current);
-        }
-      } else {
-        alert(`Erro ao salvar campanha no Supabase: ${err?.message || err}`);
-      }
+    if (editingCampaign) {
+      const updatedCamp: Campaign = {
+        ...editingCampaign,
+        name: campaignFormName.trim(),
+        message: campaignFormMessage,
+        variations: campaignFormVariations.filter(v => v.trim().length > 0),
+        useVariations: campaignFormUseVariations,
+        targetType: campaignFormTargetType,
+        selectedListIds: Array.from(campaignFormSelectedLists),
+        targetGroupId: campaignFormTargetGroup,
+        targetGroupName: selectedGroupName,
+        frequencyDays: Number(campaignFormFrequency),
+        scheduledWeekday: Number(campaignFormFrequency) === 7 ? campaignFormWeekday : undefined,
+        scheduledTime: campaignFormTime,
+        startDate: campaignFormStartDate,
+        batchSize: campaignFormBatchSize,
+        batchIntervalMinutes: campaignFormInterval,
+        totalRecipients: totalCount,
+        updatedAt: new Date().toISOString()
+      };
+
+      // 1. Atualização Instantânea no Estado da Tela
+      setCampaigns(prev => prev.map(c => c.id === updatedCamp.id ? updatedCamp : c));
+      setIsCampaignModalOpen(false);
+
+      // 2. Persistência Imediata no localStorage
+      try {
+        const raw = localStorage.getItem(LOCAL_STORAGE_CAMPAIGNS);
+        const stored = raw ? JSON.parse(raw) : [];
+        const newStored = stored.some((c: any) => c.id === updatedCamp.id)
+          ? stored.map((c: any) => c.id === updatedCamp.id ? updatedCamp : c)
+          : [...stored, updatedCamp];
+        localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(newStored));
+
+        // 3. Sincronização via API Backend
+        fetch(`${getBackendUrl()}/api/marketing/campaigns`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaigns: newStored })
+        }).catch(() => {});
+      } catch (e) {}
+
+      // 4. Sincronização Supabase em background
+      updateMarketingCampaign(
+        company.id,
+        editingCampaign.id,
+        updatedCamp,
+        editingCampaign.updatedAt || editingCampaign.createdAt
+      ).catch(e => console.warn('[Marketing] Erro na sincronização Supabase:', e));
+    } else {
+      const newCamp: Campaign = {
+        id: `camp_${Date.now()}`,
+        name: campaignFormName.trim(),
+        message: campaignFormMessage,
+        variations: campaignFormVariations.filter(v => v.trim().length > 0),
+        useVariations: campaignFormUseVariations,
+        targetType: campaignFormTargetType,
+        selectedListIds: Array.from(campaignFormSelectedLists),
+        targetGroupId: campaignFormTargetGroup,
+        targetGroupName: selectedGroupName,
+        frequencyDays: Number(campaignFormFrequency),
+        scheduledWeekday: Number(campaignFormFrequency) === 7 ? campaignFormWeekday : undefined,
+        scheduledTime: campaignFormTime,
+        startDate: campaignFormStartDate,
+        batchSize: campaignFormBatchSize,
+        batchIntervalMinutes: campaignFormInterval,
+        status: 'active',
+        totalRecipients: totalCount,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      // 1. Atualização Instantânea no Estado da Tela
+      setCampaigns(prev => [...prev, newCamp]);
+      setIsCampaignModalOpen(false);
+
+      // 2. Persistência Imediata no localStorage
+      try {
+        const raw = localStorage.getItem(LOCAL_STORAGE_CAMPAIGNS);
+        const stored = raw ? JSON.parse(raw) : [];
+        const newStored = [...stored, newCamp];
+        localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(newStored));
+
+        // 3. Sincronização via API Backend
+        fetch(`${getBackendUrl()}/api/marketing/campaigns`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaigns: newStored })
+        }).catch(() => {});
+      } catch (e) {}
+
+      // 4. Sincronização Supabase em background
+      createMarketingCampaign(company.id, newCamp).catch(e => console.warn('[Marketing] Erro ao criar Supabase:', e));
     }
   };
 

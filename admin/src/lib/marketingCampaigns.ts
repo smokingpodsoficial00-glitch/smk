@@ -140,12 +140,22 @@ export async function fetchMarketingCampaigns(companyId: string): Promise<Campai
           const data = await res.json();
           if (data.success && Array.isArray(data.campaigns) && data.campaigns.length > 0) {
             const local = getOfflineCampaignsCache();
-            const merged = [...data.campaigns];
-            local.forEach((lc: Campaign) => {
-              if (!merged.some(mc => mc.id === lc.id)) {
-                merged.push(lc);
+            const localMap = new Map<string, Campaign>();
+            local.forEach((c: Campaign) => localMap.set(c.id, c));
+
+            const merged: Campaign[] = [];
+            data.campaigns.forEach((rc: Campaign) => {
+              const lc = localMap.get(rc.id);
+              if (lc) {
+                // Se o local foi editado ou tem dados válidos, preserva o local
+                merged.push({ ...rc, ...lc });
+                localMap.delete(rc.id);
+              } else {
+                merged.push(rc);
               }
             });
+            localMap.forEach((lc: Campaign) => merged.push(lc));
+
             saveOfflineCampaignsCache(merged);
             return merged;
           }
@@ -166,12 +176,21 @@ export async function fetchMarketingCampaigns(companyId: string): Promise<Campai
         const data = await res.json();
         if (data.success && Array.isArray(data.campaigns) && data.campaigns.length > 0) {
           const local = getOfflineCampaignsCache();
-          const merged = [...data.campaigns];
-          local.forEach((lc: Campaign) => {
-            if (!merged.some(mc => mc.id === lc.id)) {
-              merged.push(lc);
+          const localMap = new Map<string, Campaign>();
+          local.forEach((c: Campaign) => localMap.set(c.id, c));
+
+          const merged: Campaign[] = [];
+          data.campaigns.forEach((rc: Campaign) => {
+            const lc = localMap.get(rc.id);
+            if (lc) {
+              merged.push({ ...rc, ...lc });
+              localMap.delete(rc.id);
+            } else {
+              merged.push(rc);
             }
           });
+          localMap.forEach((lc: Campaign) => merged.push(lc));
+
           saveOfflineCampaignsCache(merged);
           return merged;
         }
@@ -204,7 +223,7 @@ export async function createMarketingCampaign(
     startDate?: string;
     batchSize?: number;
     batchIntervalMinutes?: number;
-    status?: 'active' | 'paused' | 'draft' | 'archived';
+    status?: 'active' | 'paused' | 'draft' | 'archived' | 'completed';
     totalRecipients?: number;
   }
 ): Promise<Campaign> {
