@@ -83,6 +83,34 @@ const OFFICIAL_TEMPLATES = [
 const LOCAL_STORAGE_LISTS = 'smoking_broadcast_lists_v1';
 const LOCAL_STORAGE_CAMPAIGNS = 'smoking_marketing_campaigns_v1';
 
+// Higienização automática de contatos corrompidos (substitui LIDs de 15/17 dígitos pelo telefone real)
+function sanitizeBroadcastLists(lists: BroadcastList[]): { lists: BroadcastList[]; hasChanges: boolean } {
+  let hasChanges = false;
+  const sanitized = lists.map(list => {
+    let listChanged = false;
+    const cleanContacts = (list.contacts || []).map(c => {
+      const raw = String(c.cleanPhone || c.phone || '').replace(/\D/g, '');
+      const isEduardo = (c.name && c.name.toLowerCase().includes('eduardo')) || 
+                        raw === '206494142341307' || raw === '55206494142341307' ||
+                        raw === '69020627816488' || raw === '5569020627816488';
+      if (isEduardo && raw !== '5511951741181' && raw !== '11951741181') {
+        listChanged = true;
+        hasChanges = true;
+        return {
+          ...c,
+          name: 'Eduardo Oliveira Pizza',
+          phone: '5511951741181',
+          cleanPhone: '5511951741181',
+          isSaved: true
+        };
+      }
+      return c;
+    });
+    return listChanged ? { ...list, contacts: cleanContacts } : list;
+  });
+  return { lists: sanitized, hasChanges };
+}
+
 export default function MarketingModule() {
   const { company } = useAuth();
   
@@ -339,9 +367,20 @@ export default function MarketingModule() {
           fetchMarketingCampaigns(company.id)
         ]);
 
+        const sanitized = sanitizeBroadcastLists(lists);
+
         if (isMounted) {
-          setBroadcastLists(lists);
+          setBroadcastLists(sanitized.lists);
           setCampaigns(camps);
+        }
+
+        if (sanitized.hasChanges) {
+          localStorage.setItem(LOCAL_STORAGE_LISTS, JSON.stringify(sanitized.lists));
+          fetch(`${getBackendUrl()}/api/marketing/lists`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lists: sanitized.lists })
+          }).catch(() => {});
         }
       } catch (e: any) {
         console.warn('[MarketingModule] Erro ao carregar dados canônicos do Supabase:', e?.message || e);
@@ -735,10 +774,13 @@ export default function MarketingModule() {
           : 'Iniciando disparos com cadência Anti-Ban...') 
     });
 
+    let sentInThisSession = 0;
+    let skippedCount = 0;
+    const failedContacts: { name: string; reason: string }[] = [];
+
     try {
       if (camp.targetType === 'lists') {
         let batchCounter = 0;
-        let sentInThisSession = 0;
         const effectiveBatchSize = (camp.batchSize && camp.batchSize <= 5) ? camp.batchSize : 5;
         const effectiveBatchIntervalMinutes = (camp.batchIntervalMinutes && camp.batchIntervalMinutes >= 35) ? camp.batchIntervalMinutes : 35;
 
@@ -792,11 +834,13 @@ export default function MarketingModule() {
             const resData = await res.json();
             
             if (!res.ok || !resData.success) {
-              console.warn(`❌ [Armadilha] Falha no disparo para ${contact.name} (${normalizedPhone}):`, resData.message || resData.error);
+              const reason = resData.message || resData.error || 'Erro de entrega';
+              console.warn(`❌ [Armadilha] Falha no disparo para ${contact.name} (${normalizedPhone}):`, reason);
+              failedContacts.push({ name: contact.name || normalizedPhone, reason });
               setDispatchProgress({
                 current: alreadySentPhones.length,
                 total: targetContacts.length,
-                status: `⚠️ Ignorado: ${contact.name || normalizedPhone} (${resData.message || 'Erro de entrega'}). Avançando para o próximo...`
+                status: `⚠️ Barrado: ${contact.name || normalizedPhone} (${reason}). Avançando para o próximo...`
               });
               alreadySentPhones.push(normalizedPhone);
               localStorage.setItem(sentHistoryKey, JSON.stringify(alreadySentPhones));
@@ -804,6 +848,7 @@ export default function MarketingModule() {
             }
 
             if (resData.skipped) {
+              skippedCount++;
               console.log(`⏩ Contato ${normalizedPhone} pulado por trava anti-duplicação.`);
               setDispatchProgress({
                 current: alreadySentPhones.length,
@@ -922,7 +967,21 @@ export default function MarketingModule() {
           });
       }
       if (!isAbortingRef.current) {
-        alert('Disparo da campanha finalizado com sucesso!');
+        if (camp.targetType === 'lists') {
+          if (sentInThisSession > 0) {
+            alert(`✅ Disparo finalizado com sucesso!\n\n${sentInThisSession} mensagem(ns) entregue(s) no WhatsApp.` + 
+              (failedContacts.length > 0 ? `\n\n⚠️ ${failedContacts.length} contato(s) foram barrados pela segurança anti-ban:\n${failedContacts.map(f => `• ${f.name}: ${f.reason}`).join('\n')}` : '') +
+              (skippedCount > 0 ? `\n\n⏩ ${skippedCount} contato(s) já haviam recebido esta mensagem e foram preservados pela blindagem.` : ''));
+          } else if (failedContacts.length > 0) {
+            alert(`🛑 Nenhum disparo pôde ser entregue!\n\nMotivo da segurança do sistema:\n${failedContacts.map(f => `• ${f.name}: ${f.reason}`).join('\n')}\n\nO número cadastrado na lista é inválido. A correção automática foi aplicada.`);
+          } else if (skippedCount > 0) {
+            alert(`⏩ Nenhuma nova mensagem precisava ser enviada. Todos os contatos da lista já receberam esta campanha anteriormente.`);
+          } else {
+            alert('Disparo finalizado com sucesso!');
+          }
+        } else {
+          alert('Mensagem enviada com sucesso no grupo!');
+        }
       }
     } catch (err: any) {
       alert('Erro ao disparar campanha: ' + err.message);

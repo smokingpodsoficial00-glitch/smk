@@ -765,7 +765,7 @@ export function calculatePartnersFinancials(params: {
     if (tx.type === 'APORTE' && (tx.destination_category === 'CAIXA' || tx.destination_category === 'CAIXA_GERAL')) {
       capitalInflows += amt;
     }
-    if (['RETIRADA_CAPITAL', 'DISTRIBUICAO_LUCRO', 'PRO_LABORE', 'DESPESA_OPERACIONAL'].includes(tx.type)) {
+    if (['RETIRADA_CAPITAL', 'DISTRIBUICAO_LUCRO', 'PRO_LABORE', 'DESPESA_OPERACIONAL', 'COMPRA_ESTOQUE'].includes(tx.type)) {
       capitalOutflows += amt;
     }
   }
@@ -816,8 +816,8 @@ export function calculatePartnersFinancials(params: {
     // Parcela Econômica do Lucro Realizado pelas Vendas
     const economicProfitShare = realNetProfitPostMarketing * (equityPct / 100);
 
-    // Ganho Econômico Real
-    const economicGain = partnerEconomicEquity - cap.netInvested;
+    // Ganho Econômico Real (Total Return = Patrimônio Atual + Dividendos Recebidos - Aporte Líquido Atual)
+    const economicGain = partnerEconomicEquity + cap.dividends - cap.netInvested;
     const simplifiedROI = cap.netInvested > 0 ? (economicGain / cap.netInvested) * 100 : 0;
 
     // Fatias de Estoque

@@ -61,45 +61,44 @@ export default function PartnersDashboard() {
     try {
       setLoading(true);
 
-      // A. Mapa de custos de produtos
-      const costs = await fetchProductCostsMap(targetCompanyId).catch(() => ({}));
-      setPersistedCosts(costs);
-
-      // B. Sócios e Transações Societárias
-      const [partnersData, txData] = await Promise.all([
+      const [
+        costs,
+        partnersData,
+        txData,
+        { data: rawOrders },
+        { data: rawProducts },
+        { data: rawRepurchases }
+      ] = await Promise.all([
+        fetchProductCostsMap(targetCompanyId).catch(() => ({})),
         fetchPartners(targetCompanyId),
-        fetchPartnerTransactions(targetCompanyId)
+        fetchPartnerTransactions(targetCompanyId),
+        supabase
+          .from("smoking_orders")
+          .select("*")
+          .or("company_id.eq." + targetCompanyId + ",company_id.is.null")
+          .neq("delivery_status", "CANCELADO"),
+        supabase
+          .from("smoking_products")
+          .select("*")
+          .or("company_id.eq." + targetCompanyId + ",company_id.is.null")
+          .eq("is_active", true),
+        supabase
+          .from("smoking_stock_repurchases")
+          .select("*")
+          .or("company_id.eq." + targetCompanyId + ",company_id.is.null")
       ]);
-      setPartners(partnersData);
-      setTransactions(txData);
 
-      // C. Pedidos Reais de Venda
-      const { data: rawOrders } = await supabase
-        .from("smoking_orders")
-        .select("*")
-        .or("company_id.eq." + targetCompanyId + ",company_id.is.null")
-        .neq("delivery_status", "CANCELADO");
-      setOrders(rawOrders || []);
-
-      // D. Produtos Ativos em Estoque
-      const { data: rawProducts } = await supabase
-        .from("smoking_products")
-        .select("*")
-        .or("company_id.eq." + targetCompanyId + ",company_id.is.null")
-        .eq("is_active", true);
-      setProducts(rawProducts || []);
-
-      // E. Despesas salvas em localStorage (Marketing / Meta Ads)
       try {
         const mkt = parseFloat(localStorage.getItem("smk_mkt_investment") || "0") || 0;
         setOperationalExpenses(mkt);
       } catch (e) {}
 
-      // F. Reposições de Estoque (para cálculo do Caixa Real = Faturamento - Reposições)
-      const { data: rawRepurchases } = await supabase
-        .from("smoking_stock_repurchases")
-        .select("*")
-        .or("company_id.eq." + targetCompanyId + ",company_id.is.null");
+      // Apply all states synchronously to prevent UI flashing
+      setPersistedCosts(costs as Record<string, number>);
+      setPartners(partnersData);
+      setTransactions(txData);
+      setOrders(rawOrders || []);
+      setProducts(rawProducts || []);
       setRepurchases(rawRepurchases || []);
 
     } catch (err) {
@@ -376,18 +375,25 @@ export default function PartnersDashboard() {
         </div>
 
         {/* 4. Patrimônio Real Oficial da Loja */}
-        <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-4 space-y-1 shadow-lg">
+        <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-4 space-y-1 shadow-lg relative group">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider flex items-center gap-1.5">
               Patrimônio Real da Loja
+              <Info className="size-3 text-white/30 cursor-help" />
             </span>
             <Box className="size-4 text-blue-400" />
           </div>
+          
+          {/* Tooltip Hover */}
+          <div className="absolute top-10 right-0 w-48 p-2.5 bg-[#1a1a1d] border border-white/10 rounded-xl text-[10px] text-white/70 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+            É normal este valor cair temporariamente após o pagamento de lotes ao fornecedor (pois o dinheiro sai do caixa, mas a mercadoria ainda não chegou na prateleira).
+          </div>
+
           <div className="text-xl font-extrabold text-white font-mono tracking-tight">
             {formatBRL(financials.companyEconomicEquity)}
           </div>
-          <p className="text-[10px] text-white/50">
-            Caixa Real ({formatBRL(financials.realCash)}) + Estoque ({formatBRL(financials.stockAssetRetail)})
+          <p className="text-[10px] text-white/50 truncate">
+            Caixa ({formatBRL(financials.realCash)}) + Estoque ({formatBRL(financials.stockAssetRetail)})
           </p>
         </div>
       </div>

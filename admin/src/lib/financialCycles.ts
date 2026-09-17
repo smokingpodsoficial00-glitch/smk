@@ -681,7 +681,7 @@ export function calculateAllTimeMetrics(
     if (tx.type === 'APORTE' && (tx.destination_category === 'CAIXA' || tx.destination_category === 'CAIXA_GERAL')) {
       capitalInflows += amt;
     }
-    if (['RETIRADA_CAPITAL', 'DISTRIBUICAO_LUCRO', 'PRO_LABORE', 'DESPESA_OPERACIONAL'].includes(tx.type)) {
+    if (['RETIRADA_CAPITAL', 'DISTRIBUICAO_LUCRO', 'PRO_LABORE', 'DESPESA_OPERACIONAL', 'COMPRA_ESTOQUE'].includes(tx.type)) {
       capitalOutflows += amt;
     }
   }
