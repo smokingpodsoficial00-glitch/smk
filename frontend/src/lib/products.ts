@@ -38,9 +38,7 @@ export const fallbackProducts: Product[] = [];
 export function getCatalogCompanyId(): string {
   const envCompanyId = import.meta.env.VITE_COMPANY_ID;
   if (!envCompanyId || typeof envCompanyId !== "string" || envCompanyId.trim().length === 0) {
-    const errorMsg = "[Catálogo Config] VITE_COMPANY_ID não configurada no ambiente. O catálogo requer uma empresa válida vinculada.";
-    console.error(errorMsg);
-    throw new Error(errorMsg);
+    return "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
   }
   return envCompanyId.trim();
 }
