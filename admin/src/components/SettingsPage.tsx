@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Store, Phone, Globe,
   Save, CheckCircle2, AlertCircle, Loader2,
-  Type, Smartphone, Copy, Check, Sparkles, Lock
+  Type, Smartphone, Copy, Check, Sparkles, Lock, ExternalLink
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
@@ -327,7 +327,7 @@ export default function SettingsPage() {
                 Copie o link exclusivo da sua tabela de valores para enviar aos seus clientes no WhatsApp, campanhas de tráfego ou fixar na bio do Instagram. Todos os pedidos feitos por esse link caem diretamente no seu Kanban.
               </p>
 
-              {/* Campo de URL com Botão de Copiar */}
+              {/* Campo de URL com Botões de Copiar e Abrir */}
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <div className="flex-1 bg-[#121214] border border-white/15 rounded-2xl px-4 py-3.5 text-xs text-white/90 font-mono flex items-center justify-between overflow-hidden shadow-inner">
@@ -346,13 +346,36 @@ export default function SettingsPage() {
                     {copied ? <Check className="size-4 stroke-[3]" /> : <Copy className="size-4" />}
                     <span>{copied ? "Link Copiado!" : "Copiar Link"}</span>
                   </button>
+
+                  <a
+                    href={catalogUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 px-4 py-3.5 rounded-2xl font-bold text-xs bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all cursor-pointer shadow-md shrink-0 active:scale-95"
+                    title="Abrir tabela em nova aba"
+                  >
+                    <ExternalLink className="size-4" />
+                    <span>Abrir</span>
+                  </a>
                 </div>
 
                 {!isOfficial && (
-                  <p className="text-[11px] text-white/40 flex items-center gap-1.5">
-                    <span className="size-1.5 rounded-full bg-white/40" />
-                    <span>Link Neutro: endereço genérico compartilhado com o identificador exclusivo da sua loja <strong>(?loja={currentSlug})</strong>, sem menção a Smoking Pods.</span>
-                  </p>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-white/40 pt-0.5">
+                    <span className="flex items-center gap-1.5">
+                      <span className="size-1.5 rounded-full bg-emerald-400" />
+                      <span>Link Neutro: identificador <strong>(?loja={currentSlug})</strong> sem menção a Smoking Pods.</span>
+                    </span>
+                    <a
+                      href={`https://smoking-pods-catalogo.vercel.app/?loja=${currentSlug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white/70 hover:text-white underline underline-offset-2 flex items-center gap-1 shrink-0 font-medium"
+                      title="Link já ativo na Vercel para testes imediatos"
+                    >
+                      <span>Testar no link direto da Vercel</span>
+                      <ExternalLink className="size-3" />
+                    </a>
+                  </div>
                 )}
               </div>
 
