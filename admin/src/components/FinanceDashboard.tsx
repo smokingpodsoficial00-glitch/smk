@@ -57,6 +57,8 @@ import {
   type GroupedPeriodEvolution,
   getCurrentCycle,
   getCycleForDate,
+  getSaoPauloDateParts,
+  MONTH_NAMES,
   calculateMetricsForCycle,
   calculateAllTimeMetrics,
   calculatePeriodEvolutions,
@@ -161,68 +163,88 @@ interface EvolutionPoint {
 /**
  * Componente de visualização gráfica da evolução do faturamento (Aba Evolução)
  */
+/**
+ * Funções auxiliares para geração de curvas Bézier cúbicas suaves (estilo TradingView/Stripe)
+ */
+function generateSmoothPath(pts: { x: number; y: number }[]): string {
+  if (pts.length === 0) return "";
+  if (pts.length === 1) return `M ${pts[0].x - 15} ${pts[0].y} L ${pts[0].x + 15} ${pts[0].y}`;
+  if (pts.length === 2) return `M ${pts[0].x} ${pts[0].y} L ${pts[1].x} ${pts[1].y}`;
+
+  let path = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = i > 0 ? pts[i - 1] : pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = i < pts.length - 2 ? pts[i + 2] : p2;
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    path += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return path;
+}
+
+function generateSmoothArea(pts: { x: number; y: number }[], baseY: number): string {
+  if (pts.length === 0) return "";
+  const line = generateSmoothPath(pts);
+  const first = pts[0];
+  const last = pts[pts.length - 1];
+  return `${line} L ${last.x.toFixed(1)} ${baseY.toFixed(1)} L ${first.x.toFixed(1)} ${baseY.toFixed(1)} Z`;
+}
+
+/**
+ * Componente de visualização gráfica compacta e refinada da evolução de faturamento (Aba Evolução)
+ */
 function RevenueEvolutionChart({
   data,
   periodType,
+  dailyRange,
+  onDailyRangeChange,
 }: {
   data: EvolutionPoint[];
-  periodType: "mensal" | "trimestral" | "semestral" | "anual";
+  periodType: "diario" | "mensal" | "trimestral" | "semestral" | "anual";
+  dailyRange?: "30d" | "ciclo" | "14d";
+  onDailyRangeChange?: (range: "30d" | "ciclo" | "14d") => void;
 }) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   if (!data || data.length === 0) {
     return (
-      <div className="p-8 text-center text-white/40 text-xs italic">
+      <div className="p-8 text-center text-white/40 text-xs italic bg-black/40 border border-white/10 rounded-2xl">
         Nenhum dado disponível para o período selecionado.
       </div>
     );
   }
 
-  // Separação de ciclos concluídos vs ciclo em andamento
-  const completedPoints = data.filter((d) => !d.isCurrent);
-  const currentPoint = data.find((d) => d.isCurrent);
-
   // Faturamento total no recorte histórico
   const totalRevenue = data.reduce((sum, d) => sum + d.revenue, 0);
+  const totalOrdersCount = data.reduce((sum, d) => sum + d.orders, 0);
+  const totalPodsCount = data.reduce((sum, d) => sum + d.pods, 0);
 
-  // Média por ciclo: considera apenas ciclos CONCLUÍDOS para não diluir a média
-  const completedRevenue = completedPoints.reduce((sum, d) => sum + d.revenue, 0);
-  const avgRevenue =
-    completedPoints.length > 0
-      ? completedRevenue / completedPoints.length
-      : totalRevenue / (data.length || 1);
+  // Dias ou períodos com faturamento positivo
+  const activePeriods = data.filter((d) => d.revenue > 0);
+  const avgRevenueActive =
+    activePeriods.length > 0 ? totalRevenue / activePeriods.length : totalRevenue / data.length;
 
-  // Pico histórico de vendas
+  // Pico histórico no recorte
   const maxPoint = [...data].sort((a, b) => b.revenue - a.revenue)[0];
 
-  // Tendência recente: compara ESTRITAMENTE os dois últimos ciclos CONCLUÍDOS
-  const lastCompleted =
-    completedPoints.length > 0 ? completedPoints[completedPoints.length - 1] : null;
-  const prevCompleted =
-    completedPoints.length > 1 ? completedPoints[completedPoints.length - 2] : null;
-  const trendDiff = lastCompleted && prevCompleted ? lastCompleted.revenue - prevCompleted.revenue : 0;
-  const trendPct =
-    lastCompleted && prevCompleted && prevCompleted.revenue > 0
-      ? (trendDiff / prevCompleted.revenue) * 100
-      : null;
-  const trendSubtitle =
-    lastCompleted && prevCompleted
-      ? `${lastCompleted.label.replace(" — em andamento", "").replace(" (em andamento)", "")} vs. ${prevCompleted.label.replace(" — em andamento", "").replace(" (em andamento)", "")} (concluídos)`
-      : completedPoints.length === 1
-      ? "1º ciclo concluído"
-      : "Em apuração";
-
+  // Dimensões compactas e harmoniosas do gráfico
   const width = 800;
-  const height = 285;
-  const padLeft = 65;
-  const padRight = 45;
-  const padTop = 35;
-  const padBottom = 55;
+  const height = 190;
+  const padLeft = 60;
+  const padRight = 30;
+  const padTop = 24;
+  const padBottom = 32;
   const chartWidth = width - padLeft - padRight;
   const chartHeight = height - padTop - padBottom;
 
-  const rawMax = Math.max(...data.map((d) => d.revenue), 100);
-  const yMax = Math.ceil(rawMax * 1.18);
+  const rawMax = Math.max(...data.map((d) => d.revenue), 50);
+  const yMax = Math.ceil(rawMax * 1.15);
 
   const points = data.map((d, i) => {
     const x =
@@ -233,153 +255,184 @@ function RevenueEvolutionChart({
     return { ...d, x, y, index: i };
   });
 
-  const completedPointsWithCoords = points.filter((p) => !p.isCurrent);
-  const currentPointWithCoords = points.find((p) => p.isCurrent);
-  const lastCompletedPoint =
-    completedPointsWithCoords.length > 0
-      ? completedPointsWithCoords[completedPointsWithCoords.length - 1]
-      : null;
+  const linePath = generateSmoothPath(points);
+  const areaPath = generateSmoothArea(points, padTop + chartHeight);
 
-  // Caminho da linha sólida dos ciclos concluídos
-  const completedLinePath =
-    completedPointsWithCoords.length === 1
-      ? `M ${completedPointsWithCoords[0].x - 30} ${completedPointsWithCoords[0].y} L ${completedPointsWithCoords[0].x + 30} ${completedPointsWithCoords[0].y}`
-      : completedPointsWithCoords.length > 1
-      ? completedPointsWithCoords.reduce(
-          (acc, p, i) => `${acc} ${i === 0 ? "M" : "L"} ${p.x} ${p.y}`,
-          ""
-        )
-      : "";
+  // Níveis de grade horizontal limpa (0, 50%, 100%)
+  const gridLevels = [0, 0.5, 1];
 
-  // Caminho da área preenchida dos ciclos concluídos
-  const completedAreaPath =
-    completedPointsWithCoords.length === 1
-      ? `M ${completedPointsWithCoords[0].x - 30} ${padTop + chartHeight} L ${completedPointsWithCoords[0].x - 30} ${completedPointsWithCoords[0].y} L ${completedPointsWithCoords[0].x + 30} ${completedPointsWithCoords[0].y} L ${completedPointsWithCoords[0].x + 30} ${padTop + chartHeight} Z`
-      : completedPointsWithCoords.length > 1
-      ? `M ${completedPointsWithCoords[0].x} ${padTop + chartHeight} ${completedPointsWithCoords.reduce(
-          (acc, p) => `${acc} L ${p.x} ${p.y}`,
-          ""
-        )} L ${completedPointsWithCoords[completedPointsWithCoords.length - 1].x} ${padTop + chartHeight} Z`
-      : "";
+  const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const svgRect = e.currentTarget.getBoundingClientRect();
+    if (!svgRect.width) return;
+    const clientX = e.clientX - svgRect.left;
+    const svgX = (clientX / svgRect.width) * width;
+    const clampedX = Math.max(padLeft, Math.min(width - padRight, svgX));
 
-  // Segmento em andamento (linha pontilhada do último concluído até o ciclo atual)
-  const inProgressLinePath =
-    lastCompletedPoint && currentPointWithCoords
-      ? `M ${lastCompletedPoint.x} ${lastCompletedPoint.y} L ${currentPointWithCoords.x} ${currentPointWithCoords.y}`
-      : "";
+    let closestIdx = 0;
+    let minDiff = Infinity;
+    for (let i = 0; i < points.length; i++) {
+      const diff = Math.abs(points[i].x - clampedX);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestIdx = i;
+      }
+    }
+    setHoveredIdx(closestIdx);
+  };
 
-  // Área sob o segmento em andamento
-  const inProgressAreaPath =
-    lastCompletedPoint && currentPointWithCoords
-      ? `M ${lastCompletedPoint.x} ${padTop + chartHeight} L ${lastCompletedPoint.x} ${lastCompletedPoint.y} L ${currentPointWithCoords.x} ${currentPointWithCoords.y} L ${currentPointWithCoords.x} ${padTop + chartHeight} Z`
-      : "";
+  const handlePointerLeave = () => {
+    setHoveredIdx(null);
+  };
 
-  // Fallback caso todos os pontos sejam abertos
-  const fallbackLinePath =
-    completedPointsWithCoords.length === 0
-      ? points.reduce((acc, p, i) => `${acc} ${i === 0 ? "M" : "L"} ${p.x} ${p.y}`, "")
-      : "";
-
-  const gridLevels = [0, 0.33, 0.66, 1];
   const activePoint = hoveredIdx !== null ? points[hoveredIdx] : points[points.length - 1];
+
+  // Cálculo de passo para rótulos do eixo X (não sobrepor quando tiver 30 dias)
+  const isDaily = periodType === "diario";
+  const labelStep = isDaily ? Math.max(1, Math.ceil(points.length / 7)) : 1;
 
   return (
     <div className="space-y-4">
-      {/* Barra Resumo / KPIs de Evolução */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-black/40 border border-white/10 rounded-2xl p-4 text-xs">
-        <div>
-          <span className="text-white/40 block text-[10px] uppercase font-semibold">Faturamento no Recorte</span>
-          <span className="text-white font-extrabold text-sm sm:text-base">{formatBRL(totalRevenue)}</span>
-        </div>
-        <div>
-          <span className="text-white/40 block text-[10px] uppercase font-semibold">Pico de Vendas</span>
+      {/* Barra de KPIs Compacta no Topo */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-black/40 border border-white/10 rounded-2xl p-3 text-xs">
+        <div className="border-r border-white/5 pr-2">
+          <span className="text-white/40 block text-[10px] uppercase font-semibold">
+            {isDaily ? "Faturamento do Recorte" : "Total Faturado"}
+          </span>
           <span className="text-emerald-400 font-extrabold text-sm sm:text-base">
-            {maxPoint ? `${formatBRL(maxPoint.revenue)}` : "—"}
+            {formatBRL(totalRevenue)}
+          </span>
+          <span className="text-[10px] text-white/40 block truncate">
+            {isDaily ? `${data.length} dias apurados` : `${data.length} períodos`}
+          </span>
+        </div>
+
+        <div className="border-r border-white/5 pr-2">
+          <span className="text-white/40 block text-[10px] uppercase font-semibold">
+            {isDaily ? "Melhor Dia (Pico)" : "Pico de Vendas"}
+          </span>
+          <span className="text-white font-extrabold text-sm sm:text-base">
+            {maxPoint && maxPoint.revenue > 0 ? formatBRL(maxPoint.revenue) : "—"}
           </span>
           {maxPoint && maxPoint.revenue > 0 && (
-            <span className="text-[10px] text-white/40 block truncate">
-              {maxPoint.label.replace(" — em andamento", "").replace(" (em andamento)", "")}
+            <span className="text-[10px] text-emerald-400/80 block truncate">
+              {maxPoint.label}
             </span>
           )}
         </div>
-        <div>
-          <span className="text-white/40 block text-[10px] uppercase font-semibold">Média por Ciclo</span>
-          <span className="text-white/90 font-extrabold text-sm sm:text-base">{formatBRL(avgRevenue)}</span>
+
+        <div className="border-r border-white/5 pr-2">
+          <span className="text-white/40 block text-[10px] uppercase font-semibold">
+            {isDaily ? "Média por Dia Ativo" : "Média por Período"}
+          </span>
+          <span className="text-white/90 font-extrabold text-sm sm:text-base">
+            {formatBRL(avgRevenueActive)}
+          </span>
           <span className="text-[10px] text-white/40 block truncate">
-            {completedPoints.length > 0
-              ? `${completedPoints.length} ${completedPoints.length === 1 ? "ciclo concluído" : "ciclos concluídos"}`
-              : "Ciclo vigente"}
+            {isDaily
+              ? `${activePeriods.length} ${activePeriods.length === 1 ? "dia com vendas" : "dias com vendas"}`
+              : "Períodos apurados"}
           </span>
         </div>
+
         <div>
-          <span className="text-white/40 block text-[10px] uppercase font-semibold">Tendência Recente</span>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            {trendDiff > 0 ? (
-              <span className="text-emerald-400 font-extrabold text-sm sm:text-base flex items-center gap-0.5">
-                <span>↑</span>
-                <span>{trendPct !== null ? `+${trendPct.toFixed(1)}%` : "Crescimento"}</span>
-              </span>
-            ) : trendDiff < 0 ? (
-              <span className="text-red-400 font-extrabold text-sm sm:text-base flex items-center gap-0.5">
-                <span>↓</span>
-                <span>{trendPct !== null ? `${trendPct.toFixed(1)}%` : "Queda"}</span>
-              </span>
-            ) : (
-              <span className="text-white/60 font-extrabold text-sm sm:text-base flex items-center gap-0.5">
-                <span>→</span>
-                <span>Estável (0%)</span>
-              </span>
-            )}
-          </div>
-          {trendSubtitle && (
-            <span className="text-[10px] text-white/40 block truncate">
-              {trendSubtitle}
-            </span>
-          )}
+          <span className="text-white/40 block text-[10px] uppercase font-semibold">
+            Volume Total
+          </span>
+          <span className="text-white/90 font-extrabold text-sm sm:text-base">
+            {totalOrdersCount} ped
+          </span>
+          <span className="text-[10px] text-white/40 block truncate">
+            {totalPodsCount} pods vendidos
+          </span>
         </div>
       </div>
 
-      {/* Gráfico SVG Principal */}
-      <div className="bg-black/60 border border-white/15 rounded-3xl p-4 sm:p-6 space-y-3 relative overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between">
+      {/* Gráfico SVG Principal Compacto com Crosshair e Tooltip Interativo */}
+      <div className="bg-[#0c0d10] border border-white/10 rounded-2xl p-3 sm:p-5 relative overflow-hidden shadow-xl">
+        {/* Cabeçalho do Gráfico */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2 pb-2 border-b border-white/5">
           <div className="flex items-center gap-2">
             <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-xs font-bold text-white uppercase tracking-wider">
-              Curva de Evolução do Faturamento
+              {isDaily ? "Faturamento Dia a Dia" : "Curva de Evolução de Receitas"}
             </span>
-            <span className="text-[10px] text-white/40 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
-              {periodType === "mensal"
+            <span className="text-[10px] text-emerald-400/90 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium">
+              {isDaily
+                ? dailyRange === "ciclo"
+                  ? "Ciclo Vigente"
+                  : dailyRange === "14d"
+                  ? "Últimos 14 dias"
+                  : "Últimos 30 dias"
+                : periodType === "mensal"
                 ? "Ciclos 14 → 13"
                 : periodType === "trimestral"
-                ? "Blocos de 3 ciclos"
+                ? "Trimestres"
                 : periodType === "semestral"
-                ? "Blocos de 6 ciclos"
-                : "Anual"}
+                ? "Semestres"
+                : "Anos"}
             </span>
           </div>
-          <span className="text-[11px] text-white/40 hidden sm:inline-block">
-            Passe o mouse ou toque nos pontos para ver os detalhes
+
+          {/* Sub-seletor rápido para a visão Diária */}
+          {isDaily && onDailyRangeChange && (
+            <div className="flex items-center gap-1 bg-black/50 border border-white/10 rounded-xl p-0.5 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => onDailyRangeChange("30d")}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                  dailyRange === "30d"
+                    ? "bg-emerald-500 text-black shadow-sm"
+                    : "text-white/60 hover:text-white"
+                }`}
+              >
+                30 Dias
+              </button>
+              <button
+                type="button"
+                onClick={() => onDailyRangeChange("ciclo")}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                  dailyRange === "ciclo"
+                    ? "bg-emerald-500 text-black shadow-sm"
+                    : "text-white/60 hover:text-white"
+                }`}
+              >
+                Ciclo Atual
+              </button>
+              <button
+                type="button"
+                onClick={() => onDailyRangeChange("14d")}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                  dailyRange === "14d"
+                    ? "bg-emerald-500 text-black shadow-sm"
+                    : "text-white/60 hover:text-white"
+                }`}
+              >
+                14 Dias
+              </button>
+            </div>
+          )}
+
+          <span className="text-[10px] text-white/40 hidden md:inline-block">
+            Deslize o mouse para ver o faturamento exato de cada dia
           </span>
         </div>
 
-        {/* ViewBox SVG Responsivo */}
-        <div className="w-full overflow-x-auto">
+        {/* ViewBox SVG Responsivo com Altura Compacta (190px) */}
+        <div className="relative w-full">
           <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="w-full h-auto min-w-[550px] select-none"
+            className="w-full h-auto min-w-[500px] select-none cursor-crosshair"
+            onPointerMove={handlePointerMove}
+            onPointerLeave={handlePointerLeave}
           >
             <defs>
-              <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
-                <stop offset="80%" stopColor="#10b981" stopOpacity="0.05" />
+              <linearGradient id="compactAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
+                <stop offset="65%" stopColor="#10b981" stopOpacity="0.05" />
                 <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
               </linearGradient>
-              <linearGradient id="currentSegmentGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity="0.16" />
-                <stop offset="100%" stopColor="#10b981" stopOpacity="0.01" />
-              </linearGradient>
-              <filter id="emeraldGlow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="3" result="blur" />
+              <filter id="emeraldGlowCompact" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="2.5" result="blur" />
                 <feMerge>
                   <feMergeNode in="blur" />
                   <feMergeNode in="SourceGraphic" />
@@ -398,15 +451,15 @@ function RevenueEvolutionChart({
                     y1={yVal}
                     x2={width - padRight}
                     y2={yVal}
-                    stroke="rgba(255, 255, 255, 0.08)"
+                    stroke="rgba(255, 255, 255, 0.06)"
                     strokeDasharray="3 3"
                   />
                   <text
                     x={padLeft - 8}
-                    y={yVal + 3}
+                    y={yVal + 3.5}
                     textAnchor="end"
-                    fill="rgba(255, 255, 255, 0.4)"
-                    fontSize="10"
+                    fill="rgba(255, 255, 255, 0.35)"
+                    fontSize="9.5"
                     fontFamily="monospace"
                   >
                     {formatBRL(val).replace(",00", "")}
@@ -415,258 +468,222 @@ function RevenueEvolutionChart({
               );
             })}
 
-            {/* Área Preenchida dos Ciclos Concluídos */}
-            {completedAreaPath && <path d={completedAreaPath} fill="url(#revenueGradient)" />}
+            {/* Preenchimento de Área Gradiente */}
+            {areaPath && <path d={areaPath} fill="url(#compactAreaGrad)" />}
 
-            {/* Área Suave do Ciclo em Andamento */}
-            {inProgressAreaPath && <path d={inProgressAreaPath} fill="url(#currentSegmentGradient)" />}
-
-            {/* Linha Principal Sólida dos Ciclos Concluídos */}
-            {completedLinePath && (
+            {/* Linha Curva de Faturamento */}
+            {linePath && (
               <path
-                d={completedLinePath}
+                d={linePath}
                 fill="none"
                 stroke="#10b981"
-                strokeWidth="3.5"
+                strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                filter="url(#emeraldGlow)"
+                filter="url(#emeraldGlowCompact)"
               />
             )}
 
-            {/* Linha Pontilhada do Segmento em Andamento */}
-            {inProgressLinePath && (
-              <path
-                d={inProgressLinePath}
-                fill="none"
-                stroke="#34d399"
-                strokeWidth="2.5"
-                strokeDasharray="6 4"
-                strokeLinecap="round"
-              />
+            {/* Linha Vertical Guia (Crosshair) */}
+            {hoveredIdx !== null && activePoint && (
+              <g>
+                <line
+                  x1={activePoint.x}
+                  y1={padTop}
+                  x2={activePoint.x}
+                  y2={padTop + chartHeight}
+                  stroke="rgba(52, 211, 153, 0.45)"
+                  strokeWidth="1.5"
+                  strokeDasharray="3 3"
+                />
+              </g>
             )}
 
-            {/* Fallback caso não haja ciclos concluídos */}
-            {fallbackLinePath && (
-              <path
-                d={fallbackLinePath}
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="3"
-                strokeDasharray="4 4"
-              />
-            )}
-
-            {/* Indicadores nos Segmentos:
-                - Entre ciclos concluídos: setas normais (↗ / ↘ / →)
-                - Ligação para ciclo em andamento: pill neutro 'em andamento' (sem seta falsa de queda) */}
-            {points.map((p, i) => {
-              if (i === 0) return null;
-              const prev = points[i - 1];
-              const midX = (prev.x + p.x) / 2;
-              const midY = (prev.y + p.y) / 2;
-
-              // Transição para ciclo em andamento
-              if (p.isCurrent) {
-                return (
-                  <g key={`inprogress-pill-${i}`}>
-                    <rect
-                      x={midX - 44}
-                      y={midY - 10}
-                      width="88"
-                      height="20"
-                      rx="10"
-                      fill="#0e0e10"
-                      stroke="rgba(52, 211, 153, 0.45)"
-                      strokeWidth="1"
-                    />
-                    <circle cx={midX - 32} cy={midY} r="3" fill="#34d399" />
-                    <text
-                      x={midX + 6}
-                      y={midY + 3.5}
-                      textAnchor="middle"
-                      fill="#34d399"
-                      fontSize="8.5"
-                      fontWeight="bold"
-                    >
-                      em andamento
-                    </text>
-                  </g>
-                );
-              }
-
-              // Segmento normal entre dois ciclos concluídos
-              const isUp = p.revenue > prev.revenue;
-              const isDown = p.revenue < prev.revenue;
-              const arrowSymbol = isUp ? "↗" : isDown ? "↘" : "→";
-              const arrowColor = isUp ? "#34d399" : isDown ? "#f87171" : "rgba(255,255,255,0.4)";
-
-              return (
-                <g key={`arrow-${i}`}>
-                  <circle cx={midX} cy={midY} r="8" fill="#0e0e10" stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
-                  <text
-                    x={midX}
-                    y={midY + 3.5}
-                    textAnchor="middle"
-                    fill={arrowColor}
-                    fontSize="10"
-                    fontWeight="bold"
-                  >
-                    {arrowSymbol}
-                  </text>
-                </g>
-              );
-            })}
-
-            {/* Pontos de Dados & Rótulos */}
+            {/* Pontos de Dados Discretos */}
             {points.map((p, i) => {
               const isHovered = hoveredIdx === i;
-              const isPeak = p.revenue === maxPoint?.revenue && p.revenue > 0 && !p.isCurrent;
+              const isPeak = p.revenue === maxPoint?.revenue && p.revenue > 0;
+              const shouldShowLabel =
+                !isDaily || i % labelStep === 0 || i === points.length - 1 || isHovered;
 
               return (
-                <g
-                  key={p.id}
-                  className="cursor-pointer transition-transform"
-                  onMouseEnter={() => setHoveredIdx(i)}
-                  onClick={() => setHoveredIdx(i)}
-                >
-                  {/* Linha Guia Vertical no Hover */}
+                <g key={p.id}>
+                  {/* Ponto Focado no Hover */}
                   {isHovered && (
-                    <line
-                      x1={p.x}
-                      y1={padTop}
-                      x2={p.x}
-                      y2={padTop + chartHeight}
-                      stroke={p.isCurrent ? "rgba(52, 211, 153, 0.4)" : "rgba(16, 185, 129, 0.4)"}
-                      strokeWidth="1.5"
-                      strokeDasharray="2 2"
-                    />
-                  )}
-
-                  {/* Halo Pulsante no Ponto Selecionado / Hover */}
-                  {isHovered && (
-                    <circle
-                      cx={p.x}
-                      cy={p.y}
-                      r={12}
-                      fill={p.isCurrent ? "rgba(52, 211, 153, 0.25)" : "rgba(16, 185, 129, 0.25)"}
-                    />
-                  )}
-
-                  {/* Círculo do Ponto */}
-                  {p.isCurrent ? (
                     <g>
+                      <circle cx={p.x} cy={p.y} r="9" fill="rgba(16, 185, 129, 0.25)" />
                       <circle
                         cx={p.x}
                         cy={p.y}
-                        r={10}
-                        fill="rgba(52, 211, 153, 0.12)"
-                        stroke="rgba(52, 211, 153, 0.5)"
-                        strokeWidth="1"
-                        strokeDasharray="3 2"
+                        r="4.5"
+                        fill="#10b981"
+                        stroke="#0a0a0c"
+                        strokeWidth="2"
                       />
-                      <circle
-                        cx={p.x}
-                        cy={p.y}
-                        r={isHovered ? 6 : 5}
-                        fill="#0e0e10"
-                        stroke="#34d399"
-                        strokeWidth="2.5"
-                      />
-                      <circle cx={p.x} cy={p.y} r="2" fill="#34d399" />
                     </g>
-                  ) : (
+                  )}
+
+                  {/* Ponto de Pico ou Pontos Gerais quando poucos */}
+                  {!isHovered && (isPeak || !isDaily || p.isCurrent) && (
                     <circle
                       cx={p.x}
                       cy={p.y}
-                      r={isHovered ? 6.5 : isPeak ? 5.5 : 4.5}
-                      fill={isPeak ? "#34d399" : "#10b981"}
-                      stroke="#0e0e10"
-                      strokeWidth="2.5"
+                      r={isPeak ? 4.5 : p.isCurrent ? 4 : 3}
+                      fill={isPeak ? "#34d399" : p.isCurrent ? "#10b981" : "#059669"}
+                      stroke="#0a0a0c"
+                      strokeWidth="1.5"
                     />
                   )}
 
-                  {/* Rótulo de Valor Flutuante Acima do Ponto */}
-                  <text
-                    x={p.x}
-                    y={p.y - 12}
-                    textAnchor="middle"
-                    fill={p.isCurrent ? "#34d399" : p.revenue > 0 ? (isPeak ? "#34d399" : "#ffffff") : "rgba(255,255,255,0.35)"}
-                    fontSize={isHovered ? "11" : "10"}
-                    fontWeight={isHovered || isPeak || p.isCurrent ? "bold" : "600"}
-                  >
-                    {formatBRL(p.revenue).replace(",00", "")}
-                  </text>
+                  {/* Rótulo de Valor acima do Pico no estado repouso */}
+                  {!isHovered && isPeak && (
+                    <text
+                      x={p.x}
+                      y={Math.max(padTop + 10, p.y - 8)}
+                      textAnchor="middle"
+                      fill="#34d399"
+                      fontSize="9"
+                      fontWeight="bold"
+                    >
+                      {formatBRL(p.revenue).replace(",00", "")}
+                    </text>
+                  )}
 
-                  {/* Rótulo do Eixo X (Nome do Período) */}
-                  <text
-                    x={p.x}
-                    y={padTop + chartHeight + 20}
-                    textAnchor="middle"
-                    fill={p.isCurrent ? "#34d399" : isHovered ? "#ffffff" : "rgba(255,255,255,0.8)"}
-                    fontSize="11"
-                    fontWeight={p.isCurrent || isHovered ? "bold" : "500"}
-                  >
-                    {p.label.replace(" — em andamento", "").replace(" (em andamento)", "")}
-                  </text>
-
-                  {/* Sub-rótulo com Datas dos Ciclos 14 → 13 ou status em andamento */}
-                  <text
-                    x={p.x}
-                    y={padTop + chartHeight + 35}
-                    textAnchor="middle"
-                    fill={p.isCurrent ? "#34d399" : "rgba(255,255,255,0.35)"}
-                    fontSize="9"
-                    fontWeight={p.isCurrent ? "bold" : "normal"}
-                    fontFamily={p.isCurrent ? "sans-serif" : "monospace"}
-                  >
-                    {p.isCurrent
-                      ? "em andamento"
-                      : p.periodLabel.includes("→")
-                      ? p.periodLabel.replace(/\/2026/g, "").slice(0, 11)
-                      : p.periodLabel.slice(0, 10)}
-                  </text>
+                  {/* Rótulo do Eixo X */}
+                  {shouldShowLabel && (
+                    <text
+                      x={p.x}
+                      y={padTop + chartHeight + 18}
+                      textAnchor="middle"
+                      fill={
+                        isHovered
+                          ? "#ffffff"
+                          : p.isCurrent
+                          ? "#34d399"
+                          : "rgba(255, 255, 255, 0.45)"
+                      }
+                      fontSize={isHovered ? "10" : "8.5"}
+                      fontWeight={isHovered || p.isCurrent ? "bold" : "normal"}
+                      fontFamily="monospace"
+                    >
+                      {p.label.replace(" (vigente)", "").replace(" — em andamento", "")}
+                    </text>
+                  )}
                 </g>
               );
             })}
           </svg>
+
+          {/* Tooltip Flutuante Moderno em Tempo Real que Segue o Cursor */}
+          {hoveredIdx !== null && activePoint && (
+            <div
+              className="pointer-events-none absolute z-20 transition-transform duration-75 ease-out"
+              style={{
+                left: `${(activePoint.x / width) * 100}%`,
+                top: `${Math.max(8, (activePoint.y / height) * 100 - 12)}%`,
+                transform:
+                  activePoint.x > width * 0.72
+                    ? "translate(-96%, -105%)"
+                    : activePoint.x < width * 0.28
+                    ? "translate(-4%, -105%)"
+                    : "translate(-50%, -105%)",
+              }}
+            >
+              <div className="bg-[#121316]/95 border border-emerald-500/40 rounded-xl p-2.5 shadow-2xl backdrop-blur-md min-w-[190px] text-xs space-y-1">
+                <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1">
+                  <span className="font-bold text-white text-[11px] truncate flex items-center gap-1">
+                    <span className="size-1.5 rounded-full bg-emerald-400" />
+                    {activePoint.fullTitle}
+                  </span>
+                  {activePoint.isCurrent && (
+                    <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-bold">
+                      Hoje
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-baseline justify-between gap-2 pt-0.5">
+                  <span className="text-white/40 text-[9.5px] uppercase font-semibold">
+                    Faturamento
+                  </span>
+                  <span className="text-emerald-400 font-black text-sm">
+                    {formatBRL(activePoint.revenue)}
+                  </span>
+                </div>
+
+                {activePoint.revenue > 0 ? (
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 pt-1 border-t border-white/5 text-[9.5px]">
+                    <div>
+                      <span className="text-white/40 block">Volume</span>
+                      <span className="text-white font-medium">
+                        {activePoint.orders} ped · {activePoint.pods} pods
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-white/40 block">Lucro Líquido</span>
+                      <span className="text-emerald-300 font-medium">
+                        {formatBRL(activePoint.netProfit)}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-0.5 text-[9.5px] text-white/30 italic">
+                    Nenhuma venda registrada
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Card Detalhado do Ponto em Foco */}
+        {/* Card Detalhado Compacto do Ponto Ativo (Sempre Visível no Rodapé do Bloco) */}
         {activePoint && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="mt-3 bg-white/5 border border-white/10 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
             <div className="space-y-0.5">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-white text-sm">{activePoint.fullTitle}</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-bold text-white text-xs">{activePoint.fullTitle}</span>
                 {activePoint.isCurrent && (
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                    <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>Ciclo Vigente (Em Andamento)</span>
+                  <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                    <span className="size-1 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Em Andamento</span>
                   </span>
                 )}
               </div>
-              <p className="text-white/50 text-[11px]">
-                {activePoint.periodLabel}
-                {activePoint.isCurrent && " · Faturamento apurado até o momento (ciclo aberto)"}
-              </p>
+              <p className="text-white/40 text-[10px]">{activePoint.periodLabel}</p>
             </div>
 
-            <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-3 sm:gap-5 flex-wrap">
               <div>
-                <span className="text-white/40 block text-[10px] uppercase font-semibold">Faturamento</span>
-                <span className="text-white font-extrabold text-sm">{formatBRL(activePoint.revenue)}</span>
+                <span className="text-white/40 block text-[9px] uppercase font-semibold">
+                  Faturamento
+                </span>
+                <span className="text-white font-extrabold text-xs sm:text-sm">
+                  {formatBRL(activePoint.revenue)}
+                </span>
               </div>
               <div>
-                <span className="text-white/40 block text-[10px] uppercase font-semibold">CMV (Custo)</span>
-                <span className="text-red-400 font-bold text-sm">{formatBRL(activePoint.cmv)}</span>
+                <span className="text-white/40 block text-[9px] uppercase font-semibold">
+                  CMV (Custo)
+                </span>
+                <span className="text-red-400 font-bold text-xs sm:text-sm">
+                  {formatBRL(activePoint.cmv)}
+                </span>
               </div>
               <div>
-                <span className="text-white/40 block text-[10px] uppercase font-semibold">Lucro Líquido</span>
-                <span className="text-emerald-400 font-extrabold text-sm">{formatBRL(activePoint.netProfit)}</span>
+                <span className="text-white/40 block text-[9px] uppercase font-semibold">
+                  Lucro Líquido
+                </span>
+                <span className="text-emerald-400 font-extrabold text-xs sm:text-sm">
+                  {formatBRL(activePoint.netProfit)}
+                </span>
               </div>
               <div>
-                <span className="text-white/40 block text-[10px] uppercase font-semibold">Volume</span>
-                <span className="text-white/80 font-semibold">{activePoint.orders} ped ({activePoint.pods} pods)</span>
+                <span className="text-white/40 block text-[9px] uppercase font-semibold">
+                  Volume
+                </span>
+                <span className="text-white/80 font-medium text-xs">
+                  {activePoint.orders} ped ({activePoint.pods} pods)
+                </span>
               </div>
             </div>
           </div>
@@ -705,6 +722,8 @@ export default function FinanceDashboard() {
   // Seletores da Área: Faturamento a Longo Prazo (2 Abas: Histórico e Evolução)
   const [longTermTab, setLongTermTab] = useState<"historico" | "evolucao">("historico");
   const [historyTab, setHistoryTab] = useState<"mensal" | "trimestral" | "semestral" | "anual">("mensal");
+  const [evolutionTab, setEvolutionTab] = useState<"diario" | "mensal" | "trimestral" | "semestral" | "anual">("diario");
+  const [dailyRange, setDailyRange] = useState<"30d" | "ciclo" | "14d">("30d");
   const [selectedMonthCycleId, setSelectedMonthCycleId] = useState<string>("");
   const [selectedQuarterId, setSelectedQuarterId] = useState<string>("");
   const [selectedSemesterId, setSelectedSemesterId] = useState<string>("");
@@ -1159,14 +1178,155 @@ export default function FinanceDashboard() {
     return calculatePeriodEvolutions(selectedYear, previousYear, "período anterior");
   }, [selectedYear, previousYear]);
 
+  // Dados Reais da Aba Evolução - Visão Diária (Dia a Dia)
+  const dailyEvolutionData = useMemo<EvolutionPoint[]>(() => {
+    if (!allValidOrders || allValidOrders.length === 0) return [];
+
+    const now = new Date();
+    const nowSP = getSaoPauloDateParts(now);
+    const todayStr = `${nowSP.year}-${String(nowSP.month).padStart(2, "0")}-${String(nowSP.day).padStart(2, "0")}`;
+
+    // Determina a data inicial com base no dailyRange selecionado
+    let startDate: Date;
+    if (dailyRange === "ciclo") {
+      const curCycle = getCurrentCycle();
+      const [d, m, y] = curCycle.startDateStr.split("/").map(Number);
+      startDate = new Date(y, m - 1, d, 12, 0, 0);
+    } else if (dailyRange === "14d") {
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - 13);
+      startDate.setHours(12, 0, 0, 0);
+    } else {
+      // 30d (padrão)
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - 29);
+      startDate.setHours(12, 0, 0, 0);
+    }
+
+    const WEEKDAYS_FULL = [
+      "Domingo",
+      "Segunda-feira",
+      "Terça-feira",
+      "Quarta-feira",
+      "Quinta-feira",
+      "Sexta-feira",
+      "Sábado",
+    ];
+
+    // Gerar sequência contínua de dias cronológicos até hoje
+    const daysList: Array<{
+      dateKey: string;
+      label: string;
+      fullTitle: string;
+      periodLabel: string;
+      isToday: boolean;
+    }> = [];
+
+    const cur = new Date(startDate);
+    while (true) {
+      const parts = getSaoPauloDateParts(cur);
+      const dateKey = `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+
+      if (!daysList.some((d) => d.dateKey === dateKey)) {
+        const isToday = dateKey === todayStr;
+        const dayOfWeek = cur.getDay();
+        const fullWd = WEEKDAYS_FULL[dayOfWeek];
+        const dayFormatted = String(parts.day).padStart(2, "0");
+        const monthFormatted = String(parts.month).padStart(2, "0");
+
+        daysList.push({
+          dateKey,
+          label: `${dayFormatted}/${monthFormatted}`,
+          fullTitle: `${parts.day} de ${MONTH_NAMES[parts.month]} de ${parts.year}${isToday ? " (Hoje)" : ""}`,
+          periodLabel: `${fullWd} · ${dayFormatted}/${monthFormatted}/${parts.year}`,
+          isToday,
+        });
+      }
+
+      if (dateKey === todayStr) break;
+      cur.setDate(cur.getDate() + 1);
+      if (daysList.length > 90) break;
+    }
+
+    // Indexar pedidos por data de São Paulo
+    const ordersByDay = new Map<string, any[]>();
+    for (const order of allValidOrders) {
+      if (!order.created_at) continue;
+      const p = getSaoPauloDateParts(order.created_at);
+      const key = `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+      if (!ordersByDay.has(key)) {
+        ordersByDay.set(key, []);
+      }
+      ordersByDay.get(key)!.push(order);
+    }
+
+    return daysList.map((day) => {
+      const dayOrders = ordersByDay.get(day.dateKey) || [];
+      let dayRev = 0;
+      let dayCmv = 0;
+      let dayPods = 0;
+
+      for (const o of dayOrders) {
+        const items = Array.isArray(o.items) ? o.items : [];
+        if (items.length > 0) {
+          for (const item of items) {
+            const qty = Number(item.quantity) || 1;
+            const brand = (item.brand || "OUTROS").toUpperCase();
+            const modelName = (item.name || "POD").toUpperCase();
+            const itemPrice = Number(item.price || item.unit_price) || 0;
+            const modelKey = (item.modelKey || `${brand}__${modelName}`).toLowerCase();
+
+            let itemCost = Number(item.cost_price || item.costPrice) || 0;
+            if (!itemCost && item.product_id && persistedProductCosts[item.product_id]) {
+              itemCost = persistedProductCosts[item.product_id];
+            }
+            if (!itemCost && modelKey && DEFAULT_MODEL_COSTS[modelKey]) {
+              itemCost = DEFAULT_MODEL_COSTS[modelKey];
+            }
+            if (!itemCost) itemCost = 65;
+
+            dayRev += qty * itemPrice;
+            dayCmv += qty * itemCost;
+            dayPods += qty;
+          }
+        } else {
+          dayRev += Number(o.total_amount) || 0;
+          dayCmv += (Number(o.total_amount) || 0) * 0.45;
+          dayPods += 1;
+        }
+      }
+
+      const dayProfit = dayRev - dayCmv;
+
+      return {
+        id: day.dateKey,
+        label: day.label,
+        fullTitle: day.fullTitle,
+        periodLabel: day.periodLabel,
+        revenue: Number(dayRev.toFixed(2)),
+        cmv: Number(dayCmv.toFixed(2)),
+        netProfit: Number(dayProfit.toFixed(2)),
+        orders: dayOrders.length,
+        pods: dayPods,
+        isCurrent: day.isToday,
+      };
+    });
+  }, [allValidOrders, dailyRange, persistedProductCosts]);
+
   // Dados Reais da Aba Evolução (Curva de Faturamento ao Longo dos Períodos)
   const evolutionData = useMemo<EvolutionPoint[]>(() => {
-    if (historyTab === "mensal") {
+    if (evolutionTab === "diario") {
+      return dailyEvolutionData;
+    }
+    if (evolutionTab === "mensal") {
       // Ordena cronologicamente: do ciclo mais antigo para o mais recente
       const sorted = [...monthlyCycles].sort((a, b) => a.cycle.id.localeCompare(b.cycle.id));
-      return sorted.map((m) => ({
+      // Filtra ciclos com faturamento > 0 ou o ciclo vigente para não deixar 5 meses vazios esticando o gráfico
+      const relevant = sorted.filter((m) => m.grossRevenue > 0 || m.cycle.isCurrent);
+      const toShow = relevant.length > 0 ? relevant : sorted;
+      return toShow.map((m) => ({
         id: m.cycle.id,
-        label: m.cycle.isCurrent ? `${m.cycle.monthName} — em andamento` : m.cycle.monthName,
+        label: m.cycle.isCurrent ? `${m.cycle.monthName} (vigente)` : m.cycle.monthName,
         fullTitle: `${m.cycle.name}${m.cycle.isCurrent ? " — em andamento" : ""} (${m.cycle.label})`,
         periodLabel: m.cycle.label,
         revenue: m.grossRevenue,
@@ -1177,9 +1337,11 @@ export default function FinanceDashboard() {
         isCurrent: m.cycle.isCurrent,
       }));
     }
-    if (historyTab === "trimestral") {
+    if (evolutionTab === "trimestral") {
       const sorted = [...quarterlyPeriods].reverse();
-      return sorted.map((q) => {
+      const relevant = sorted.filter((q) => q.grossRevenue > 0 || q.includedCycles?.some((c) => c.cycle.isCurrent));
+      const toShow = relevant.length > 0 ? relevant : sorted;
+      return toShow.map((q) => {
         const parts = q.name.split(" ");
         const shortName = parts.length >= 2 ? `${parts[0]} ${parts[1]}` : q.name;
         const hasCurrent = q.includedCycles?.some((c) => c.cycle.isCurrent);
@@ -1197,9 +1359,11 @@ export default function FinanceDashboard() {
         };
       });
     }
-    if (historyTab === "semestral") {
+    if (evolutionTab === "semestral") {
       const sorted = [...semiannualPeriods].reverse();
-      return sorted.map((s) => {
+      const relevant = sorted.filter((s) => s.grossRevenue > 0 || s.includedCycles?.some((c) => c.cycle.isCurrent));
+      const toShow = relevant.length > 0 ? relevant : sorted;
+      return toShow.map((s) => {
         const parts = s.name.split(" ");
         const shortName = parts.length >= 2 ? `${parts[0]} ${parts[1]}` : s.name;
         const hasCurrent = s.includedCycles?.some((c) => c.cycle.isCurrent);
@@ -1219,7 +1383,9 @@ export default function FinanceDashboard() {
     }
     // Anual
     const sorted = [...annualPeriods].reverse();
-    return sorted.map((y) => {
+    const relevant = sorted.filter((y) => y.grossRevenue > 0 || y.includedCycles?.some((c) => c.cycle.isCurrent));
+    const toShow = relevant.length > 0 ? relevant : sorted;
+    return toShow.map((y) => {
       const hasCurrent = y.includedCycles?.some((c) => c.cycle.isCurrent);
       const shortName = y.name.replace("Ano Financeiro · ", "Ano ");
       return {
@@ -1235,7 +1401,14 @@ export default function FinanceDashboard() {
         isCurrent: Boolean(hasCurrent),
       };
     });
-  }, [historyTab, monthlyCycles, quarterlyPeriods, semiannualPeriods, annualPeriods]);
+  }, [
+    evolutionTab,
+    dailyEvolutionData,
+    monthlyCycles,
+    quarterlyPeriods,
+    semiannualPeriods,
+    annualPeriods,
+  ]);
 
   // Modal Handlers de Recompra
   const handleOpenRepurchaseModal = () => {
@@ -2629,14 +2802,26 @@ export default function FinanceDashboard() {
         {/* ══════════════════════════════════════════════════════════════════ */}
         {longTermTab === "evolucao" && (
           <div className="space-y-6">
-            {/* Seletor de Modalidade da Evolução: Mensal / Trimestral / Semestral / Anual */}
+            {/* Seletor de Modalidade da Evolução: Diário / Mensal / Trimestral / Semestral / Anual */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="inline-flex p-1 rounded-2xl bg-black/60 border border-white/15">
                 <button
                   type="button"
-                  onClick={() => setHistoryTab("mensal")}
+                  onClick={() => setEvolutionTab("diario")}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    historyTab === "mensal"
+                    evolutionTab === "diario"
+                      ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+                      : "text-white/70 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <CalendarDays className="size-3.5" />
+                  <span>Diário (Dia a Dia)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEvolutionTab("mensal")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    evolutionTab === "mensal"
                       ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                       : "text-white/70 hover:text-white hover:bg-white/5"
                   }`}
@@ -2646,9 +2831,9 @@ export default function FinanceDashboard() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setHistoryTab("trimestral")}
+                  onClick={() => setEvolutionTab("trimestral")}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    historyTab === "trimestral"
+                    evolutionTab === "trimestral"
                       ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                       : "text-white/70 hover:text-white hover:bg-white/5"
                   }`}
@@ -2658,9 +2843,9 @@ export default function FinanceDashboard() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setHistoryTab("semestral")}
+                  onClick={() => setEvolutionTab("semestral")}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    historyTab === "semestral"
+                    evolutionTab === "semestral"
                       ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                       : "text-white/70 hover:text-white hover:bg-white/5"
                   }`}
@@ -2670,9 +2855,9 @@ export default function FinanceDashboard() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setHistoryTab("anual")}
+                  onClick={() => setEvolutionTab("anual")}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    historyTab === "anual"
+                    evolutionTab === "anual"
                       ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                       : "text-white/70 hover:text-white hover:bg-white/5"
                   }`}
@@ -2688,7 +2873,12 @@ export default function FinanceDashboard() {
             </div>
 
             {/* O Gráfico como elemento principal */}
-            <RevenueEvolutionChart data={evolutionData} periodType={historyTab} />
+            <RevenueEvolutionChart
+              data={evolutionData}
+              periodType={evolutionTab}
+              dailyRange={dailyRange}
+              onDailyRangeChange={setDailyRange}
+            />
           </div>
         )}
       </div>
