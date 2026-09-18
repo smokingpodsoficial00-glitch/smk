@@ -91,24 +91,20 @@ export function LoginPage() {
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-4 pt-2">
             <Link
-              to="/cadastro"
+              to="/lp"
               className="bg-white hover:bg-slate-100 text-black font-extrabold px-7 py-3.5 rounded-xl transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] flex items-center gap-2 active:scale-95 text-xs sm:text-sm"
             >
-              <span>Criar Conta Grátis</span>
+              <span>Adquirir Acesso</span>
               <ArrowRight className="size-4" />
             </Link>
 
-            <a
-              href="#conhecer"
-              onClick={(e) => {
-                e.preventDefault();
-                alert('Conheça o SaaS: Painel Kanban em tempo real, DRE automático, gestão de estoque inteligente e fatias de lucros para sócios.');
-              }}
+            <Link
+              to="/lp"
               className="bg-[#121212] hover:bg-[#1c1c1c] border border-[#262626] text-white/90 hover:text-white font-semibold px-6 py-3.5 rounded-xl transition-all flex items-center gap-2 text-xs sm:text-sm active:scale-95"
             >
               <Sparkles className="size-4 text-white" />
               <span>Conhecer Plataforma</span>
-            </a>
+            </Link>
           </div>
 
           {/* Glass Feature Highlights Cards */}
@@ -254,8 +250,8 @@ export function LoginPage() {
           {/* Footer Register Link */}
           <div className="mt-8 pt-6 border-t border-[#1a1a1a] text-center text-xs text-white/50">
             Ainda não tem uma conta?{' '}
-            <Link to="/cadastro" className="font-bold text-white hover:underline underline-offset-4 ml-1">
-              Criar uma conta
+            <Link to="/lp" className="font-bold text-white hover:underline underline-offset-4 ml-1">
+              Adquirir Acesso
             </Link>
           </div>
         </div>
