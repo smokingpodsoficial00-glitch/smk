@@ -201,9 +201,8 @@ function generateSmoothArea(pts: { x: number; y: number }[], baseY: number): str
 
 /**
  * Componente Gráfico SaaS Técnico & Minimalista (Revenue Performance)
- * Inspirado fielmente na referência de dashboards SaaS B2B com 2 séries de dados:
- * Linha 1: Faturamento Bruto (Esmeralda com área sombreada e valores nos nós)
- * Linha 2: Lucro Líquido Real (Ciano luminoso)
+ * Duas séries: Faturamento Bruto (esmeralda) + Lucro Líquido Real (ciano)
+ * Labels aparecem APENAS via tooltip no hover — resting state limpo e profissional.
  */
 function RevenueEvolutionChart({
   data,
@@ -228,85 +227,78 @@ function RevenueEvolutionChart({
     );
   }
 
-  // Faturamento total e lucro no recorte
+  // KPIs totais
   const totalRevenue = data.reduce((sum, d) => sum + d.revenue, 0);
   const totalNetProfit = data.reduce((sum, d) => sum + d.netProfit, 0);
   const totalOrdersCount = data.reduce((sum, d) => sum + d.orders, 0);
   const totalPodsCount = data.reduce((sum, d) => sum + d.pods, 0);
   const overallMargin = totalRevenue > 0 ? (totalNetProfit / totalRevenue) * 100 : 0;
 
-  // Dimensões compactas e técnicas SaaS
+  // Dimensões — altura maior para respiração entre as 2 linhas
   const width = 760;
-  const height = 210;
-  const padLeft = 65;
-  const padRight = 35;
-  const padTop = 30;
-  const padBottom = 38;
-  const chartWidth = width - padLeft - padRight;
-  const chartHeight = height - padTop - padBottom;
+  const height = 280;
+  const padLeft = 62;
+  const padRight = 30;
+  const padTop = 24;
+  const padBottom = 44;
+  const chartW = width - padLeft - padRight;
+  const chartH = height - padTop - padBottom;
 
-  const maxVal = Math.max(
-    ...data.map((d) => Math.max(d.revenue, d.netProfit)),
-    50
-  );
-  const yMax = Math.ceil(maxVal * 1.2);
+  const maxVal = Math.max(...data.map((d) => Math.max(d.revenue, d.netProfit)), 50);
+  const yMax = Math.ceil(maxVal * 1.15);
 
-  // Mapeamento dos pontos
+  // Mapear pontos de faturamento e lucro
   const revenuePoints = data.map((d, i) => {
-    const x =
-      data.length === 1
-        ? padLeft + chartWidth / 2
-        : padLeft + (i / (data.length - 1)) * chartWidth;
-    const y = padTop + chartHeight - (Math.max(0, d.revenue) / yMax) * chartHeight;
+    const x = data.length === 1 ? padLeft + chartW / 2 : padLeft + (i / (data.length - 1)) * chartW;
+    const y = padTop + chartH - (Math.max(0, d.revenue) / yMax) * chartH;
     return { ...d, x, y, index: i };
   });
 
   const profitPoints = data.map((d, i) => {
-    const x =
-      data.length === 1
-        ? padLeft + chartWidth / 2
-        : padLeft + (i / (data.length - 1)) * chartWidth;
-    const y = padTop + chartHeight - (Math.max(0, d.netProfit) / yMax) * chartHeight;
+    const x = data.length === 1 ? padLeft + chartW / 2 : padLeft + (i / (data.length - 1)) * chartW;
+    const y = padTop + chartH - (Math.max(0, d.netProfit) / yMax) * chartH;
     return { ...d, x, y, index: i };
   });
 
-  const revenueLinePath = generateSmoothPath(revenuePoints);
-  const revenueAreaPath = generateSmoothArea(revenuePoints, padTop + chartHeight);
-  const profitLinePath = generateSmoothPath(profitPoints);
+  const revLinePath = generateSmoothPath(revenuePoints);
+  const revAreaPath = generateSmoothArea(revenuePoints, padTop + chartH);
+  const profLinePath = generateSmoothPath(profitPoints);
 
-  // 4 níveis de grade horizontal
-  const gridLevels = [0, 0.33, 0.66, 1];
+  // 5 níveis Y (0%, 25%, 50%, 75%, 100%)
+  const gridLevels = [0, 0.25, 0.5, 0.75, 1];
+
+  // Quantos labels no eixo X exibir (evitar sobreposição)
+  const isMonthlyDaily = periodType === "mensal";
+  const xLabelStep = isMonthlyDaily
+    ? Math.max(1, Math.ceil(data.length / 8))
+    : Math.max(1, Math.ceil(data.length / 12));
 
   const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    const svgRect = e.currentTarget.getBoundingClientRect();
-    if (!svgRect.width) return;
-    const clientX = e.clientX - svgRect.left;
-    const svgX = (clientX / svgRect.width) * width;
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (!rect.width) return;
+    const svgX = ((e.clientX - rect.left) / rect.width) * width;
     const clampedX = Math.max(padLeft, Math.min(width - padRight, svgX));
-
-    let closestIdx = 0;
-    let minDiff = Infinity;
+    let best = 0;
+    let bestD = Infinity;
     for (let i = 0; i < revenuePoints.length; i++) {
-      const diff = Math.abs(revenuePoints[i].x - clampedX);
-      if (diff < minDiff) {
-        minDiff = diff;
-        closestIdx = i;
-      }
+      const d = Math.abs(revenuePoints[i].x - clampedX);
+      if (d < bestD) { bestD = d; best = i; }
     }
-    setHoveredIdx(closestIdx);
+    setHoveredIdx(best);
   };
 
-  const handlePointerLeave = () => {
-    setHoveredIdx(null);
-  };
+  const handlePointerLeave = () => setHoveredIdx(null);
 
   const activePoint = hoveredIdx !== null ? revenuePoints[hoveredIdx] : null;
-  const isMonthlyDaily = periodType === "mensal";
-  const labelStep = isMonthlyDaily ? Math.max(1, Math.ceil(revenuePoints.length / 6)) : 1;
+  const activeProfitPoint = hoveredIdx !== null ? profitPoints[hoveredIdx] : null;
+
+  // Determinar pico de faturamento para label fixo opcional (apenas em <= 12 pontos)
+  const showPeakLabel = data.length <= 12;
+  const peakIdx = revenuePoints.reduce((best, p, i) => (p.revenue > revenuePoints[best].revenue ? i : best), 0);
 
   return (
     <div className="bg-[#0f1115] border border-white/10 rounded-2xl p-4 sm:p-5 shadow-2xl relative select-none">
-      {/* Cabeçalho Técnico SaaS */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 pb-3 border-b border-white/5">
         <div>
           <h4 className="text-sm font-bold text-white tracking-wide flex items-center gap-2">
@@ -317,12 +309,12 @@ function RevenueEvolutionChart({
             {isMonthlyDaily
               ? "Acompanhamento dia a dia das vendas e rentabilidade do ciclo."
               : periodType === "trimestral"
-              ? "Consolidação trimestral de receitas e lucro líquido."
-              : "Consolidação anual de receitas e lucro líquido."}
+              ? "Visão mensal do trimestre — receitas e lucro líquido mês a mês."
+              : "Visão mensal do ano — receitas e lucro líquido mês a mês."}
           </p>
         </div>
 
-        {/* Seletor de Ciclo se for modo Mensal */}
+        {/* Seletor de Ciclo (modo Mensal) */}
         {isMonthlyDaily && availableCycles && availableCycles.length > 0 && onCycleChange && (
           <div className="flex items-center gap-2 self-start sm:self-auto">
             <span className="text-[11px] text-white/40">Ciclo:</span>
@@ -341,7 +333,7 @@ function RevenueEvolutionChart({
         )}
       </div>
 
-      {/* Legenda das 2 Linhas Técnicas */}
+      {/* Legenda */}
       <div className="flex items-center justify-between gap-4 mb-2 text-xs">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
@@ -354,11 +346,11 @@ function RevenueEvolutionChart({
           </div>
         </div>
         <span className="text-[10px] text-white/40 hidden sm:inline-block">
-          Passe o cursor sobre os pontos para inspecionar
+          Passe o cursor sobre o gráfico para inspecionar valores
         </span>
       </div>
 
-      {/* ViewBox SVG Responsivo */}
+      {/* SVG Chart */}
       <div className="relative w-full overflow-x-auto">
         <svg
           viewBox={`0 0 ${width} ${height}`}
@@ -368,216 +360,164 @@ function RevenueEvolutionChart({
         >
           <defs>
             <linearGradient id="saasAreaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
-              <stop offset="70%" stopColor="#10b981" stopOpacity="0.04" />
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.18" />
+              <stop offset="60%" stopColor="#10b981" stopOpacity="0.04" />
               <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
             </linearGradient>
           </defs>
 
-          {/* Rótulo Lateral do Eixo Y (Receita $) */}
+          {/* Rótulo lateral Y */}
           <text
             transform="rotate(-90)"
-            x={-(padTop + chartHeight / 2)}
-            y="16"
+            x={-(padTop + chartH / 2)}
+            y="14"
             textAnchor="middle"
-            fill="rgba(255, 255, 255, 0.4)"
-            fontSize="9"
+            fill="rgba(255,255,255,0.35)"
+            fontSize="8.5"
             fontWeight="500"
           >
             Receita (R$)
           </text>
 
-          {/* Linhas de Grade Horizontais */}
+          {/* Grade Horizontal + Labels Y */}
           {gridLevels.map((lvl) => {
-            const yVal = padTop + chartHeight - lvl * chartHeight;
+            const yVal = padTop + chartH - lvl * chartH;
             const val = lvl * yMax;
             return (
-              <g key={`h-grid-${lvl}`}>
-                <line
-                  x1={padLeft}
-                  y1={yVal}
-                  x2={width - padRight}
-                  y2={yVal}
-                  stroke="rgba(255, 255, 255, 0.07)"
-                  strokeWidth="1"
-                />
-                <text
-                  x={padLeft - 8}
-                  y={yVal + 3.5}
-                  textAnchor="end"
-                  fill="rgba(255, 255, 255, 0.35)"
-                  fontSize="9.5"
-                  fontFamily="monospace"
-                >
+              <g key={`hg-${lvl}`}>
+                <line x1={padLeft} y1={yVal} x2={width - padRight} y2={yVal} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+                <text x={padLeft - 6} y={yVal + 3.5} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize="9" fontFamily="monospace">
                   {lvl === 0 ? "0" : formatBRL(val).replace(",00", "")}
                 </text>
               </g>
             );
           })}
 
-          {/* Linhas de Grade Verticais */}
+          {/* Grade Vertical (apenas onde há label X) */}
           {revenuePoints.map((p, i) => {
-            if (i % labelStep !== 0 && i !== revenuePoints.length - 1) return null;
+            if (i % xLabelStep !== 0 && i !== revenuePoints.length - 1) return null;
             return (
-              <line
-                key={`v-grid-${i}`}
-                x1={p.x}
-                y1={padTop}
-                x2={p.x}
-                y2={padTop + chartHeight}
-                stroke="rgba(255, 255, 255, 0.05)"
-                strokeWidth="1"
-              />
+              <line key={`vg-${i}`} x1={p.x} y1={padTop} x2={p.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
             );
           })}
 
-          {/* Área Preenchida Translúcida da Linha 1 */}
-          {revenueAreaPath && <path d={revenueAreaPath} fill="url(#saasAreaGrad)" />}
+          {/* Área sob a curva de faturamento */}
+          {revAreaPath && <path d={revAreaPath} fill="url(#saasAreaGrad)" />}
 
-          {/* Linha 1: Faturamento Bruto (Verde Esmeralda) */}
-          {revenueLinePath && (
-            <path
-              d={revenueLinePath}
-              fill="none"
-              stroke="#10b981"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+          {/* Linha Faturamento */}
+          {revLinePath && (
+            <path d={revLinePath} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           )}
 
-          {/* Linha 2: Lucro Líquido Real (Ciano) */}
-          {profitLinePath && (
-            <path
-              d={profitLinePath}
-              fill="none"
-              stroke="#06b6d4"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+          {/* Linha Lucro */}
+          {profLinePath && (
+            <path d={profLinePath} fill="none" stroke="#06b6d4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray={isMonthlyDaily ? "none" : "none"} />
           )}
 
-          {/* Crosshair Vertical no Hover */}
+          {/* Crosshair vertical no hover */}
           {hoveredIdx !== null && activePoint && (
-            <line
-              x1={activePoint.x}
-              y1={padTop}
-              x2={activePoint.x}
-              y2={padTop + chartHeight}
-              stroke="rgba(255, 255, 255, 0.4)"
-              strokeWidth="1"
-              strokeDasharray="3 3"
-            />
+            <>
+              <line x1={activePoint.x} y1={padTop} x2={activePoint.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.35)" strokeWidth="1" strokeDasharray="4 3" />
+              {/* Horizontal guide lines to Y axis */}
+              <line x1={padLeft} y1={activePoint.y} x2={activePoint.x} y2={activePoint.y} stroke="rgba(16,185,129,0.25)" strokeWidth="1" strokeDasharray="3 3" />
+              {activeProfitPoint && (
+                <line x1={padLeft} y1={activeProfitPoint.y} x2={activeProfitPoint.x} y2={activeProfitPoint.y} stroke="rgba(6,182,212,0.25)" strokeWidth="1" strokeDasharray="3 3" />
+              )}
+            </>
           )}
 
-          {/* Pontos da Linha 2 (Lucro Líquido): Marcadores Brancos com borda ciano */}
+          {/* Dots Lucro — pequenos, expandem no hover */}
           {profitPoints.map((p, i) => {
-            const hasValue = p.netProfit > 0;
-            const isHovered = hoveredIdx === i;
-            if (!hasValue && !isHovered && revenuePoints.length > 15) return null;
-
+            const isHov = hoveredIdx === i;
+            const show = p.netProfit > 0 || isHov;
+            if (!show && data.length > 15) return null;
             return (
-              <circle
-                key={`p-dot-${i}`}
-                cx={p.x}
-                cy={p.y}
-                r={isHovered ? 4.5 : 3}
-                fill="#ffffff"
-                stroke="#06b6d4"
-                strokeWidth={isHovered ? 2.5 : 1.8}
-              />
+              <circle key={`pd-${i}`} cx={p.x} cy={p.y} r={isHov ? 5 : 2.5} fill={isHov ? "#ffffff" : "#06b6d4"} stroke={isHov ? "#06b6d4" : "none"} strokeWidth={isHov ? 2.5 : 0} />
             );
           })}
 
-          {/* Pontos da Linha 1 (Faturamento) + Valores no Estilo da Referência */}
+          {/* Dots Faturamento — pequenos, expandem no hover */}
           {revenuePoints.map((p, i) => {
-            const hasRevenue = p.revenue > 0;
-            const isHovered = hoveredIdx === i;
-            const shouldShowDot = hasRevenue || isHovered || revenuePoints.length <= 15;
-
+            const isHov = hoveredIdx === i;
+            const show = p.revenue > 0 || isHov;
+            if (!show && data.length > 15) return null;
             return (
-              <g key={`r-dot-${i}`}>
-                {shouldShowDot && (
-                  <circle
-                    cx={p.x}
-                    cy={p.y}
-                    r={isHovered ? 5 : 3.5}
-                    fill="#ffffff"
-                    stroke="#10b981"
-                    strokeWidth={isHovered ? 2.5 : 2}
-                  />
-                )}
+              <g key={`rd-${i}`}>
+                <circle cx={p.x} cy={p.y} r={isHov ? 5.5 : 3} fill={isHov ? "#ffffff" : "#10b981"} stroke={isHov ? "#10b981" : "#0f1115"} strokeWidth={isHov ? 2.5 : 1.5} />
 
-                {/* Valor Direto acima do Ponto (estilo $78k, $92k da referência) */}
-                {hasRevenue && (
-                  <text
-                    x={p.x}
-                    y={p.y - 7}
-                    textAnchor="middle"
-                    fill="#ffffff"
-                    fontSize="8.5"
-                    fontWeight="bold"
-                    fontFamily="sans-serif"
-                  >
+                {/* Label fixo APENAS no pico e em modos com poucos pontos (≤12) */}
+                {showPeakLabel && i === peakIdx && p.revenue > 0 && !isHov && (
+                  <text x={p.x} y={p.y - 10} textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="bold" fontFamily="sans-serif">
                     {formatBRL(p.revenue).replace(",00", "")}
                   </text>
                 )}
 
-                {/* Rótulo do Eixo X */}
-                {(i % labelStep === 0 || i === revenuePoints.length - 1 || isHovered) && (
-                  <text
-                    x={p.x}
-                    y={padTop + chartHeight + 17}
-                    textAnchor="middle"
-                    fill={isHovered ? "#ffffff" : "rgba(255, 255, 255, 0.45)"}
-                    fontSize={isHovered ? "9.5" : "8.5"}
-                    fontWeight={isHovered ? "bold" : "normal"}
-                    fontFamily="monospace"
-                  >
-                    {p.label.replace(" (vigente)", "").replace(" — em andamento", "")}
+                {/* Label do valor no hover */}
+                {isHov && p.revenue > 0 && (
+                  <text x={p.x} y={p.y - 10} textAnchor="middle" fill="#10b981" fontSize="9.5" fontWeight="bold" fontFamily="sans-serif">
+                    {formatBRL(p.revenue)}
                   </text>
                 )}
               </g>
             );
           })}
 
-          {/* Rótulo Inferior Central do Eixo X */}
+          {/* Eixo X labels */}
+          {revenuePoints.map((p, i) => {
+            const isHov = hoveredIdx === i;
+            if (!isHov && i % xLabelStep !== 0 && i !== revenuePoints.length - 1) return null;
+            return (
+              <text
+                key={`xl-${i}`}
+                x={p.x}
+                y={padTop + chartH + 16}
+                textAnchor="middle"
+                fill={isHov ? "#ffffff" : "rgba(255,255,255,0.4)"}
+                fontSize={isHov ? "9.5" : "8.5"}
+                fontWeight={isHov ? "bold" : "normal"}
+                fontFamily="monospace"
+              >
+                {p.label.replace(" (vigente)", "").replace(" — em andamento", "")}
+              </text>
+            );
+          })}
+
+          {/* Label eixo X inferior */}
           <text
-            x={padLeft + chartWidth / 2}
+            x={padLeft + chartW / 2}
             y={height - 6}
             textAnchor="middle"
-            fill="rgba(255, 255, 255, 0.35)"
-            fontSize="9.5"
+            fill="rgba(255,255,255,0.3)"
+            fontSize="9"
             fontWeight="500"
           >
-            {isMonthlyDaily ? "Dias do Ciclo (14 → 13)" : "Períodos"}
+            {isMonthlyDaily ? "Dias do Ciclo (14 → 13)" : periodType === "trimestral" ? "Meses do Trimestre" : "Meses do Ano"}
           </text>
         </svg>
 
-        {/* Tooltip Técnico Minimalista que segue o cursor */}
+        {/* Tooltip flutuante */}
         {hoveredIdx !== null && activePoint && (
           <div
             className="pointer-events-none absolute z-20 transition-transform duration-75 ease-out"
             style={{
               left: `${(activePoint.x / width) * 100}%`,
-              top: `${Math.max(6, (activePoint.y / height) * 100 - 10)}%`,
+              top: `${Math.max(4, (activePoint.y / height) * 100 - 12)}%`,
               transform:
                 activePoint.x > width * 0.72
-                  ? "translate(-96%, -105%)"
+                  ? "translate(-100%, -105%)"
                   : activePoint.x < width * 0.28
-                  ? "translate(-4%, -105%)"
+                  ? "translate(0%, -105%)"
                   : "translate(-50%, -105%)",
             }}
           >
-            <div className="bg-[#16181e]/95 border border-white/20 rounded-xl p-2.5 shadow-2xl backdrop-blur-md min-w-[185px] text-xs space-y-1">
+            <div className="bg-[#16181e]/95 border border-white/20 rounded-xl p-2.5 shadow-2xl backdrop-blur-md min-w-[190px] text-xs space-y-1">
               <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1">
-                <span className="font-bold text-white text-[11px] truncate">
+                <span className="font-bold text-white text-[11px] truncate max-w-[160px]">
                   {activePoint.fullTitle}
                 </span>
                 {activePoint.isCurrent && (
-                  <span className="text-[8.5px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-bold">
-                    Hoje
+                  <span className="text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold shrink-0">
+                    Atual
                   </span>
                 )}
               </div>
@@ -602,6 +542,15 @@ function RevenueEvolutionChart({
                 </span>
               </div>
 
+              {activePoint.revenue > 0 && (
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-white/50 text-[10px]">Margem:</span>
+                  <span className="text-white/80 font-semibold text-[10px]">
+                    {activePoint.revenue > 0 ? ((activePoint.netProfit / activePoint.revenue) * 100).toFixed(1) : "0.0"}%
+                  </span>
+                </div>
+              )}
+
               <div className="pt-1 border-t border-white/5 flex items-center justify-between text-[9.5px] text-white/50">
                 <span>Volume:</span>
                 <span className="text-white font-medium">
@@ -613,7 +562,7 @@ function RevenueEvolutionChart({
         )}
       </div>
 
-      {/* Barra de KPIs Compacta no Rodapé do Card */}
+      {/* KPIs Footer */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 mt-2 border-t border-white/5 text-xs">
         <div>
           <span className="text-white/40 block text-[9.5px] uppercase font-semibold">
@@ -1256,48 +1205,49 @@ export default function FinanceDashboard() {
     if (evolutionTab === "mensal") {
       return monthlyCycleDailyPoints;
     }
-    if (evolutionTab === "trimestral") {
-      const sorted = [...quarterlyPeriods].reverse();
-      const relevant = sorted.filter((q) => q.grossRevenue > 0 || q.includedCycles?.some((c) => c.cycle.isCurrent));
-      const toShow = relevant.length > 0 ? relevant : sorted;
-      return toShow.map((q) => {
-        const parts = q.name.split(" ");
-        const shortName = parts.length >= 2 ? `${parts[0]} ${parts[1]}` : q.name;
-        const hasCurrent = q.includedCycles?.some((c) => c.cycle.isCurrent);
-        return {
-          id: q.id,
-          label: hasCurrent ? `${shortName} — em andamento` : shortName,
-          fullTitle: `${q.name}${hasCurrent ? " — em andamento" : ""} (${q.label})`,
-          periodLabel: q.label,
-          revenue: q.grossRevenue,
-          cmv: q.cmv,
-          netProfit: q.netProfit,
-          orders: q.totalOrders,
-          pods: q.totalPodsSold,
-          isCurrent: Boolean(hasCurrent),
-        };
-      });
-    }
-    // Anual
-    const sorted = [...annualPeriods].reverse();
-    const relevant = sorted.filter((y) => y.grossRevenue > 0 || y.includedCycles?.some((c) => c.cycle.isCurrent));
-    const toShow = relevant.length > 0 ? relevant : sorted;
-    return toShow.map((y) => {
-      const hasCurrent = y.includedCycles?.some((c) => c.cycle.isCurrent);
-      const shortName = y.name.replace("Ano Financeiro · ", "Ano ");
+
+    // Helper: transforma um CycleFinancialMetrics em EvolutionPoint usando o nome do mês como label
+    const cycleToPoint = (c: CycleFinancialMetrics): EvolutionPoint => {
+      const SHORT_MONTHS = ["", "Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+      const shortLabel = SHORT_MONTHS[c.cycle.month] || c.cycle.monthName.slice(0, 3);
       return {
-        id: y.id,
-        label: hasCurrent ? `${shortName} — em andamento` : shortName,
-        fullTitle: `${y.name}${hasCurrent ? " — em andamento" : ""} (${y.label})`,
-        periodLabel: y.label,
-        revenue: y.grossRevenue,
-        cmv: y.cmv,
-        netProfit: y.netProfit,
-        orders: y.totalOrders,
-        pods: y.totalPodsSold,
-        isCurrent: Boolean(hasCurrent),
+        id: c.cycle.id,
+        label: c.cycle.isCurrent ? `${shortLabel} (atual)` : shortLabel,
+        fullTitle: `${c.cycle.name}${c.cycle.isCurrent ? " — em andamento" : ""} (${c.cycle.label})`,
+        periodLabel: c.cycle.label,
+        revenue: c.grossRevenue,
+        cmv: c.cmv,
+        netProfit: c.netProfit,
+        orders: c.totalOrders,
+        pods: c.totalPodsSold,
+        isCurrent: c.cycle.isCurrent,
       };
-    });
+    };
+
+    if (evolutionTab === "trimestral") {
+      // Encontrar o trimestre vigente (que contém o mês atual) ou o mais recente com dados
+      const sorted = [...quarterlyPeriods].reverse();
+      const withCurrent = sorted.find((q) => q.includedCycles?.some((c) => c.cycle.isCurrent));
+      const withRevenue = sorted.find((q) => q.grossRevenue > 0);
+      const target = withCurrent || withRevenue || sorted[0];
+      if (!target || !target.includedCycles || target.includedCycles.length === 0) return [];
+
+      // Mostrar cada mês do trimestre como ponto individual
+      return target.includedCycles.map(cycleToPoint);
+    }
+
+    // Anual — mostrar todos os meses do ano com dados (ou o mês vigente)
+    const sorted = [...annualPeriods].reverse();
+    const withCurrent = sorted.find((y) => y.includedCycles?.some((c) => c.cycle.isCurrent));
+    const withRevenue = sorted.find((y) => y.grossRevenue > 0);
+    const target = withCurrent || withRevenue || sorted[0];
+    if (!target || !target.includedCycles || target.includedCycles.length === 0) return [];
+
+    // Filtrar: só meses com faturamento > 0 ou que sejam o mês vigente
+    const relevantMonths = target.includedCycles.filter(
+      (c) => c.grossRevenue > 0 || c.cycle.isCurrent
+    );
+    return relevantMonths.length > 0 ? relevantMonths.map(cycleToPoint) : target.includedCycles.map(cycleToPoint);
   }, [
     evolutionTab,
     monthlyCycleDailyPoints,
