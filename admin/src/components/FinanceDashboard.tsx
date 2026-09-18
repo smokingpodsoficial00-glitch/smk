@@ -1533,7 +1533,7 @@ export default function FinanceDashboard() {
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Sparkles className="size-6 text-emerald-400" />
+            <Sparkles className="size-6 text-white" />
             <span>Financeiro</span>
           </h2>
           <p className="text-xs text-white/50 mt-0.5">
@@ -1542,7 +1542,7 @@ export default function FinanceDashboard() {
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/5 text-white/90 border border-white/10">
-            <Calendar className="size-3.5 text-emerald-400" />
+            <Calendar className="size-3.5 text-white/70" />
             <span>Ciclo atual: {currentCycle.startDateStr.slice(0, 5)} → {currentCycle.endDateStr.slice(0, 5)}</span>
           </div>
         </div>
@@ -1674,7 +1674,7 @@ export default function FinanceDashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
           <div>
             <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-              <PackagePlus className="size-5 text-emerald-400" />
+              <PackagePlus className="size-5 text-white" />
               <span>Recompra de Estoque & Caixa Real</span>
             </h3>
             <p className="text-xs text-white/50 mt-0.5">
@@ -1684,7 +1684,7 @@ export default function FinanceDashboard() {
           <div className="flex items-center gap-3">
             <button
               onClick={handleOpenRepurchaseModal}
-              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95 cursor-pointer"
+              className="inline-flex items-center gap-2 bg-white hover:bg-slate-100 text-black font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] transition-all active:scale-95 cursor-pointer"
             >
               <Plus className="size-4 stroke-[3]" />
               <span>Registrar Recompra</span>

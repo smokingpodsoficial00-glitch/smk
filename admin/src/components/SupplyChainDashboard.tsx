@@ -1249,7 +1249,7 @@ export default function SupplyChainDashboard() {
             <div className="flex items-center gap-4 flex-wrap">
               <div>
                 <h2 className="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                  <PackageSearch className="size-5 text-emerald-400" />
+                  <PackageSearch className="size-5 text-white" />
                   Central de Gestão de Estoque
                 </h2>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -1264,7 +1264,7 @@ export default function SupplyChainDashboard() {
                   onClick={() => setActiveMainView("ESTOQUE")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     activeMainView === "ESTOQUE"
-                      ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20"
+                      ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.2)]"
                       : "text-muted-foreground hover:text-white"
                   }`}
                 >

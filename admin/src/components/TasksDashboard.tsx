@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   CheckSquare, Plus, FolderPlus, Filter, 
   CheckCircle2, Clock, AlertCircle, RefreshCw, Layers,
@@ -158,13 +158,13 @@ export default function TasksDashboard() {
       <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-white/10">
         <div>
           <div className="flex items-center gap-3">
-            <div className="size-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-sm">
+            <div className="size-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white shadow-[0_0_15px_rgba(255,255,255,0.1)]">
               <CheckSquare className="size-5" />
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
                 <span>QG de Tarefas & Operações</span>
-                <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                <span className="text-[10px] bg-white/10 text-white border border-white/20 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider shadow-sm">
                   SÓCIOS
                 </span>
               </h1>
@@ -193,7 +193,7 @@ export default function TasksDashboard() {
               onClick={() => setFilterMode('CONCLUIDAS')}
               className={`px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                 filterMode === 'CONCLUIDAS' 
-                  ? 'bg-white/15 text-emerald-300 shadow-sm' 
+                  ? 'bg-white/15 text-white shadow-sm' 
                   : 'text-white/40 hover:text-white'
               }`}
             >
@@ -217,9 +217,9 @@ export default function TasksDashboard() {
               setModalDefaultPartnerId(undefined);
               setIsCategoryModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95"
+            className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-white border border-white/15 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-sm"
           >
-            <FolderPlus className="size-4" />
+            <FolderPlus className="size-4 text-white/80" />
             <span>+ Novo Setor</span>
           </button>
 
@@ -230,7 +230,7 @@ export default function TasksDashboard() {
               setModalDefaultCategoryId(undefined);
               setIsTaskModalOpen(true);
             }}
-            className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-5 py-2.5 rounded-xl text-xs transition-all shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
+            className="inline-flex items-center gap-2 bg-white hover:bg-slate-100 text-black font-extrabold px-5 py-2.5 rounded-xl text-xs transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] active:scale-95 cursor-pointer"
           >
             <Plus className="size-4 stroke-[3]" />
             <span>Nova Tarefa</span>

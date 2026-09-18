@@ -221,7 +221,7 @@ export default function PartnersDashboard() {
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Scale className="size-6 text-emerald-400" />
+              <Scale className="size-6 text-white" />
               <span>Sócios & Gestão de Equity</span>
             </h1>
             <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
@@ -249,18 +249,18 @@ export default function PartnersDashboard() {
               }
             }}
             disabled={isValidating}
-            className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+            className="px-3 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/15 border border-white/20 text-white transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
             title="Executar bateria controlada de 18 testes do Bloco 8"
           >
-            <ShieldCheck className="size-3.5 text-emerald-400" />
-            <span>{isValidating ? 'Validando 18 testes...' : 'Validar Sociedade (Bloco 8)'}</span>
+            <ShieldCheck className="size-3.5 text-white" />
+            <span>{isValidating ? 'Validando 18 testes...' : 'Validar Sociedade'}</span>
           </button>
 
           <button
             onClick={() => setShowDilutionModal(true)}
-            className="px-3 py-2 rounded-xl text-xs font-bold bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+            className="px-3 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/15 border border-white/20 text-white transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
           >
-            <Calculator className="size-3.5 text-purple-400" />
+            <Calculator className="size-3.5 text-white/80" />
             <span>Simulador de Aportes</span>
           </button>
 
@@ -268,15 +268,15 @@ export default function PartnersDashboard() {
             onClick={() => setShowNewPartnerModal(true)}
             className="px-3 py-2 rounded-xl text-xs font-bold bg-[#141416] hover:bg-[#1a1a1d] border border-white/10 text-white transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
           >
-            <UserPlus className="size-3.5 text-emerald-400" />
+            <UserPlus className="size-3.5 text-white/80" />
             <span>Cadastrar Sócio</span>
           </button>
 
           <button
             onClick={() => handleOpenAporte()}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-white transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-md shadow-emerald-500/20"
+            className="px-4 py-2 rounded-xl text-xs font-extrabold bg-white hover:bg-slate-100 text-black transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)]"
           >
-            <Plus className="size-3.5" />
+            <Plus className="size-3.5 stroke-[3]" />
             <span>Novo Aporte / Retirada</span>
           </button>
         </div>
@@ -286,7 +286,7 @@ export default function PartnersDashboard() {
       <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-4 sm:p-5 space-y-3 shadow-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <PieChart className="size-4 text-emerald-400" />
+            <PieChart className="size-4 text-white" />
             <span className="text-xs font-bold text-white uppercase tracking-wider">
               Composição Societária por Capital
             </span>

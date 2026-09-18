@@ -40,6 +40,37 @@ function InstagramIcon({ className = "size-5" }: { className?: string }) {
   );
 }
 
+// Componente inteligente: Se o print real existir em /prints/, exibe a imagem. Senão, exibe o mockup nativo.
+function ScreenshotOrFallback({
+  src,
+  alt,
+  fallback,
+  className = "w-full rounded-2xl border border-white/20 shadow-[0_0_40px_rgba(255,255,255,0.08)]"
+}: {
+  src: string;
+  alt: string;
+  fallback: React.ReactNode;
+  className?: string;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+
+  return (
+    <div className="relative w-full">
+      {!error && (
+        <img
+          src={src}
+          alt={alt}
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
+          className={`${className} ${loaded ? 'block' : 'hidden'}`}
+        />
+      )}
+      {(!loaded || error) && fallback}
+    </div>
+  );
+}
+
 export function LandingPage() {
   // Contagem regressiva de lançamento (dias, horas, minutos, segundos)
   const [timeLeft, setTimeLeft] = useState({
@@ -74,7 +105,7 @@ export function LandingPage() {
   return (
     <div id="topo" className="min-h-screen bg-[#050505] text-white font-sans antialiased relative selection:bg-white/20 selection:text-white overflow-x-hidden">
       
-      {/* Dynamic Ambient Background Glows */}
+      {/* Ambient White Glowing Neons */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-white/[0.04] blur-[180px] rounded-full pointer-events-none" />
       <div className="absolute top-[1400px] left-1/4 -translate-x-1/2 w-[600px] h-[600px] bg-white/[0.02] blur-[200px] rounded-full pointer-events-none" />
       <div className="absolute top-[2800px] right-1/4 translate-x-1/2 w-[700px] h-[700px] bg-white/[0.03] blur-[220px] rounded-full pointer-events-none" />
@@ -85,8 +116,8 @@ export function LandingPage() {
       {/* ==================================================================== */}
       <div className="w-full bg-[#0a0a0a] border-b border-[#1c1c1c] py-2.5 px-4 text-center sticky top-0 z-50 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-xs">
-          <div className="flex items-center gap-1.5 text-amber-400 font-bold uppercase tracking-wider text-[11px]">
-            <Flame className="size-3.5 fill-amber-400 animate-pulse" />
+          <div className="flex items-center gap-1.5 text-white font-extrabold uppercase tracking-wider text-[11px]">
+            <Sparkles className="size-3.5 text-white animate-pulse" />
             <span>Oferta de Lançamento:</span>
           </div>
           <span className="text-white/70 hidden sm:inline">Trave sua mensalidade vitalícia sem reajustes pelos próximos 30 dias:</span>
@@ -126,9 +157,9 @@ export function LandingPage() {
           {/* Nav Links (Desktop) */}
           <nav className="hidden lg:flex items-center gap-6 text-xs font-medium text-white/60">
             <a href="#dores" className="hover:text-white transition-colors">O Caos</a>
-            <a href="#catalogo" className="text-amber-400 hover:text-amber-300 transition-colors font-semibold flex items-center gap-1">
+            <a href="#catalogo" className="text-white hover:text-white transition-colors font-bold flex items-center gap-1.5">
               <span>Catálogo na Bio</span>
-              <span className="size-1.5 rounded-full bg-amber-400 animate-ping" />
+              <span className="size-1.5 rounded-full bg-white animate-ping" />
             </a>
             <a href="#kanban" className="hover:text-white transition-colors">Kanban & Entrega</a>
             <a href="#recompra" className="hover:text-white transition-colors">Aviso de Pod Acabando</a>
@@ -166,7 +197,7 @@ export function LandingPage() {
           
           {/* Niche Pill Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold shadow-[0_0_20px_rgba(255,255,255,0.15)]">
-            <Zap className="size-3.5 fill-amber-400 text-amber-400" />
+            <Zap className="size-3.5 fill-white text-white" />
             <span>O 1º Sistema de Gestão & Catálogo Feito Sob Medida para Lojas de Pods</span>
           </div>
 
@@ -217,7 +248,7 @@ export function LandingPage() {
             </span>
             <span>•</span>
             <span className="flex items-center gap-1.5">
-              <Flame className="size-4 text-amber-400" />
+              <Sparkles className="size-4 text-white" />
               Preço vitalício congelado
             </span>
           </div>
@@ -237,9 +268,9 @@ export function LandingPage() {
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-[#1c1c1c] text-xs">
               <div className="flex items-center gap-2">
                 <div className="flex gap-1.5">
-                  <div className="size-2.5 rounded-full bg-red-500/80" />
-                  <div className="size-2.5 rounded-full bg-amber-500/80" />
-                  <div className="size-2.5 rounded-full bg-emerald-500/80" />
+                  <div className="size-2.5 rounded-full bg-white/30" />
+                  <div className="size-2.5 rounded-full bg-white/30" />
+                  <div className="size-2.5 rounded-full bg-white/30" />
                 </div>
                 <span className="font-mono text-white/40 text-[11px] ml-2">
                   SMK Flow • Central Operacional de Pods
@@ -254,23 +285,23 @@ export function LandingPage() {
             {/* Live Metrics Header Bar */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <div className="bg-[#121212] border border-[#222] p-3 rounded-xl">
-                <span className="text-[10px] text-white/40 uppercase block">Catálogo na Bio</span>
+                <span className="text-[10px] text-white/40 uppercase block font-mono">Catálogo na Bio</span>
                 <span className="text-sm font-bold text-white flex items-center gap-1.5 mt-0.5">
                   <span className="size-2 rounded-full bg-emerald-400" />
                   Estoque Sincronizado
                 </span>
               </div>
               <div className="bg-[#121212] border border-[#222] p-3 rounded-xl">
-                <span className="text-[10px] text-white/40 uppercase block">Pedidos em Rota</span>
-                <span className="text-sm font-bold text-purple-400">4 Entregas em Andamento</span>
+                <span className="text-[10px] text-white/40 uppercase block font-mono">Pedidos em Rota</span>
+                <span className="text-sm font-bold text-white font-mono">4 Entregas em Andamento</span>
               </div>
               <div className="bg-[#121212] border border-[#222] p-3 rounded-xl">
-                <span className="text-[10px] text-white/40 uppercase block">Pods Prestes a Queimar</span>
-                <span className="text-sm font-bold text-amber-400">7 Clientes p/ Chamar</span>
+                <span className="text-[10px] text-white/40 uppercase block font-mono">Pods Prestes a Queimar</span>
+                <span className="text-sm font-bold text-white font-mono">7 Clientes p/ Chamar</span>
               </div>
               <div className="bg-[#121212] border border-[#222] p-3 rounded-xl">
-                <span className="text-[10px] text-white/40 uppercase block">Lucro Líquido Real</span>
-                <span className="text-sm font-bold text-emerald-400">25.3% Auditado</span>
+                <span className="text-[10px] text-white/40 uppercase block font-mono">Lucro Líquido Real</span>
+                <span className="text-sm font-bold text-emerald-400 font-mono">25.3% Auditado</span>
               </div>
             </div>
 
@@ -280,8 +311,8 @@ export function LandingPage() {
               {/* Box 1: Pedido do WhatsApp */}
               <div className="bg-[#141414] border border-[#242424] rounded-2xl p-4 space-y-3">
                 <div className="flex items-center justify-between text-xs font-bold text-white/80 pb-2 border-b border-white/5">
-                  <span className="flex items-center gap-1.5 text-amber-400">
-                    <ShoppingBag className="size-4" />
+                  <span className="flex items-center gap-1.5 text-white">
+                    <ShoppingBag className="size-4 text-white" />
                     Pedido Chegando do Catálogo
                   </span>
                   <span className="text-[10px] font-mono text-emerald-400 font-bold">PIX PAGO</span>
@@ -300,16 +331,16 @@ export function LandingPage() {
               {/* Box 2: Motoboy em Rota */}
               <div className="bg-[#141414] border border-[#242424] rounded-2xl p-4 space-y-3">
                 <div className="flex items-center justify-between text-xs font-bold text-white/80 pb-2 border-b border-white/5">
-                  <span className="flex items-center gap-1.5 text-purple-400">
-                    <Truck className="size-4" />
+                  <span className="flex items-center gap-1.5 text-white">
+                    <Truck className="size-4 text-white" />
                     Despacho no Kanban
                   </span>
-                  <span className="text-[10px] font-mono bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">EM ROTA</span>
+                  <span className="text-[10px] font-mono bg-white/10 text-white px-2 py-0.5 rounded font-bold">EM ROTA</span>
                 </div>
                 <div className="space-y-2 text-xs">
                   <div className="font-bold text-white">2x Ignite V50 Watermelon Ice</div>
                   <div className="text-white/50 text-[11px]">Cliente: Lucas Martins • Pedido #1050</div>
-                  <div className="p-2 bg-purple-950/20 border border-purple-500/30 rounded-lg text-[11px] text-purple-300 font-medium">
+                  <div className="p-2 bg-white/5 border border-white/10 rounded-lg text-[11px] text-white/80 font-medium">
                     ⚡ Uber Flash despachado há 8 min.<br />
                     Previsão de entrega: 12 min.
                   </div>
@@ -317,18 +348,18 @@ export function LandingPage() {
               </div>
 
               {/* Box 3: Alerta de Recompra */}
-              <div className="bg-[#141414] border border-amber-500/30 rounded-2xl p-4 space-y-3 relative overflow-hidden">
+              <div className="bg-[#141414] border border-white/20 rounded-2xl p-4 space-y-3 relative overflow-hidden">
                 <div className="flex items-center justify-between text-xs font-bold text-white/80 pb-2 border-b border-white/5">
-                  <span className="flex items-center gap-1.5 text-amber-400">
-                    <Bell className="size-4 animate-bounce" />
+                  <span className="flex items-center gap-1.5 text-white">
+                    <Bell className="size-4 animate-bounce text-white" />
                     Pod Prestes a Acabar
                   </span>
-                  <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-bold">HOJE</span>
+                  <span className="text-[10px] font-mono bg-white/10 text-white px-2 py-0.5 rounded font-bold">HOJE</span>
                 </div>
                 <div className="space-y-2 text-xs">
                   <div className="font-bold text-white">João Pedro comprou há 18 dias</div>
                   <div className="text-white/60 text-[11px]">Elfbar BC15000 Blue Razz • Estimativa: ~5% restante</div>
-                  <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-[11px] text-amber-300 font-medium">
+                  <div className="p-2 bg-white/5 border border-white/10 rounded-lg text-[11px] text-white/80 font-medium">
                     💬 "Fala João! Seu Elfbar tá no finzinho, né? Chegou reposição dos seus favoritos..."
                   </div>
                 </div>
@@ -348,7 +379,7 @@ export function LandingPage() {
         <div className="max-w-6xl mx-auto space-y-12">
           
           <div className="text-center space-y-3 max-w-3xl mx-auto">
-            <span className="text-xs font-bold uppercase tracking-widest text-amber-400 font-mono">
+            <span className="text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
               O Custo Oculto do Amadorismo
             </span>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
@@ -362,9 +393,9 @@ export function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
             {/* Dor 1 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-red-500/40 p-6 sm:p-8 rounded-3xl transition-all duration-300 space-y-3 group">
-              <div className="size-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 group-hover:scale-110 transition-transform">
-                <MessageSquare className="size-6" />
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 p-6 sm:p-8 rounded-3xl transition-all duration-300 space-y-3 group shadow-lg">
+              <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                <MessageSquare className="size-6 text-white" />
               </div>
               <span className="text-xs font-mono text-white/40 block">DOR #01</span>
               <h3 className="text-lg font-bold text-white">O Inferno de Digitar Listas de Sabores Todo Santo Dia</h3>
@@ -374,9 +405,9 @@ export function LandingPage() {
             </div>
 
             {/* Dor 2 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-red-500/40 p-6 sm:p-8 rounded-3xl transition-all duration-300 space-y-3 group">
-              <div className="size-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 group-hover:scale-110 transition-transform">
-                <Truck className="size-6" />
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 p-6 sm:p-8 rounded-3xl transition-all duration-300 space-y-3 group shadow-lg">
+              <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                <Truck className="size-6 text-white" />
               </div>
               <span className="text-xs font-mono text-white/40 block">DOR #02</span>
               <h3 className="text-lg font-bold text-white">O Caos de Despachar Múltiplos Pedidos no Horário de Pico</h3>
@@ -386,9 +417,9 @@ export function LandingPage() {
             </div>
 
             {/* Dor 3 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-red-500/40 p-6 sm:p-8 rounded-3xl transition-all duration-300 space-y-3 group">
-              <div className="size-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 group-hover:scale-110 transition-transform">
-                <RefreshCw className="size-6" />
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 p-6 sm:p-8 rounded-3xl transition-all duration-300 space-y-3 group shadow-lg">
+              <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                <RefreshCw className="size-6 text-white" />
               </div>
               <span className="text-xs font-mono text-white/40 block">DOR #03</span>
               <h3 className="text-lg font-bold text-white">Ficar Postando Stories e Deixar o Cliente Comprar de Outra Loja</h3>
@@ -398,9 +429,9 @@ export function LandingPage() {
             </div>
 
             {/* Dor 4 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-red-500/40 p-6 sm:p-8 rounded-3xl transition-all duration-300 space-y-3 group">
-              <div className="size-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 group-hover:scale-110 transition-transform">
-                <Wallet className="size-6" />
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 p-6 sm:p-8 rounded-3xl transition-all duration-300 space-y-3 group shadow-lg">
+              <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                <Wallet className="size-6 text-white" />
               </div>
               <span className="text-xs font-mono text-white/40 block">DOR #04</span>
               <h3 className="text-lg font-bold text-white">Dar Desconto no Pod Errado e Prender Dinheiro em Sabores Parados</h3>
@@ -419,20 +450,18 @@ export function LandingPage() {
       {/* ==================================================================== */}
       <section id="catalogo" className="py-24 px-4 sm:px-6 border-t border-[#161616] relative overflow-hidden bg-[#050505]">
         
-        <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[500px] h-[500px] bg-amber-500/[0.04] blur-[200px] rounded-full pointer-events-none" />
-
         <div className="max-w-6xl mx-auto space-y-16">
           
           <div className="text-center space-y-4 max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold font-mono">
-              <Sparkles className="size-3.5 fill-amber-400" />
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold font-mono">
+              <Sparkles className="size-3.5 text-white" />
               <span>O Maior Diferencial Para Donos de Loja de Pods</span>
             </div>
 
             {/* HEADLINE ÚNICA DO CATÁLOGO */}
             <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
               Sua Vitrine Online na Bio do Instagram:{' '}
-              <span className="text-amber-400">
+              <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
                 Chega de digitar lista de sabores todo santo dia.
               </span>
             </h2>
@@ -448,8 +477,8 @@ export function LandingPage() {
             <div className="space-y-6">
               
               {/* Pilar 1 */}
-              <div className="flex gap-4 p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-amber-500/40 transition-colors">
-                <div className="size-11 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400 shrink-0 font-bold font-mono">
+              <div className="flex gap-4 p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 transition-colors">
+                <div className="size-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 font-bold font-mono">
                   01
                 </div>
                 <div className="space-y-1">
@@ -461,8 +490,8 @@ export function LandingPage() {
               </div>
 
               {/* Pilar 2 */}
-              <div className="flex gap-4 p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-amber-500/40 transition-colors">
-                <div className="size-11 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shrink-0 font-bold font-mono">
+              <div className="flex gap-4 p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 transition-colors">
+                <div className="size-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 font-bold font-mono">
                   02
                 </div>
                 <div className="space-y-1">
@@ -474,7 +503,7 @@ export function LandingPage() {
               </div>
 
               {/* Pilar 3 */}
-              <div className="flex gap-4 p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-amber-500/40 transition-colors">
+              <div className="flex gap-4 p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 transition-colors">
                 <div className="size-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 font-bold font-mono">
                   03
                 </div>
@@ -501,85 +530,91 @@ export function LandingPage() {
 
             </div>
 
-            {/* MOCKUP VISUAL DO SMARTPHONE DO CATÁLOGO */}
+            {/* MOCKUP VISUAL DO SMARTPHONE DO CATÁLOGO COM SUPORTE A PRINT REAL */}
             <div className="flex justify-center">
-              <div className="w-full max-w-[340px] bg-[#0c0c0c] border-[6px] border-[#222] rounded-[44px] p-3.5 shadow-[0_0_50px_rgba(255,255,255,0.1)] relative">
-                
-                {/* Speaker notch */}
-                <div className="w-24 h-4 bg-[#222] rounded-full mx-auto mb-3" />
+              <ScreenshotOrFallback
+                src="/prints/catalogo-mobile.png"
+                alt="Catálogo Mobile Smoking Pods"
+                className="w-full max-w-[340px] rounded-[36px] border-[4px] border-white/20 shadow-[0_0_50px_rgba(255,255,255,0.15)] mx-auto"
+                fallback={
+                  <div className="w-full max-w-[340px] bg-[#0c0c0c] border-[6px] border-[#222] rounded-[44px] p-3.5 shadow-[0_0_50px_rgba(255,255,255,0.1)] relative mx-auto">
+                    {/* Speaker notch */}
+                    <div className="w-24 h-4 bg-[#222] rounded-full mx-auto mb-3" />
 
-                {/* Catalog Header */}
-                <div className="space-y-2 pb-3 border-b border-white/10 text-center">
-                  <div className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full font-bold">
-                    <span>⚡ Entrega Express em 25-35min</span>
-                  </div>
-                  <div className="font-extrabold text-sm text-white">Smoking Pods • Catálogo Oficial</div>
-                  <div className="text-[10px] text-white/50">Toque no pod para ver os sabores disponíveis</div>
-                </div>
-
-                {/* Filter Pills */}
-                <div className="flex gap-1.5 py-2 overflow-x-auto text-[10px] font-bold no-scrollbar">
-                  <span className="px-2.5 py-1 rounded-lg bg-white text-black shrink-0">Todos</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] text-white/70 shrink-0">Ignite V50</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] text-white/70 shrink-0">Lost Mary</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] text-white/70 shrink-0">Elfbar</span>
-                </div>
-
-                {/* Products List inside Phone */}
-                <div className="space-y-2.5 pt-1">
-                  
-                  {/* Product 1 */}
-                  <div className="bg-[#141414] border border-[#262626] rounded-xl p-2.5 flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-bold text-white">Ignite V50</div>
-                      <div className="text-[10px] text-amber-400 font-mono">5.000 Puffs • R$ 115,00</div>
-                      <div className="text-[9px] text-emerald-400 mt-0.5">8 sabores disponíveis</div>
+                    {/* Catalog Header */}
+                    <div className="space-y-2 pb-3 border-b border-white/10 text-center">
+                      <div className="inline-flex items-center gap-1 text-[10px] text-white bg-white/10 border border-white/15 px-2 py-0.5 rounded-full font-bold">
+                        <span>⚡ Entrega Express em 25-35min</span>
+                      </div>
+                      <div className="font-extrabold text-sm text-white">Smoking Pods • Catálogo Oficial</div>
+                      <div className="text-[10px] text-white/50">Toque no pod para ver os sabores disponíveis</div>
                     </div>
-                    <span className="px-2 py-1 rounded-md bg-white/10 text-[10px] font-bold text-white border border-white/20">
-                      Escolher
-                    </span>
-                  </div>
 
-                  {/* Product 2 */}
-                  <div className="bg-[#141414] border border-amber-500/40 rounded-xl p-2.5 flex items-center justify-between shadow-[0_0_15px_rgba(245,158,11,0.1)]">
-                    <div>
-                      <span className="text-[9px] bg-amber-500 text-black px-1.5 py-0.2 rounded font-black uppercase tracking-wider">Mais Vendido</span>
-                      <div className="text-xs font-bold text-white mt-0.5">Lost Mary MO20000 Pro</div>
-                      <div className="text-[10px] text-amber-400 font-mono">20.000 Puffs • R$ 135,00</div>
-                      <div className="text-[9px] text-emerald-400">Blue Baja, Miami Mint...</div>
+                    {/* Filter Pills */}
+                    <div className="flex gap-1.5 py-2 overflow-x-auto text-[10px] font-bold no-scrollbar">
+                      <span className="px-2.5 py-1 rounded-lg bg-white text-black shrink-0">Todos</span>
+                      <span className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] text-white/70 shrink-0">Ignite V50</span>
+                      <span className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] text-white/70 shrink-0">Lost Mary</span>
+                      <span className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] text-white/70 shrink-0">Elfbar</span>
                     </div>
-                    <span className="px-2 py-1 rounded-md bg-amber-400 text-[10px] font-bold text-black shadow">
-                      Escolher
-                    </span>
-                  </div>
 
-                  {/* Product 3 */}
-                  <div className="bg-[#141414] border border-[#262626] rounded-xl p-2.5 flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-bold text-white">Elfbar BC15000</div>
-                      <div className="text-[10px] text-amber-400 font-mono">15.000 Puffs • R$ 125,00</div>
-                      <div className="text-[9px] text-emerald-400 mt-0.5">Blackberry, Blue Razz...</div>
+                    {/* Products List inside Phone */}
+                    <div className="space-y-2.5 pt-1">
+                      
+                      {/* Product 1 */}
+                      <div className="bg-[#141414] border border-[#262626] rounded-xl p-2.5 flex items-center justify-between">
+                        <div>
+                          <div className="text-xs font-bold text-white">Ignite V50</div>
+                          <div className="text-[10px] text-white/70 font-mono">5.000 Puffs • R$ 115,00</div>
+                          <div className="text-[9px] text-emerald-400 mt-0.5">8 sabores disponíveis</div>
+                        </div>
+                        <span className="px-2 py-1 rounded-md bg-white/10 text-[10px] font-bold text-white border border-white/20">
+                          Escolher
+                        </span>
+                      </div>
+
+                      {/* Product 2 */}
+                      <div className="bg-[#141414] border border-white/40 rounded-xl p-2.5 flex items-center justify-between shadow-[0_0_15px_rgba(255,255,255,0.08)]">
+                        <div>
+                          <span className="text-[9px] bg-white text-black px-1.5 py-0.2 rounded font-black uppercase tracking-wider">Mais Vendido</span>
+                          <div className="text-xs font-bold text-white mt-0.5">Lost Mary MO20000 Pro</div>
+                          <div className="text-[10px] text-white/70 font-mono">20.000 Puffs • R$ 135,00</div>
+                          <div className="text-[9px] text-emerald-400">Blue Baja, Miami Mint...</div>
+                        </div>
+                        <span className="px-2 py-1 rounded-md bg-white text-[10px] font-bold text-black shadow">
+                          Escolher
+                        </span>
+                      </div>
+
+                      {/* Product 3 */}
+                      <div className="bg-[#141414] border border-[#262626] rounded-xl p-2.5 flex items-center justify-between">
+                        <div>
+                          <div className="text-xs font-bold text-white">Elfbar BC15000</div>
+                          <div className="text-[10px] text-white/70 font-mono">15.000 Puffs • R$ 125,00</div>
+                          <div className="text-[9px] text-emerald-400 mt-0.5">Blackberry, Blue Razz...</div>
+                        </div>
+                        <span className="px-2 py-1 rounded-md bg-white/10 text-[10px] font-bold text-white border border-white/20">
+                          Escolher
+                        </span>
+                      </div>
+
                     </div>
-                    <span className="px-2 py-1 rounded-md bg-white/10 text-[10px] font-bold text-white border border-white/20">
-                      Escolher
-                    </span>
+
+                    {/* Floating Bottom Cart Bar */}
+                    <div className="mt-4 bg-white text-black font-extrabold p-2.5 rounded-xl text-center text-xs flex items-center justify-between shadow-lg">
+                      <div className="text-left">
+                        <span className="text-[9px] block text-black/70 uppercase">Sacola (1 item)</span>
+                        <span>R$ 135,00</span>
+                      </div>
+                      <span className="flex items-center gap-1 text-[11px] bg-black text-white px-3 py-1 rounded-lg">
+                        <span>Pedir no WhatsApp</span>
+                        <ArrowRight className="size-3" />
+                      </span>
+                    </div>
+
                   </div>
-
-                </div>
-
-                {/* Floating Bottom Cart Bar */}
-                <div className="mt-4 bg-emerald-500 text-black font-extrabold p-2.5 rounded-xl text-center text-xs flex items-center justify-between shadow-lg">
-                  <div className="text-left">
-                    <span className="text-[9px] block text-black/70 uppercase">Sacola (1 item)</span>
-                    <span>R$ 135,00</span>
-                  </div>
-                  <span className="flex items-center gap-1 text-[11px] bg-black text-white px-3 py-1 rounded-lg">
-                    <span>Pedir no WhatsApp</span>
-                    <ArrowRight className="size-3" />
-                  </span>
-                </div>
-
-              </div>
+                }
+              />
             </div>
 
           </div>
@@ -594,14 +629,14 @@ export function LandingPage() {
         <div className="max-w-6xl mx-auto space-y-12">
           
           <div className="text-center space-y-3 max-w-3xl mx-auto">
-            <span className="text-xs font-bold uppercase tracking-widest text-purple-400 font-mono">
+            <span className="text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
               Operação de Entrega Blindada
             </span>
 
             {/* HEADLINE ÚNICA DO KANBAN */}
             <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
               Painel de Pedidos em Kanban:{' '}
-              <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
                 Saiba exatamente onde cada motoboy está e nunca mais atrase uma entrega.
               </span>
             </h2>
@@ -614,8 +649,8 @@ export function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
             {/* Card 1 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-purple-500/40 transition-colors">
-              <div className="size-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
                 <Package className="size-5" />
               </div>
               <h3 className="text-base font-bold text-white">Controle de Múltiplos Pedidos Sem Erro</h3>
@@ -625,8 +660,8 @@ export function LandingPage() {
             </div>
 
             {/* Card 2 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-purple-500/40 transition-colors">
-              <div className="size-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
                 <Truck className="size-5" />
               </div>
               <h3 className="text-base font-bold text-white">Você Sabe Onde o Motoboy Está</h3>
@@ -636,8 +671,8 @@ export function LandingPage() {
             </div>
 
             {/* Card 3 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-purple-500/40 transition-colors">
-              <div className="size-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
                 <TrendingUp className="size-5" />
               </div>
               <h3 className="text-base font-bold text-white">Mais Entregas Rápidas = Mais Faturamento</h3>
@@ -648,53 +683,59 @@ export function LandingPage() {
 
           </div>
 
-          {/* Kanban Mini Board Visual */}
-          <div className="bg-[#0f0f0f] border border-[#222] rounded-2xl p-4 sm:p-6 space-y-4">
-            <div className="flex items-center justify-between text-xs font-mono text-white/60 border-b border-white/5 pb-3">
-              <span>FLUXO OPERACIONAL AO VIVO</span>
-              <span className="text-emerald-400">3 Fases de Despacho Rápido</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              
-              {/* Coluna 1 */}
-              <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
-                <div className="text-xs font-bold text-amber-400 flex justify-between">
-                  <span>1. Novos Pedidos</span>
-                  <span className="bg-amber-500/20 px-1.5 py-0.5 rounded text-[10px]">2</span>
+          {/* Kanban Board Visual ou Print Real */}
+          <ScreenshotOrFallback
+            src="/prints/kanban-desktop.png"
+            alt="Kanban de Pedidos SMK Flow"
+            fallback={
+              <div className="bg-[#0f0f0f] border border-[#222] rounded-2xl p-4 sm:p-6 space-y-4">
+                <div className="flex items-center justify-between text-xs font-mono text-white/60 border-b border-white/5 pb-3">
+                  <span>FLUXO OPERACIONAL AO VIVO</span>
+                  <span className="text-emerald-400">3 Fases de Despacho Rápido</span>
                 </div>
-                <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
-                  <div className="font-bold text-white">#1055 • Ignite V50 Watermelon</div>
-                  <div className="text-[10px] text-white/50">Marina Silva • Pix Confirmado</div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  
+                  {/* Coluna 1 */}
+                  <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
+                    <div className="text-xs font-bold text-white flex justify-between">
+                      <span>1. Novos Pedidos</span>
+                      <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">2</span>
+                    </div>
+                    <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
+                      <div className="font-bold text-white">#1055 • Ignite V50 Watermelon</div>
+                      <div className="text-[10px] text-white/50">Marina Silva • Pix Confirmado</div>
+                    </div>
+                  </div>
+
+                  {/* Coluna 2 */}
+                  <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
+                    <div className="text-xs font-bold text-white flex justify-between">
+                      <span>2. Separando Sabor</span>
+                      <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">1</span>
+                    </div>
+                    <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
+                      <div className="font-bold text-white">#1054 • Lost Mary 20k Miami Mint</div>
+                      <div className="text-[10px] text-white/50">Embalando c/ adesivo da loja</div>
+                    </div>
+                  </div>
+
+                  {/* Coluna 3 */}
+                  <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
+                    <div className="text-xs font-bold text-white flex justify-between">
+                      <span>3. Em Rota (Uber/Moto)</span>
+                      <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">2</span>
+                    </div>
+                    <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
+                      <div className="font-bold text-white">#1053 • Elfbar BC15k Blue Razz</div>
+                      <div className="text-[10px] text-white/70 font-mono">🛵 Uber Flash a caminho (7 min)</div>
+                    </div>
+                  </div>
+
                 </div>
               </div>
-
-              {/* Coluna 2 */}
-              <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
-                <div className="text-xs font-bold text-blue-400 flex justify-between">
-                  <span>2. Separando Sabor</span>
-                  <span className="bg-blue-500/20 px-1.5 py-0.5 rounded text-[10px]">1</span>
-                </div>
-                <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
-                  <div className="font-bold text-white">#1054 • Lost Mary 20k Miami Mint</div>
-                  <div className="text-[10px] text-white/50">Embalando c/ adesivo da loja</div>
-                </div>
-              </div>
-
-              {/* Coluna 3 */}
-              <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
-                <div className="text-xs font-bold text-purple-400 flex justify-between">
-                  <span>3. Em Rota (Uber/Moto)</span>
-                  <span className="bg-purple-500/20 px-1.5 py-0.5 rounded text-[10px]">2</span>
-                </div>
-                <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
-                  <div className="font-bold text-white">#1053 • Elfbar BC15k Blue Razz</div>
-                  <div className="text-[10px] text-purple-300">🛵 Uber Flash a caminho (7 min)</div>
-                </div>
-              </div>
-
-            </div>
-          </div>
+            }
+          />
 
         </div>
       </section>
@@ -707,14 +748,14 @@ export function LandingPage() {
         <div className="max-w-6xl mx-auto space-y-12">
           
           <div className="text-center space-y-4 max-w-3xl mx-auto">
-            <span className="text-xs font-bold uppercase tracking-widest text-emerald-400 font-mono">
+            <span className="text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
               Retenção Ativa de Clientes
             </span>
 
             {/* HEADLINE ÚNICA DO ALERTA DE RECOMPRA */}
             <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
               Alerta de Pod Acabando:{' '}
-              <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+              <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
                 Venda de novo para o mesmo cliente antes que ele compre de outra loja.
               </span>
             </h2>
@@ -760,74 +801,80 @@ export function LandingPage() {
 
             </div>
 
-            {/* Mockup do Alerta na Prática */}
-            <div className="bg-[#0c0c0c] border border-emerald-500/30 rounded-3xl p-6 shadow-[0_0_40px_rgba(16,185,129,0.1)] space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-white/10 text-xs">
-                <div className="flex items-center gap-2 font-bold text-white">
-                  <Bell className="size-4 text-emerald-400" />
-                  <span>Painel de Recompra Ativa</span>
-                </div>
-                <span className="text-emerald-400 font-mono text-[11px]">7 Clientes em Alerta</span>
-              </div>
-
-              <div className="space-y-3">
-                
-                {/* Alerta 1 */}
-                <div className="bg-[#141414] border border-[#222] rounded-xl p-3.5 space-y-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="text-xs font-bold text-white">Matheus Albuquerque</div>
-                      <div className="text-[11px] text-white/50">Comprou Lost Mary 35k há 23 dias</div>
+            {/* Mockup do Alerta na Prática ou Print Real */}
+            <ScreenshotOrFallback
+              src="/prints/crm-recompra.png"
+              alt="Alerta de Pod Acabando SMK Flow"
+              fallback={
+                <div className="bg-[#0c0c0c] border border-white/20 rounded-3xl p-6 shadow-[0_0_40px_rgba(255,255,255,0.06)] space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-white/10 text-xs">
+                    <div className="flex items-center gap-2 font-bold text-white">
+                      <Bell className="size-4 text-white" />
+                      <span>Painel de Recompra Ativa</span>
                     </div>
-                    <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-bold">
-                      ~3% Juice Restante
-                    </span>
+                    <span className="text-white/60 font-mono text-[11px]">7 Clientes em Alerta</span>
                   </div>
-                  <div className="pt-1 flex items-center justify-between">
-                    <span className="text-[10px] text-white/40">Gosta de: Sabores Ice (Menta / Uva)</span>
-                    <a 
-                      href={whatsappLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-3 py-1 rounded-lg text-[10px] flex items-center gap-1 transition-colors"
-                    >
-                      <MessageCircle className="size-3" />
-                      <span>Chamar no WhatsApp</span>
-                    </a>
-                  </div>
-                </div>
 
-                {/* Alerta 2 */}
-                <div className="bg-[#141414] border border-[#222] rounded-xl p-3.5 space-y-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="text-xs font-bold text-white">Camila Rezende</div>
-                      <div className="text-[11px] text-white/50">Comprou Elfbar BC15k há 14 dias</div>
+                  <div className="space-y-3">
+                    
+                    {/* Alerta 1 */}
+                    <div className="bg-[#141414] border border-[#222] rounded-xl p-3.5 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="text-xs font-bold text-white">Matheus Albuquerque</div>
+                          <div className="text-[11px] text-white/50">Comprou Lost Mary 35k há 23 dias</div>
+                        </div>
+                        <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-bold">
+                          ~3% Juice Restante
+                        </span>
+                      </div>
+                      <div className="pt-1 flex items-center justify-between">
+                        <span className="text-[10px] text-white/40">Gosta de: Sabores Ice (Menta / Uva)</span>
+                        <a 
+                          href={whatsappLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-3 py-1 rounded-lg text-[10px] flex items-center gap-1 transition-colors"
+                        >
+                          <MessageCircle className="size-3" />
+                          <span>Chamar no WhatsApp</span>
+                        </a>
+                      </div>
                     </div>
-                    <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded font-bold">
-                      ~7% Juice Restante
-                    </span>
+
+                    {/* Alerta 2 */}
+                    <div className="bg-[#141414] border border-[#222] rounded-xl p-3.5 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="text-xs font-bold text-white">Camila Rezende</div>
+                          <div className="text-[11px] text-white/50">Comprou Elfbar BC15k há 14 dias</div>
+                        </div>
+                        <span className="text-[10px] bg-white/10 text-white px-2 py-0.5 rounded font-bold">
+                          ~7% Juice Restante
+                        </span>
+                      </div>
+                      <div className="pt-1 flex items-center justify-between">
+                        <span className="text-[10px] text-white/40">Gosta de: Strawberry / Frutados</span>
+                        <a 
+                          href={whatsappLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-3 py-1 rounded-lg text-[10px] flex items-center gap-1 transition-colors"
+                        >
+                          <MessageCircle className="size-3" />
+                          <span>Chamar no WhatsApp</span>
+                        </a>
+                      </div>
+                    </div>
+
                   </div>
-                  <div className="pt-1 flex items-center justify-between">
-                    <span className="text-[10px] text-white/40">Gosta de: Strawberry / Frutados</span>
-                    <a 
-                      href={whatsappLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-3 py-1 rounded-lg text-[10px] flex items-center gap-1 transition-colors"
-                    >
-                      <MessageCircle className="size-3" />
-                      <span>Chamar no WhatsApp</span>
-                    </a>
+
+                  <div className="p-3 bg-white/5 rounded-xl text-center text-[11px] text-white/60">
+                    💡 Lojistas que usam esse alerta têm uma taxa de recompra de <strong className="text-emerald-400">74%</strong> na mesma loja.
                   </div>
                 </div>
-
-              </div>
-
-              <div className="p-3 bg-white/5 rounded-xl text-center text-[11px] text-white/60">
-                💡 Lojistas que usam esse alerta têm uma taxa de recompra de <strong>74%</strong> na mesma loja.
-              </div>
-            </div>
+              }
+            />
 
           </div>
 
@@ -841,14 +888,14 @@ export function LandingPage() {
         <div className="max-w-6xl mx-auto space-y-12">
           
           <div className="text-center space-y-3 max-w-3xl mx-auto">
-            <span className="text-xs font-bold uppercase tracking-widest text-amber-400 font-mono">
+            <span className="text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
               Destrave seu Capital de Giro
             </span>
 
             {/* HEADLINE ÚNICA DO ESTOQUE PARADO */}
             <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
               Radar de Estoque Parado:{' '}
-              <span className="text-white underline decoration-amber-400 decoration-2 underline-offset-8">
+              <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
                 Dê descontos inteligentes sem queimar o lucro dos pods que mais vendem.
               </span>
             </h2>
@@ -861,7 +908,7 @@ export function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
             <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3">
-              <div className="size-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 font-bold font-mono">
+              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold font-mono">
                 01
               </div>
               <h3 className="text-base font-bold text-white">Proteja os Pods Mais Vendidos</h3>
@@ -871,7 +918,7 @@ export function LandingPage() {
             </div>
 
             <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3">
-              <div className="size-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 font-bold font-mono">
+              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold font-mono">
                 02
               </div>
               <h3 className="text-base font-bold text-white">Localize o Dinheiro Encalhado</h3>
@@ -881,7 +928,7 @@ export function LandingPage() {
             </div>
 
             <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3">
-              <div className="size-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 font-bold font-mono">
+              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold font-mono">
                 03
               </div>
               <h3 className="text-base font-bold text-white">Liquidação Cirúrgica e Caixa Destravado</h3>
@@ -891,6 +938,13 @@ export function LandingPage() {
             </div>
 
           </div>
+
+          {/* Screenshot Container para Estoque Parado */}
+          <ScreenshotOrFallback
+            src="/prints/estoque-parado.png"
+            alt="Estoque Parado SMK Flow"
+            fallback={<div className="hidden" />}
+          />
 
         </div>
       </section>
@@ -902,7 +956,7 @@ export function LandingPage() {
         <div className="max-w-6xl mx-auto space-y-12">
           
           <div className="text-center space-y-3 max-w-3xl mx-auto">
-            <span className="text-xs font-bold uppercase tracking-widest text-emerald-400 font-mono">
+            <span className="text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
               Clareza & Fim das Discussões
             </span>
 
@@ -924,7 +978,7 @@ export function LandingPage() {
             <div className="space-y-5 text-xs sm:text-sm text-white/70">
               
               <div className="flex gap-3">
-                <CheckCircle2 className="size-5 text-emerald-400 shrink-0 mt-0.5" />
+                <CheckCircle2 className="size-5 text-white shrink-0 mt-0.5" />
                 <div>
                   <strong className="text-white block text-sm">O Dinheiro da Empresa é Intocável</strong>
                   O sistema separa claramente o caixa de reposição (que tem que ficar na conta para comprar o próximo lote com o fornecedor) do lucro limpo disponível. Ninguém gasta o dinheiro da mercadoria.
@@ -932,7 +986,7 @@ export function LandingPage() {
               </div>
 
               <div className="flex gap-3">
-                <CheckCircle2 className="size-5 text-emerald-400 shrink-0 mt-0.5" />
+                <CheckCircle2 className="size-5 text-white shrink-0 mt-0.5" />
                 <div>
                   <strong className="text-white block text-sm">Patrimônio Real na Prateleira</strong>
                   Quem investe quer saber onde o dinheiro está. O sistema calcula a soma do caixa líquido com todos os pods físicos em estoque a preço de custo. Fica tudo visível e registrado.
@@ -940,7 +994,7 @@ export function LandingPage() {
               </div>
 
               <div className="flex gap-3">
-                <CheckCircle2 className="size-5 text-emerald-400 shrink-0 mt-0.5" />
+                <CheckCircle2 className="size-5 text-white shrink-0 mt-0.5" />
                 <div>
                   <strong className="text-white block text-sm">Fatia Automática por Sócio</strong>
                   Se a divisão for 50/50, 60/40 ou 70/30, cada retirada fica registrada com data e valor. Acabou aquele clima chato de um sócio achar que o outro está com o dinheiro dele na mão.
@@ -949,47 +1003,53 @@ export function LandingPage() {
 
             </div>
 
-            {/* Card Widget dos Sócios */}
-            <div className="bg-[#0c0c0c] border border-[#242424] rounded-3xl p-6 space-y-5">
-              <div className="flex justify-between items-center pb-3 border-b border-white/10 text-xs">
-                <span className="font-bold text-white">Resumo Societário da Loja</span>
-                <span className="text-emerald-400 font-mono font-bold">100% Auditado</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-[#141414] p-3 rounded-xl border border-white/5">
-                  <span className="text-[10px] text-white/40 block">Caixa Líquido</span>
-                  <span className="text-base font-extrabold text-white">R$ 18.545,00</span>
-                </div>
-                <div className="bg-[#141414] p-3 rounded-xl border border-white/5">
-                  <span className="text-[10px] text-white/40 block">Estoque em Pods</span>
-                  <span className="text-base font-extrabold text-emerald-400">R$ 22.310,00</span>
-                </div>
-              </div>
-
-              {/* Sócios Split */}
-              <div className="space-y-2 pt-2 border-t border-white/10 text-xs">
-                <div className="flex justify-between p-2.5 rounded-xl bg-white/5 items-center">
-                  <div>
-                    <span className="font-bold text-white block">Sócio 1 (50%)</span>
-                    <span className="text-[10px] text-white/50">Disponível para retirada</span>
+            {/* Card Widget dos Sócios ou Print Real */}
+            <ScreenshotOrFallback
+              src="/prints/socios-equity.png"
+              alt="Divisão de Sócios SMK Flow"
+              fallback={
+                <div className="bg-[#0c0c0c] border border-[#242424] rounded-3xl p-6 space-y-5">
+                  <div className="flex justify-between items-center pb-3 border-b border-white/10 text-xs">
+                    <span className="font-bold text-white">Resumo Societário da Loja</span>
+                    <span className="text-emerald-400 font-mono font-bold">100% Auditado</span>
                   </div>
-                  <span className="font-mono font-bold text-white text-sm">R$ 6.272,50</span>
-                </div>
 
-                <div className="flex justify-between p-2.5 rounded-xl bg-white/5 items-center">
-                  <div>
-                    <span className="font-bold text-white block">Sócio 2 (50%)</span>
-                    <span className="text-[10px] text-white/50">Disponível para retirada</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-[#141414] p-3 rounded-xl border border-white/5">
+                      <span className="text-[10px] text-white/40 block">Caixa Líquido</span>
+                      <span className="text-base font-extrabold text-emerald-400">R$ 18.545,00</span>
+                    </div>
+                    <div className="bg-[#141414] p-3 rounded-xl border border-white/5">
+                      <span className="text-[10px] text-white/40 block">Estoque em Pods</span>
+                      <span className="text-base font-extrabold text-white">R$ 22.310,00</span>
+                    </div>
                   </div>
-                  <span className="font-mono font-bold text-white text-sm">R$ 6.272,50</span>
-                </div>
-              </div>
 
-              <div className="text-[10px] text-center text-white/40">
-                🔒 Caixa de Reposição de Fornecedor: R$ 6.000,00 blindado.
-              </div>
-            </div>
+                  {/* Sócios Split */}
+                  <div className="space-y-2 pt-2 border-t border-white/10 text-xs">
+                    <div className="flex justify-between p-2.5 rounded-xl bg-white/5 items-center">
+                      <div>
+                        <span className="font-bold text-white block">Sócio 1 (50%)</span>
+                        <span className="text-[10px] text-white/50">Disponível para retirada</span>
+                      </div>
+                      <span className="font-mono font-bold text-emerald-400 text-sm">R$ 6.272,50</span>
+                    </div>
+
+                    <div className="flex justify-between p-2.5 rounded-xl bg-white/5 items-center">
+                      <div>
+                        <span className="font-bold text-white block">Sócio 2 (50%)</span>
+                        <span className="text-[10px] text-white/50">Disponível para retirada</span>
+                      </div>
+                      <span className="font-mono font-bold text-emerald-400 text-sm">R$ 6.272,50</span>
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] text-center text-white/40">
+                    🔒 Caixa de Reposição de Fornecedor: R$ 6.000,00 blindado.
+                  </div>
+                </div>
+              }
+            />
 
           </div>
 
@@ -1010,7 +1070,7 @@ export function LandingPage() {
           {/* HEADLINE ÚNICA DO CASE REAL */}
           <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight max-w-3xl mx-auto leading-tight">
             Criado por quem vive o balcão:{' '}
-            <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+            <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
               O sistema testado na operação da Smoking Pods com +10.000 pedidos.
             </span>
           </h2>
@@ -1025,17 +1085,27 @@ export function LandingPage() {
               <div className="text-[11px] text-white/50 mt-1">Pedidos entregues no ABC</div>
             </div>
             <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-5 rounded-2xl">
-              <div className="text-2xl sm:text-4xl font-extrabold text-emerald-400">0 minutos</div>
+              <div className="text-2xl sm:text-4xl font-extrabold text-white">0 minutos</div>
               <div className="text-[11px] text-white/50 mt-1">Digitando sabores no WhatsApp</div>
             </div>
             <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-5 rounded-2xl">
-              <div className="text-2xl sm:text-4xl font-extrabold text-white">25.3%</div>
+              <div className="text-2xl sm:text-4xl font-extrabold text-emerald-400">25.3%</div>
               <div className="text-[11px] text-white/50 mt-1">Margem líquida média real</div>
             </div>
             <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-5 rounded-2xl">
               <div className="text-2xl sm:text-4xl font-extrabold text-white">100%</div>
               <div className="text-[11px] text-white/50 mt-1">Paz de espírito entre os sócios</div>
             </div>
+          </div>
+
+          {/* Print Real do Financeiro / Prova de Faturamento */}
+          <div className="pt-4">
+            <ScreenshotOrFallback
+              src="/prints/financeiro-dre.png"
+              alt="Painel Financeiro Real da Smoking Pods"
+              className="w-full max-w-4xl mx-auto rounded-2xl border border-white/20 shadow-[0_0_50px_rgba(255,255,255,0.1)]"
+              fallback={<div className="hidden" />}
+            />
           </div>
 
         </div>
@@ -1048,8 +1118,8 @@ export function LandingPage() {
         <div className="max-w-5xl mx-auto space-y-12">
           
           <div className="text-center space-y-3 max-w-2xl mx-auto">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-400 text-xs font-bold font-mono">
-              <Flame className="size-3.5 fill-amber-400" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold font-mono">
+              <Sparkles className="size-3.5 text-white" />
               <span>Condição Especial de Lançamento</span>
             </div>
 
@@ -1082,7 +1152,7 @@ export function LandingPage() {
                     <span className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">R$ 97</span>
                     <span className="text-white/50 text-sm font-semibold">,00 / mês</span>
                   </div>
-                  <p className="text-[11px] text-amber-400 font-semibold font-mono">
+                  <p className="text-[11px] text-emerald-400 font-semibold font-mono">
                     Valor congelado vitalício no lançamento
                   </p>
                 </div>
@@ -1131,7 +1201,7 @@ export function LandingPage() {
             {/* PLANO 2: SMK PRO COMBO (MAIS VENDIDO) */}
             <div className="bg-[#0d0d0d] border-2 border-white/60 rounded-3xl p-8 flex flex-col justify-between relative shadow-[0_0_40px_rgba(255,255,255,0.15)] transition-all duration-300 group">
               
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-amber-500 text-black text-xs font-black uppercase tracking-wider shadow-lg flex items-center gap-1.5">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-white text-black text-xs font-black uppercase tracking-wider shadow-lg flex items-center gap-1.5">
                 <Star className="size-3 fill-black" />
                 <span>Mais Vendido • Recomendado</span>
               </div>
@@ -1140,7 +1210,7 @@ export function LandingPage() {
                 <div>
                   <div className="flex items-center justify-between">
                     <h3 className="text-xl font-bold text-white">SMK Pro Combo</h3>
-                    <Sparkles className="size-5 text-amber-400" />
+                    <Sparkles className="size-5 text-white" />
                   </div>
                   <p className="text-xs text-white/50 mt-1">Sistema Completo + Catálogo Oficial na Bio do Instagram.</p>
                 </div>
@@ -1162,7 +1232,7 @@ export function LandingPage() {
                     <span>TUDO incluso no Plano Gestão de Pods</span>
                   </div>
                   <div className="flex items-center gap-2.5 font-semibold text-white">
-                    <CheckCircle2 className="size-4 text-amber-400 shrink-0" />
+                    <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
                     <span>Catálogo Digital Oficial Próprio para a Bio</span>
                   </div>
                   <div className="flex items-center gap-2.5">
@@ -1254,10 +1324,10 @@ export function LandingPage() {
               >
                 <button
                   onClick={() => toggleFaq(idx)}
-                  className="w-full p-5 text-left flex items-center justify-between gap-4 font-bold text-xs sm:text-sm text-white hover:text-amber-400 transition-colors"
+                  className="w-full p-5 text-left flex items-center justify-between gap-4 font-bold text-xs sm:text-sm text-white hover:text-white transition-colors"
                 >
                   <span>{item.q}</span>
-                  <ChevronDown className={`size-4 shrink-0 transition-transform duration-200 ${openFaq === idx ? 'rotate-180 text-amber-400' : 'text-white/40'}`} />
+                  <ChevronDown className={`size-4 shrink-0 transition-transform duration-200 ${openFaq === idx ? 'rotate-180 text-white' : 'text-white/40'}`} />
                 </button>
                 {openFaq === idx && (
                   <div className="px-5 pb-5 text-xs sm:text-sm text-white/60 leading-relaxed border-t border-white/5 pt-3">

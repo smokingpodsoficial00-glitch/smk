@@ -1031,10 +1031,10 @@ export default function MarketingModule() {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Megaphone className="size-6 text-emerald-400" />
+                <Megaphone className="size-6 text-white" />
                 Módulo de Marketing & Disparos
               </h2>
-              <span className="text-[10px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-bold">
+              <span className="text-[10px] font-mono uppercase bg-white/10 text-white border border-white/20 px-2.5 py-0.5 rounded-full font-bold shadow-sm">
                 Exclusivo Smoking Pods
               </span>
             </div>
@@ -1078,10 +1078,10 @@ export default function MarketingModule() {
             <button
               onClick={handleScanWhatsAppHistory}
               disabled={loadingScan}
-              className="px-3.5 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
               title="Faz varredura profunda no WhatsApp para blindar e impedir que qualquer contato receba mensagens repetidas"
             >
-              <ShieldCheck className={`size-3.5 text-purple-400 ${loadingScan ? 'animate-spin' : ''}`} />
+              <ShieldCheck className={`size-3.5 text-white/80 ${loadingScan ? 'animate-spin' : ''}`} />
               <span>{loadingScan ? 'Varrendo Histórico...' : '🔍 Varredura & Blindagem'}</span>
             </button>
 
@@ -1091,13 +1091,13 @@ export default function MarketingModule() {
               className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
               title="Sincroniza contatos da agenda do WhatsApp e grupos"
             >
-              <RefreshCw className={`size-3.5 text-emerald-400 ${loadingSync ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`size-3.5 text-white ${loadingSync ? 'animate-spin' : ''}`} />
               <span>{loadingSync ? 'Sincronizando...' : 'Sincronizar WhatsApp'}</span>
             </button>
 
             <button
               onClick={() => handleOpenCampaignModal()}
-              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_20px_rgba(16,185,129,0.25)]"
+              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-extrabold flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] active:scale-95"
             >
               <Plus className="size-4 stroke-[3]" />
               <span>Nova Campanha</span>
@@ -1106,7 +1106,7 @@ export default function MarketingModule() {
         </div>
 
         {syncStatus && (
-          <div className="mt-3 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg font-mono">
+          <div className="mt-3 text-xs text-white/90 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg font-mono">
             {syncStatus}
           </div>
         )}
@@ -1117,11 +1117,11 @@ export default function MarketingModule() {
             onClick={() => setActiveTab('campaigns')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'campaigns'
-                ? 'bg-white/10 text-white border border-white/20 shadow-sm'
+                ? 'bg-white/10 text-white border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.1)]'
                 : 'text-white/50 hover:bg-white/5 hover:text-white border border-transparent'
             }`}
           >
-            <Layers className="size-4 text-emerald-400" />
+            <Layers className="size-4 text-white" />
             <span>Campanhas ({campaigns.length})</span>
           </button>
 
@@ -1129,11 +1129,11 @@ export default function MarketingModule() {
             onClick={() => setActiveTab('broadcast_lists')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'broadcast_lists'
-                ? 'bg-white/10 text-white border border-white/20 shadow-sm'
+                ? 'bg-white/10 text-white border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.1)]'
                 : 'text-white/50 hover:bg-white/5 hover:text-white border border-transparent'
             }`}
           >
-            <Users className="size-4 text-purple-400" />
+            <Users className="size-4 text-white" />
             <span>Listas de Transmissão ({broadcastLists.length})</span>
           </button>
         </div>
