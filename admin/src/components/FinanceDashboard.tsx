@@ -244,7 +244,7 @@ function RevenueEvolutionChart({
   onCycleChange,
 }: {
   data: EvolutionPoint[];
-  periodType: "mensal" | "trimestral" | "anual";
+  periodType: "mensal" | "anual";
   availableCycles?: CycleFinancialMetrics[];
   selectedCycleId?: string;
   onCycleChange?: (id: string) => void;
@@ -299,7 +299,7 @@ function RevenueEvolutionChart({
   // 4 níveis Y limpos (0%, 33%, 66%, 100%)
   const gridLevels = [0, 0.33, 0.66, 1];
 
-  // No modo Mensal (~30 dias) espaça labels; no Anual (12 meses) e Trimestral (3 meses) exibe TODOS
+  // No modo Mensal (~30 dias) espaça labels; no Anual (12 meses) exibe TODOS
   const isMonthlyDaily = periodType === "mensal";
   const xLabelStep = isMonthlyDaily ? Math.max(1, Math.ceil(data.length / 8)) : 1;
 
@@ -334,8 +334,6 @@ function RevenueEvolutionChart({
           <p className="text-[10px] text-white/40 mt-0.5">
             {isMonthlyDaily
               ? "Acompanhamento dia a dia das vendas e rentabilidade do ciclo."
-              : periodType === "trimestral"
-              ? "Desempenho mês a mês dos ciclos do trimestre."
               : "Visão mensal dos 12 meses do ano financeiro."}
           </p>
         </div>
@@ -376,11 +374,11 @@ function RevenueEvolutionChart({
         </span>
       </div>
 
-      {/* SVG Chart Compacto */}
-      <div className="relative w-full overflow-x-auto">
+      {/* SVG Chart Compacto com Tooltip Seguro (overflow-visible para nunca cortar o card) */}
+      <div className="relative w-full overflow-visible">
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-auto min-w-[480px] cursor-crosshair"
+          className="w-full h-auto min-w-[480px] cursor-crosshair overflow-visible"
           onPointerMove={handlePointerMove}
           onPointerLeave={handlePointerLeave}
         >
@@ -475,31 +473,15 @@ function RevenueEvolutionChart({
             const show = p.revenue > 0 || isHov;
             if (!show && data.length > 15) return null;
             return (
-              <g key={`rd-${i}`}>
-                <circle
-                  cx={p.x}
-                  cy={p.y}
-                  r={isHov ? 5 : 2.5}
-                  fill={isHov ? "#ffffff" : "#10b981"}
-                  stroke={isHov ? "#10b981" : "#0f1115"}
-                  strokeWidth={isHov ? 2 : 1}
-                />
-
-                {/* Label de valor flutuante APENAS no ponto sob hover */}
-                {isHov && p.revenue > 0 && (
-                  <text
-                    x={p.x}
-                    y={Math.max(12, p.y - 8)}
-                    textAnchor="middle"
-                    fill="#10b981"
-                    fontSize="9"
-                    fontWeight="bold"
-                    fontFamily="sans-serif"
-                  >
-                    {formatBRL(p.revenue)}
-                  </text>
-                )}
-              </g>
+              <circle
+                key={`rd-${i}`}
+                cx={p.x}
+                cy={p.y}
+                r={isHov ? 5 : 2.5}
+                fill={isHov ? "#ffffff" : "#10b981"}
+                stroke={isHov ? "#10b981" : "#0f1115"}
+                strokeWidth={isHov ? 2 : 1}
+              />
             );
           })}
 
@@ -532,75 +514,81 @@ function RevenueEvolutionChart({
             fontSize="8"
             fontWeight="500"
           >
-            {isMonthlyDaily ? "Dias do Ciclo (14 → 13)" : periodType === "trimestral" ? "Meses do Trimestre" : "12 Meses do Ano (Jan → Dez)"}
+            {isMonthlyDaily ? "Dias do Ciclo (14 → 13)" : "12 Meses do Ano (Jan → Dez)"}
           </text>
         </svg>
 
-        {/* HUD / Tooltip flutuante */}
-        {hoveredIdx !== null && activePoint && (
-          <div
-            className="pointer-events-none absolute z-20 transition-transform duration-75 ease-out"
-            style={{
-              left: `${(activePoint.x / width) * 100}%`,
-              top: `${Math.max(2, (activePoint.y / height) * 100 - 10)}%`,
-              transform:
-                activePoint.x > width * 0.72
-                  ? "translate(-100%, -105%)"
-                  : activePoint.x < width * 0.28
-                  ? "translate(0%, -105%)"
-                  : "translate(-50%, -105%)",
-            }}
-          >
-            <div className="bg-[#14161c]/95 border border-white/20 rounded-lg p-2 shadow-2xl backdrop-blur-md min-w-[175px] text-[11px] space-y-1">
-              <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-0.5">
-                <span className="font-bold text-white text-[10.5px] truncate max-w-[145px]">
-                  {activePoint.fullTitle}
-                </span>
-                {activePoint.isCurrent && (
-                  <span className="text-[7.5px] bg-emerald-500/25 text-emerald-300 px-1 py-0.2 rounded font-bold shrink-0">
-                    Atual
+        {/* HUD / Tooltip flutuante inteligente (inverte para baixo quando o ponto está no topo, garantindo 100% de visibilidade) */}
+        {hoveredIdx !== null && activePoint && (() => {
+          // Se o ponto estiver na metade superior do gráfico (ex: pico de Agosto), exibe o tooltip ABAIXO do ponto
+          // Se o ponto estiver na metade inferior, exibe ACIMA do ponto
+          const isNearTop = activePoint.y < height * 0.55;
+          const isNearRight = activePoint.x > width * 0.72;
+          const isNearLeft = activePoint.x < width * 0.28;
+
+          const xTranslate = isNearRight ? "-95%" : isNearLeft ? "-5%" : "-50%";
+          const yTranslate = isNearTop ? "14px" : "calc(-100% - 14px)";
+
+          return (
+            <div
+              className="pointer-events-none absolute z-30 transition-transform duration-75 ease-out"
+              style={{
+                left: `${(activePoint.x / width) * 100}%`,
+                top: `${(activePoint.y / height) * 100}%`,
+                transform: `translate(${xTranslate}, ${yTranslate})`,
+              }}
+            >
+              <div className="bg-[#12141a]/95 border border-white/20 rounded-lg p-2.5 shadow-2xl backdrop-blur-md min-w-[180px] text-[11px] space-y-1">
+                <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1">
+                  <span className="font-bold text-white text-[11px] truncate max-w-[145px]">
+                    {activePoint.fullTitle}
                   </span>
-                )}
-              </div>
+                  {activePoint.isCurrent && (
+                    <span className="text-[7.5px] bg-emerald-500/25 text-emerald-300 px-1 py-0.2 rounded font-bold shrink-0">
+                      Atual
+                    </span>
+                  )}
+                </div>
 
-              <div className="flex items-baseline justify-between gap-2 pt-0.5">
-                <span className="text-white/50 text-[9.5px] flex items-center gap-1">
-                  <span className="size-1.5 rounded-full bg-[#10b981]" />
-                  Faturamento:
-                </span>
-                <span className="text-emerald-400 font-extrabold text-[11.5px]">
-                  {formatBRL(activePoint.revenue)}
-                </span>
-              </div>
-
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-white/50 text-[9.5px] flex items-center gap-1">
-                  <span className="size-1.5 rounded-full bg-[#06b6d4]" />
-                  Lucro Líquido:
-                </span>
-                <span className="text-cyan-400 font-bold text-[11.5px]">
-                  {formatBRL(activePoint.netProfit)}
-                </span>
-              </div>
-
-              {activePoint.revenue > 0 && (
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-white/50 text-[9px]">Margem:</span>
-                  <span className="text-white/80 font-medium text-[9.5px]">
-                    {((activePoint.netProfit / activePoint.revenue) * 100).toFixed(1)}%
+                <div className="flex items-baseline justify-between gap-2 pt-0.5">
+                  <span className="text-white/50 text-[9.5px] flex items-center gap-1">
+                    <span className="size-1.5 rounded-full bg-[#10b981]" />
+                    Faturamento:
+                  </span>
+                  <span className="text-emerald-400 font-extrabold text-xs">
+                    {formatBRL(activePoint.revenue)}
                   </span>
                 </div>
-              )}
 
-              <div className="pt-0.5 border-t border-white/5 flex items-center justify-between text-[9px] text-white/45">
-                <span>Volume:</span>
-                <span className="text-white font-medium">
-                  {activePoint.orders} ped · {activePoint.pods} pods
-                </span>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-white/50 text-[9.5px] flex items-center gap-1">
+                    <span className="size-1.5 rounded-full bg-[#06b6d4]" />
+                    Lucro Líquido:
+                  </span>
+                  <span className="text-cyan-400 font-bold text-xs">
+                    {formatBRL(activePoint.netProfit)}
+                  </span>
+                </div>
+
+                {activePoint.revenue > 0 && (
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-white/50 text-[9px]">Margem:</span>
+                    <span className="text-white/80 font-medium text-[9.5px]">
+                      {((activePoint.netProfit / activePoint.revenue) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                )}
+
+                <div className="pt-0.5 border-t border-white/5 flex items-center justify-between text-[9px] text-white/45">
+                  <span>Volume:</span>
+                  <span className="text-white font-medium">
+                    {activePoint.orders} ped · {activePoint.pods} pods
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* KPIs Footer Compacto */}
@@ -671,7 +659,7 @@ export default function FinanceDashboard() {
   // Seletores da Área: Faturamento a Longo Prazo (2 Abas: Histórico e Evolução)
   const [longTermTab, setLongTermTab] = useState<"historico" | "evolucao">("historico");
   const [historyTab, setHistoryTab] = useState<"mensal" | "trimestral" | "semestral" | "anual">("mensal");
-  const [evolutionTab, setEvolutionTab] = useState<"mensal" | "trimestral" | "anual">("mensal");
+  const [evolutionTab, setEvolutionTab] = useState<"mensal" | "anual">("mensal");
   const [selectedEvolutionCycleId, setSelectedEvolutionCycleId] = useState<string>("");
   const [selectedMonthCycleId, setSelectedMonthCycleId] = useState<string>("");
   const [selectedQuarterId, setSelectedQuarterId] = useState<string>("");
@@ -1264,19 +1252,6 @@ export default function FinanceDashboard() {
         isCurrent: c.cycle.isCurrent,
       };
     };
-
-    if (evolutionTab === "trimestral") {
-      // Encontrar o trimestre vigente (que contém o mês atual) ou o mais recente com dados
-      const sorted = [...quarterlyPeriods].reverse();
-      const withCurrent = sorted.find((q) => q.includedCycles?.some((c) => c.cycle.isCurrent));
-      const withRevenue = sorted.find((q) => q.grossRevenue > 0);
-      const target = withCurrent || withRevenue || sorted[0];
-      if (!target || !target.includedCycles || target.includedCycles.length === 0) return [];
-
-      // Ordenar cronologicamente do mês mais antigo para o mais novo (da esquerda para a direita)
-      const chronological = [...target.includedCycles].sort((a, b) => a.cycle.id.localeCompare(b.cycle.id));
-      return chronological.map(cycleToPoint);
-    }
 
     // Anual — Apresentação oficial e cronológica de todos os 12 meses do ano financeiro (Jan → Dez)
     const currentYear = currentCycle.year || 2026;
@@ -2793,18 +2768,6 @@ export default function FinanceDashboard() {
                 >
                   <Calendar className="size-3.5" />
                   <span>Mensal (14 → 13)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEvolutionTab("trimestral")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    evolutionTab === "trimestral"
-                      ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
-                      : "text-white/70 hover:text-white hover:bg-white/5"
-                  }`}
-                >
-                  <BarChart3 className="size-3.5" />
-                  <span>Trimestral</span>
                 </button>
                 <button
                   type="button"
