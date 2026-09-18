@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Store, Phone, Globe,
   Save, CheckCircle2, AlertCircle, Loader2,
-  Type, Smartphone, Copy, Check, Sparkles
+  Type, Smartphone, Copy, Check, Sparkles, Lock
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
@@ -34,14 +34,32 @@ export default function SettingsPage() {
       .replace(/-+/g, "-");
   };
 
-  // Dynamic Catalog Link (Suporta loja oficial e multi-tenant com isolamento)
+  // Dynamic Catalog Link (White-label: nome da loja no início sem "smoking-pods")
+  const isOfficial = !company?.id || company?.id === "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+  const saasDomain = (import.meta as any).env?.VITE_SAAS_CATALOG_DOMAIN || "cardapio.vip";
+
+  const currentSlug = generateSlug(storeName || company?.name || config?.store_name || "");
+
+  // O link só é liberado se for a loja oficial OU se o lojista já definiu e salvou um nome de loja válido
+  const isStoreConfigured = Boolean(
+    (config?.store_name && config.store_name.trim().length >= 2 && config.store_name.trim().toLowerCase() !== "minha loja") ||
+    (company?.name && company.name.trim().length >= 2 && company.name.trim().toLowerCase() !== "minha loja")
+  );
+
+  const [linkUnlocked, setLinkUnlocked] = useState(isOfficial || isStoreConfigured);
+
+  useEffect(() => {
+    if (isOfficial || isStoreConfigured) {
+      setLinkUnlocked(true);
+    }
+  }, [isOfficial, isStoreConfigured]);
+
   const getCatalogUrl = () => {
-    const isOfficial = !company?.id || company?.id === "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
     if (isOfficial) {
       return "https://smoking-pods-catalogo.vercel.app/";
     }
-    const slug = generateSlug(storeName || company?.name || config?.store_name || "loja");
-    return `https://smoking-pods-catalogo.vercel.app/?loja=${slug}&company=${company.id}`;
+    // Subdomínio próprio: o nome da loja vem no início do link
+    return `https://${currentSlug || 'loja'}.${saasDomain}`;
   };
 
   const catalogUrl = getCatalogUrl();
@@ -110,6 +128,14 @@ export default function SettingsPage() {
     } catch (e) {
       console.warn("Erro ao atualizar empresa:", e);
     }
+  };
+
+  const handleGenerateLink = async () => {
+    if (!storeName.trim() || storeName.trim().toLowerCase() === "minha loja") {
+      return;
+    }
+    await handleSave();
+    setLinkUnlocked(true);
   };
 
   const hasChanges = () => {
@@ -247,58 +273,113 @@ export default function SettingsPage() {
                 <p className="text-xs text-white/50">Endereço público do catálogo online para divulgar aos seus clientes</p>
               </div>
             </div>
-            <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full font-semibold flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Catálogo Online Ativo
-            </span>
+            {linkUnlocked ? (
+              <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full font-semibold flex items-center gap-1.5">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Catálogo Online Ativo
+              </span>
+            ) : (
+              <span className="text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-3 py-1 rounded-full font-semibold flex items-center gap-1.5">
+                <Lock className="size-3" />
+                Aguardando Nome da Loja
+              </span>
+            )}
           </div>
 
-          <p className="text-xs text-white/60 leading-relaxed">
-            Copie o link exclusivo do seu catálogo para enviar aos seus clientes no WhatsApp, campanhas de tráfego ou fixar na bio do Instagram. Todos os pedidos feitos por esse link caem diretamente no seu Kanban.
-          </p>
+          {!linkUnlocked ? (
+            <div className="rounded-2xl border border-dashed border-white/20 bg-[#121214] p-6 sm:p-8 text-center space-y-4">
+              <div className="size-14 mx-auto rounded-2xl bg-white/5 border border-white/15 flex items-center justify-center text-white shadow-[0_0_20px_rgba(255,255,255,0.08)]">
+                <Sparkles className="size-6 text-white animate-pulse" />
+              </div>
+              <div className="max-w-md mx-auto space-y-1.5">
+                <h3 className="text-base font-bold text-white">
+                  Defina o Nome da Loja para Liberar seu Catálogo
+                </h3>
+                <p className="text-xs text-white/50 leading-relaxed">
+                  Para que o catálogo seja gerado com a identidade da sua marca no início do link, digite o <strong>Nome da Loja</strong> na Seção 1 e clique no botão abaixo.
+                </p>
+              </div>
 
-          {/* Campo de URL com Botão de Copiar */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="flex-1 bg-[#121214] border border-white/15 rounded-2xl px-4 py-3.5 text-xs text-white/90 font-mono flex items-center justify-between overflow-hidden shadow-inner">
-              <span className="truncate selection:bg-white/20">{catalogUrl}</span>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleGenerateLink}
+                  disabled={saving || !storeName.trim() || storeName.trim().toLowerCase() === "minha loja"}
+                  className={`inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-xs transition-all cursor-pointer shadow-lg ${
+                    storeName.trim() && storeName.trim().toLowerCase() !== "minha loja"
+                      ? "bg-white hover:bg-white/90 text-black shadow-[0_0_25px_rgba(255,255,255,0.3)] active:scale-95"
+                      : "bg-white/10 text-white/30 border border-white/10 cursor-not-allowed"
+                  }`}
+                >
+                  {saving ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                  <span>{saving ? "Gerando Link..." : "⚡ Salvar Nome e Gerar Link do Catálogo"}</span>
+                </button>
+                {(!storeName.trim() || storeName.trim().toLowerCase() === "minha loja") && (
+                  <p className="text-[11px] text-amber-400/70 mt-2">
+                    * Digite o nome da sua loja no campo acima para habilitar a geração do link.
+                  </p>
+                )}
+              </div>
             </div>
-
-            <button
-              type="button"
-              onClick={handleCopyCatalogLink}
-              className={`flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-xs transition-all cursor-pointer shadow-lg shrink-0 ${
-                copied
-                  ? "bg-emerald-500 text-black font-extrabold shadow-[0_0_20px_rgba(16,185,129,0.4)]"
-                  : "bg-white hover:bg-white/90 text-black shadow-[0_0_20px_rgba(255,255,255,0.25)] active:scale-[0.98]"
-              }`}
-            >
-              {copied ? <Check className="size-4 stroke-[3]" /> : <Copy className="size-4" />}
-              <span>{copied ? "Link Copiado!" : "Copiar Link"}</span>
-            </button>
-          </div>
-
-          {/* Preview do Cabeçalho do Catálogo */}
-          <div className="pt-2">
-            <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider block mb-3">
-              Preview do Cabeçalho da Loja
-            </span>
-            <div className="rounded-2xl border border-white/10 bg-[#121214] p-6 text-center space-y-3 relative overflow-hidden">
-              <div className="absolute top-3 right-3">
-                <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-white/5 text-white/40 border border-white/10">
-                  Visão do Cliente
-                </span>
-              </div>
-              <div className="size-16 mx-auto rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-                <Store className="size-7" />
-              </div>
-              <h3 className="text-xl font-extrabold text-white tracking-tight drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
-                {storeName || "Minha Loja"}
-              </h3>
-              <p className="text-xs text-white/50">
-                Pedido finalizado em segundos pelo WhatsApp.
+          ) : (
+            <>
+              <p className="text-xs text-white/60 leading-relaxed">
+                Copie o link exclusivo do seu catálogo para enviar aos seus clientes no WhatsApp, campanhas de tráfego ou fixar na bio do Instagram. Todos os pedidos feitos por esse link caem diretamente no seu Kanban.
               </p>
-            </div>
-          </div>
+
+              {/* Campo de URL com Botão de Copiar */}
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <div className="flex-1 bg-[#121214] border border-white/15 rounded-2xl px-4 py-3.5 text-xs text-white/90 font-mono flex items-center justify-between overflow-hidden shadow-inner">
+                    <span className="truncate selection:bg-white/20">{catalogUrl}</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyCatalogLink}
+                    className={`flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-xs transition-all cursor-pointer shadow-lg shrink-0 ${
+                      copied
+                        ? "bg-emerald-500 text-black font-extrabold shadow-[0_0_20px_rgba(16,185,129,0.4)]"
+                        : "bg-white hover:bg-white/90 text-black shadow-[0_0_20px_rgba(255,255,255,0.25)] active:scale-[0.98]"
+                    }`}
+                  >
+                    {copied ? <Check className="size-4 stroke-[3]" /> : <Copy className="size-4" />}
+                    <span>{copied ? "Link Copiado!" : "Copiar Link"}</span>
+                  </button>
+                </div>
+
+                {!isOfficial && (
+                  <p className="text-[11px] text-white/40 flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-white/40" />
+                    <span>Link White-Label: o nome da sua marca <strong>({currentSlug})</strong> aparece logo no início do endereço.</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Preview do Cabeçalho do Catálogo */}
+              <div className="pt-2">
+                <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider block mb-3">
+                  Preview do Cabeçalho da Loja
+                </span>
+                <div className="rounded-2xl border border-white/10 bg-[#121214] p-6 text-center space-y-3 relative overflow-hidden">
+                  <div className="absolute top-3 right-3">
+                    <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-white/5 text-white/40 border border-white/10">
+                      Visão do Cliente
+                    </span>
+                  </div>
+                  <div className="size-16 mx-auto rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                    <Store className="size-7" />
+                  </div>
+                  <h3 className="text-xl font-extrabold text-white tracking-tight drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
+                    {storeName || "Minha Loja"}
+                  </h3>
+                  <p className="text-xs text-white/50">
+                    Pedido finalizado em segundos pelo WhatsApp.
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
         </section>
 
         {/* ─── Seção 3: Canais de Atendimento (Contato) ─── */}

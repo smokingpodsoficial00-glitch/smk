@@ -53,7 +53,37 @@ export function getCatalogCompanyId(): string {
 
 export async function fetchProductsFromSupabase(customCompanyId?: string): Promise<Product[]> {
   try {
-    const companyId = customCompanyId || getCatalogCompanyId();
+    let companyId = customCompanyId || getCatalogCompanyId();
+
+    // Se não veio company_id explícito na URL, tenta resolver por slug (?loja=slug ou subdomínio)
+    if (typeof window !== "undefined" && !customCompanyId && !new URLSearchParams(window.location.search).get("company")) {
+      let slug = new URLSearchParams(window.location.search).get("loja");
+      if (!slug) {
+        const host = window.location.hostname;
+        if (!host.includes("localhost") && !host.includes("127.0.0.1")) {
+          const parts = host.split(".");
+          if (parts.length >= 3 && !["www", "smoking-pods-catalogo", "admin", "app"].includes(parts[0])) {
+            slug = parts[0];
+          }
+        }
+      }
+
+      if (slug && slug !== "smoking-pods") {
+        try {
+          const { data: storeData } = await supabase
+            .from("store_config")
+            .select("company_id")
+            .eq("store_slug", slug)
+            .maybeSingle();
+
+          if (storeData?.company_id) {
+            companyId = storeData.company_id;
+          }
+        } catch (e) {
+          console.warn("Erro ao buscar empresa por slug no catálogo:", e);
+        }
+      }
+    }
 
     const [productsRes, promosMap] = await Promise.all([
       supabase
