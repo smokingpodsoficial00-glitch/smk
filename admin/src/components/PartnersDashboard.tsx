@@ -159,7 +159,26 @@ export default function PartnersDashboard() {
     });
   }, [partners, transactions, orders, products, persistedCosts, operationalExpenses, repurchases]);
 
-  // 3. Filtragem de Transações
+  // 3. Resolução e Filtragem de Transações
+  const getPartnerName = (tx: PartnerTransaction) => {
+    if (tx.partner_name && tx.partner_name !== 'Sócio') return tx.partner_name;
+    if (tx.partner_id) {
+      const found = partners.find(p => p.id === tx.partner_id);
+      if (found?.name) return found.name;
+      if (tx.partner_id === 'p1-eduardo') return 'Eduardo';
+      if (tx.partner_id === 'p2-gabriel') return 'Gabriel';
+    }
+    if (tx.description && tx.description.includes(' - ')) {
+      const parts = tx.description.split(' - ');
+      if (parts[1]) {
+        const n = parts[1].trim();
+        if (n.toLowerCase().includes('smolking') || n.toLowerCase().includes('smoking')) return 'Smoking Pods';
+        return n;
+      }
+    }
+    return 'Sócio';
+  };
+
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
       if (txFilterType === 'APORTE' && tx.type !== 'APORTE') return false;
@@ -167,12 +186,12 @@ export default function PartnersDashboard() {
       if (txSearchQuery.trim()) {
         const q = txSearchQuery.toLowerCase();
         const descMatch = (tx.description || '').toLowerCase().includes(q);
-        const partnerMatch = (tx.partner_name || '').toLowerCase().includes(q);
+        const partnerMatch = getPartnerName(tx).toLowerCase().includes(q);
         if (!descMatch && !partnerMatch) return false;
       }
       return true;
     });
-  }, [transactions, txFilterType, txSearchQuery]);
+  }, [transactions, txFilterType, txSearchQuery, partners]);
 
   const handleOpenAporte = (partnerId?: string) => {
     setNewTxDefaultType('APORTE');
@@ -634,7 +653,10 @@ export default function PartnersDashboard() {
                           </span>
                         </td>
                         <td className="py-3 px-4 font-semibold text-white whitespace-nowrap">
-                          {tx.partner_name || 'Sócio'}
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-white font-medium">
+                            <span className="size-1.5 rounded-full bg-emerald-400" />
+                            {getPartnerName(tx)}
+                          </span>
                         </td>
                         <td className="py-3 px-4 text-right font-mono font-bold whitespace-nowrap">
                           <span className={isEntry ? 'text-emerald-400' : 'text-rose-400'}>
