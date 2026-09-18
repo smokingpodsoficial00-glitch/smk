@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
-  Store, Upload, Phone, Globe,
-  Save, CheckCircle2, AlertCircle, Loader2, ImagePlus,
-  Trash2, Type, Smartphone, Copy, Check, Sparkles
+  Store, Phone, Globe,
+  Save, CheckCircle2, AlertCircle, Loader2,
+  Type, Smartphone, Copy, Check, Sparkles
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { validateAndNormalizeBrazilianPhone, formatBrazilianPhone } from "@/lib/phoneUtils";
 
 export default function SettingsPage() {
-  const { config, loading, saving, saveStatus, updateConfig, updateStoreWhatsApp, uploadLogo } = useStoreConfig();
+  const { config, loading, saving, saveStatus, updateConfig, updateStoreWhatsApp } = useStoreConfig();
   const { company, refreshCompany } = (useAuth() as any) || {};
 
   // Form state local
@@ -21,13 +21,6 @@ export default function SettingsPage() {
 
   // Copy link state
   const [copied, setCopied] = useState(false);
-
-  // Logo upload
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Slugifier seguro
   const generateSlug = (str: string) => {
@@ -59,7 +52,6 @@ export default function SettingsPage() {
       if (!storeName && !whatsappNumber) {
         setStoreName(config.store_name || "");
         setWhatsappNumber(formatBrazilianPhone(config.whatsapp_number || ""));
-        setLogoPreview(config.logo_url || null);
       }
     }
   }, [config, loading]);
@@ -87,19 +79,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleLogoSelect = (file: File) => {
-    if (!file.type.startsWith("image/")) return;
-    setLogoFile(file);
-    const reader = new FileReader();
-    reader.onload = (e) => setLogoPreview(e.target?.result as string);
-    reader.readAsDataURL(file);
-  };
-
-  const handleRemoveLogo = () => {
-    setLogoFile(null);
-    setLogoPreview(null);
-  };
-
   const handleCopyCatalogLink = () => {
     navigator.clipboard.writeText(catalogUrl);
     setCopied(true);
@@ -107,24 +86,6 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
-    let logoUrl = config?.logo_url || null;
-
-    // Upload logo se houve alteração
-    if (logoFile) {
-      setUploadingLogo(true);
-      const url = await uploadLogo(logoFile);
-      setUploadingLogo(false);
-      if (url) {
-        logoUrl = url;
-        setLogoFile(null);
-      }
-    }
-
-    // Se usuário removeu o logo
-    if (!logoPreview && !logoFile) {
-      logoUrl = null;
-    }
-
     const finalStoreName = storeName.trim() || "Minha Loja";
     const waVal = validateAndNormalizeBrazilianPhone(whatsappNumber);
     const normalizedWhatsApp = waVal.valid ? waVal.normalized : (whatsappNumber ? whatsappNumber.replace(/\D/g, "") : "");
@@ -133,15 +94,13 @@ export default function SettingsPage() {
       store_name: finalStoreName,
       store_slug: generateSlug(finalStoreName),
       whatsapp_number: normalizedWhatsApp,
-      logo_url: logoUrl,
     });
 
-    // Sincroniza tabela companies e recarrega AuthContext para atualizar a logo/nome no topo esquerdo imediatamente
+    // Sincroniza tabela companies e recarrega AuthContext para atualizar o nome no topo esquerdo imediatamente
     const targetCompanyId = company?.id || (typeof window !== "undefined" ? localStorage.getItem("smk_auth_company_id") : null) || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
     try {
       await supabase.from('companies').update({
         name: finalStoreName,
-        logo_url: logoUrl,
         phone: normalizedWhatsApp
       }).eq('id', targetCompanyId);
 
@@ -157,9 +116,7 @@ export default function SettingsPage() {
     if (!config) return false;
     return (
       storeName !== (config.store_name || "") ||
-      whatsappNumber.replace(/\D/g, "") !== (config.whatsapp_number || "").replace(/\D/g, "") ||
-      logoFile !== null ||
-      (logoPreview === null && config.logo_url !== null)
+      whatsappNumber.replace(/\D/g, "") !== (config.whatsapp_number || "").replace(/\D/g, "")
     );
   };
 
@@ -199,7 +156,7 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving || uploadingLogo || !hasChanges()}
+              disabled={saving || !hasChanges()}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all duration-300 cursor-pointer ${
                 saveStatus === "success"
                   ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
@@ -210,7 +167,7 @@ export default function SettingsPage() {
                   : "bg-white/5 text-white/30 border border-white/10 cursor-not-allowed"
               }`}
             >
-              {saving || uploadingLogo ? (
+              {saving ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : saveStatus === "success" ? (
                 <CheckCircle2 className="size-4" />
@@ -220,7 +177,7 @@ export default function SettingsPage() {
                 <Save className="size-4" />
               )}
               <span>
-                {saving || uploadingLogo
+                {saving
                   ? "Salvando..."
                   : saveStatus === "success"
                   ? "Salvo com sucesso!"
@@ -236,7 +193,7 @@ export default function SettingsPage() {
       {/* Conteúdo Central */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
         
-        {/* ─── Seção 1: Identidade da Loja (Nome e Logo) ─── */}
+        {/* ─── Seção 1: Identidade da Loja (Nome do Negócio) ─── */}
         <section className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 sm:p-7 space-y-6 shadow-2xl relative overflow-hidden">
           <div className="flex items-center justify-between pb-4 border-b border-white/10">
             <div className="flex items-center gap-2.5">
@@ -245,7 +202,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <h2 className="font-bold text-base text-white">Identidade da Loja</h2>
-                <p className="text-xs text-white/50">Nome do negócio e logotipo exibidos no sistema e no catálogo</p>
+                <p className="text-xs text-white/50">Nome oficial do seu negócio exibido no topo do catálogo e no painel admin</p>
               </div>
             </div>
             <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-white/5 text-white/70 border border-white/10">
@@ -253,89 +210,27 @@ export default function SettingsPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-            {/* Campo 1: Nome da Loja */}
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-xs uppercase font-bold text-white/70 tracking-wider flex items-center gap-2">
-                  <Type className="size-3.5 text-white" />
-                  Nome da Loja *
-                </label>
-                <input
-                  type="text"
-                  value={storeName}
-                  onChange={(e) => setStoreName(e.target.value)}
-                  placeholder="Ex: Smoking Pods, Vape House..."
-                  className="w-full bg-[#121214] border border-white/15 rounded-2xl px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white focus:ring-1 focus:ring-white/20 transition-all font-semibold shadow-inner"
-                />
-                <div className="flex flex-col gap-1 text-[11px] text-white/40 pt-1">
-                  <span>Este nome é exibido no topo do catálogo e no canto superior esquerdo deste painel.</span>
-                  {storeName && (
-                    <span className="font-mono text-white/80 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10 w-fit mt-1">
-                      Slug: /{generateSlug(storeName)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Campo 2: Logo do Negócio */}
-            <div className="space-y-3">
-              <label className="text-xs uppercase font-bold text-white/70 tracking-wider flex items-center gap-2">
-                <ImagePlus className="size-3.5 text-white" />
-                Logo do Negócio
-              </label>
-
-              <div
-                className={`relative h-44 rounded-2xl border-2 border-dashed transition-all duration-300 flex items-center justify-center overflow-hidden cursor-pointer group ${
-                  isDragging
-                    ? "border-white bg-white/10 scale-[1.01]"
-                    : logoPreview
-                    ? "border-white/20 bg-[#121214]"
-                    : "border-white/15 bg-[#121214] hover:border-white/40 hover:bg-white/5"
-                }`}
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setIsDragging(false);
-                  const file = e.dataTransfer.files[0];
-                  if (file) handleLogoSelect(file);
-                }}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {logoPreview ? (
-                  <>
-                    <img src={logoPreview} alt="Logo" className="max-h-36 max-w-full object-contain p-3" />
-                    <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-xs">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleRemoveLogo(); }}
-                        className="p-2.5 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition-colors cursor-pointer"
-                        title="Remover Logo"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center gap-2 text-white/40 group-hover:text-white/70 transition-colors">
-                    <Upload className="size-8 text-white/60" />
-                    <span className="text-xs font-semibold text-white/80">Clique ou arraste a logo aqui</span>
-                    <span className="text-[10px] text-white/40">PNG, JPG ou SVG (aparece ao lado do nome no menu)</span>
-                  </div>
-                )}
-              </div>
+          <div className="max-w-2xl space-y-3">
+            <label className="text-xs uppercase font-bold text-white/70 tracking-wider flex items-center gap-2">
+              <Type className="size-3.5 text-white" />
+              Nome da Loja *
+            </label>
+            <div className="relative">
               <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleLogoSelect(file);
-                }}
+                type="text"
+                value={storeName}
+                onChange={(e) => setStoreName(e.target.value)}
+                placeholder="Ex: Smoking Pods, Vape House..."
+                className="w-full bg-[#121214] border border-white/15 rounded-2xl px-4 py-3.5 text-base text-white placeholder:text-white/30 focus:outline-none focus:border-white focus:ring-1 focus:ring-white/20 transition-all font-semibold shadow-inner"
               />
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-white/40 pt-1">
+              <span>Este nome substitui o título principal do catálogo e atualiza o menu superior deste painel.</span>
+              {storeName && (
+                <span className="font-mono text-white/80 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10 shrink-0 w-fit">
+                  Slug: /{generateSlug(storeName)}
+                </span>
+              )}
             </div>
           </div>
         </section>
@@ -393,15 +288,9 @@ export default function SettingsPage() {
                   Visão do Cliente
                 </span>
               </div>
-              {logoPreview ? (
-                <div className="relative size-16 mx-auto rounded-2xl p-2 bg-black border border-white/20 shadow-xl flex items-center justify-center">
-                  <img src={logoPreview} alt="Logo" className="size-full object-contain" />
-                </div>
-              ) : (
-                <div className="size-16 mx-auto rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-                  <Store className="size-7" />
-                </div>
-              )}
+              <div className="size-16 mx-auto rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                <Store className="size-7" />
+              </div>
               <h3 className="text-xl font-extrabold text-white tracking-tight drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
                 {storeName || "Minha Loja"}
               </h3>
@@ -498,7 +387,7 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || uploadingLogo || !hasChanges()}
+            disabled={saving || !hasChanges()}
             className={`flex items-center gap-2 px-7 py-3.5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer ${
               saveStatus === "success"
                 ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
@@ -509,7 +398,7 @@ export default function SettingsPage() {
                 : "bg-white/5 text-white/30 border border-white/10 cursor-not-allowed"
             }`}
           >
-            {saving || uploadingLogo ? (
+            {saving ? (
               <Loader2 className="size-4 animate-spin" />
             ) : saveStatus === "success" ? (
               <CheckCircle2 className="size-4" />
@@ -517,7 +406,7 @@ export default function SettingsPage() {
               <Save className="size-4" />
             )}
             <span>
-              {saving || uploadingLogo
+              {saving
                 ? "Salvando alterações..."
                 : saveStatus === "success"
                 ? "Configurações salvas!"
