@@ -58,7 +58,7 @@ export function LoginPage() {
         {/* Top Header Logo */}
         <div className="flex items-center gap-3 mb-12">
           <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(255,255,255,0.25)]">
-            <Bot className="size-5" />
+            <Store className="size-5" />
           </div>
           <span className="font-bold text-lg tracking-tight text-white">
             Smoking Pods <span className="text-white font-mono text-xs ml-1 px-2 py-0.5 rounded-full bg-white/10 border border-white/20">SaaS Pro</span>
@@ -71,7 +71,7 @@ export function LoginPage() {
           {/* Discret Badge */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/25 text-white text-xs font-bold shadow-[0_0_15px_rgba(255,255,255,0.15)]">
             <Zap className="size-3.5 text-white fill-white/20 animate-pulse" />
-            <span>Gestão Inteligente & Automação WhatsApp</span>
+            <span>Gestão Comercial & Inteligência Financeira</span>
           </div>
 
           {/* Large Typographic Title with Bright White Highlight */}
@@ -85,7 +85,7 @@ export function LoginPage() {
 
           {/* Description */}
           <p className="text-sm sm:text-base text-white/70 leading-relaxed font-normal">
-            Nossa plataforma integra atendimento via WhatsApp, gestão de pedidos, estoque, clientes, financeiro e automações com Inteligência Artificial em um único painel profissional.
+            Plataforma completa para distribuidores e lounges: Cardápio Digital sincronizado, Kanban de pedidos em tempo real, controle cirúrgico de CMV e divisão automática de cotas societárias.
           </p>
 
           {/* Action Buttons */}
@@ -102,7 +102,7 @@ export function LoginPage() {
               href="#conhecer"
               onClick={(e) => {
                 e.preventDefault();
-                alert('Conheça o SaaS: Integração total com Supabase, IA Eloísa no WhatsApp e Painel Kanban.');
+                alert('Conheça o SaaS: Painel Kanban em tempo real, DRE automático, gestão de estoque inteligente e fatias de lucros para sócios.');
               }}
               className="bg-[#121212] hover:bg-[#1c1c1c] border border-[#262626] text-white/90 hover:text-white font-semibold px-6 py-3.5 rounded-xl transition-all flex items-center gap-2 text-xs sm:text-sm active:scale-95"
             >
@@ -116,9 +116,9 @@ export function LoginPage() {
             <div className="bg-[#0b0b0b]/60 border border-[#1f1f1f] hover:border-white/30 p-3.5 rounded-2xl backdrop-blur-md transition-colors">
               <div className="text-xs font-bold text-white flex items-center gap-1.5 mb-1">
                 <TrendingUp className="size-3.5 text-white" />
-                <span>+40% Conversão</span>
+                <span>+40% Margem</span>
               </div>
-              <p className="text-[11px] text-white/50 font-medium">Vendas automatizadas no WhatsApp</p>
+              <p className="text-[11px] text-white/50 font-medium">Gestão cirúrgica de compras e CMV</p>
             </div>
 
             <div className="bg-[#0b0b0b]/60 border border-[#1f1f1f] hover:border-white/30 p-3.5 rounded-2xl backdrop-blur-md transition-colors">
@@ -131,10 +131,10 @@ export function LoginPage() {
 
             <div className="bg-[#0b0b0b]/60 border border-[#1f1f1f] hover:border-white/30 p-3.5 rounded-2xl backdrop-blur-md transition-colors">
               <div className="text-xs font-bold text-white flex items-center gap-1.5 mb-1">
-                <Bot className="size-3.5 text-white" />
-                <span>IA Vendedora</span>
+                <Store className="size-3.5 text-white" />
+                <span>DRE em Tempo Real</span>
               </div>
-              <p className="text-[11px] text-white/50 font-medium">Atendimento 24/7 especialista em pods</p>
+              <p className="text-[11px] text-white/50 font-medium">Caixa real, estoque e cotas de sócios</p>
             </div>
           </div>
 

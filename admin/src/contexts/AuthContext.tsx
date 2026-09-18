@@ -94,16 +94,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchUserData = async (authUser: User) => {
     try {
       // 1. Busca os dados do usuário em company_users
-      const { data: compUserData, error: compUserError } = await supabase
+      const { data: compUsers, error: compUserError } = await supabase
         .from('company_users')
         .select('*')
         .eq('auth_user_id', authUser.id)
         .eq('is_active', true)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
 
       if (compUserError) {
         console.warn('[AuthContext] Erro ao consultar company_users:', compUserError.message);
       }
+
+      const compUserData = compUsers && compUsers.length > 0 ? compUsers[0] : null;
 
       if (compUserData && compUserData.company_id) {
         const { data: companyData, error: companyError } = await supabase

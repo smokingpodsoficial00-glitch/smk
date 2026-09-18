@@ -38,6 +38,8 @@ export function OnboardingPage() {
     return company?.name || '';
   });
   const [logoUrl, setLogoUrl] = useState(company?.logo_url || '');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [address, setAddress] = useState(company?.address || '');
   const [originCep, setOriginCep] = useState('');
   const [phone, setPhone] = useState(() => {
@@ -247,6 +249,34 @@ export function OnboardingPage() {
     }
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const ext = file.name.split('.').pop() || 'png';
+      const fileName = `logo_${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('store-assets').upload(`logo/${fileName}`, file, { upsert: true });
+      if (!upErr) {
+        const { data } = supabase.storage.from('store-assets').getPublicUrl(`logo/${fileName}`);
+        if (data?.publicUrl) {
+          setLogoUrl(data.publicUrl);
+          setUploadingLogo(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Storage upload falhou, fallback base64:', err);
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setLogoUrl(ev.target?.result as string);
+      setUploadingLogo(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden selection:bg-white/20 selection:text-white">
       {/* Glow Effects */}
@@ -305,21 +335,39 @@ export function OnboardingPage() {
 
               <div>
                 <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">URL da Logo (ou Upload)</label>
-                <div className="flex gap-3">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleLogoUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <div className="flex gap-3 items-center">
                   <input
                     type="url"
                     value={logoUrl}
                     onChange={(e) => setLogoUrl(e.target.value)}
-                    placeholder="https://exemplo.com/logo.png"
+                    placeholder="https://exemplo.com/logo.png ou clique em Upload"
                     className="flex-1 bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 px-4 text-sm text-white focus:outline-none font-medium"
                   />
-                  <div className="size-11 rounded-xl bg-[#141414] border border-[#262626] flex items-center justify-center shrink-0">
-                    {logoUrl ? (
-                      <img src={logoUrl} alt="Logo" className="size-8 object-contain rounded" />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingLogo}
+                    className="h-11 px-3.5 rounded-xl bg-[#141414] hover:bg-white/10 border border-[#262626] hover:border-white/40 flex items-center justify-center gap-2 shrink-0 transition-all cursor-pointer text-xs font-semibold text-white/80 hover:text-white"
+                    title="Escolher imagem do computador"
+                  >
+                    {uploadingLogo ? (
+                      <Loader2 className="size-4 animate-spin text-white" />
+                    ) : logoUrl ? (
+                      <img src={logoUrl} alt="Logo" className="size-6 object-contain rounded" />
                     ) : (
-                      <Upload className="size-4 text-white/30" />
+                      <>
+                        <Upload className="size-4 text-white/60" />
+                        <span className="hidden sm:inline">Upload</span>
+                      </>
                     )}
-                  </div>
+                  </button>
                 </div>
               </div>
             </div>
