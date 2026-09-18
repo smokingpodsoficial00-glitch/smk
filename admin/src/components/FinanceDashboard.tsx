@@ -167,24 +167,53 @@ interface EvolutionPoint {
  * Funções auxiliares para geração de curvas Bézier cúbicas suaves (estilo TradingView/Stripe)
  */
 /**
- * Funções auxiliares para geração de curvas Bézier cúbicas suaves (estilo TradingView/Stripe)
+ * Algoritmo Fritsch-Carlson de Spline Cúbica Monotônica (padrão TradingView / D3 Monotone)
+ * Garante que a curva financeira passe com precisão cirúrgica por cada ponto:
+ * - Em valores zerados (0), a curva se mantém 100% reta no piso (sem ondulações ou mergulhos)
+ * - Em picos de alta e fundos (quedas), a derivada é zero, eliminando qualquer efeito balão
+ * - Reproduz o visual exato de gráficos de ativos / day trade de alta resolução
  */
 function generateSmoothPath(pts: { x: number; y: number }[]): string {
-  if (pts.length === 0) return "";
-  if (pts.length === 1) return `M ${pts[0].x - 15} ${pts[0].y} L ${pts[0].x + 15} ${pts[0].y}`;
-  if (pts.length === 2) return `M ${pts[0].x} ${pts[0].y} L ${pts[1].x} ${pts[1].y}`;
+  const n = pts.length;
+  if (n === 0) return "";
+  if (n === 1) return `M ${pts[0].x - 10} ${pts[0].y} L ${pts[0].x + 10} ${pts[0].y}`;
+  if (n === 2) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)} L ${pts[1].x.toFixed(1)} ${pts[1].y.toFixed(1)}`;
+
+  const dxs: number[] = [];
+  const dys: number[] = [];
+  const ms: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const dx = pts[i + 1].x - pts[i].x;
+    const dy = pts[i + 1].y - pts[i].y;
+    dxs.push(dx);
+    dys.push(dy);
+    ms.push(dx === 0 ? 0 : dy / dx);
+  }
+
+  const c1s: number[] = [ms[0]];
+  for (let i = 0; i < ms.length - 1; i++) {
+    const m0 = ms[i];
+    const m1 = ms[i + 1];
+    if (m0 * m1 <= 0) {
+      c1s.push(0);
+    } else {
+      const dx0 = dxs[i];
+      const dx1 = dxs[i + 1];
+      const common = dx0 + dx1;
+      c1s.push(common === 0 ? 0 : (3 * common) / ((common + dx1) / m0 + (common + dx0) / m1));
+    }
+  }
+  c1s.push(ms[ms.length - 1]);
 
   let path = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = i > 0 ? pts[i - 1] : pts[i];
+  for (let i = 0; i < n - 1; i++) {
     const p1 = pts[i];
     const p2 = pts[i + 1];
-    const p3 = i < pts.length - 2 ? pts[i + 2] : p2;
-
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p3.x - p1.x) / 6;
-    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    const dx = dxs[i];
+    const cp1x = p1.x + dx / 3;
+    const cp1y = p1.y + (c1s[i] * dx) / 3;
+    const cp2x = p2.x - dx / 3;
+    const cp2y = p2.y - (c1s[i + 1] * dx) / 3;
 
     path += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
   }
@@ -201,8 +230,11 @@ function generateSmoothArea(pts: { x: number; y: number }[], baseY: number): str
 
 /**
  * Componente Gráfico SaaS Técnico & Minimalista (Revenue Performance)
- * Duas séries: Faturamento Bruto (esmeralda) + Lucro Líquido Real (ciano)
- * Labels aparecem APENAS via tooltip no hover — resting state limpo e profissional.
+ * Estilo Day Trade / Terminal Financeiro:
+ * - Altura compacta e proporcional (180px) para não tomar a tela toda
+ * - Curva Monotônica de alta fidelidade
+ * - Resting state 100% limpo, sem números colidindo
+ * - Crosshair + HUD dinâmico no hover
  */
 function RevenueEvolutionChart({
   data,
@@ -221,7 +253,7 @@ function RevenueEvolutionChart({
 
   if (!data || data.length === 0) {
     return (
-      <div className="p-8 text-center text-white/40 text-xs italic bg-[#0f1115] border border-white/10 rounded-2xl">
+      <div className="p-6 text-center text-white/40 text-xs italic bg-[#0f1115] border border-white/10 rounded-xl">
         Nenhum dado disponível para o período selecionado.
       </div>
     );
@@ -234,20 +266,20 @@ function RevenueEvolutionChart({
   const totalPodsCount = data.reduce((sum, d) => sum + d.pods, 0);
   const overallMargin = totalRevenue > 0 ? (totalNetProfit / totalRevenue) * 100 : 0;
 
-  // Dimensões — altura maior para respiração entre as 2 linhas
-  const width = 760;
-  const height = 280;
-  const padLeft = 62;
-  const padRight = 30;
-  const padTop = 24;
-  const padBottom = 44;
+  // Dimensões compactas estilo trading terminal (180px de altura)
+  const width = 740;
+  const height = 180;
+  const padLeft = 52;
+  const padRight = 20;
+  const padTop = 14;
+  const padBottom = 26;
   const chartW = width - padLeft - padRight;
   const chartH = height - padTop - padBottom;
 
   const maxVal = Math.max(...data.map((d) => Math.max(d.revenue, d.netProfit)), 50);
-  const yMax = Math.ceil(maxVal * 1.15);
+  const yMax = Math.ceil(maxVal * 1.12);
 
-  // Mapear pontos de faturamento e lucro
+  // Mapear pontos
   const revenuePoints = data.map((d, i) => {
     const x = data.length === 1 ? padLeft + chartW / 2 : padLeft + (i / (data.length - 1)) * chartW;
     const y = padTop + chartH - (Math.max(0, d.revenue) / yMax) * chartH;
@@ -264,14 +296,12 @@ function RevenueEvolutionChart({
   const revAreaPath = generateSmoothArea(revenuePoints, padTop + chartH);
   const profLinePath = generateSmoothPath(profitPoints);
 
-  // 5 níveis Y (0%, 25%, 50%, 75%, 100%)
-  const gridLevels = [0, 0.25, 0.5, 0.75, 1];
+  // 4 níveis Y limpos (0%, 33%, 66%, 100%)
+  const gridLevels = [0, 0.33, 0.66, 1];
 
-  // Quantos labels no eixo X exibir (evitar sobreposição)
+  // No modo Mensal (~30 dias) espaça labels; no Anual (12 meses) e Trimestral (3 meses) exibe TODOS
   const isMonthlyDaily = periodType === "mensal";
-  const xLabelStep = isMonthlyDaily
-    ? Math.max(1, Math.ceil(data.length / 8))
-    : Math.max(1, Math.ceil(data.length / 12));
+  const xLabelStep = isMonthlyDaily ? Math.max(1, Math.ceil(data.length / 8)) : 1;
 
   const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -292,36 +322,32 @@ function RevenueEvolutionChart({
   const activePoint = hoveredIdx !== null ? revenuePoints[hoveredIdx] : null;
   const activeProfitPoint = hoveredIdx !== null ? profitPoints[hoveredIdx] : null;
 
-  // Determinar pico de faturamento para label fixo opcional (apenas em <= 12 pontos)
-  const showPeakLabel = data.length <= 12;
-  const peakIdx = revenuePoints.reduce((best, p, i) => (p.revenue > revenuePoints[best].revenue ? i : best), 0);
-
   return (
-    <div className="bg-[#0f1115] border border-white/10 rounded-2xl p-4 sm:p-5 shadow-2xl relative select-none">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 pb-3 border-b border-white/5">
+    <div className="bg-[#0f1115] border border-white/10 rounded-xl p-3 sm:p-3.5 shadow-xl relative select-none">
+      {/* Header Compacto */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2 pb-2 border-b border-white/5">
         <div>
-          <h4 className="text-sm font-bold text-white tracking-wide flex items-center gap-2">
+          <h4 className="text-xs font-bold text-white tracking-wide flex items-center gap-2">
             <span>Desempenho Financeiro</span>
-            <span className="text-[10px] text-white/30 font-normal">Revenue Performance</span>
+            <span className="text-[9px] text-white/30 font-normal">Revenue Performance</span>
           </h4>
-          <p className="text-[11px] text-white/40 mt-0.5">
+          <p className="text-[10px] text-white/40 mt-0.5">
             {isMonthlyDaily
               ? "Acompanhamento dia a dia das vendas e rentabilidade do ciclo."
               : periodType === "trimestral"
-              ? "Visão mensal do trimestre — receitas e lucro líquido mês a mês."
-              : "Visão mensal do ano — receitas e lucro líquido mês a mês."}
+              ? "Desempenho mês a mês dos ciclos do trimestre."
+              : "Visão mensal dos 12 meses do ano financeiro."}
           </p>
         </div>
 
         {/* Seletor de Ciclo (modo Mensal) */}
         {isMonthlyDaily && availableCycles && availableCycles.length > 0 && onCycleChange && (
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <span className="text-[11px] text-white/40">Ciclo:</span>
+          <div className="flex items-center gap-1.5 self-start sm:self-auto">
+            <span className="text-[10px] text-white/40">Ciclo:</span>
             <select
               value={selectedCycleId || availableCycles[0]?.cycle.id}
               onChange={(e) => onCycleChange(e.target.value)}
-              className="bg-black/80 border border-white/15 rounded-xl px-3 py-1 text-xs font-semibold text-emerald-400 focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+              className="bg-black/80 border border-white/15 rounded-lg px-2.5 py-0.5 text-[11px] font-semibold text-emerald-400 focus:outline-none focus:border-emerald-500/50 cursor-pointer"
             >
               {availableCycles.map((c) => (
                 <option key={c.cycle.id} value={c.cycle.id} className="bg-[#121316] text-white">
@@ -333,35 +359,35 @@ function RevenueEvolutionChart({
         )}
       </div>
 
-      {/* Legenda */}
-      <div className="flex items-center justify-between gap-4 mb-2 text-xs">
-        <div className="flex items-center gap-4">
+      {/* Legenda Estilo Terminal */}
+      <div className="flex items-center justify-between gap-3 mb-1.5 text-[11px]">
+        <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-full bg-[#10b981] border border-white/30" />
-            <span className="text-white/80 font-semibold text-[11px]">Faturamento Bruto</span>
+            <span className="size-2 rounded-full bg-[#10b981] shadow-sm shadow-emerald-500/40" />
+            <span className="text-white/80 font-medium text-[10.5px]">Faturamento Bruto</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-full bg-[#06b6d4] border border-white/30" />
-            <span className="text-white/80 font-semibold text-[11px]">Lucro Líquido Real</span>
+            <span className="size-2 rounded-full bg-[#06b6d4] shadow-sm shadow-cyan-500/40" />
+            <span className="text-white/80 font-medium text-[10.5px]">Lucro Líquido Real</span>
           </div>
         </div>
-        <span className="text-[10px] text-white/40 hidden sm:inline-block">
-          Passe o cursor sobre o gráfico para inspecionar valores
+        <span className="text-[9.5px] text-white/35 hidden sm:inline-block">
+          Passe o cursor sobre a curva para inspecionar
         </span>
       </div>
 
-      {/* SVG Chart */}
+      {/* SVG Chart Compacto */}
       <div className="relative w-full overflow-x-auto">
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-auto min-w-[500px] cursor-crosshair"
+          className="w-full h-auto min-w-[480px] cursor-crosshair"
           onPointerMove={handlePointerMove}
           onPointerLeave={handlePointerLeave}
         >
           <defs>
             <linearGradient id="saasAreaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#10b981" stopOpacity="0.18" />
-              <stop offset="60%" stopColor="#10b981" stopOpacity="0.04" />
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.16" />
+              <stop offset="60%" stopColor="#10b981" stopOpacity="0.03" />
               <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
             </linearGradient>
           </defs>
@@ -370,10 +396,10 @@ function RevenueEvolutionChart({
           <text
             transform="rotate(-90)"
             x={-(padTop + chartH / 2)}
-            y="14"
+            y="12"
             textAnchor="middle"
-            fill="rgba(255,255,255,0.35)"
-            fontSize="8.5"
+            fill="rgba(255,255,255,0.3)"
+            fontSize="7.5"
             fontWeight="500"
           >
             Receita (R$)
@@ -385,76 +411,91 @@ function RevenueEvolutionChart({
             const val = lvl * yMax;
             return (
               <g key={`hg-${lvl}`}>
-                <line x1={padLeft} y1={yVal} x2={width - padRight} y2={yVal} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
-                <text x={padLeft - 6} y={yVal + 3.5} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize="9" fontFamily="monospace">
+                <line x1={padLeft} y1={yVal} x2={width - padRight} y2={yVal} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+                <text x={padLeft - 5} y={yVal + 3} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize="8.5" fontFamily="monospace">
                   {lvl === 0 ? "0" : formatBRL(val).replace(",00", "")}
                 </text>
               </g>
             );
           })}
 
-          {/* Grade Vertical (apenas onde há label X) */}
+          {/* Grade Vertical */}
           {revenuePoints.map((p, i) => {
             if (i % xLabelStep !== 0 && i !== revenuePoints.length - 1) return null;
             return (
-              <line key={`vg-${i}`} x1={p.x} y1={padTop} x2={p.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+              <line key={`vg-${i}`} x1={p.x} y1={padTop} x2={p.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
             );
           })}
 
           {/* Área sob a curva de faturamento */}
           {revAreaPath && <path d={revAreaPath} fill="url(#saasAreaGrad)" />}
 
-          {/* Linha Faturamento */}
+          {/* Linha Faturamento (Verde Esmeralda) */}
           {revLinePath && (
-            <path d={revLinePath} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={revLinePath} fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           )}
 
-          {/* Linha Lucro */}
+          {/* Linha Lucro (Ciano) */}
           {profLinePath && (
-            <path d={profLinePath} fill="none" stroke="#06b6d4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray={isMonthlyDaily ? "none" : "none"} />
+            <path d={profLinePath} fill="none" stroke="#06b6d4" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           )}
 
           {/* Crosshair vertical no hover */}
           {hoveredIdx !== null && activePoint && (
             <>
-              <line x1={activePoint.x} y1={padTop} x2={activePoint.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.35)" strokeWidth="1" strokeDasharray="4 3" />
-              {/* Horizontal guide lines to Y axis */}
-              <line x1={padLeft} y1={activePoint.y} x2={activePoint.x} y2={activePoint.y} stroke="rgba(16,185,129,0.25)" strokeWidth="1" strokeDasharray="3 3" />
+              <line x1={activePoint.x} y1={padTop} x2={activePoint.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeDasharray="3 3" />
+              <line x1={padLeft} y1={activePoint.y} x2={activePoint.x} y2={activePoint.y} stroke="rgba(16,185,129,0.3)" strokeWidth="1" strokeDasharray="2 2" />
               {activeProfitPoint && (
-                <line x1={padLeft} y1={activeProfitPoint.y} x2={activeProfitPoint.x} y2={activeProfitPoint.y} stroke="rgba(6,182,212,0.25)" strokeWidth="1" strokeDasharray="3 3" />
+                <line x1={padLeft} y1={activeProfitPoint.y} x2={activeProfitPoint.x} y2={activeProfitPoint.y} stroke="rgba(6,182,212,0.3)" strokeWidth="1" strokeDasharray="2 2" />
               )}
             </>
           )}
 
-          {/* Dots Lucro — pequenos, expandem no hover */}
+          {/* Dots Lucro */}
           {profitPoints.map((p, i) => {
             const isHov = hoveredIdx === i;
             const show = p.netProfit > 0 || isHov;
             if (!show && data.length > 15) return null;
             return (
-              <circle key={`pd-${i}`} cx={p.x} cy={p.y} r={isHov ? 5 : 2.5} fill={isHov ? "#ffffff" : "#06b6d4"} stroke={isHov ? "#06b6d4" : "none"} strokeWidth={isHov ? 2.5 : 0} />
+              <circle
+                key={`pd-${i}`}
+                cx={p.x}
+                cy={p.y}
+                r={isHov ? 4.5 : 2}
+                fill={isHov ? "#ffffff" : "#06b6d4"}
+                stroke={isHov ? "#06b6d4" : "none"}
+                strokeWidth={isHov ? 2 : 0}
+              />
             );
           })}
 
-          {/* Dots Faturamento — pequenos, expandem no hover */}
+          {/* Dots Faturamento */}
           {revenuePoints.map((p, i) => {
             const isHov = hoveredIdx === i;
             const show = p.revenue > 0 || isHov;
             if (!show && data.length > 15) return null;
             return (
               <g key={`rd-${i}`}>
-                <circle cx={p.x} cy={p.y} r={isHov ? 5.5 : 3} fill={isHov ? "#ffffff" : "#10b981"} stroke={isHov ? "#10b981" : "#0f1115"} strokeWidth={isHov ? 2.5 : 1.5} />
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={isHov ? 5 : 2.5}
+                  fill={isHov ? "#ffffff" : "#10b981"}
+                  stroke={isHov ? "#10b981" : "#0f1115"}
+                  strokeWidth={isHov ? 2 : 1}
+                />
 
-                {/* Label fixo APENAS no pico e em modos com poucos pontos (≤12) */}
-                {showPeakLabel && i === peakIdx && p.revenue > 0 && !isHov && (
-                  <text x={p.x} y={p.y - 10} textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="bold" fontFamily="sans-serif">
-                    {formatBRL(p.revenue).replace(",00", "")}
-                  </text>
-                )}
-
-                {/* Label do valor no hover */}
+                {/* Label de valor flutuante APENAS no ponto sob hover */}
                 {isHov && p.revenue > 0 && (
-                  <text x={p.x} y={p.y - 10} textAnchor="middle" fill="#10b981" fontSize="9.5" fontWeight="bold" fontFamily="sans-serif">
+                  <text
+                    x={p.x}
+                    y={Math.max(12, p.y - 8)}
+                    textAnchor="middle"
+                    fill="#10b981"
+                    fontSize="9"
+                    fontWeight="bold"
+                    fontFamily="sans-serif"
+                  >
                     {formatBRL(p.revenue)}
                   </text>
                 )}
@@ -470,38 +511,38 @@ function RevenueEvolutionChart({
               <text
                 key={`xl-${i}`}
                 x={p.x}
-                y={padTop + chartH + 16}
+                y={padTop + chartH + 14}
                 textAnchor="middle"
-                fill={isHov ? "#ffffff" : "rgba(255,255,255,0.4)"}
-                fontSize={isHov ? "9.5" : "8.5"}
+                fill={isHov ? "#ffffff" : "rgba(255,255,255,0.45)"}
+                fontSize={isHov ? "8.5" : "8"}
                 fontWeight={isHov ? "bold" : "normal"}
                 fontFamily="monospace"
               >
-                {p.label.replace(" (vigente)", "").replace(" — em andamento", "")}
+                {p.label.replace(" (vigente)", "").replace(" (atual)", "")}
               </text>
             );
           })}
 
-          {/* Label eixo X inferior */}
+          {/* Rótulo inferior central */}
           <text
             x={padLeft + chartW / 2}
-            y={height - 6}
+            y={height - 3}
             textAnchor="middle"
-            fill="rgba(255,255,255,0.3)"
-            fontSize="9"
+            fill="rgba(255,255,255,0.25)"
+            fontSize="8"
             fontWeight="500"
           >
-            {isMonthlyDaily ? "Dias do Ciclo (14 → 13)" : periodType === "trimestral" ? "Meses do Trimestre" : "Meses do Ano"}
+            {isMonthlyDaily ? "Dias do Ciclo (14 → 13)" : periodType === "trimestral" ? "Meses do Trimestre" : "12 Meses do Ano (Jan → Dez)"}
           </text>
         </svg>
 
-        {/* Tooltip flutuante */}
+        {/* HUD / Tooltip flutuante */}
         {hoveredIdx !== null && activePoint && (
           <div
             className="pointer-events-none absolute z-20 transition-transform duration-75 ease-out"
             style={{
               left: `${(activePoint.x / width) * 100}%`,
-              top: `${Math.max(4, (activePoint.y / height) * 100 - 12)}%`,
+              top: `${Math.max(2, (activePoint.y / height) * 100 - 10)}%`,
               transform:
                 activePoint.x > width * 0.72
                   ? "translate(-100%, -105%)"
@@ -510,48 +551,48 @@ function RevenueEvolutionChart({
                   : "translate(-50%, -105%)",
             }}
           >
-            <div className="bg-[#16181e]/95 border border-white/20 rounded-xl p-2.5 shadow-2xl backdrop-blur-md min-w-[190px] text-xs space-y-1">
-              <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1">
-                <span className="font-bold text-white text-[11px] truncate max-w-[160px]">
+            <div className="bg-[#14161c]/95 border border-white/20 rounded-lg p-2 shadow-2xl backdrop-blur-md min-w-[175px] text-[11px] space-y-1">
+              <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-0.5">
+                <span className="font-bold text-white text-[10.5px] truncate max-w-[145px]">
                   {activePoint.fullTitle}
                 </span>
                 {activePoint.isCurrent && (
-                  <span className="text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold shrink-0">
+                  <span className="text-[7.5px] bg-emerald-500/25 text-emerald-300 px-1 py-0.2 rounded font-bold shrink-0">
                     Atual
                   </span>
                 )}
               </div>
 
               <div className="flex items-baseline justify-between gap-2 pt-0.5">
-                <span className="text-white/50 text-[10px] flex items-center gap-1">
+                <span className="text-white/50 text-[9.5px] flex items-center gap-1">
                   <span className="size-1.5 rounded-full bg-[#10b981]" />
                   Faturamento:
                 </span>
-                <span className="text-emerald-400 font-extrabold text-xs">
+                <span className="text-emerald-400 font-extrabold text-[11.5px]">
                   {formatBRL(activePoint.revenue)}
                 </span>
               </div>
 
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-white/50 text-[10px] flex items-center gap-1">
+                <span className="text-white/50 text-[9.5px] flex items-center gap-1">
                   <span className="size-1.5 rounded-full bg-[#06b6d4]" />
                   Lucro Líquido:
                 </span>
-                <span className="text-cyan-400 font-bold text-xs">
+                <span className="text-cyan-400 font-bold text-[11.5px]">
                   {formatBRL(activePoint.netProfit)}
                 </span>
               </div>
 
               {activePoint.revenue > 0 && (
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-white/50 text-[10px]">Margem:</span>
-                  <span className="text-white/80 font-semibold text-[10px]">
-                    {activePoint.revenue > 0 ? ((activePoint.netProfit / activePoint.revenue) * 100).toFixed(1) : "0.0"}%
+                  <span className="text-white/50 text-[9px]">Margem:</span>
+                  <span className="text-white/80 font-medium text-[9.5px]">
+                    {((activePoint.netProfit / activePoint.revenue) * 100).toFixed(1)}%
                   </span>
                 </div>
               )}
 
-              <div className="pt-1 border-t border-white/5 flex items-center justify-between text-[9.5px] text-white/50">
+              <div className="pt-0.5 border-t border-white/5 flex items-center justify-between text-[9px] text-white/45">
                 <span>Volume:</span>
                 <span className="text-white font-medium">
                   {activePoint.orders} ped · {activePoint.pods} pods
@@ -562,37 +603,37 @@ function RevenueEvolutionChart({
         )}
       </div>
 
-      {/* KPIs Footer */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 mt-2 border-t border-white/5 text-xs">
+      {/* KPIs Footer Compacto */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 mt-1.5 border-t border-white/5 text-[11px]">
         <div>
-          <span className="text-white/40 block text-[9.5px] uppercase font-semibold">
+          <span className="text-white/40 block text-[9px] uppercase font-semibold">
             Faturamento Total
           </span>
-          <span className="text-emerald-400 font-extrabold text-sm">
+          <span className="text-emerald-400 font-extrabold text-xs sm:text-sm">
             {formatBRL(totalRevenue)}
           </span>
         </div>
         <div>
-          <span className="text-white/40 block text-[9.5px] uppercase font-semibold">
+          <span className="text-white/40 block text-[9px] uppercase font-semibold">
             Lucro Líquido Total
           </span>
-          <span className="text-cyan-400 font-extrabold text-sm">
+          <span className="text-cyan-400 font-extrabold text-xs sm:text-sm">
             {formatBRL(totalNetProfit)}
           </span>
         </div>
         <div>
-          <span className="text-white/40 block text-[9.5px] uppercase font-semibold">
+          <span className="text-white/40 block text-[9px] uppercase font-semibold">
             Margem Líquida
           </span>
-          <span className="text-white font-extrabold text-sm">
+          <span className="text-white font-extrabold text-xs sm:text-sm">
             {overallMargin.toFixed(1)}%
           </span>
         </div>
         <div>
-          <span className="text-white/40 block text-[9.5px] uppercase font-semibold">
+          <span className="text-white/40 block text-[9px] uppercase font-semibold">
             Volume Total
           </span>
-          <span className="text-white/80 font-semibold text-xs sm:text-sm">
+          <span className="text-white/80 font-medium text-[11px]">
             {totalOrdersCount} ped ({totalPodsCount} pods)
           </span>
         </div>
@@ -1232,27 +1273,118 @@ export default function FinanceDashboard() {
       const target = withCurrent || withRevenue || sorted[0];
       if (!target || !target.includedCycles || target.includedCycles.length === 0) return [];
 
-      // Mostrar cada mês do trimestre como ponto individual
-      return target.includedCycles.map(cycleToPoint);
+      // Ordenar cronologicamente do mês mais antigo para o mais novo (da esquerda para a direita)
+      const chronological = [...target.includedCycles].sort((a, b) => a.cycle.id.localeCompare(b.cycle.id));
+      return chronological.map(cycleToPoint);
     }
 
-    // Anual — mostrar todos os meses do ano com dados (ou o mês vigente)
-    const sorted = [...annualPeriods].reverse();
-    const withCurrent = sorted.find((y) => y.includedCycles?.some((c) => c.cycle.isCurrent));
-    const withRevenue = sorted.find((y) => y.grossRevenue > 0);
-    const target = withCurrent || withRevenue || sorted[0];
-    if (!target || !target.includedCycles || target.includedCycles.length === 0) return [];
+    // Anual — Apresentação oficial e cronológica de todos os 12 meses do ano financeiro (Jan → Dez)
+    const currentYear = currentCycle.year || 2026;
+    const SHORT_MONTHS = [
+      "",
+      "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+      "Jul", "Ago", "Set", "Out", "Nov", "Dez"
+    ];
+    const FULL_MONTH_NAMES = [
+      "",
+      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    ];
 
-    // Filtrar: só meses com faturamento > 0 ou que sejam o mês vigente
-    const relevantMonths = target.includedCycles.filter(
-      (c) => c.grossRevenue > 0 || c.cycle.isCurrent
-    );
-    return relevantMonths.length > 0 ? relevantMonths.map(cycleToPoint) : target.includedCycles.map(cycleToPoint);
+    // Indexar métricas de ciclos mensais disponíveis
+    const cycleByMonth = new Map<number, CycleFinancialMetrics>();
+    for (const m of monthlyCycles) {
+      if (m.cycle.year === currentYear) {
+        cycleByMonth.set(m.cycle.month, m);
+      }
+    }
+
+    // Indexar pedidos válidos diretamente por mês calendário para cobrir meses sem ciclo
+    const ordersByMonth = new Map<number, any[]>();
+    for (const order of allValidOrders || []) {
+      if (!order.created_at) continue;
+      const p = getSaoPauloDateParts(order.created_at);
+      if (p.year === currentYear) {
+        if (!ordersByMonth.has(p.month)) {
+          ordersByMonth.set(p.month, []);
+        }
+        ordersByMonth.get(p.month)!.push(order);
+      }
+    }
+
+    const annualPoints: EvolutionPoint[] = [];
+
+    for (let m = 1; m <= 12; m++) {
+      const shortLabel = SHORT_MONTHS[m];
+      const fullMonthName = FULL_MONTH_NAMES[m];
+      const existing = cycleByMonth.get(m);
+
+      let rev = 0;
+      let cmvVal = 0;
+      let profit = 0;
+      let ordersCount = 0;
+      let podsCount = 0;
+      let isCurrentMonth = false;
+
+      if (existing) {
+        rev = existing.grossRevenue;
+        cmvVal = existing.cmv;
+        profit = existing.netProfit;
+        ordersCount = existing.totalOrders;
+        podsCount = existing.totalPodsSold;
+        isCurrentMonth = existing.cycle.isCurrent;
+      } else {
+        const mOrders = ordersByMonth.get(m) || [];
+        if (mOrders.length > 0) {
+          for (const o of mOrders) {
+            const items = Array.isArray(o.items) ? o.items : [];
+            for (const it of items) {
+              const qty = Number(it.quantity) || 1;
+              const price = Number(it.price || it.unit_price) || 0;
+              let cost = Number(it.cost_price || it.costPrice) || 0;
+              if (!cost && it.product_id && persistedProductCosts[it.product_id]) {
+                cost = persistedProductCosts[it.product_id];
+              }
+              if (!cost) cost = 65;
+              rev += qty * price;
+              cmvVal += qty * cost;
+              podsCount += qty;
+            }
+            if (items.length === 0) {
+              rev += Number(o.total_amount) || 0;
+              cmvVal += (Number(o.total_amount) || 0) * 0.45;
+              podsCount += 1;
+            }
+          }
+          ordersCount = mOrders.length;
+          profit = rev - cmvVal;
+        }
+        isCurrentMonth = m === currentCycle.month && currentYear === currentCycle.year;
+      }
+
+      annualPoints.push({
+        id: `ano-${currentYear}-${String(m).padStart(2, "0")}`,
+        label: isCurrentMonth ? `${shortLabel} (atual)` : shortLabel,
+        fullTitle: `${fullMonthName} de ${currentYear}${isCurrentMonth ? " (Ciclo Vigente)" : ""}`,
+        periodLabel: `Ano ${currentYear} · ${fullMonthName}`,
+        revenue: Number(rev.toFixed(2)),
+        cmv: Number(cmvVal.toFixed(2)),
+        netProfit: Number(profit.toFixed(2)),
+        orders: ordersCount,
+        pods: podsCount,
+        isCurrent: isCurrentMonth,
+      });
+    }
+
+    return annualPoints;
   }, [
     evolutionTab,
     monthlyCycleDailyPoints,
     quarterlyPeriods,
-    annualPeriods,
+    monthlyCycles,
+    currentCycle,
+    allValidOrders,
+    persistedProductCosts,
   ]);
 
   // Modal Handlers de Recompra
