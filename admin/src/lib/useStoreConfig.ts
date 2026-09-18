@@ -291,12 +291,12 @@ export function useStoreConfig() {
           cachedConfig.id = upsertData.id;
         }
 
-        if (updates.store_name) {
-          const effectiveCompanyId = (typeof window !== "undefined" ? localStorage.getItem("smk_auth_company_id") : null) || config.company_id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
-          await supabase.from("companies").update({
-            name: updates.store_name,
-            ...(updates.logo_url ? { logo_url: updates.logo_url } : {})
-          }).eq("id", effectiveCompanyId);
+        const effectiveCompanyId = (typeof window !== "undefined" ? localStorage.getItem("smk_auth_company_id") : null) || config.company_id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+        const companyUpdates: any = {};
+        if (updates.store_name) companyUpdates.name = updates.store_name;
+        if (updates.logo_url !== undefined) companyUpdates.logo_url = updates.logo_url;
+        if (Object.keys(companyUpdates).length > 0) {
+          await supabase.from("companies").update(companyUpdates).eq("id", effectiveCompanyId);
         }
       } catch (e) {
         console.info("Erro ao salvar store_config no Supabase:", e);

@@ -36,6 +36,14 @@ export const BRANDS = ["Ignite", "Elf Bar", "Lost Mary", "Waka", "Oxbar"] as con
 export const fallbackProducts: Product[] = [];
 
 export function getCatalogCompanyId(): string {
+  if (typeof window !== "undefined") {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramCompany = urlParams.get("company") || urlParams.get("c");
+    if (paramCompany && paramCompany.trim().length > 0) {
+      return paramCompany.trim();
+    }
+  }
+
   const envCompanyId = import.meta.env.VITE_COMPANY_ID;
   if (!envCompanyId || typeof envCompanyId !== "string" || envCompanyId.trim().length === 0) {
     return "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
