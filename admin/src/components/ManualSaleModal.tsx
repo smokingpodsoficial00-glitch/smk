@@ -403,7 +403,34 @@ export function ManualSaleModal({
         insertedOrderId = insertedData.id;
       }
 
-      // 4. Inserir automaticamente na Lista de Transmissão de Compradores do Marketing
+      // 4. Abater estoque diretamente em smoking_products para cada item vendido
+      for (const item of effectiveItems) {
+        if (!item.productId) continue;
+        try {
+          const { data: pData } = await supabase
+            .from("smoking_products")
+            .select("stock")
+            .eq("id", item.productId)
+            .single();
+
+          if (pData) {
+            const currentStock = typeof pData.stock === "number" ? pData.stock : parseInt(String(pData.stock || "0"), 10);
+            const qtyToDeduct = Number(item.quantity) || 1;
+            const newStock = Math.max(0, currentStock - qtyToDeduct);
+
+            await supabase
+              .from("smoking_products")
+              .update({ stock: newStock })
+              .eq("id", item.productId);
+
+            console.log(`[ManualSaleModal] Baixa de estoque para ${item.modelName} - ${item.flavor}: ${currentStock} -> ${newStock}`);
+          }
+        } catch (stockErr) {
+          console.error("Erro ao abater estoque do produto no Supabase:", stockErr);
+        }
+      }
+
+      // 5. Inserir automaticamente na Lista de Transmissão de Compradores do Marketing
       let marketingListNote = "";
       if (autoAddToMarketingList && cleanPhone && !isNoWhatsApp && !formattedPhone.startsWith("INSTA_")) {
         try {

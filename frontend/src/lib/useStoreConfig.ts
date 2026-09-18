@@ -46,7 +46,13 @@ try {
 function getLocalFallback(): StoreConfig {
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.store_name && (parsed.store_name.toLowerCase().includes("02") || parsed.store_name.toLowerCase().includes("smk pods 2"))) {
+        parsed.store_name = "Smoking Pods";
+      }
+      return parsed;
+    }
   } catch (e) {
     console.warn("Erro ao ler localStorage no frontend:", e);
   }
@@ -110,12 +116,13 @@ async function fetchConfig(): Promise<StoreConfig> {
     console.warn("Fallback smoking_products não acessível no frontend:", e);
   }
 
-  // 3. Tentar ler da tabela `companies`
+  // 3. Tentar ler da tabela `companies` para a empresa correta
   try {
+    const companyId = getCatalogCompanyId();
     const { data: compData } = await supabase
       .from("companies")
       .select("name, logo_url")
-      .limit(1)
+      .eq("id", companyId)
       .maybeSingle();
 
     if (compData && compData.name) {
