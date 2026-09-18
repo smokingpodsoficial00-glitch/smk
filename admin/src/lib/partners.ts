@@ -258,41 +258,55 @@ export const INITIAL_DEFAULT_TRANSACTIONS: PartnerTransaction[] = [
 
 // ─── Funções de Cache Local (Secundário / Fallback de Contingência) ──────────
 
-export function getLocalPartners(): Partner[] {
+export function getLocalPartners(companyId?: string): Partner[] {
+  const isMatrix = !companyId || companyId === DEFAULT_COMPANY_ID;
+  const key = isMatrix ? LOCAL_STORAGE_PARTNERS_KEY : `${companyId}_${LOCAL_STORAGE_PARTNERS_KEY}`;
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_PARTNERS_KEY);
+    const raw = localStorage.getItem(key);
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {}
 
-  saveLocalPartners(INITIAL_DEFAULT_PARTNERS);
-  return INITIAL_DEFAULT_PARTNERS;
+  if (isMatrix) {
+    saveLocalPartners(INITIAL_DEFAULT_PARTNERS, DEFAULT_COMPANY_ID);
+    return INITIAL_DEFAULT_PARTNERS;
+  }
+  return [];
 }
 
-export function saveLocalPartners(partners: Partner[]) {
+export function saveLocalPartners(partners: Partner[], companyId?: string) {
+  const isMatrix = !companyId || companyId === DEFAULT_COMPANY_ID;
+  const key = isMatrix ? LOCAL_STORAGE_PARTNERS_KEY : `${companyId}_${LOCAL_STORAGE_PARTNERS_KEY}`;
   try {
-    localStorage.setItem(LOCAL_STORAGE_PARTNERS_KEY, JSON.stringify(partners));
+    localStorage.setItem(key, JSON.stringify(partners));
   } catch (e) {}
 }
 
-export function getLocalPartnerTransactions(): PartnerTransaction[] {
+export function getLocalPartnerTransactions(companyId?: string): PartnerTransaction[] {
+  const isMatrix = !companyId || companyId === DEFAULT_COMPANY_ID;
+  const key = isMatrix ? LOCAL_STORAGE_TRANSACTIONS_KEY : `${companyId}_${LOCAL_STORAGE_TRANSACTIONS_KEY}`;
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_TRANSACTIONS_KEY);
+    const raw = localStorage.getItem(key);
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {}
 
-  saveLocalPartnerTransactions(INITIAL_DEFAULT_TRANSACTIONS);
-  return INITIAL_DEFAULT_TRANSACTIONS;
+  if (isMatrix) {
+    saveLocalPartnerTransactions(INITIAL_DEFAULT_TRANSACTIONS, DEFAULT_COMPANY_ID);
+    return INITIAL_DEFAULT_TRANSACTIONS;
+  }
+  return [];
 }
 
-export function saveLocalPartnerTransactions(transactions: PartnerTransaction[]) {
+export function saveLocalPartnerTransactions(transactions: PartnerTransaction[], companyId?: string) {
+  const isMatrix = !companyId || companyId === DEFAULT_COMPANY_ID;
+  const key = isMatrix ? LOCAL_STORAGE_TRANSACTIONS_KEY : `${companyId}_${LOCAL_STORAGE_TRANSACTIONS_KEY}`;
   try {
-    localStorage.setItem(LOCAL_STORAGE_TRANSACTIONS_KEY, JSON.stringify(transactions));
+    localStorage.setItem(key, JSON.stringify(transactions));
   } catch (e) {}
 }
 
@@ -309,7 +323,7 @@ export async function fetchPartners(companyId?: string): Promise<Partner[]> {
 
     if (!error && data) {
       // Sincroniza cache local com os dados oficiais do Supabase
-      saveLocalPartners(data);
+      saveLocalPartners(data, targetCompanyId);
       return data;
     }
 
@@ -320,7 +334,7 @@ export async function fetchPartners(companyId?: string): Promise<Partner[]> {
     console.warn("[Partners] Exceção ao consultar Supabase (ativando fallback local):", e?.message || e);
   }
 
-  return getLocalPartners();
+  return getLocalPartners(targetCompanyId);
 }
 
 export async function createPartner(payload: {
@@ -464,7 +478,7 @@ export async function fetchPartnerTransactions(companyId?: string): Promise<Part
 
     if (!error && data) {
       // Sincroniza cache local
-      saveLocalPartnerTransactions(data);
+      saveLocalPartnerTransactions(data, targetCompanyId);
       return data;
     }
 
@@ -475,7 +489,7 @@ export async function fetchPartnerTransactions(companyId?: string): Promise<Part
     console.warn("[Partners] Exceção ao buscar transações no Supabase (fallback local):", e?.message || e);
   }
 
-  return getLocalPartnerTransactions();
+  return getLocalPartnerTransactions(targetCompanyId);
 }
 
 export async function createPartnerTransaction(payload: {
@@ -528,16 +542,18 @@ export async function createPartnerTransaction(payload: {
   }
 
   // Sincroniza cache local
-  const current = getLocalPartnerTransactions().filter(t => t.id !== savedTx.id);
-  saveLocalPartnerTransactions([savedTx, ...current]);
+  const current = getLocalPartnerTransactions(targetCompanyId).filter(t => t.id !== savedTx.id);
+  saveLocalPartnerTransactions([savedTx, ...current], targetCompanyId);
 
   return savedTx;
 }
 
 export async function updatePartnerTransaction(
   transactionId: string,
-  payload: Partial<PartnerTransaction>
+  payload: Partial<PartnerTransaction>,
+  companyId?: string
 ): Promise<boolean> {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
   const updateData: any = {};
   if (payload.partner_id !== undefined) updateData.partner_id = payload.partner_id;
   if (payload.type !== undefined) updateData.type = payload.type;
@@ -551,7 +567,7 @@ export async function updatePartnerTransaction(
       .from("smoking_partner_transactions")
       .update(updateData)
       .eq("id", transactionId)
-      .eq("company_id", DEFAULT_COMPANY_ID);
+      .eq("company_id", targetCompanyId);
 
     if (error) {
       console.warn("[Partners] Erro ao atualizar transação no Supabase:", error.message);
@@ -561,20 +577,21 @@ export async function updatePartnerTransaction(
   }
 
   // Sincroniza cache local
-  const current = getLocalPartnerTransactions();
+  const current = getLocalPartnerTransactions(targetCompanyId);
   const updated = current.map(t => t.id === transactionId ? { ...t, ...payload } : t);
-  saveLocalPartnerTransactions(updated);
+  saveLocalPartnerTransactions(updated, targetCompanyId);
 
   return true;
 }
 
-export async function deletePartnerTransaction(transactionId: string): Promise<PartnerTransaction[]> {
+export async function deletePartnerTransaction(transactionId: string, companyId?: string): Promise<PartnerTransaction[]> {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
   try {
     const { error } = await supabase
       .from("smoking_partner_transactions")
       .delete()
       .eq("id", transactionId)
-      .eq("company_id", DEFAULT_COMPANY_ID);
+      .eq("company_id", targetCompanyId);
 
     if (error) {
       console.warn("[Partners] Erro ao excluir transação no Supabase:", error.message);
@@ -584,9 +601,9 @@ export async function deletePartnerTransaction(transactionId: string): Promise<P
   }
 
   // Sincroniza cache local
-  const current = getLocalPartnerTransactions();
+  const current = getLocalPartnerTransactions(targetCompanyId);
   const updated = current.filter(t => t.id !== transactionId);
-  saveLocalPartnerTransactions(updated);
+  saveLocalPartnerTransactions(updated, targetCompanyId);
 
   return updated;
 }

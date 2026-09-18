@@ -25,6 +25,7 @@ const MEDAL_STYLES = [
 
 export default function SupplyChainDashboard() {
   const { company } = useAuth();
+  const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
   const [products, setProducts] = useState<any[]>([]);
   const [topSelling, setTopSelling] = useState<any[]>([]);
   const [rawOrdersList, setRawOrdersList] = useState<any[]>([]);
@@ -506,7 +507,7 @@ export default function SupplyChainDashboard() {
       const newImageUrl = await uploadProductImage(file);
       const ids = group.flavors.map((f: any) => f.id);
       setProducts(prev => prev.map(p => ids.includes(p.id) ? { ...p, image_url: newImageUrl } : p));
-      await supabase.from("smoking_products").update({ image_url: newImageUrl }).in("id", ids);
+      await supabase.from("smoking_products").update({ image_url: newImageUrl }).in("id", ids).eq("company_id", targetCompanyId);
     } catch (err) {
       console.error("Erro ao atualizar imagem do modelo:", err);
       fetchData();
@@ -638,7 +639,7 @@ export default function SupplyChainDashboard() {
     const newActiveState = !anyActive;
     try {
       setProducts(prev => prev.map(p => ids.includes(p.id) ? { ...p, is_active: newActiveState } : p));
-      await supabase.from("smoking_products").update({ is_active: newActiveState }).in("id", ids);
+      await supabase.from("smoking_products").update({ is_active: newActiveState }).in("id", ids).eq("company_id", targetCompanyId);
     } catch (err) {
       console.error(err); fetchData();
     }
@@ -651,7 +652,7 @@ export default function SupplyChainDashboard() {
     try {
       setProducts(prev => prev.filter(p => !ids.includes(p.id)));
       if (selectedDrawerSKU && ids.includes(selectedDrawerSKU.id)) setSelectedDrawerSKU(null);
-      await supabase.from("smoking_products").delete().in("id", ids);
+      await supabase.from("smoking_products").delete().in("id", ids).eq("company_id", targetCompanyId);
     } catch (err) {
       console.error(err); fetchData();
     }
@@ -949,7 +950,7 @@ export default function SupplyChainDashboard() {
       if (selectedDrawerSKU?.id === id) {
         setSelectedDrawerSKU((prev: any) => prev ? { ...prev, is_active: !currentStatus } : null);
       }
-      await supabase.from("smoking_products").update({ is_active: !currentStatus }).eq("id", id);
+      await supabase.from("smoking_products").update({ is_active: !currentStatus }).eq("id", id).eq("company_id", targetCompanyId);
     } catch (err) { fetchData(); }
   };
 
@@ -958,13 +959,14 @@ export default function SupplyChainDashboard() {
     try {
       setProducts(prev => prev.filter(p => p.id !== id));
       if (selectedDrawerSKU?.id === id) setSelectedDrawerSKU(null);
-      await supabase.from("smoking_products").delete().eq("id", id);
+      await supabase.from("smoking_products").delete().eq("id", id).eq("company_id", targetCompanyId);
     } catch (err) { fetchData(); }
   };
 
   const handleDuplicateSKU = async (sku: any) => {
     try {
       const { data, error } = await supabase.from("smoking_products").insert({
+        company_id: targetCompanyId,
         name: `${sku.name} (Cópia)`, brand: sku.brand, flavor: `${sku.flavor} (Cópia)`,
         price: sku.price, cost_price: sku.cost_price || 0, stock: 0,
         puffs: sku.puffs, image_url: sku.image_url, is_active: true,

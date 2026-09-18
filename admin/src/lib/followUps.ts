@@ -104,9 +104,10 @@ export function calculateDaysDiff(scheduledDateStr: string): number {
 }
 
 // Helpers seguros para LocalStorage (Fallback / Cache Secundário)
-export function getLocalFollowUps(): FollowUpItem[] {
+export function getLocalFollowUps(companyId?: string): FollowUpItem[] {
+  const key = companyId ? `${companyId}_${LOCAL_STORAGE_KEY}` : LOCAL_STORAGE_KEY;
   try {
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_KEY) : null;
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
     return raw ? JSON.parse(raw) : [];
   } catch (e) {
     console.warn('[FollowUps] Erro ao ler fallback LocalStorage:', e);
@@ -114,41 +115,42 @@ export function getLocalFollowUps(): FollowUpItem[] {
   }
 }
 
-export function saveLocalFollowUps(items: FollowUpItem[]): void {
+export function saveLocalFollowUps(items: FollowUpItem[], companyId?: string): void {
+  const key = companyId ? `${companyId}_${LOCAL_STORAGE_KEY}` : LOCAL_STORAGE_KEY;
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(items));
+      localStorage.setItem(key, JSON.stringify(items));
     }
   } catch (e) {
     console.warn('[FollowUps] Erro ao gravar cache secundário no LocalStorage:', e);
   }
 }
 
-function addLocalFollowUp(item: FollowUpItem): void {
+function addLocalFollowUp(item: FollowUpItem, companyId?: string): void {
   try {
-    const current = getLocalFollowUps();
+    const current = getLocalFollowUps(companyId);
     const updated = [item, ...current.filter(i => i.id !== item.id)];
-    saveLocalFollowUps(updated);
+    saveLocalFollowUps(updated, companyId);
   } catch (e) {
     console.warn('[FollowUps] Erro ao adicionar item no cache local:', e);
   }
 }
 
-function updateLocalFollowUp(id: string, updates: Partial<FollowUpItem>): void {
+function updateLocalFollowUp(id: string, updates: Partial<FollowUpItem>, companyId?: string): void {
   try {
-    const current = getLocalFollowUps();
+    const current = getLocalFollowUps(companyId);
     const updated = current.map(item => item.id === id ? { ...item, ...updates } : item);
-    saveLocalFollowUps(updated);
+    saveLocalFollowUps(updated, companyId);
   } catch (e) {
     console.warn('[FollowUps] Erro ao atualizar item no cache local:', e);
   }
 }
 
-function deleteLocalFollowUp(id: string): void {
+function deleteLocalFollowUp(id: string, companyId?: string): void {
   try {
-    const current = getLocalFollowUps();
+    const current = getLocalFollowUps(companyId);
     const updated = current.filter(item => item.id !== id);
-    saveLocalFollowUps(updated);
+    saveLocalFollowUps(updated, companyId);
   } catch (e) {
     console.warn('[FollowUps] Erro ao remover item do cache local:', e);
   }
@@ -194,7 +196,7 @@ export async function fetchFollowUps(companyId?: string): Promise<FollowUpItem[]
     if (!error && data) {
       const enriched = enrichFollowUps(data);
       // Sincroniza cache local com a resposta oficial do Supabase
-      saveLocalFollowUps(data);
+      saveLocalFollowUps(data, targetCompanyId);
       return enriched;
     }
 
@@ -206,7 +208,7 @@ export async function fetchFollowUps(companyId?: string): Promise<FollowUpItem[]
   }
 
   // Fallback seguro se Supabase indisponível
-  const localItems = getLocalFollowUps();
+  const localItems = getLocalFollowUps(targetCompanyId);
   console.info('[FollowUps] Consumindo cache secundário local:', localItems.length, 'itens.');
   return enrichFollowUps(localItems);
 }

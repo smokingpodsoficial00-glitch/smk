@@ -44,12 +44,17 @@ export function NewClientModal({ isOpen, onClose, onClientCreated }: NewClientMo
 
     setLoading(true);
     try {
-      // 1. Verificar se já existe cliente cadastrado com esse telefone
-      const { data: existing, error: checkErr } = await supabase
+      // 1. Verificar se já existe cliente cadastrado com esse telefone na mesma empresa
+      let checkQuery = supabase
         .from('smoking_clients')
         .select('id, name')
-        .eq('phone', normalizedPhone)
-        .maybeSingle();
+        .eq('phone', normalizedPhone);
+
+      if (effectiveCompanyId) {
+        checkQuery = checkQuery.eq('company_id', effectiveCompanyId);
+      }
+
+      const { data: existing, error: checkErr } = await checkQuery.maybeSingle();
 
       if (checkErr) {
         console.warn('Aviso ao checar duplicidade:', checkErr.message);
