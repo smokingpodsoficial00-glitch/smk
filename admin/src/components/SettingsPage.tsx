@@ -34,9 +34,9 @@ export default function SettingsPage() {
       .replace(/-+/g, "-");
   };
 
-  // Dynamic Catalog Link (Neutro para SaaS: 'tabeladevalores-pods.vercel.app', 100% gratuito sem pagar domínio)
+  // Dynamic Catalog Link (Neutro para SaaS: 'gradedevalores-pods.vercel.app', 100% gratuito sem pagar domínio)
   const isOfficial = !company?.id || company?.id === "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
-  const saasBaseUrl = (import.meta as any).env?.VITE_SAAS_CATALOG_BASE_URL || "https://tabeladevalores-pods.vercel.app";
+  const saasBaseUrl = (import.meta as any).env?.VITE_SAAS_CATALOG_BASE_URL || "https://gradedevalores-pods.vercel.app";
 
   const currentSlug = generateSlug(storeName || company?.name || config?.store_name || "");
 
