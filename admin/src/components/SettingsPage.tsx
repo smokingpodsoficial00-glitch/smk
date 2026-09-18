@@ -34,9 +34,9 @@ export default function SettingsPage() {
       .replace(/-+/g, "-");
   };
 
-  // Dynamic Catalog Link (Neutro para SaaS: 'meucardapio-pods.vercel.app', 100% gratuito sem pagar domínio)
+  // Dynamic Catalog Link (Neutro para SaaS: 'tabeladevalores-pods.vercel.app', 100% gratuito sem pagar domínio)
   const isOfficial = !company?.id || company?.id === "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
-  const saasBaseUrl = (import.meta as any).env?.VITE_SAAS_CATALOG_BASE_URL || "https://meucardapio-pods.vercel.app";
+  const saasBaseUrl = (import.meta as any).env?.VITE_SAAS_CATALOG_BASE_URL || "https://tabeladevalores-pods.vercel.app";
 
   const currentSlug = generateSlug(storeName || company?.name || config?.store_name || "");
 
@@ -58,7 +58,7 @@ export default function SettingsPage() {
     if (isOfficial) {
       return "https://smoking-pods-catalogo.vercel.app/";
     }
-    // Link genérico neutro: https://meucardapio-pods.vercel.app/?loja=nomedaloja
+    // Link genérico neutro de Tabela de Valores: https://tabeladevalores-pods.vercel.app/?loja=nomedaloja
     return `${saasBaseUrl}/?loja=${currentSlug || 'loja'}`;
   };
 
@@ -261,7 +261,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* ─── Seção 2: Link do Catálogo de Pods (Compartilhamento) ─── */}
+        {/* ─── Seção 2: Link da Tabela de Valores / Catálogo (Compartilhamento) ─── */}
         <section className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 sm:p-7 space-y-6 shadow-2xl relative">
           <div className="flex items-center justify-between pb-4 border-b border-white/10">
             <div className="flex items-center gap-2.5">
@@ -269,14 +269,14 @@ export default function SettingsPage() {
                 <Globe className="size-4" />
               </div>
               <div>
-                <h2 className="font-bold text-base text-white">Link do seu Catálogo de Pods</h2>
-                <p className="text-xs text-white/50">Endereço público do catálogo online para divulgar aos seus clientes</p>
+                <h2 className="font-bold text-base text-white">Link da sua Tabela de Valores</h2>
+                <p className="text-xs text-white/50">Endereço público da tabela de valores e estoque para divulgar aos seus clientes</p>
               </div>
             </div>
             {linkUnlocked ? (
               <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full font-semibold flex items-center gap-1.5">
                 <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Catálogo Online Ativo
+                Tabela Online Ativa
               </span>
             ) : (
               <span className="text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-3 py-1 rounded-full font-semibold flex items-center gap-1.5">
@@ -293,10 +293,10 @@ export default function SettingsPage() {
               </div>
               <div className="max-w-md mx-auto space-y-1.5">
                 <h3 className="text-base font-bold text-white">
-                  Defina o Nome da Loja para Liberar seu Catálogo
+                  Defina o Nome da Loja para Liberar sua Tabela de Valores
                 </h3>
                 <p className="text-xs text-white/50 leading-relaxed">
-                  Para que o catálogo seja gerado com a identidade da sua marca no início do link, digite o <strong>Nome da Loja</strong> na Seção 1 e clique no botão abaixo.
+                  Para que sua tabela de valores seja gerada com a identidade da sua marca, digite o <strong>Nome da Loja</strong> na Seção 1 e clique no botão abaixo.
                 </p>
               </div>
 
@@ -312,7 +312,7 @@ export default function SettingsPage() {
                   }`}
                 >
                   {saving ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                  <span>{saving ? "Gerando Link..." : "⚡ Salvar Nome e Gerar Link do Catálogo"}</span>
+                  <span>{saving ? "Gerando Link..." : "⚡ Salvar Nome e Gerar Tabela de Valores"}</span>
                 </button>
                 {(!storeName.trim() || storeName.trim().toLowerCase() === "minha loja") && (
                   <p className="text-[11px] text-amber-400/70 mt-2">
@@ -324,7 +324,7 @@ export default function SettingsPage() {
           ) : (
             <>
               <p className="text-xs text-white/60 leading-relaxed">
-                Copie o link exclusivo do seu catálogo para enviar aos seus clientes no WhatsApp, campanhas de tráfego ou fixar na bio do Instagram. Todos os pedidos feitos por esse link caem diretamente no seu Kanban.
+                Copie o link exclusivo da sua tabela de valores para enviar aos seus clientes no WhatsApp, campanhas de tráfego ou fixar na bio do Instagram. Todos os pedidos feitos por esse link caem diretamente no seu Kanban.
               </p>
 
               {/* Campo de URL com Botão de Copiar */}
@@ -356,10 +356,10 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              {/* Preview do Cabeçalho do Catálogo */}
+              {/* Preview do Cabeçalho da Tabela de Valores */}
               <div className="pt-2">
                 <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider block mb-3">
-                  Preview do Cabeçalho da Loja
+                  Preview da sua Tabela de Valores
                 </span>
                 <div className="rounded-2xl border border-white/10 bg-[#121214] p-6 text-center space-y-3 relative overflow-hidden">
                   <div className="absolute top-3 right-3">
