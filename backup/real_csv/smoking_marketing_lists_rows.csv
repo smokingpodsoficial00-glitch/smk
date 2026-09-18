@@ -1,0 +1,6 @@
+id,company_id,legacy_id,name,description,color,created_at,updated_at
+0d925499-da68-4a93-9591-f4b6f78744b1,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,list_1786989733027,LISTA CLIENTES COMPRADORES,Lista personalizada de contatos,#10b981,2026-08-17 18:02:13.027+00,2026-09-11 15:01:37.213128+00
+7961c163-d07a-4965-abc4-976eb389082d,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,list_1786992631910,lista teste,Lista personalizada de contatos,#10b981,2026-08-17 18:50:31.91+00,2026-09-11 15:01:37.313023+00
+7e6699dc-329d-4d2c-bd83-c5e6c76633fa,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,list_base_virgem_oficial,⭐ BASE VIRGEM (Ainda Não Enviados),Lista higienizada contendo apenas contatos que NUNCA receberam mensagens de marketing,#10b981,2026-08-25 22:42:35.375+00,2026-09-11 15:01:37.041795+00
+c35118f5-38a5-49ce-bb4b-5877c395b520,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,,Lista de teste,Lista personalizada de contatos,#10b981,2026-09-15 23:15:16.628587+00,2026-09-15 23:15:16.628587+00
+e1b78396-c685-45bb-97f4-f6352a70afbd,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,list_base_blindada_enviados,🛡️ BASE BLINDADA (Já Contactados),Contatos que já possuem conversas no WhatsApp — protegidos contra novos disparos,#6b7280,2026-08-25 22:42:35.375+00,2026-09-11 15:01:37.410357+00

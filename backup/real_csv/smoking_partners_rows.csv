@@ -1,0 +1,4 @@
+id,company_id,name,email,phone,role,avatar_color,is_active,notes,created_at,updated_at
+5c1d1b90-2732-4a1c-b18d-76d880a4e6f4,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,Smoking Pods,,,Sócio,#10b981,true,,2026-09-15 20:30:21.486652+00,2026-09-15 20:38:55.453+00
+p1-eduardo,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,Eduardo,,,Sócio,#10b981,true,,2026-08-18 19:09:28.561+00,2026-09-10 21:32:25.421137+00
+p2-gabriel,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,Gabriel,,,Sócio,#3b82f6,true,,2026-08-18 19:09:28.561+00,2026-09-10 21:32:25.421137+00

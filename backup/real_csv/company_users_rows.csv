@@ -1,0 +1,2 @@
+id,company_id,auth_user_id,name,email,role,auth_password,is_super_admin,is_active,created_at
+6b47395f-aade-46e2-9b9f-e70bb098ef99,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,27ff7a66-22e9-4e0e-9180-d610bda5796e,Administrador,smokingpodsoficial00@gmail.com,admin,,true,true,2026-09-09 21:42:39.73086+00
