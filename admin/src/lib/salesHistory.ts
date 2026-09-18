@@ -88,7 +88,11 @@ export async function fetchSalesHistory(companyId?: string): Promise<{ sales: De
     // 2. Buscar Clientes Mestre para dados cadastrais, LTV e status VIP
     let clientsMap = new Map<string, any>();
     try {
-      const { data: clientsData } = await supabase.from('smoking_clients').select('*');
+      let clientsQuery = supabase.from('smoking_clients').select('*');
+      if (companyId) {
+        clientsQuery = clientsQuery.or(`company_id.eq.${companyId},company_id.is.null`);
+      }
+      const { data: clientsData } = await clientsQuery;
       if (clientsData && Array.isArray(clientsData)) {
         for (const c of clientsData) {
           if (c && c.phone) {

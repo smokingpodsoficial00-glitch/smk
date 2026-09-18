@@ -13,6 +13,7 @@ async function getSupabase() {
 
 export interface StoreConfig {
   id: string;
+  company_id?: string;
   store_name: string;
   store_slug: string;
   logo_url: string | null;
@@ -285,10 +286,11 @@ export function useStoreConfig() {
         }
 
         if (updates.store_name) {
+          const effectiveCompanyId = (typeof window !== "undefined" ? localStorage.getItem("smk_auth_company_id") : null) || config.company_id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
           await supabase.from("companies").update({
             name: updates.store_name,
             ...(updates.logo_url ? { logo_url: updates.logo_url } : {})
-          }).neq("id", "00000000-0000-0000-0000-000000000000");
+          }).eq("id", effectiveCompanyId);
         }
       } catch (e) {
         console.info("Erro ao salvar store_config no Supabase:", e);

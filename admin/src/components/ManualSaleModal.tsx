@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 import { ensureBuyerInBroadcastList } from "@/lib/marketingLists";
 import {
   ShoppingCart,
@@ -26,10 +27,12 @@ export function ManualSaleModal({
   isOpen,
   onClose,
   onSaleSuccess,
-  companyId = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5",
+  companyId: propCompanyId,
   preSelectedFlavorId,
   preSelectedGroup,
 }: ManualSaleModalProps) {
+  const { company } = useAuth();
+  const companyId = propCompanyId || company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [productsList, setProductsList] = useState<any[]>([]);
   const [clientsList, setClientsList] = useState<any[]>([]);

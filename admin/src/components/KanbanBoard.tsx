@@ -396,6 +396,7 @@ export default function KanbanBoard() {
       {/* Modal de Venda Manual Integrado */}
       <ManualSaleModal 
         isOpen={isManualSaleOpen} 
+        companyId={company?.id}
         onClose={() => {
           setIsManualSaleOpen(false);
           fetchOrders();
