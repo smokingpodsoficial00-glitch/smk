@@ -34,9 +34,9 @@ export default function SettingsPage() {
       .replace(/-+/g, "-");
   };
 
-  // Dynamic Catalog Link (White-label: nome da loja no início sem "smoking-pods")
+  // Dynamic Catalog Link (Neutro para SaaS: 'meucardapio-pods.vercel.app', 100% gratuito sem pagar domínio)
   const isOfficial = !company?.id || company?.id === "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
-  const saasDomain = (import.meta as any).env?.VITE_SAAS_CATALOG_DOMAIN || "cardapio.vip";
+  const saasBaseUrl = (import.meta as any).env?.VITE_SAAS_CATALOG_BASE_URL || "https://meucardapio-pods.vercel.app";
 
   const currentSlug = generateSlug(storeName || company?.name || config?.store_name || "");
 
@@ -58,8 +58,8 @@ export default function SettingsPage() {
     if (isOfficial) {
       return "https://smoking-pods-catalogo.vercel.app/";
     }
-    // Subdomínio próprio: o nome da loja vem no início do link
-    return `https://${currentSlug || 'loja'}.${saasDomain}`;
+    // Link genérico neutro: https://meucardapio-pods.vercel.app/?loja=nomedaloja
+    return `${saasBaseUrl}/?loja=${currentSlug || 'loja'}`;
   };
 
   const catalogUrl = getCatalogUrl();
@@ -351,7 +351,7 @@ export default function SettingsPage() {
                 {!isOfficial && (
                   <p className="text-[11px] text-white/40 flex items-center gap-1.5">
                     <span className="size-1.5 rounded-full bg-white/40" />
-                    <span>Link White-Label: o nome da sua marca <strong>({currentSlug})</strong> aparece logo no início do endereço.</span>
+                    <span>Link Neutro: endereço genérico compartilhado com o identificador exclusivo da sua loja <strong>(?loja={currentSlug})</strong>, sem menção a Smoking Pods.</span>
                   </p>
                 )}
               </div>
