@@ -540,91 +540,86 @@ export function LandingPage() {
 
             </div>
 
-            {/* MOCKUP VISUAL DO SMARTPHONE DO CATÁLOGO COM SUPORTE A PRINT REAL */}
+            {/* MOCKUP VISUAL DO SMARTPHONE DO CATÁLOGO COM O PRINT REAL EMBUTIDO */}
             <div className="flex justify-center">
-              <ScreenshotOrFallback
-                src="/prints/catalogo-mobile.png"
-                alt="Catálogo Mobile Smoking Pods"
-                className="w-full max-w-[340px] rounded-[36px] border-[4px] border-white/20 shadow-[0_0_50px_rgba(255,255,255,0.15)] mx-auto"
-                fallback={
-                  <div className="w-full max-w-[340px] bg-[#0c0c0c] border-[6px] border-[#222] rounded-[44px] p-3.5 shadow-[0_0_50px_rgba(255,255,255,0.1)] relative mx-auto">
-                    {/* Speaker notch */}
-                    <div className="w-24 h-4 bg-[#222] rounded-full mx-auto mb-3" />
+              <div className="w-full max-w-[340px] bg-[#0c0c0c] border-[7px] sm:border-[8px] border-[#222] rounded-[46px] sm:rounded-[48px] p-2.5 sm:p-3 shadow-[0_0_60px_rgba(255,255,255,0.12),0_25px_50px_rgba(0,0,0,0.85)] relative mx-auto select-none group ring-1 ring-white/10">
+                {/* Speaker notch */}
+                <div className="w-24 h-3.5 bg-[#1c1c1e] rounded-full mx-auto mb-2 flex items-center justify-center gap-1.5 shadow-inner">
+                  <div className="size-1 rounded-full bg-white/20" />
+                  <div className="w-6 h-0.5 bg-white/10 rounded-full" />
+                </div>
 
-                    {/* Catalog Header */}
-                    <div className="space-y-2 pb-3 border-b border-white/10 text-center">
-                      <div className="inline-flex items-center gap-1 text-[10px] text-white bg-white/10 border border-white/15 px-2 py-0.5 rounded-full font-bold">
-                        <span>⚡ Entrega Express em 25-35min</span>
-                      </div>
-                      <div className="font-extrabold text-sm text-white">Smoking Pods • Catálogo Oficial</div>
-                      <div className="text-[10px] text-white/50">Toque no pod para ver os sabores disponíveis</div>
-                    </div>
-
-                    {/* Filter Pills */}
-                    <div className="flex gap-1.5 py-2 overflow-x-auto text-[10px] font-bold no-scrollbar">
-                      <span className="px-2.5 py-1 rounded-lg bg-white text-black shrink-0">Todos</span>
-                      <span className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] text-white/70 shrink-0">Ignite V50</span>
-                      <span className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] text-white/70 shrink-0">Lost Mary</span>
-                      <span className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] text-white/70 shrink-0">Elfbar</span>
-                    </div>
-
-                    {/* Products List inside Phone */}
-                    <div className="space-y-2.5 pt-1">
-                      
-                      {/* Product 1 */}
-                      <div className="bg-[#141414] border border-[#262626] rounded-xl p-2.5 flex items-center justify-between">
-                        <div>
-                          <div className="text-xs font-bold text-white">Ignite V50</div>
-                          <div className="text-[10px] text-white/70 font-mono">5.000 Puffs • R$ 115,00</div>
-                          <div className="text-[9px] text-emerald-400 mt-0.5">8 sabores disponíveis</div>
+                {/* Tela do Celular com Print Real do Catálogo */}
+                <div className="rounded-[34px] overflow-hidden border border-white/10 relative bg-black shadow-inner">
+                  <ScreenshotOrFallback
+                    src="/prints/catalogo-mobile.png"
+                    alt="Catálogo Oficial Smoking Pods no Celular"
+                    className="w-full h-auto object-cover object-top block transition-transform duration-500 group-hover:scale-[1.02]"
+                    fallback={
+                      <div className="p-3 space-y-2">
+                        {/* Catalog Header */}
+                        <div className="space-y-1.5 pb-2.5 border-b border-white/10 text-center">
+                          <div className="inline-flex items-center gap-1 text-[9px] text-white bg-white/10 border border-white/15 px-2 py-0.5 rounded-full font-bold">
+                            <span>⚡ Entrega Express em 25-35min</span>
+                          </div>
+                          <div className="font-extrabold text-xs text-white">Smoking Pods • Catálogo Oficial</div>
+                          <div className="text-[9px] text-white/50">Toque no pod para ver os sabores disponíveis</div>
                         </div>
-                        <span className="px-2 py-1 rounded-md bg-white/10 text-[10px] font-bold text-white border border-white/20">
-                          Escolher
-                        </span>
-                      </div>
 
-                      {/* Product 2 */}
-                      <div className="bg-[#141414] border border-white/40 rounded-xl p-2.5 flex items-center justify-between shadow-[0_0_15px_rgba(255,255,255,0.08)]">
-                        <div>
-                          <span className="text-[9px] bg-white text-black px-1.5 py-0.2 rounded font-black uppercase tracking-wider">Mais Vendido</span>
-                          <div className="text-xs font-bold text-white mt-0.5">Lost Mary MO20000 Pro</div>
-                          <div className="text-[10px] text-white/70 font-mono">20.000 Puffs • R$ 135,00</div>
-                          <div className="text-[9px] text-emerald-400">Blue Baja, Miami Mint...</div>
+                        {/* Filter Pills */}
+                        <div className="flex gap-1 py-1.5 overflow-x-auto text-[9px] font-bold no-scrollbar">
+                          <span className="px-2 py-0.5 rounded-md bg-white text-black shrink-0">Todos</span>
+                          <span className="px-2 py-0.5 rounded-md bg-[#1a1a1a] text-white/70 shrink-0">Ignite V50</span>
+                          <span className="px-2 py-0.5 rounded-md bg-[#1a1a1a] text-white/70 shrink-0">Lost Mary</span>
+                          <span className="px-2 py-0.5 rounded-md bg-[#1a1a1a] text-white/70 shrink-0">Elfbar</span>
                         </div>
-                        <span className="px-2 py-1 rounded-md bg-white text-[10px] font-bold text-black shadow">
-                          Escolher
-                        </span>
-                      </div>
 
-                      {/* Product 3 */}
-                      <div className="bg-[#141414] border border-[#262626] rounded-xl p-2.5 flex items-center justify-between">
-                        <div>
-                          <div className="text-xs font-bold text-white">Elfbar BC15000</div>
-                          <div className="text-[10px] text-white/70 font-mono">15.000 Puffs • R$ 125,00</div>
-                          <div className="text-[9px] text-emerald-400 mt-0.5">Blackberry, Blue Razz...</div>
+                        {/* Products List inside Phone */}
+                        <div className="space-y-2 pt-0.5">
+                          <div className="bg-[#141414] border border-[#262626] rounded-xl p-2 flex items-center justify-between">
+                            <div>
+                              <div className="text-[11px] font-bold text-white">Ignite V50</div>
+                              <div className="text-[9px] text-white/70 font-mono">5.000 Puffs • R$ 115,00</div>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-md bg-white/10 text-[9px] font-bold text-white border border-white/20">
+                              Escolher
+                            </span>
+                          </div>
+
+                          <div className="bg-[#141414] border border-white/40 rounded-xl p-2 flex items-center justify-between">
+                            <div>
+                              <span className="text-[8px] bg-white text-black px-1 rounded font-black uppercase">Mais Vendido</span>
+                              <div className="text-[11px] font-bold text-white mt-0.5">Lost Mary MO20000 Pro</div>
+                              <div className="text-[9px] text-white/70 font-mono">20.000 Puffs • R$ 135,00</div>
+                            </div>
+                            <span className="px-2 py-1 rounded-md bg-white text-[9px] font-bold text-black shadow">
+                              Escolher
+                            </span>
+                          </div>
                         </div>
-                        <span className="px-2 py-1 rounded-md bg-white/10 text-[10px] font-bold text-white border border-white/20">
-                          Escolher
-                        </span>
+
+                        {/* Floating Bottom Cart Bar */}
+                        <div className="mt-2.5 bg-white text-black font-extrabold p-2 rounded-xl text-center text-xs flex items-center justify-between shadow-lg">
+                          <div className="text-left">
+                            <span className="text-[8px] block text-black/70 uppercase">Sacola (1 item)</span>
+                            <span className="text-xs">R$ 135,00</span>
+                          </div>
+                          <span className="flex items-center gap-1 text-[10px] bg-black text-white px-2.5 py-1 rounded-lg">
+                            <span>Pedir no WhatsApp</span>
+                            <ArrowRight className="size-2.5" />
+                          </span>
+                        </div>
                       </div>
+                    }
+                  />
 
-                    </div>
+                  {/* Reflexo sutil de vidro da tela */}
+                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.02] to-white/[0.06] pointer-events-none" />
+                </div>
 
-                    {/* Floating Bottom Cart Bar */}
-                    <div className="mt-4 bg-white text-black font-extrabold p-2.5 rounded-xl text-center text-xs flex items-center justify-between shadow-lg">
-                      <div className="text-left">
-                        <span className="text-[9px] block text-black/70 uppercase">Sacola (1 item)</span>
-                        <span>R$ 135,00</span>
-                      </div>
-                      <span className="flex items-center gap-1 text-[11px] bg-black text-white px-3 py-1 rounded-lg">
-                        <span>Pedir no WhatsApp</span>
-                        <ArrowRight className="size-3" />
-                      </span>
-                    </div>
-
-                  </div>
-                }
-              />
+                {/* Home indicator bar at bottom */}
+                <div className="w-24 h-1 bg-white/30 rounded-full mx-auto mt-2" />
+              </div>
             </div>
 
           </div>
