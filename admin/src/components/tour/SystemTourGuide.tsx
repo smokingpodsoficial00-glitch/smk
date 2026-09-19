@@ -235,7 +235,7 @@ export function SystemTourGuide() {
     };
   }, [isOpen, currentStep, activeStep]);
 
-  // Rastreamento e Spotlight dinâmico do elemento alvo da etapa (Zero Lag no Scroll)
+  // Rastreamento e Spotlight dinâmico do elemento alvo da etapa (Zero Lag no Scroll & Auto-Resize Instantâneo)
   useEffect(() => {
     if (!isOpen || isMinimized) {
       setTargetRect(null);
@@ -243,6 +243,10 @@ export function SystemTourGuide() {
     }
 
     let isMounted = true;
+    let observedEl: Element | null = null;
+    let ro: ResizeObserver | null = null;
+    let mo: MutationObserver | null = null;
+
     const updateRect = () => {
       if (!isMounted) return;
       if (!activeStep.targetSelector) {
@@ -251,15 +255,53 @@ export function SystemTourGuide() {
       }
       const el = document.querySelector(activeStep.targetSelector);
       if (el) {
-        setTargetRect(el.getBoundingClientRect());
+        const rect = el.getBoundingClientRect();
+        setTargetRect(rect);
+
+        // Conecta observadores de redimensionamento e mutações de DOM no elemento ativo
+        if (el !== observedEl) {
+          if (observedEl && ro) ro.unobserve(observedEl);
+          if (mo) mo.disconnect();
+          observedEl = el;
+          if (ro) ro.observe(el);
+          if (mo) {
+            mo.observe(el, { childList: true, subtree: true, attributes: true, characterData: true });
+          }
+        }
       } else {
         setTargetRect(null);
+        if (observedEl && ro) {
+          ro.unobserve(observedEl);
+          observedEl = null;
+        }
+        if (mo) mo.disconnect();
       }
     };
 
     const handleScrollOrResize = () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(updateRect);
+    };
+
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => {
+        handleScrollOrResize();
+      });
+    }
+
+    if (typeof MutationObserver !== "undefined") {
+      mo = new MutationObserver(() => {
+        handleScrollOrResize();
+      });
+    }
+
+    // Listener global de cliques: qualquer clique em abas (Mensal/Trimestral/Anual/Evolução) dispara re-cálculo imediato
+    const handleClickOrTouch = () => {
+      handleScrollOrResize();
+      setTimeout(handleScrollOrResize, 30);
+      setTimeout(handleScrollOrResize, 100);
+      setTimeout(handleScrollOrResize, 250);
+      setTimeout(handleScrollOrResize, 450);
     };
 
     // Ticks para aguardar transições de rota e montagem de componentes
@@ -277,15 +319,24 @@ export function SystemTourGuide() {
       setTimeout(updateRect, 1400),
     ];
 
+    // Polling contínuo leve (heartbeat a cada 200ms) enquanto o tour estiver aberto para garantir sincronização 100% à prova de falhas
+    const interval = setInterval(updateRect, 200);
+
     window.addEventListener("scroll", handleScrollOrResize, true);
     window.addEventListener("resize", handleScrollOrResize);
+    window.addEventListener("click", handleClickOrTouch, true);
 
     return () => {
       isMounted = false;
       timers.forEach(clearTimeout);
+      clearInterval(interval);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (observedEl && ro) ro.unobserve(observedEl);
+      if (ro) ro.disconnect();
+      if (mo) mo.disconnect();
       window.removeEventListener("scroll", handleScrollOrResize, true);
       window.removeEventListener("resize", handleScrollOrResize);
+      window.removeEventListener("click", handleClickOrTouch, true);
     };
   }, [isOpen, isMinimized, currentStep, activeStep, location.pathname]);
 
@@ -377,9 +428,9 @@ export function SystemTourGuide() {
       {/* ━━━ SPOTLIGHT + ANEL DE LUZ + SETA ANIMADA (SINALIZAÇÃO DO BOTÃO) ━━━━━ */}
       {isOpen && !isMinimized && targetRect && (
         <>
-          {/* Anel de Luz cravado no elemento - Transição apenas de cor/sombra, zero atraso no scroll */}
+          {/* Anel de Luz cravado no elemento - Transição de tamanho instantânea/suave, zero atraso no scroll */}
           <div 
-            className="fixed pointer-events-none z-[99990] transition-[opacity,box-shadow,border-color] duration-300 rounded-2xl"
+            className="fixed pointer-events-none z-[99990] transition-[opacity,box-shadow,border-color,width,height] duration-150 ease-out rounded-2xl"
             style={{
               top: targetRect.top - 8,
               left: targetRect.left - 8,
