@@ -91,10 +91,10 @@ export function LoginPage() {
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-4 pt-2">
             <Link
-              to="/lp"
+              to="/cadastro"
               className="bg-white hover:bg-slate-100 text-black font-extrabold px-7 py-3.5 rounded-xl transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] flex items-center gap-2 active:scale-95 text-xs sm:text-sm"
             >
-              <span>Adquirir Acesso</span>
+              <span>Criar Nova Empresa</span>
               <ArrowRight className="size-4" />
             </Link>
 
@@ -248,11 +248,18 @@ export function LoginPage() {
           </form>
 
           {/* Footer Register Link */}
-          <div className="mt-8 pt-6 border-t border-[#1a1a1a] text-center text-xs text-white/50">
-            Ainda não tem uma conta?{' '}
-            <Link to="/lp" className="font-bold text-white hover:underline underline-offset-4 ml-1">
-              Adquirir Acesso
-            </Link>
+          <div className="mt-8 pt-6 border-t border-[#1a1a1a] flex flex-col items-center gap-2.5 text-xs text-white/50">
+            <div>
+              Ainda não tem uma conta?{' '}
+              <Link to="/cadastro" className="font-bold text-white hover:underline underline-offset-4 ml-1">
+                Cadastre sua empresa
+              </Link>
+            </div>
+            <div>
+              <Link to="/lp" className="text-white/40 hover:text-white/80 transition-colors text-[11px]">
+                Conhecer a página de planos e recursos →
+              </Link>
+            </div>
           </div>
         </div>
 

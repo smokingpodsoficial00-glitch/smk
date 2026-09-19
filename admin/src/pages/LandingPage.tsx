@@ -170,12 +170,18 @@ export function LandingPage() {
           </nav>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link 
               to="/login" 
               className="text-xs font-bold text-white/70 hover:text-white px-3 py-2 rounded-lg hover:bg-white/5 transition-colors hidden sm:block"
             >
-              Entrar no Sistema
+              Entrar
+            </Link>
+            <Link 
+              to="/cadastro" 
+              className="text-xs font-bold text-white/90 hover:text-white px-3 py-2 rounded-lg hover:bg-white/5 transition-colors hidden md:block"
+            >
+              Criar Conta
             </Link>
             <a 
               href="#planos"
