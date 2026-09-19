@@ -1144,13 +1144,13 @@ export function LandingPage() {
           </h2>
 
           <p className="text-xs sm:text-sm text-white/70 max-w-2xl mx-auto leading-relaxed">
-            O SMK System não foi desenhado por quem nunca pegou uma caixa de pod na mão. Ele nasceu e foi lapidado dentro da nossa própria operação em São Bernardo do Campo, resolvendo os problemas reais de entregadores, estoque e clientes exigentes.
+            O SMK System não foi desenhado por quem nunca pegou uma caixa de pod na mão. Ele nasceu e foi lapidado dentro da nossa própria operação real, resolvendo os problemas diários de entregadores, estoque e clientes exigentes.
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6">
             <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-5 rounded-2xl">
               <div className="text-2xl sm:text-4xl font-extrabold text-white">+10.000</div>
-              <div className="text-[11px] text-white/50 mt-1">Pedidos entregues no ABC</div>
+              <div className="text-[11px] text-white/50 mt-1">Pedidos entregues com sucesso</div>
             </div>
             <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-5 rounded-2xl">
               <div className="text-2xl sm:text-4xl font-extrabold text-white">0 minutos</div>

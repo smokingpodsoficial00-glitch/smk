@@ -22,7 +22,7 @@ import {
   ShieldAlert,
   ArrowRight
 } from 'lucide-react';
-import { generatePixPayload, getQrCodeImageUrl } from '../lib/pixUtils';
+import { generatePixPayload, generateQrCodeDataUrl } from '../lib/pixUtils';
 
 export function CheckoutPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -45,7 +45,6 @@ export function CheckoutPage() {
   // Dados Oficiais do Pix
   const pixKeyOfficial = 'cc0c1ec5-cf52-4481-ada0-af0a862a7462';
   const pixNameOfficial = 'Eduardo de Oliveira Pizza';
-  const pixCityOfficial = 'São Bernardo do Campo - SP';
 
   // Sync with URL query param
   useEffect(() => {
@@ -117,20 +116,31 @@ export function CheckoutPage() {
 
   const currentPrice = paymentMethod === 'cartao' ? planInfo.priceCartao : planInfo.pricePix;
 
-  // Pix Payload & QR Code com dados oficiais
+  // Pix Payload & QR Code com dados oficiais e padrão estático Bacen
   const pixPayload = useMemo(() => {
     return generatePixPayload({
       pixKey: pixKeyOfficial,
       merchantName: 'EDUARDO DE OLIVEIRA PIZZA',
-      merchantCity: 'SAO BERNARDO DO CAMPO',
+      merchantCity: 'SAO PAULO',
       amount: planInfo.pricePix,
-      txId: selectedPlan === 'gestao' ? 'SMKGESTAO' : 'SMKPROCOMBO',
-      description: `Assinatura ${planInfo.name}`
+      txId: '***'
     });
-  }, [planInfo, selectedPlan]);
+  }, [planInfo, pixKeyOfficial]);
 
-  const qrCodeUrl = useMemo(() => {
-    return getQrCodeImageUrl(pixPayload, 260);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
+
+  useEffect(() => {
+    let isMounted = true;
+    generateQrCodeDataUrl(pixPayload, 360)
+      .then(url => {
+        if (isMounted) setQrCodeDataUrl(url);
+      })
+      .catch(err => {
+        console.error('Erro ao gerar QR Code local:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
   }, [pixPayload]);
 
   const handleCopyPix = () => {
@@ -492,13 +502,19 @@ export function CheckoutPage() {
 
                   {/* Bloco QR Code e Instruções */}
                   <div className="bg-[#121212] border border-emerald-500/20 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-5 sm:gap-6">
-                    {/* QR Code Container */}
-                    <div className="p-3 bg-white rounded-xl shadow-[0_0_25px_rgba(255,255,255,0.15)] shrink-0">
-                      <img
-                        src={qrCodeUrl}
-                        alt="QR Code Pix SMK System"
-                        className="size-40 sm:size-44 block"
-                      />
+                    {/* QR Code Container (Gerado localmente em alta resolução) */}
+                    <div className="p-3 bg-white rounded-xl shadow-[0_0_25px_rgba(255,255,255,0.15)] shrink-0 flex items-center justify-center min-w-40 min-h-40">
+                      {qrCodeDataUrl ? (
+                        <img
+                          src={qrCodeDataUrl}
+                          alt="QR Code Pix SMK System"
+                          className="size-40 sm:size-44 block object-contain"
+                        />
+                      ) : (
+                        <div className="size-40 sm:size-44 flex items-center justify-center text-black/40 text-xs font-mono">
+                          Gerando QR Code...
+                        </div>
+                      )}
                     </div>
 
                     {/* Instruções do Pix com Dados Reais */}
@@ -515,9 +531,8 @@ export function CheckoutPage() {
                         </div>
                       </div>
 
-                      <div className="text-xs text-white/70 space-y-1 bg-black/40 p-2.5 rounded-lg border border-white/5 font-mono text-[11px]">
+                      <div className="text-xs text-white/70 bg-black/40 p-2.5 rounded-lg border border-white/5 font-mono text-[11px]">
                         <div><strong>Titular:</strong> {pixNameOfficial}</div>
-                        <div><strong>Cidade:</strong> {pixCityOfficial}</div>
                       </div>
 
                       <div className="text-[11px] text-white/50 leading-relaxed">
