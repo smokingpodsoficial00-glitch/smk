@@ -6,7 +6,7 @@ import { CartSheet } from "@/components/CartSheet";
 import { FlavorSheet } from "@/components/FlavorSheet";
 import { CartProvider } from "@/lib/cart";
 import type { SortOption } from "@/components/SortDropdown";
-import { fetchProductsFromSupabase, getCatalogCompanyId, type Product, type PodModel } from "@/lib/products";
+import { fetchProductsFromSupabase, resolveCatalogCompanyId, getCatalogCompanyId, type Product, type PodModel } from "@/lib/products";
 import { fetchCategories, fetchProductCategoryMappings, DEFAULT_CATEGORIES, type Category } from "@/lib/categories";
 import { supabase } from "@/lib/supabase";
 import { Loader2, Star } from "lucide-react";
@@ -93,9 +93,9 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
   const [selectedModel, setSelectedModel] = useState<PodModel | null>(null);
 
   const loadProducts = async () => {
-    let companyId: string | undefined;
+    let companyId = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
     try {
-      companyId = getCatalogCompanyId();
+      companyId = await resolveCatalogCompanyId();
     } catch (e) {
       console.error(e);
     }
@@ -113,11 +113,6 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
   useEffect(() => {
     loadProducts();
 
-    // Sincronização em segundo plano suave a cada 20 segundos (Realtime já atualiza na hora)
-    const intervalId = setInterval(() => {
-      loadProducts();
-    }, 20000);
-
     // Inscrição em tempo real para atualizações no estoque e catálogo (smoking_products)
     const subscription = supabase
       .channel("public:realtime_menu")
@@ -127,7 +122,6 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
       .subscribe();
 
     return () => {
-      clearInterval(intervalId);
       supabase.removeChannel(subscription);
     };
   }, []);

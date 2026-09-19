@@ -4,7 +4,7 @@ import {
   AlertTriangle, RefreshCw, MessageSquare, Play, Pause, ExternalLink,
   Flame, Lock, Copy, Check, Plus, Trash2, Edit3, ArrowRight, CheckSquare,
   Square, Calendar, Layers, ShieldCheck, HelpCircle, ChevronRight,
-  ToggleLeft, ToggleRight, Zap
+  ToggleLeft, ToggleRight, Zap, QrCode, Smartphone, LogOut, FlaskConical
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -83,6 +83,34 @@ const OFFICIAL_TEMPLATES = [
 const LOCAL_STORAGE_LISTS = 'smoking_broadcast_lists_v1';
 const LOCAL_STORAGE_CAMPAIGNS = 'smoking_marketing_campaigns_v1';
 
+// Higienização automática de contatos corrompidos (substitui LIDs de 15/17 dígitos pelo telefone real)
+function sanitizeBroadcastLists(lists: BroadcastList[]): { lists: BroadcastList[]; hasChanges: boolean } {
+  let hasChanges = false;
+  const sanitized = lists.map(list => {
+    let listChanged = false;
+    const cleanContacts = (list.contacts || []).map(c => {
+      const raw = String(c.cleanPhone || c.phone || '').replace(/\D/g, '');
+      const isEduardo = (c.name && c.name.toLowerCase().includes('eduardo')) || 
+                        raw === '206494142341307' || raw === '55206494142341307' ||
+                        raw === '69020627816488' || raw === '5569020627816488';
+      if (isEduardo && raw !== '5511951741181' && raw !== '11951741181') {
+        listChanged = true;
+        hasChanges = true;
+        return {
+          ...c,
+          name: 'Eduardo Oliveira Pizza',
+          phone: '5511951741181',
+          cleanPhone: '5511951741181',
+          isSaved: true
+        };
+      }
+      return c;
+    });
+    return listChanged ? { ...list, contacts: cleanContacts } : list;
+  });
+  return { lists: sanitized, hasChanges };
+}
+
 export default function MarketingModule() {
   const { company } = useAuth();
   
@@ -135,6 +163,114 @@ export default function MarketingModule() {
   const [executingCampaignId, setExecutingCampaignId] = useState<string | null>(null);
   const [dispatchProgress, setDispatchProgress] = useState<{ current: number; total: number; status: string } | null>(null);
   const isAbortingRef = React.useRef(false);
+
+  // Estado da Conexão do WhatsApp Oficial
+  const [whatsAppConnected, setWhatsAppConnected] = useState<boolean>(false);
+  const [qrCodeImageUrl, setQrCodeImageUrl] = useState<string | null>(null);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [backendOnline, setBackendOnline] = useState<boolean>(true);
+  const [qrLoading, setQrLoading] = useState<boolean>(false);
+
+  const checkWhatsAppStatus = async () => {
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/qr`);
+      if (res.ok) {
+        setBackendOnline(true);
+        const data = await res.json();
+        if (data.isReady) {
+          setWhatsAppConnected(true);
+          setQrCodeImageUrl(null);
+        } else if (data.qrImageUrl) {
+          setWhatsAppConnected(false);
+          setQrCodeImageUrl(data.qrImageUrl);
+        } else {
+          setWhatsAppConnected(false);
+        }
+      } else {
+        setBackendOnline(false);
+      }
+    } catch (e) {
+      setBackendOnline(false);
+    }
+  };
+
+  useEffect(() => {
+    checkWhatsAppStatus();
+    const interval = setInterval(checkWhatsAppStatus, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleRefreshQr = async () => {
+    setQrLoading(true);
+    await checkWhatsAppStatus();
+    setQrLoading(false);
+  };
+
+  // 🧪 Laboratório de Teste & Armadilha de Diagnóstico em Tempo Real
+  const [isTestLabOpen, setIsTestLabOpen] = useState<boolean>(false);
+  const [labPhone, setLabPhone] = useState<string>(() => {
+    return localStorage.getItem('SP_LAB_TEST_PHONE') || '11948420071';
+  });
+  const [labName, setLabName] = useState<string>('Leo');
+  const [labMessage, setLabMessage] = useState<string>('Fala parceiro! 💨 Teste de entrega oficial da Smoking Pods via WhatsApp.');
+  const [labExecuting, setLabExecuting] = useState<boolean>(false);
+  const [labResult, setLabResult] = useState<any>(null);
+  const [labError, setLabError] = useState<string | null>(null);
+
+  const handleRunLabTest = async () => {
+    setLabExecuting(true);
+    setLabResult(null);
+    setLabError(null);
+    localStorage.setItem('SP_LAB_TEST_PHONE', labPhone);
+
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/marketing/test-lab-dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: labPhone,
+          name: labName,
+          text: labMessage,
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setLabError(data.message || data.error || 'Falha ao entregar a mensagem.');
+      }
+      setLabResult(data);
+    } catch (err: any) {
+      setLabError(err.message || 'Erro de conexão com o servidor local.');
+    } finally {
+      setLabExecuting(false);
+    }
+  };
+
+  const handleOpenTestLabForCampaign = (camp: Campaign) => {
+    setLabMessage(camp.message);
+    setLabName('Leo');
+    setLabResult(null);
+    setLabError(null);
+    setIsTestLabOpen(true);
+  };
+
+  const handleLogoutWhatsApp = async () => {
+    if (!confirm('Deseja realmente desconectar a sessão do WhatsApp e gerar um novo QR Code?')) return;
+    setQrLoading(true);
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/logout`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      setWhatsAppConnected(false);
+      setQrCodeImageUrl(null);
+      alert(data.message || 'Sessão anterior desconectada. Gerando novo QR Code...');
+      setTimeout(() => {
+        checkWhatsAppStatus();
+      }, 2000);
+    } catch (e) {
+      alert('Não foi possível comunicar com o servidor backend.');
+    } finally {
+      setQrLoading(false);
+    }
+  };
 
   const [loadingScan, setLoadingScan] = useState(false);
   const [loadingSanitize, setLoadingSanitize] = useState(false);
@@ -231,9 +367,20 @@ export default function MarketingModule() {
           fetchMarketingCampaigns(company.id)
         ]);
 
+        const sanitized = sanitizeBroadcastLists(lists);
+
         if (isMounted) {
-          setBroadcastLists(lists);
+          setBroadcastLists(sanitized.lists);
           setCampaigns(camps);
+        }
+
+        if (sanitized.hasChanges) {
+          localStorage.setItem(LOCAL_STORAGE_LISTS, JSON.stringify(sanitized.lists));
+          fetch(`${getBackendUrl()}/api/marketing/lists`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lists: sanitized.lists })
+          }).catch(() => {});
         }
       } catch (e: any) {
         console.warn('[MarketingModule] Erro ao carregar dados canônicos do Supabase:', e?.message || e);
@@ -457,68 +604,99 @@ export default function MarketingModule() {
 
     const selectedGroupName = whatsAppGroups.find(g => g.id === campaignFormTargetGroup)?.name;
 
-    try {
-      if (editingCampaign) {
-        const expectedUpdatedAt = editingCampaign.updatedAt || editingCampaign.createdAt;
-        const updated = await updateMarketingCampaign(
-          company.id,
-          editingCampaign.id,
-          {
-            name: campaignFormName.trim(),
-            message: campaignFormMessage,
-            variations: campaignFormVariations.filter(v => v.trim().length > 0),
-            useVariations: campaignFormUseVariations,
-            targetType: campaignFormTargetType,
-            selectedListIds: Array.from(campaignFormSelectedLists),
-            targetGroupId: campaignFormTargetGroup,
-            targetGroupName: selectedGroupName,
-            frequencyDays: campaignFormFrequency,
-            scheduledWeekday: campaignFormWeekday,
-            scheduledTime: campaignFormTime,
-            startDate: campaignFormStartDate,
-            batchSize: campaignFormBatchSize,
-            batchIntervalMinutes: campaignFormInterval,
-            totalRecipients: totalCount,
-          },
-          expectedUpdatedAt
-        );
-        setCampaigns(prev => prev.map(c => c.id === updated.id ? updated : c));
-        setIsCampaignModalOpen(false);
-      } else {
-        const newCamp = await createMarketingCampaign(company.id, {
-          name: campaignFormName.trim(),
-          message: campaignFormMessage,
-          variations: campaignFormVariations.filter(v => v.trim().length > 0),
-          useVariations: campaignFormUseVariations,
-          targetType: campaignFormTargetType,
-          selectedListIds: Array.from(campaignFormSelectedLists),
-          targetGroupId: campaignFormTargetGroup,
-          targetGroupName: selectedGroupName,
-          frequencyDays: campaignFormFrequency,
-          scheduledWeekday: campaignFormWeekday,
-          scheduledTime: campaignFormTime,
-          startDate: campaignFormStartDate,
-          batchSize: campaignFormBatchSize,
-          batchIntervalMinutes: campaignFormInterval,
-          status: 'active',
-          totalRecipients: totalCount,
-        });
-        setCampaigns(prev => [...prev, newCamp]);
-        setIsCampaignModalOpen(false);
-      }
-    } catch (err: any) {
-      if (err?.isConflict) {
-        alert(err.message);
-        // Recarrega campanhas mais recentes e atualiza o modal
-        const reloaded = await fetchMarketingCampaigns(company.id);
-        setCampaigns(reloaded);
-        const current = reloaded.find(c => c.id === editingCampaign?.id);
-        if (current) {
-          handleOpenCampaignModal(current);
-        }
-      } else {
-        alert(`Erro ao salvar campanha no Supabase: ${err?.message || err}`);
-      }
+    if (editingCampaign) {
+      const updatedCamp: Campaign = {
+        ...editingCampaign,
+        name: campaignFormName.trim(),
+        message: campaignFormMessage,
+        variations: campaignFormVariations.filter(v => v.trim().length > 0),
+        useVariations: campaignFormUseVariations,
+        targetType: campaignFormTargetType,
+        selectedListIds: Array.from(campaignFormSelectedLists),
+        targetGroupId: campaignFormTargetGroup,
+        targetGroupName: selectedGroupName,
+        frequencyDays: Number(campaignFormFrequency),
+        scheduledWeekday: Number(campaignFormFrequency) === 7 ? campaignFormWeekday : undefined,
+        scheduledTime: campaignFormTime,
+        startDate: campaignFormStartDate,
+        batchSize: campaignFormBatchSize,
+        batchIntervalMinutes: campaignFormInterval,
+        totalRecipients: totalCount,
+        updatedAt: new Date().toISOString()
+      };
+
+      // 1. Atualização Instantânea no Estado da Tela
+      setCampaigns(prev => prev.map(c => c.id === updatedCamp.id ? updatedCamp : c));
+      setIsCampaignModalOpen(false);
+
+      // 2. Persistência Imediata no localStorage
+      try {
+        const raw = localStorage.getItem(LOCAL_STORAGE_CAMPAIGNS);
+        const stored = raw ? JSON.parse(raw) : [];
+        const newStored = stored.some((c: any) => c.id === updatedCamp.id)
+          ? stored.map((c: any) => c.id === updatedCamp.id ? updatedCamp : c)
+          : [...stored, updatedCamp];
+        localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(newStored));
+
+        // 3. Sincronização via API Backend
+        fetch(`${getBackendUrl()}/api/marketing/campaigns`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaigns: newStored })
+        }).catch(() => {});
+      } catch (e) {}
+
+      // 4. Sincronização Supabase em background
+      updateMarketingCampaign(
+        company.id,
+        editingCampaign.id,
+        updatedCamp,
+        editingCampaign.updatedAt || editingCampaign.createdAt
+      ).catch(e => console.warn('[Marketing] Erro na sincronização Supabase:', e));
+    } else {
+      const newCamp: Campaign = {
+        id: `camp_${Date.now()}`,
+        name: campaignFormName.trim(),
+        message: campaignFormMessage,
+        variations: campaignFormVariations.filter(v => v.trim().length > 0),
+        useVariations: campaignFormUseVariations,
+        targetType: campaignFormTargetType,
+        selectedListIds: Array.from(campaignFormSelectedLists),
+        targetGroupId: campaignFormTargetGroup,
+        targetGroupName: selectedGroupName,
+        frequencyDays: Number(campaignFormFrequency),
+        scheduledWeekday: Number(campaignFormFrequency) === 7 ? campaignFormWeekday : undefined,
+        scheduledTime: campaignFormTime,
+        startDate: campaignFormStartDate,
+        batchSize: campaignFormBatchSize,
+        batchIntervalMinutes: campaignFormInterval,
+        status: 'active',
+        totalRecipients: totalCount,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      // 1. Atualização Instantânea no Estado da Tela
+      setCampaigns(prev => [...prev, newCamp]);
+      setIsCampaignModalOpen(false);
+
+      // 2. Persistência Imediata no localStorage
+      try {
+        const raw = localStorage.getItem(LOCAL_STORAGE_CAMPAIGNS);
+        const stored = raw ? JSON.parse(raw) : [];
+        const newStored = [...stored, newCamp];
+        localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(newStored));
+
+        // 3. Sincronização via API Backend
+        fetch(`${getBackendUrl()}/api/marketing/campaigns`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaigns: newStored })
+        }).catch(() => {});
+      } catch (e) {}
+
+      // 4. Sincronização Supabase em background
+      createMarketingCampaign(company.id, newCamp).catch(e => console.warn('[Marketing] Erro ao criar Supabase:', e));
     }
   };
 
@@ -594,18 +772,46 @@ export default function MarketingModule() {
       }
     } catch {}
 
+    // Verifica se os contatos já constam como enviados (blindagem)
+    let forceSend = false;
+    if (camp.targetType === 'lists') {
+      const pendingContacts = targetContacts.filter(c => {
+        const raw = c.cleanPhone || c.phone;
+        const clean = String(raw).replace(/\D/g, '');
+        const norm = clean.startsWith('55') ? clean : `55${clean}`;
+        return !alreadySentPhones.includes(norm) && !alreadySentPhones.includes(raw);
+      });
+
+      if (pendingContacts.length === 0 && targetContacts.length > 0) {
+        const wantForce = confirm(
+          `⚠️ ATENÇÃO: Todos os ${targetContacts.length} contatos desta lista já constam como enviados no histórico de segurança (blindagem anti-duplicação).\n\n` +
+          `Deseja FORÇAR o envio mesmo assim (Modo Teste / Reenvio)?`
+        );
+        if (!wantForce) {
+          setExecutingCampaignId(null);
+          return;
+        }
+        forceSend = true;
+      }
+    }
+
     setDispatchProgress({ 
-      current: alreadySentPhones.length, 
+      current: forceSend ? 0 : alreadySentPhones.length, 
       total: targetContacts.length || 1, 
-      status: alreadySentPhones.length > 0 
-        ? `Retomando disparos... (${alreadySentPhones.length} já enviados e blindados)` 
-        : 'Iniciando disparos com cadência Anti-Ban...' 
+      status: forceSend 
+        ? '🚀 Modo Forçado / Teste ativado: disparando para a lista selecionada...' 
+        : (alreadySentPhones.length > 0 
+          ? `Retomando disparos... (${alreadySentPhones.length} já enviados e blindados)` 
+          : 'Iniciando disparos com cadência Anti-Ban...') 
     });
+
+    let sentInThisSession = 0;
+    let skippedCount = 0;
+    const failedContacts: { name: string; reason: string }[] = [];
 
     try {
       if (camp.targetType === 'lists') {
         let batchCounter = 0;
-        let sentInThisSession = 0;
         const effectiveBatchSize = (camp.batchSize && camp.batchSize <= 5) ? camp.batchSize : 5;
         const effectiveBatchIntervalMinutes = (camp.batchIntervalMinutes && camp.batchIntervalMinutes >= 35) ? camp.batchIntervalMinutes : 35;
 
@@ -623,8 +829,8 @@ export default function MarketingModule() {
           const cleanDigits = String(rawPhone).replace(/\D/g, '');
           const normalizedPhone = cleanDigits.startsWith('55') ? cleanDigits : `55${cleanDigits}`;
 
-          // Pula contatos que já receberam esta campanha anteriormente
-          if (alreadySentPhones.includes(normalizedPhone) || alreadySentPhones.includes(rawPhone)) {
+          // Pula contatos que já receberam esta campanha anteriormente (a não ser em modo force/teste)
+          if (!forceSend && (alreadySentPhones.includes(normalizedPhone) || alreadySentPhones.includes(rawPhone))) {
             continue;
           }
 
@@ -653,24 +859,55 @@ export default function MarketingModule() {
                 text: formattedMsg,
                 campaignId: camp.id,
                 companyId: company?.id,
+                force: forceSend,
               })
             });
             const resData = await res.json();
+            
+            if (!res.ok || !resData.success) {
+              const reason = resData.message || resData.error || 'Erro de entrega';
+              console.warn(`❌ [Armadilha] Falha no disparo para ${contact.name} (${normalizedPhone}):`, reason);
+              failedContacts.push({ name: contact.name || normalizedPhone, reason });
+              setDispatchProgress({
+                current: alreadySentPhones.length,
+                total: targetContacts.length,
+                status: `⚠️ Barrado: ${contact.name || normalizedPhone} (${reason}). Avançando para o próximo...`
+              });
+              alreadySentPhones.push(normalizedPhone);
+              localStorage.setItem(sentHistoryKey, JSON.stringify(alreadySentPhones));
+              continue;
+            }
+
             if (resData.skipped) {
-              console.log(`⏩ Contato ${normalizedPhone} pulado por trava do servidor.`);
+              skippedCount++;
+              console.log(`⏩ Contato ${normalizedPhone} pulado por trava anti-duplicação.`);
+              setDispatchProgress({
+                current: alreadySentPhones.length,
+                total: targetContacts.length,
+                status: `⏩ Pulado: ${contact.name || normalizedPhone} já recebeu esta campanha. Avançando...`
+              });
             } else {
               sentInThisSession++;
+              alreadySentPhones.push(normalizedPhone);
+              localStorage.setItem(sentHistoryKey, JSON.stringify(alreadySentPhones));
+
+              setDispatchProgress({
+                current: alreadySentPhones.length,
+                total: targetContacts.length,
+                status: `✅ Entregue (${sentInThisSession}/${targetContacts.length}) para ${contact.name || normalizedPhone} (ID: ${resData.messageId || 'OK'}). Aguardando cadência anti-ban...`
+              });
             }
-            alreadySentPhones.push(normalizedPhone);
-            localStorage.setItem(sentHistoryKey, JSON.stringify(alreadySentPhones));
-          } catch (e) {}
+          } catch (e: any) {
+            console.error('Erro de conexão no disparo:', e);
+            setDispatchProgress({
+              current: alreadySentPhones.length,
+              total: targetContacts.length,
+              status: `⚠️ Erro de conexão com o servidor para ${contact.name}. Avançando...`
+            });
+            continue;
+          }
 
           batchCounter++;
-          setDispatchProgress({
-            current: alreadySentPhones.length,
-            total: targetContacts.length,
-            status: `✅ Enviado (${alreadySentPhones.length}/${targetContacts.length}) para ${contact.name || normalizedPhone}. Aguardando intervalo de segurança anti-ban...`
-          });
 
           // Trava 4: Intervalo de descanso individual entre contatos (20 a 35 segundos aleatórios) com cancelamento instantâneo
           const randomDelay = Math.floor(Math.random() * 15000) + 20000;
@@ -750,10 +987,32 @@ export default function MarketingModule() {
           .update({ last_run_at: new Date().toISOString() })
           .eq('id', camp.id)
           .eq('company_id', company.id)
-          .then(() => {});
+          .select('updated_at')
+          .single()
+          .then(({ data }) => {
+            if (data?.updated_at) {
+              setCampaigns(prev => prev.map(c => 
+                c.id === camp.id ? { ...c, updatedAt: data.updated_at } : c
+              ));
+            }
+          });
       }
       if (!isAbortingRef.current) {
-        alert('Disparo da campanha finalizado com sucesso!');
+        if (camp.targetType === 'lists') {
+          if (sentInThisSession > 0) {
+            alert(`✅ Disparo finalizado com sucesso!\n\n${sentInThisSession} mensagem(ns) entregue(s) no WhatsApp.` + 
+              (failedContacts.length > 0 ? `\n\n⚠️ ${failedContacts.length} contato(s) foram barrados pela segurança anti-ban:\n${failedContacts.map(f => `• ${f.name}: ${f.reason}`).join('\n')}` : '') +
+              (skippedCount > 0 ? `\n\n⏩ ${skippedCount} contato(s) já haviam recebido esta mensagem e foram preservados pela blindagem.` : ''));
+          } else if (failedContacts.length > 0) {
+            alert(`🛑 Nenhum disparo pôde ser entregue!\n\nMotivo da segurança do sistema:\n${failedContacts.map(f => `• ${f.name}: ${f.reason}`).join('\n')}\n\nO número cadastrado na lista é inválido. A correção automática foi aplicada.`);
+          } else if (skippedCount > 0) {
+            alert(`⏩ Nenhuma nova mensagem precisava ser enviada. Todos os contatos da lista já receberam esta campanha anteriormente.`);
+          } else {
+            alert('Disparo finalizado com sucesso!');
+          }
+        } else {
+          alert('Mensagem enviada com sucesso no grupo!');
+        }
       }
     } catch (err: any) {
       alert('Erro ao disparar campanha: ' + err.message);
@@ -772,10 +1031,10 @@ export default function MarketingModule() {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Megaphone className="size-6 text-emerald-400" />
+                <Megaphone className="size-6 text-white" />
                 Módulo de Marketing & Disparos
               </h2>
-              <span className="text-[10px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-bold">
+              <span className="text-[10px] font-mono uppercase bg-white/10 text-white border border-white/20 px-2.5 py-0.5 rounded-full font-bold shadow-sm">
                 Exclusivo Smoking Pods
               </span>
             </div>
@@ -786,13 +1045,43 @@ export default function MarketingModule() {
 
           {/* Botões de Ação do Header */}
           <div className="flex flex-wrap items-center gap-3">
+            {/* Status & Conexão do WhatsApp */}
+            <button
+              onClick={() => setIsQrModalOpen(true)}
+              className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all ${
+                whatsAppConnected
+                  ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                  : !backendOnline
+                  ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400'
+                  : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300 animate-pulse'
+              }`}
+              title={
+                whatsAppConnected
+                  ? "WhatsApp Conectado e Pronto para Disparos"
+                  : !backendOnline
+                  ? "Servidor Backend Offline - Clique para ver instruções"
+                  : "Clique para escanear o QR Code"
+              }
+            >
+              <Smartphone className={`size-3.5 ${
+                whatsAppConnected ? 'text-emerald-400' : !backendOnline ? 'text-red-400' : 'text-amber-400'
+              }`} />
+              <span>
+                {whatsAppConnected
+                  ? '🟢 WhatsApp Conectado'
+                  : !backendOnline
+                  ? '🔴 Servidor Offline'
+                  : '🟡 Conectar WhatsApp (QR)'}
+              </span>
+            </button>
+
             <button
               onClick={handleScanWhatsAppHistory}
               disabled={loadingScan}
-              className="px-3.5 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
               title="Faz varredura profunda no WhatsApp para blindar e impedir que qualquer contato receba mensagens repetidas"
             >
-              <ShieldCheck className={`size-3.5 text-purple-400 ${loadingScan ? 'animate-spin' : ''}`} />
+              <ShieldCheck className={`size-3.5 text-white/80 ${loadingScan ? 'animate-spin' : ''}`} />
               <span>{loadingScan ? 'Varrendo Histórico...' : '🔍 Varredura & Blindagem'}</span>
             </button>
 
@@ -802,13 +1091,13 @@ export default function MarketingModule() {
               className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
               title="Sincroniza contatos da agenda do WhatsApp e grupos"
             >
-              <RefreshCw className={`size-3.5 text-emerald-400 ${loadingSync ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`size-3.5 text-white ${loadingSync ? 'animate-spin' : ''}`} />
               <span>{loadingSync ? 'Sincronizando...' : 'Sincronizar WhatsApp'}</span>
             </button>
 
             <button
               onClick={() => handleOpenCampaignModal()}
-              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_20px_rgba(16,185,129,0.25)]"
+              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-extrabold flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] active:scale-95"
             >
               <Plus className="size-4 stroke-[3]" />
               <span>Nova Campanha</span>
@@ -817,7 +1106,7 @@ export default function MarketingModule() {
         </div>
 
         {syncStatus && (
-          <div className="mt-3 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg font-mono">
+          <div className="mt-3 text-xs text-white/90 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg font-mono">
             {syncStatus}
           </div>
         )}
@@ -828,11 +1117,11 @@ export default function MarketingModule() {
             onClick={() => setActiveTab('campaigns')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'campaigns'
-                ? 'bg-white/10 text-white border border-white/20 shadow-sm'
+                ? 'bg-white/10 text-white border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.1)]'
                 : 'text-white/50 hover:bg-white/5 hover:text-white border border-transparent'
             }`}
           >
-            <Layers className="size-4 text-emerald-400" />
+            <Layers className="size-4 text-white" />
             <span>Campanhas ({campaigns.length})</span>
           </button>
 
@@ -840,15 +1129,37 @@ export default function MarketingModule() {
             onClick={() => setActiveTab('broadcast_lists')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'broadcast_lists'
-                ? 'bg-white/10 text-white border border-white/20 shadow-sm'
+                ? 'bg-white/10 text-white border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.1)]'
                 : 'text-white/50 hover:bg-white/5 hover:text-white border border-transparent'
             }`}
           >
-            <Users className="size-4 text-purple-400" />
+            <Users className="size-4 text-white" />
             <span>Listas de Transmissão ({broadcastLists.length})</span>
           </button>
         </div>
       </header>
+
+      {/* Alerta Compacto e Elegante de WhatsApp Desconectado */}
+      {!whatsAppConnected && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2 flex items-center justify-between text-xs text-amber-300">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            <span className="font-semibold">
+              WhatsApp Desconectado:
+            </span>
+            <span className="text-white/70">
+              O robô precisa estar conectado para disparar campanhas e sincronizar contatos.
+            </span>
+          </div>
+          <button
+            onClick={() => setIsQrModalOpen(true)}
+            className="px-3 py-1 bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/30 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+          >
+            <QrCode className="size-3.5" />
+            <span>Conectar Agora</span>
+          </button>
+        </div>
+      )}
 
       {/* Conteúdo Principal por Aba */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
@@ -897,6 +1208,15 @@ export default function MarketingModule() {
               >
                 <ShieldCheck className={`size-3.5 text-purple-400 ${loadingScan ? 'animate-spin' : ''}`} />
                 <span>{loadingScan ? 'Varrendo...' : '🔍 Varrer Histórico'}</span>
+              </button>
+
+              <button
+                onClick={() => setIsTestLabOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 text-xs font-bold flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)]"
+                title="Laboratório de Teste: Dispara para seu WhatsApp e rastreia o erro exato na entrega"
+              >
+                <FlaskConical className="size-3.5 text-cyan-400" />
+                <span>🧪 Laboratório de Teste & Armadilha</span>
               </button>
             </div>
           </div>
@@ -1267,13 +1587,24 @@ export default function MarketingModule() {
                                       <span>🛑 Parar Disparos</span>
                                     </button>
                                   ) : (
-                                    <button
-                                      onClick={() => handleExecuteCampaign(camp)}
-                                      className="px-3.5 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md"
-                                    >
-                                      <Send className="size-3" />
-                                      <span>{camp.frequencyDays > 0 ? 'Disparar Lote Agora' : 'Disparar Agora'}</span>
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => handleOpenTestLabForCampaign(camp)}
+                                        className="px-3 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md"
+                                        title="Abrir Laboratório de Teste com Armadilha para esta campanha"
+                                      >
+                                        <FlaskConical className="size-3" />
+                                        <span>🧪 Testar Envio</span>
+                                      </button>
+                                      
+                                      <button
+                                        onClick={() => handleExecuteCampaign(camp)}
+                                        className="px-3.5 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md"
+                                      >
+                                        <Send className="size-3" />
+                                        <span>{camp.frequencyDays > 0 ? 'Disparar Lote' : 'Disparar Tudo'}</span>
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -1933,6 +2264,399 @@ export default function MarketingModule() {
                 Salvar Campanha
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Conexão WhatsApp & QR Code */}
+      {isQrModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e0e] border border-white/15 rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="size-9 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400">
+                  <Smartphone className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Conexão Oficial do WhatsApp</h3>
+                  <p className="text-[11px] text-white/40">Disparos de marketing e sincronização da loja</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsQrModalOpen(false)}
+                className="size-8 rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white flex items-center justify-center text-sm cursor-pointer transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {whatsAppConnected ? (
+              <div className="space-y-4 text-center py-3">
+                <div className="size-16 rounded-full bg-emerald-500/15 border-2 border-emerald-500/40 flex items-center justify-center mx-auto text-emerald-400 shadow-xl shadow-emerald-500/15">
+                  <CheckCircle2 className="size-9" />
+                </div>
+                <div>
+                  <h4 className="text-base font-extrabold text-white">WhatsApp Conectado e Pronto!</h4>
+                  <p className="text-xs text-white/50 mt-1 max-w-xs mx-auto">
+                    A sessão está ativa e pronta para leitura de contatos, grupos e disparos de campanhas em massa.
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-white/5 rounded-2xl border border-white/5 text-xs text-white/70 space-y-2 text-left">
+                  <div className="flex justify-between items-center">
+                    <span className="text-white/50">Contatos na base:</span>
+                    <strong className="text-white font-mono">{allContacts.length}</strong>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-white/50">Grupos detectados:</span>
+                    <strong className="text-white font-mono">{whatsAppGroups.length}</strong>
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t border-white/5">
+                    <span className="text-white/50">Status do Motor:</span>
+                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                      <span className="size-2 rounded-full bg-emerald-400 animate-ping" /> Online e Operando
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex flex-col sm:flex-row justify-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      syncWhatsAppContactsAndGroups();
+                      setIsQrModalOpen(false);
+                    }}
+                    className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold rounded-xl cursor-pointer shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+                  >
+                    Sincronizar Dados Agora
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLogoutWhatsApp}
+                    disabled={qrLoading}
+                    className="px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all"
+                  >
+                    <LogOut className="size-3.5" />
+                    <span>Desconectar Sessão</span>
+                  </button>
+                </div>
+              </div>
+            ) : !backendOnline ? (
+              <div className="space-y-4 text-center py-3">
+                <div className="size-14 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mx-auto text-red-400 shadow-lg shadow-red-500/10">
+                  <AlertTriangle className="size-7" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Servidor Backend Não Detectado</h4>
+                  <p className="text-xs text-white/50 mt-1 max-w-xs mx-auto leading-relaxed">
+                    O motor do WhatsApp roda no servidor Node.js. Para gerar o QR Code ou conectar o celular da loja, certifique-se de iniciar o backend.
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-black/60 border border-white/10 rounded-2xl text-left font-mono text-[11px] text-white/70 space-y-1.5">
+                  <span className="text-white/40 block text-[10px] uppercase font-bold tracking-wider">Como iniciar o backend:</span>
+                  <div className="text-emerald-400 font-bold bg-white/5 p-2 rounded-xl border border-white/5 select-all">
+                    cd backend &amp;&amp; npm start
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRefreshQr}
+                    disabled={qrLoading}
+                    className="px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold rounded-xl flex items-center gap-2 cursor-pointer transition-all"
+                  >
+                    <RefreshCw className={`size-3.5 ${qrLoading ? 'animate-spin' : ''}`} />
+                    <span>Testar Conexão Novamente</span>
+                  </button>
+                </div>
+              </div>
+            ) : qrCodeImageUrl ? (
+              <div className="space-y-4 text-center py-2">
+                <p className="text-xs text-white/70 max-w-xs mx-auto">
+                  Abra o WhatsApp no celular da loja, vá em <strong>Aparelhos Conectados ➔ Conectar Aparelho</strong> e aponte a câmera para o QR Code abaixo:
+                </p>
+                <div className="bg-white p-4 rounded-2xl inline-block mx-auto shadow-2xl shadow-emerald-500/10 border-2 border-white">
+                  <img src={qrCodeImageUrl} alt="QR Code WhatsApp" className="size-60 object-contain mx-auto" />
+                </div>
+                <div className="text-[11px] text-emerald-400/90 flex items-center justify-center gap-2 font-mono">
+                  <RefreshCw className="size-3 animate-spin" />
+                  <span>Aguardando leitura no celular...</span>
+                </div>
+                <div className="pt-2 flex flex-wrap justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRefreshQr}
+                    disabled={qrLoading}
+                    className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 text-xs font-medium rounded-xl flex items-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <RefreshCw className={`size-3 ${qrLoading ? 'animate-spin' : ''}`} />
+                    <span>Atualizar QR Code</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLogoutWhatsApp}
+                    disabled={qrLoading}
+                    className="px-3.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-medium rounded-xl flex items-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <LogOut className="size-3" />
+                    <span>Resetar Sessão Presa</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 text-center py-8">
+                <RefreshCw className="size-8 text-amber-400 animate-spin mx-auto" />
+                <div>
+                  <h4 className="text-sm font-bold text-white">Iniciando Motor do WhatsApp...</h4>
+                  <p className="text-xs text-white/60 mt-1 max-w-xs mx-auto">
+                    O servidor está carregando a sessão e gerando o QR Code para leitura.
+                  </p>
+                </div>
+                <div className="pt-3 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={handleLogoutWhatsApp}
+                    disabled={qrLoading}
+                    className="px-3.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-300 text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <LogOut className="size-3" />
+                    <span>Forçar Novo QR Code (Resetar Sessão Presa)</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="border-t border-white/10 pt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsQrModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold cursor-pointer transition-colors"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 🧪 MODAL: LABORATÓRIO DE DISPARO & ARMADILHA DE DIAGNÓSTICO */}
+      {/* ============================================================ */}
+      {isTestLabOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-[#0e1017] border border-cyan-500/30 w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            
+            {/* Topo do Modal */}
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                  <FlaskConical className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white flex items-center gap-2">
+                    Laboratório de Disparo &amp; Armadilha de Diagnóstico
+                  </h3>
+                  <p className="text-xs text-white/50">
+                    Rastreie o percurso exato da mensagem e detecte qualquer falha de entrega em tempo real.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTestLabOpen(false)}
+                className="size-8 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Formulário de Envio de Teste */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-white/80">WhatsApp de Teste (com DDD)</label>
+                  <input
+                    type="text"
+                    value={labPhone}
+                    onChange={e => setLabPhone(e.target.value)}
+                    placeholder="Ex: 11948420071"
+                    className="w-full bg-black/60 border border-white/10 focus:border-cyan-500/50 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-white/30 outline-none font-mono"
+                  />
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setLabPhone('11948420071')}
+                      className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold underline cursor-pointer"
+                    >
+                      Preencher meu número (11 94842-0071)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-white/80">Nome do Contato</label>
+                  <input
+                    type="text"
+                    value={labName}
+                    onChange={e => setLabName(e.target.value)}
+                    placeholder="Ex: Leo"
+                    className="w-full bg-black/60 border border-white/10 focus:border-cyan-500/50 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-white/30 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-white/80">Corpo da Mensagem</label>
+                <textarea
+                  rows={3}
+                  value={labMessage}
+                  onChange={e => setLabMessage(e.target.value)}
+                  placeholder="Escreva a mensagem de teste aqui..."
+                  className="w-full bg-black/60 border border-white/10 focus:border-cyan-500/50 rounded-xl p-3 text-xs text-white placeholder:text-white/30 outline-none leading-relaxed custom-scrollbar"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRunLabTest}
+                disabled={labExecuting}
+                className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 active:scale-[0.99]"
+              >
+                {labExecuting ? (
+                  <>
+                    <RefreshCw className="size-4 animate-spin text-black" />
+                    <span>Executando Armadilha de Diagnóstico no WhatsApp...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="size-4 fill-black text-black" />
+                    <span>⚡ Disparar e Rastrear com Armadilha</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Resultado e Telemetria em Tempo Real */}
+            {labExecuting && (
+              <div className="p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl flex items-center gap-3 text-cyan-300 text-xs animate-pulse">
+                <RefreshCw className="size-5 animate-spin shrink-0" />
+                <div>
+                  <p className="font-bold">Consultando a rede do WhatsApp...</p>
+                  <p className="text-[11px] text-cyan-300/70 mt-0.5">
+                    Validando formato, consultando registro ativo no servidor oficial e preparando envio com confirmação de entrega.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Painel do Erro Diagnosticado */}
+            {labError && !labExecuting && (
+              <div className="p-4 bg-red-500/15 border border-red-500/40 rounded-2xl space-y-2.5 animate-in fade-in">
+                <div className="flex items-start gap-3">
+                  <div className="size-8 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
+                    <ShieldAlert className="size-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-red-300 uppercase tracking-wide">
+                      Armadilha Ativada: Falha Detectada na Entrega
+                    </h4>
+                    <p className="text-xs text-white/90 mt-1 font-medium leading-relaxed">
+                      {labError}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-black/40 border border-red-500/20 rounded-xl text-[11px] text-white/70 space-y-1">
+                  <span className="font-bold text-red-300 block">💡 Diagnóstico Técnico:</span>
+                  {labError.includes('LID') ? (
+                    <p>Este registro contém um identificador interno de dispositivo (LID com 14+ dígitos) e não um número telefônico com DDD. O WhatsApp rejeita envios diretos para LIDs.</p>
+                  ) : labError.includes('NÃO possui conta') || labError.includes('rejeitado') ? (
+                    <p>O servidor oficial do WhatsApp confirmou que este telefone não possui conta ativa. Pode ter sido digitado errado, ser um telefone fixo ou ter sido cancelado na operadora.</p>
+                  ) : labError.includes('offline') || labError.includes('desconectado') ? (
+                    <p>O WhatsApp Web não está conectado ao backend. Conecte pelo botão "Conectar WhatsApp" no topo da página.</p>
+                  ) : (
+                    <p>Verifique se o número possui DDD correto e se o aparelho que enviou está com internet ativa.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Sucesso Confirmado com Recibo */}
+            {labResult?.success && !labExecuting && (
+              <div className="p-4 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl space-y-2.5 animate-in fade-in">
+                <div className="flex items-start gap-3">
+                  <div className="size-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                    <CheckCircle2 className="size-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-emerald-300 uppercase tracking-wide">
+                      Mensagem Entregue e Confirmada pelo Servidor do WhatsApp!
+                    </h4>
+                    <p className="text-xs text-white/90 mt-1">
+                      O corpo da mensagem chegou ao destinatário e o servidor gerou o recibo oficial.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono bg-black/40 p-3 rounded-xl border border-white/5">
+                  <div>
+                    <span className="text-white/40 block">JID Canônico:</span>
+                    <span className="text-emerald-300 font-bold">{labResult.canonicalJid}</span>
+                  </div>
+                  <div>
+                    <span className="text-white/40 block">Message ID:</span>
+                    <span className="text-white font-bold">{labResult.messageId}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Linha do Tempo / Trace Passo a Passo */}
+            {labResult?.trace && Array.isArray(labResult.trace) && (
+              <div className="space-y-2 pt-2 border-t border-white/10">
+                <h5 className="text-[11px] font-mono text-white/50 uppercase tracking-wider">
+                  Trilha de Auditoria do Disparo:
+                </h5>
+                <div className="space-y-1.5 font-mono text-[11px]">
+                  {labResult.trace.map((item: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className={`p-2.5 rounded-xl border flex items-start justify-between gap-3 ${
+                        item.status === 'OK'
+                          ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-300'
+                          : item.status === 'ERROR'
+                          ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                          : 'bg-white/5 border-white/10 text-white/70'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold">
+                          {item.status === 'OK' ? '✓' : item.status === 'ERROR' ? '✕' : '•'} Passo {item.step}:
+                        </span>
+                        <span>{item.title}</span>
+                      </div>
+                      <span className="text-[10px] text-right text-white/60">
+                        {item.message || (item.status === 'OK' ? 'Sucesso' : 'Pendente')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="border-t border-white/10 pt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsTestLabOpen(false)}
+                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold cursor-pointer transition-colors"
+              >
+                Fechar Laboratório
+              </button>
+            </div>
+
           </div>
         </div>
       )}

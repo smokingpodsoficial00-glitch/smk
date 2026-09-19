@@ -1,245 +1,312 @@
-import React from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
-  X, CheckCircle2, Clock, Calendar, User, Edit3, Trash2, 
-  ArrowRight, ArrowLeft, CheckSquare, Sparkles, AlertCircle
+  X, CheckCircle2, Clock, Circle, Calendar, User, 
+  Tag, AlertCircle, Trash2, Edit3, Save, ArrowRight
 } from 'lucide-react';
-import type { 
-  CompanyTask, 
-  TaskStatus, 
-} from '@/lib/companyTasks';
-import { 
-  TASK_CATEGORY_CONFIG, 
-  TASK_PRIORITY_CONFIG, 
-  TASK_STATUS_COLUMNS 
-} from '@/lib/companyTasks';
+import type { PartnerTask, TaskCategory, TaskPriority, TaskStatus } from '../../lib/tasks';
 
 interface TaskDetailModalProps {
-  task: CompanyTask | null;
+  task: PartnerTask | null;
+  isOpen: boolean;
   onClose: () => void;
-  onEdit: (task: CompanyTask) => void;
-  onDelete: (taskId: string) => void;
-  onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
-  onToggleSubtask: (taskId: string, subtaskId: string) => void;
+  category?: TaskCategory;
+  assignedPartnerName?: string;
+  creatorPartnerName?: string;
+  onToggleStatus: (task: PartnerTask) => void;
+  onUpdateTask: (taskId: string, updates: Partial<PartnerTask>) => void;
+  onDeleteTask: (taskId: string) => void;
 }
 
-export function TaskDetailModal({
+export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   task,
+  isOpen,
   onClose,
-  onEdit,
-  onDelete,
-  onStatusChange,
-  onToggleSubtask
-}: TaskDetailModalProps) {
-  if (!task) return null;
+  category,
+  assignedPartnerName,
+  creatorPartnerName,
+  onToggleStatus,
+  onUpdateTask,
+  onDeleteTask,
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState<TaskPriority>('MEDIA');
+  const [dueDate, setDueDate] = useState('');
 
-  const catConfig = TASK_CATEGORY_CONFIG[task.category];
-  const prioConfig = TASK_PRIORITY_CONFIG[task.priority];
-  const currentStatusCol = TASK_STATUS_COLUMNS.find(c => c.id === task.status);
+  useEffect(() => {
+    if (task) {
+      setTitle(task.title || '');
+      setDescription(task.description || '');
+      setPriority(task.priority || 'MEDIA');
+      setDueDate(task.due_date || '');
+      setIsEditing(false);
+    }
+  }, [task]);
 
-  const completedSubtasksCount = task.subtasks.filter(s => s.completed).length;
-  const totalSubtasks = task.subtasks.length;
-  const progressPercent = totalSubtasks > 0 
-    ? Math.round((completedSubtasksCount / totalSubtasks) * 100) 
-    : 0;
+  if (!isOpen || !task) return null;
 
-  const partnerBadgeColor = 
-    task.assigned_to === 'Eduardo' 
-      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-      : task.assigned_to === 'Gabriel'
-      ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-      : 'bg-purple-500/20 text-purple-300 border-purple-500/40';
+  const handleSave = () => {
+    if (!title.trim()) return;
+    onUpdateTask(task.id, {
+      title: title.trim(),
+      description: description.trim(),
+      priority,
+      due_date: dueDate || null,
+    });
+    setIsEditing(false);
+  };
+
+  const isCompleted = task.status === 'CONCLUIDA';
+  const isInProgress = task.status === 'EM_ANDAMENTO';
+
+  const priorityConfig: Record<TaskPriority, { label: string; badgeClass: string; dotClass: string }> = {
+    ALTA: { label: 'Prioridade Alta', badgeClass: 'bg-rose-500/15 text-rose-400 border-rose-500/30', dotClass: 'bg-rose-500' },
+    MEDIA: { label: 'Prioridade Média', badgeClass: 'bg-amber-500/15 text-amber-400 border-amber-500/30', dotClass: 'bg-amber-500' },
+    BAIXA: { label: 'Prioridade Baixa', badgeClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', dotClass: 'bg-emerald-500' },
+  };
+
+  const currPriority = priorityConfig[task.priority] || priorityConfig.MEDIA;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div 
-        className="bg-[#0e0e10] border border-white/15 rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header com Badges e Ações Rápidas */}
-        <div className="p-5 sm:p-6 border-b border-white/10 flex items-start justify-between gap-4 bg-[#141416]/60 shrink-0">
-          <div className="space-y-2 flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Badge de Categoria */}
-              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${catConfig.badge}`}>
-                {catConfig.icon} {catConfig.label}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-2xl bg-[#111114] border border-white/15 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        
+        {/* Header do Modal */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#16161a]">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Tag Categoria */}
+            {category && (
+              <span 
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border"
+                style={{
+                  backgroundColor: `${category.color}18`,
+                  color: category.color,
+                  borderColor: `${category.color}40`,
+                }}
+              >
+                <Tag className="size-3" />
+                {category.name}
               </span>
+            )}
 
-              {/* Badge de Prioridade */}
-              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 ${prioConfig.badge}`}>
-                <div className={`size-1.5 rounded-full ${prioConfig.dotColor}`} />
-                <span>{prioConfig.label}</span>
-              </span>
+            {/* Tag Prioridade */}
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider border ${currPriority.badgeClass}`}>
+              <div className={`size-1.5 rounded-full ${currPriority.dotClass} animate-pulse`} />
+              {currPriority.label}
+            </span>
 
-              {/* Badge de Responsável */}
-              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border flex items-center gap-1 ${partnerBadgeColor}`}>
-                <User className="size-3" />
-                <span>{task.assigned_to}</span>
-              </span>
-            </div>
-
-            <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight leading-snug">
-              {task.title}
-            </h2>
+            {/* Status Atual */}
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider border ${
+              isCompleted 
+                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                : isInProgress
+                ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30'
+                : 'bg-white/10 text-white/70 border-white/15'
+            }`}>
+              {isCompleted ? '✓ Concluída' : isInProgress ? '⏳ Em Andamento' : '⚪ Pendente'}
+            </span>
           </div>
 
-          <button
-            onClick={onClose}
-            className="size-8 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
-          >
-            <X className="size-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                isEditing 
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' 
+                  : 'text-white/40 hover:text-white border-transparent hover:bg-white/5'
+              }`}
+              title={isEditing ? 'Cancelar edição' : 'Editar tarefa'}
+            >
+              <Edit3 className="size-4" />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl text-white/40 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              <X className="size-5" />
+            </button>
+          </div>
         </div>
 
-        {/* Corpo com Informações e Checklist */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 custom-scrollbar">
-          {/* Seletor Rápido de Status (Fases) */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-white/50 uppercase tracking-wider">
-              Movimentar Fase da Tarefa
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {TASK_STATUS_COLUMNS.map((col) => {
-                const isActive = task.status === col.id;
-                return (
-                  <button
-                    key={col.id}
-                    type="button"
-                    onClick={() => onStatusChange(task.id, col.id)}
-                    className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
-                      isActive
-                        ? `${col.badgeBg} border-emerald-500/50 shadow-md shadow-emerald-500/10 scale-[1.02]`
-                        : 'bg-[#141416] border-white/5 text-white/50 hover:text-white hover:bg-white/10'
-                    }`}
-                  >
-                    <span>{col.title}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Descrição Completa */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-white/50 uppercase tracking-wider">
-              Descrição e Detalhes
-            </label>
-            <div className="bg-[#141416] border border-white/10 rounded-2xl p-4 text-xs sm:text-sm text-white/90 leading-relaxed whitespace-pre-wrap">
-              {task.description ? (
-                task.description
-              ) : (
-                <span className="text-white/30 italic">Nenhuma descrição detalhada informada.</span>
-              )}
-            </div>
-          </div>
-
-          {/* Checklist de Subtarefas com Progresso */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-[10px] font-bold text-white/50 uppercase tracking-wider flex items-center gap-1.5">
-                <CheckSquare className="size-3.5 text-emerald-400" />
-                <span>Checklist de Resolução</span>
+        {/* Conteúdo Principal do Modal */}
+        <div className="p-6 sm:p-8 space-y-6 overflow-y-auto custom-scrollbar">
+          
+          {/* Título */}
+          {isEditing ? (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-white/60 mb-1.5">
+                Título da Tarefa
               </label>
-              {totalSubtasks > 0 && (
-                <span className="text-xs font-mono font-bold text-emerald-400">
-                  {completedSubtasksCount} de {totalSubtasks} ({progressPercent}%)
-                </span>
-              )}
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full bg-[#18181c] border border-white/20 rounded-xl px-4 py-3 text-base text-white font-bold focus:outline-none focus:border-emerald-500/50"
+              />
+            </div>
+          ) : (
+            <div className="flex items-start gap-4">
+              {/* Botão de Status Rápido */}
+              <button
+                onClick={() => onToggleStatus(task)}
+                className="mt-1 shrink-0 p-1 text-white/40 hover:text-emerald-400 transition-colors cursor-pointer"
+                title="Avançar status da tarefa"
+              >
+                {isCompleted ? (
+                  <CheckCircle2 className="size-6 text-emerald-400 fill-emerald-500/20" />
+                ) : isInProgress ? (
+                  <Clock className="size-6 text-cyan-400 animate-pulse" />
+                ) : (
+                  <Circle className="size-6 hover:text-emerald-400" />
+                )}
+              </button>
+              
+              <div className="flex-1 min-w-0">
+                <h2 className={`text-xl sm:text-2xl font-extrabold leading-snug break-words ${
+                  isCompleted ? 'line-through text-white/40' : 'text-white'
+                }`}>
+                  {task.title}
+                </h2>
+              </div>
+            </div>
+          )}
+
+          {/* Linha de Metadados: Responsável, Criador e Prazo */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-black/40 border border-white/5 text-xs">
+            <div>
+              <span className="text-white/40 block mb-1 font-medium">Responsável:</span>
+              <span className="text-white font-bold flex items-center gap-1.5">
+                <User className="size-3.5 text-emerald-400" />
+                {assignedPartnerName || 'Sócio'}
+              </span>
             </div>
 
-            {totalSubtasks > 0 ? (
-              <div className="space-y-2">
-                {/* Barra de Progresso Visual */}
-                <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-emerald-400 transition-all duration-300 rounded-full"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
+            <div>
+              <span className="text-white/40 block mb-1 font-medium">Criado por:</span>
+              <span className="text-white/80 font-semibold">
+                {creatorPartnerName || 'Não especificado'}
+              </span>
+            </div>
 
-                {/* Lista de Itens do Checklist */}
-                <div className="space-y-1.5 pt-1">
-                  {task.subtasks.map((sub) => (
-                    <div
-                      key={sub.id}
-                      onClick={() => onToggleSubtask(task.id, sub.id)}
-                      className="flex items-center gap-3 p-2.5 rounded-xl bg-[#141416] border border-white/5 hover:border-white/15 cursor-pointer transition-all"
-                    >
-                      <div className={`size-4 rounded border flex items-center justify-center transition-colors shrink-0 ${
-                        sub.completed ? 'bg-emerald-500 border-emerald-500 text-black' : 'border-white/30 bg-transparent'
-                      }`}>
-                        {sub.completed && <CheckCircle2 className="size-3.5 stroke-[3]" />}
-                      </div>
-                      <span className={`text-xs sm:text-sm ${sub.completed ? 'line-through text-white/40' : 'text-white/90'}`}>
-                        {sub.title}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+            <div>
+              <span className="text-white/40 block mb-1 font-medium">Prazo Estimado:</span>
+              <span className="font-mono text-amber-400/90 font-bold flex items-center gap-1.5">
+                <Calendar className="size-3.5" />
+                {task.due_date ? new Date(task.due_date + 'T00:00:00').toLocaleDateString('pt-BR') : 'Sem prazo definido'}
+              </span>
+            </div>
+          </div>
+
+          {/* Edição de Prioridade e Prazo se estiver em modo de edição */}
+          {isEditing && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-white/60 mb-1.5">
+                  Prioridade
+                </label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as TaskPriority)}
+                  className="w-full bg-[#18181c] border border-white/15 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50"
+                >
+                  <option value="ALTA">🔴 Prioridade Alta</option>
+                  <option value="MEDIA">🟡 Prioridade Média</option>
+                  <option value="BAIXA">🟢 Prioridade Baixa</option>
+                </select>
               </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-white/60 mb-1.5">
+                  Data Limite (Prazo)
+                </label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="w-full bg-[#18181c] border border-white/15 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Descrição Ampla com Word-Break e Formatação Rica */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-white/60 flex items-center justify-between">
+              <span>Descrição & Instruções da Tarefa</span>
+              <span className="text-[11px] text-white/30 font-normal">Quebras de linha e links preservados</span>
+            </label>
+
+            {isEditing ? (
+              <textarea
+                rows={8}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full bg-[#18181c] border border-white/20 rounded-2xl p-4 text-sm text-white font-normal leading-relaxed focus:outline-none focus:border-emerald-500/50 custom-scrollbar"
+                placeholder="Insira as instruções detalhadas, referências ou links..."
+              />
             ) : (
-              <div className="text-xs text-white/30 italic p-3 bg-[#141416]/50 rounded-xl border border-white/5">
-                Nenhuma subtarefa no checklist.
+              <div className="p-5 sm:p-6 rounded-2xl bg-black/50 border border-white/10 text-sm text-white/90 leading-relaxed font-normal whitespace-pre-wrap break-words overflow-x-hidden min-h-[140px]">
+                {task.description ? (
+                  task.description
+                ) : (
+                  <span className="text-white/30 italic">Nenhuma descrição detalhada informada para esta tarefa.</span>
+                )}
               </div>
             )}
           </div>
-
-          {/* Metadados: Prazo e Datas de Criação */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-white/10 text-xs text-white/50">
-            <div className="flex items-center gap-2">
-              <Calendar className="size-3.5 text-white/40" />
-              <span>Prazo de conclusão:</span>
-              <span className="font-bold text-white/80 font-mono">
-                {task.due_date ? task.due_date.split('-').reverse().join('/') : 'Sem prazo definido'}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="size-3.5 text-white/40" />
-              <span>Cadastrado por:</span>
-              <span className="font-bold text-white/80">
-                {task.created_by_name || 'Sócio'}
-              </span>
-            </div>
-          </div>
         </div>
 
-        {/* Footer com Botões de Editar e Excluir */}
-        <div className="p-4 sm:p-5 border-t border-white/10 bg-[#141416]/80 flex items-center justify-between shrink-0">
+        {/* Rodapé com Ações */}
+        <div className="flex items-center justify-between px-6 sm:px-8 py-4 border-t border-white/10 bg-[#16161a]">
           <button
             type="button"
             onClick={() => {
-              if (window.confirm(`Deseja realmente excluir a tarefa "${task.title}"?`)) {
-                onDelete(task.id);
+              if (confirm('Deseja realmente excluir esta tarefa permanentemente?')) {
+                onDeleteTask(task.id);
                 onClose();
               }
             }}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-400/70 hover:text-rose-400 hover:bg-rose-500/10 px-3.5 py-2 rounded-xl transition-all cursor-pointer"
           >
-            <Trash2 className="size-3.5" />
-            <span>Excluir</span>
+            <Trash2 className="size-4" />
+            <span>Excluir Tarefa</span>
           </button>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                onEdit(task);
-                onClose();
-              }}
-              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <Edit3 className="size-3.5" />
-              <span>Editar</span>
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 text-xs font-bold transition-colors cursor-pointer"
-            >
-              Fechar
-            </button>
+          <div className="flex items-center gap-3">
+            {isEditing ? (
+              <button
+                type="button"
+                onClick={handleSave}
+                className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-6 py-2.5 rounded-xl text-xs transition-all shadow-lg shadow-emerald-500/20 cursor-pointer"
+              >
+                <Save className="size-4" />
+                <span>Salvar Alterações</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onToggleStatus(task)}
+                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg ${
+                  isCompleted 
+                    ? 'bg-white/10 hover:bg-white/20 text-white border border-white/15'
+                    : isInProgress
+                    ? 'bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold shadow-emerald-500/20'
+                    : 'bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold shadow-cyan-500/20'
+                }`}
+              >
+                {isCompleted ? (
+                  <>Reabrir Demanda</>
+                ) : isInProgress ? (
+                  <>Concluir Tarefa ✓</>
+                ) : (
+                  <>Iniciar Tarefa (Em Andamento) <ArrowRight className="size-4" /></>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
-}
+};

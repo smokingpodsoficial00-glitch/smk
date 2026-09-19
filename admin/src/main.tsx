@@ -9,6 +9,11 @@ import './lib/partnersTester';
 import './lib/followUpsTester';
 import './lib/stockEntryTester';
 
+// Auto-reload se um chunk lazy falhar após novo deploy no Vercel
+window.addEventListener('vite:preloadError', () => {
+  window.location.reload();
+});
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>

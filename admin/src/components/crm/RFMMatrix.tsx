@@ -429,15 +429,21 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
                       </td>
 
                       <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <a
-                          href={waUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all"
-                        >
-                          <MessageSquare className="size-3.5" />
-                          WhatsApp
-                        </a>
+                        {phoneClean && !client.phone?.includes('Instagram') && !client.phone?.startsWith('INSTA_') ? (
+                          <a
+                            href={waUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all"
+                          >
+                            <MessageSquare className="size-3.5" />
+                            WhatsApp
+                          </a>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 bg-white/5 text-white/40 border border-white/10 px-2.5 py-1 rounded-lg text-[10px] font-semibold tracking-wider">
+                            Sem WhatsApp
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );

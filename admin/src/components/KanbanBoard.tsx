@@ -127,11 +127,6 @@ export default function KanbanBoard() {
   useEffect(() => {
     fetchOrders();
 
-    // Sincronização em segundo plano suave a cada 20 segundos (Realtime já atualiza na hora sem sobrecarga)
-    const intervalId = setInterval(() => {
-      fetchOrders();
-    }, 20000);
-
     // Inscrição em tempo real para atualizações no Supabase
     const subscription = supabase
       .channel('public:smoking_orders_kanban')
@@ -141,7 +136,6 @@ export default function KanbanBoard() {
       .subscribe();
 
     return () => {
-      clearInterval(intervalId);
       supabase.removeChannel(subscription);
     };
   }, [company?.id]);
@@ -367,19 +361,19 @@ export default function KanbanBoard() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsManualSaleOpen(true)}
-            className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] cursor-pointer"
+            className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] active:scale-95 cursor-pointer"
           >
             <Plus className="size-3.5 stroke-[3]" />
             <span>Registrar Venda</span>
           </button>
 
-          <div className="flex items-center gap-1 bg-[#121212]/50 p-1 rounded-xl border border-white/5">
+          <div className="flex items-center gap-1 bg-[#121212]/50 p-1 rounded-xl border border-white/10">
             <button
               onClick={() => setActiveTab('kanban')}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'kanban' 
-                  ? 'bg-white/5 text-emerald-400 font-bold border border-white/5' 
-                  : 'text-white/40 hover:text-white'
+                  ? 'bg-white/10 text-white font-extrabold border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.15)]' 
+                  : 'text-white/50 hover:text-white'
               }`}
             >
               📦 Pedidos ({activeOrders.length})
@@ -388,8 +382,8 @@ export default function KanbanBoard() {
               onClick={() => setActiveTab('concluidos')}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'concluidos' 
-                  ? 'bg-white/5 text-emerald-400 font-bold border border-white/5' 
-                  : 'text-white/40 hover:text-white'
+                  ? 'bg-white/10 text-white font-extrabold border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.15)]' 
+                  : 'text-white/50 hover:text-white'
               }`}
             >
               <CheckCircle2 className="size-3.5" />
@@ -402,6 +396,7 @@ export default function KanbanBoard() {
       {/* Modal de Venda Manual Integrado */}
       <ManualSaleModal 
         isOpen={isManualSaleOpen} 
+        companyId={company?.id}
         onClose={() => {
           setIsManualSaleOpen(false);
           fetchOrders();

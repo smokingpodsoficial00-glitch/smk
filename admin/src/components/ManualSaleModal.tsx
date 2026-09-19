@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
+import { ensureBuyerInBroadcastList } from "@/lib/marketingLists";
 import {
   ShoppingCart,
   User,
@@ -9,6 +11,7 @@ import {
   Loader2,
   Plus,
   Trash2,
+  Megaphone,
 } from "lucide-react";
 
 interface ManualSaleModalProps {
@@ -24,10 +27,12 @@ export function ManualSaleModal({
   isOpen,
   onClose,
   onSaleSuccess,
-  companyId = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5",
+  companyId: propCompanyId,
   preSelectedFlavorId,
   preSelectedGroup,
 }: ManualSaleModalProps) {
+  const { company } = useAuth();
+  const companyId = propCompanyId || company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [productsList, setProductsList] = useState<any[]>([]);
   const [clientsList, setClientsList] = useState<any[]>([]);
@@ -39,6 +44,8 @@ export function ManualSaleModal({
   const [paymentMethod, setPaymentMethod] = useState("PIX");
   const [shippingFee, setShippingFee] = useState<string>("0"); // Cobrado do cliente
   const [shippingCost, setShippingCost] = useState<string>("0"); // Custo real pago ao motoboy/Uber
+  const [autoAddToMarketingList, setAutoAddToMarketingList] = useState(true);
+  const [isNoWhatsApp, setIsNoWhatsApp] = useState(false);
 
   // Lista de Itens no Pedido
   const [items, setItems] = useState<
@@ -264,7 +271,14 @@ export function ManualSaleModal({
     const found = clientsList.find((c) => c.client_phone === phone);
     if (found) {
       setClientName(found.client_name || "");
-      setClientPhone(found.client_phone || "");
+      if (found.client_phone && (found.client_phone.startsWith("INSTA_") || found.client_phone.startsWith("SEM_WPP_") || found.client_phone.includes("Instagram"))) {
+        setIsNoWhatsApp(true);
+        setClientPhone("");
+        setAutoAddToMarketingList(false);
+      } else {
+        setIsNoWhatsApp(false);
+        setClientPhone(found.client_phone || "");
+      }
       setShippingAddress(found.shipping_address || "");
     }
   };
@@ -290,7 +304,14 @@ export function ManualSaleModal({
       // 1. Inserir/Atualizar Cliente no CRM (smoking_clients)
       const rawPhone = clientPhone.trim();
       const cleanPhone = rawPhone.replace(/\D/g, "");
-      const formattedPhone = cleanPhone ? (cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`) : "5511999999999";
+      
+      let formattedPhone = "";
+      if (isNoWhatsApp || (!cleanPhone && !rawPhone)) {
+        const cleanSlug = clientName.trim().toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10) || "cliente";
+        formattedPhone = `INSTA_${cleanSlug}_${Date.now().toString().slice(-6)}`;
+      } else {
+        formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+      }
 
       let clientSaveWarning: string | null = null;
       try {
@@ -382,14 +403,54 @@ export function ManualSaleModal({
         insertedOrderId = insertedData.id;
       }
 
-      // 4. A baixa de estoque em smoking_products é realizada automaticamente
-      // pela Trigger SQL no Supabase (decrement_stock_on_payment) ao inserir o pedido com payment_status = 'PAGO'.
-      // Não fazemos segundo update em JS para evitar baixa duplicada!
+      // 4. Abater estoque diretamente em smoking_products para cada item vendido
+      for (const item of effectiveItems) {
+        if (!item.productId) continue;
+        try {
+          const { data: pData } = await supabase
+            .from("smoking_products")
+            .select("stock")
+            .eq("id", item.productId)
+            .single();
+
+          if (pData) {
+            const currentStock = typeof pData.stock === "number" ? pData.stock : parseInt(String(pData.stock || "0"), 10);
+            const qtyToDeduct = Number(item.quantity) || 1;
+            const newStock = Math.max(0, currentStock - qtyToDeduct);
+
+            await supabase
+              .from("smoking_products")
+              .update({ stock: newStock })
+              .eq("id", item.productId);
+
+            console.log(`[ManualSaleModal] Baixa de estoque para ${item.modelName} - ${item.flavor}: ${currentStock} -> ${newStock}`);
+          }
+        } catch (stockErr) {
+          console.error("Erro ao abater estoque do produto no Supabase:", stockErr);
+        }
+      }
+
+      // 5. Inserir automaticamente na Lista de Transmissão de Compradores do Marketing
+      let marketingListNote = "";
+      if (autoAddToMarketingList && cleanPhone && !isNoWhatsApp && !formattedPhone.startsWith("INSTA_")) {
+        try {
+          const mktRes = await ensureBuyerInBroadcastList({
+            companyId,
+            clientName: clientName.trim(),
+            clientPhone: formattedPhone,
+          });
+          if (mktRes.success) {
+            marketingListNote = ` e ${mktRes.listName}`;
+          }
+        } catch (mktErr) {
+          console.warn("Aviso ao incluir cliente na lista de marketing:", mktErr);
+        }
+      }
 
       if (clientSaveWarning) {
         setSuccessMessage(`✅ Venda registrada com sucesso! (${clientSaveWarning})`);
       } else {
-        setSuccessMessage("✅ Venda registrada com sucesso! Estoque abatido, ranking e CRM atualizados.");
+        setSuccessMessage(`✅ Venda registrada com sucesso! Estoque abatido, ranking, CRM${marketingListNote} atualizados.`);
       }
 
       setTimeout(() => {
@@ -399,6 +460,7 @@ export function ManualSaleModal({
         setItems([]);
         setClientName("");
         setClientPhone("");
+        setIsNoWhatsApp(false);
         setShippingAddress("");
         setSelectedModelKey("");
         setSelectedFlavorId("");
@@ -497,14 +559,51 @@ export function ManualSaleModal({
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-silver font-medium block mb-1">WhatsApp (DDD + Número)</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] text-silver font-medium">WhatsApp (DDD + Número)</label>
+                    <label className="flex items-center gap-1.5 text-[10px] text-white/50 hover:text-white/80 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isNoWhatsApp}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setIsNoWhatsApp(checked);
+                          if (checked) {
+                            setClientPhone("");
+                            setAutoAddToMarketingList(false);
+                          }
+                        }}
+                        className="size-3 rounded accent-amber-500 cursor-pointer"
+                      />
+                      <span>Sem WhatsApp (Insta)</span>
+                    </label>
+                  </div>
                   <input
                     type="text"
-                    value={clientPhone}
+                    disabled={isNoWhatsApp}
+                    value={isNoWhatsApp ? "(Venda Instagram / Sem WhatsApp)" : clientPhone}
                     onChange={(e) => setClientPhone(e.target.value)}
                     placeholder="Ex: 11943856234"
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400/50 font-semibold"
+                    className={`w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400/50 font-semibold ${
+                      isNoWhatsApp ? 'opacity-50 cursor-not-allowed italic text-white/60 bg-white/5' : ''
+                    }`}
                   />
+                </div>
+
+                {/* Checkbox: Adicionar automaticamente à Lista de Compradores */}
+                <div className="sm:col-span-2 pt-1">
+                  <label className="flex items-center gap-2.5 text-xs font-semibold text-white/90 cursor-pointer select-none bg-black/40 border border-white/10 hover:border-emerald-500/40 p-2.5 rounded-xl transition-all">
+                    <input
+                      type="checkbox"
+                      checked={autoAddToMarketingList}
+                      onChange={(e) => setAutoAddToMarketingList(e.target.checked)}
+                      className="size-4 rounded accent-emerald-500 cursor-pointer"
+                    />
+                    <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                      <Megaphone className="size-3.5 text-emerald-400" />
+                      Incluir automaticamente na Lista de Compradores (Marketing)
+                    </span>
+                  </label>
                 </div>
               </div>
             </div>

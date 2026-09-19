@@ -1,0 +1,148 @@
+id,company_id,legacy_id,name,status,target_type,target_group_id,target_group_name,message_template,variations,use_variations,frequency_days,schedule_type,scheduled_weekday,scheduled_time,start_date,batch_size,batch_interval_minutes,total_recipients,last_run_at,created_at,updated_at,legacy_metadata
+20167b4e-3524-413c-acfb-e83b598f6432,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,,CPM TESTE GRUPO,active,group,120363430820740157@g.us,SMK MATERIAL MKT,"Oii, tudo bem? 💨
+Passando pra te avisar que a *Smoking Pods tá de volta oficialmente à ativa em SBC!*
+
+As entregas pro final de semana já estão rolando a todo vapor pra você *garantir o seu pod a tempo e não ficar na mão no rolê*. Reabrimos com estoque 100% renovado, produtos originais e o delivery rápido de sempre de *30 a 40 min* pelo Uber Direct.
+
+📦 *Dá uma olhada nos modelos disponíveis no Cardápio Digital:*
+🔗 [LINK_DO_CARDAPIO_VERCEL]
+
+💬 *Também ativamos o Grupo VIP no WhatsApp pra soltar lotes exclusivos e frete promocional pro fds:*
+🔗 [LINK_DO_GRUPO_VIP_WHATSAPP]
+
+Qual modelo e sabor posso separar pra você já garantir pro fds?",[],false,0,one_time,,15:00:00,2026-09-17,5,35,3,,2026-09-17 17:43:54.486847+00,2026-09-17 17:43:54.486847+00,{}
+28d26f94-c2ff-4268-b5ff-d7e65674dd62,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,camp_1786817784280,CPM SABADÃO 3,active,group,120363429733361752@g.us,Clientes Smoking Vip," 🗳️ VOCÊS ESCOLHEM O ESTOQUE DE SEGUNDA-FEIRA! 📦
+
+Fala pessoal do VIP! Passando pra um recado especial:
+
+A gente tá fechando a lista do pedido de reposição que chega na segunda-feira e, como vocês estão aqui no VIP, queremos saber a opinião de vocês primeiro!
+
+💬 Qual modelo e sabor que NÃO PODE FALTAR no estoque pra você na segunda?
+(Ignite, Elfbar, Lost Mary, Oxbar, sabores Ice, doces, cítricos...)
+
+👉 Manda aqui no nosso WhatsApp privado qual sabor você quer que a gente traga:
+🔗 https://wa.me/5511948420071?text=Quero%20recomendar%20um%20sabor!!
+
+A gente vai priorizar os modelos mais votados por vocês! 👑",[],false,7,weekly,SABADO,19:30:00,2026-08-26,5,45,1,,2026-09-11 15:03:53.754434+00,2026-09-11 15:03:53.754434+00,"{""orphan_list_ids"":[""list_1786807808763""]}"
+34f4e134-c7d8-4c41-8b5b-7dab1ab3a409,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,camp_1786816065551,CPM GRUPO SEXTOU NOTURNO 3,active,group,120363429733361752@g.us,Clientes Smoking Vip,"PLANTÃO NOTURNO ATIVO — SMOKING PODS 💨
+
+Salve galera da noite! Faltou pod no rolê ou acabou o seu no meio da resenha?
+
+Plantão de Sexta rolando até as 23:30!
+Entregamos direto na sua casa, na adega, no bar ou onde você estiver NO ABC e região!
+
+📦 Escolha seu modelo e receba rápido:
+🔗 https://smokingproject01.vercel.app/
+
+Atendimento jajá vai ser encerrado pessoal!",[],false,7,weekly,SEXTA,21:30:00,,5,45,1,,2026-09-11 15:03:53.485782+00,2026-09-11 15:03:53.485782+00,"{""orphan_list_ids"":[""list_1786807808763""]}"
+4e4a393c-5a6b-44cf-9488-ec5e3c025937,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,camp_1786814768806,CPM GRUPO INSTAGRAM,active,group,120363429733361752@g.us,Clientes Smoking Vip,"📢 COMUNICADOS & HORÁRIOS DA SMOKING PODS ⏰
+
+Salve turma! Passando um aviso rápido: Todos os comunicados oficiais de funcionamento, horários de plantão nos finais de semana, umboxing de produtos novos, feriados e alertas de reposição de estoque são postados diariamente no nosso Instagram oficial!
+
+📲 Acompanhe nosso perfil pra ficar 100% informado:
+🔗https://www.instagram.com/smk.express?igsh=MWtsY29ubXF3bWdxdw%3D%3D&utm_source=qr
+
+Salva o perfil aí pra não ficar na mão quando precisar! 🥇",[],false,14,interval,QUARTA,15:00:00,,1,45,1,,2026-09-11 15:03:53.192241+00,2026-09-11 15:03:53.192241+00,"{""orphan_list_ids"":[""list_1786807808763""]}"
+68573283-0eff-42fe-9a39-c6dc16f446c0,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,camp_1786818802616,CPM DOMINGO 1,active,group,120363429733361752@g.us,Clientes Smoking Vip,"🛋️ DOMINGO OFF — AGENDAMENTO PARA SEGUNDA-FEIRA! 💨
+
+Salve turma do VIP! Passando pra avisar que aos domingos nossa operação de delivery fica fechada para descanso do time.
+
+📦 Quer garantir seu pod pro início da semana?
+O nosso Cardápio Digital fica aberto normalmente para você agendar seu pedido! Deixando seu pedido feito hoje, o motoboy já sai com a sua entrega logo no primeiro horário de segunda-feira!
+
+📲 Agende seu pedido no Cardápio:
+🔗 https://smokingproject01.vercel.app/
+
+Bom descanso a todos! 🥇",[],false,7,weekly,DOMINGO,12:00:00,2026-08-26,5,45,1,,2026-09-11 15:03:53.84567+00,2026-09-11 15:03:53.84567+00,"{""orphan_list_ids"":[""list_1786807808763""]}"
+7374d4ba-9031-446f-9c7b-d001608641bf,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,camp_1786815404807,REATIVAÇÃO SEXTOU/ESCASSEZ,active,group,120363429733361752@g.us,Clientes Smoking Vip,"SEXTOU NO ABC FÁMILIA, NÃO FIQUE NA MÃO NO ROLÊ 🥇
+
+As entregas de hoje já estão on! não espere esgotar..
+
+Delivery Expresso rápido de sempre 25 a 35 min pelo Uber. Prioridade VIP: Pedidos feitos pelo grupo entram no topo da fila de despacho do motoboy.
+
+📦 Cardápio Digital no ar:
+🔗 https://smokingproject01.vercel.app/",[],false,7,weekly,SEXTA,13:00:00,,5,45,1,,2026-09-11 15:03:53.290095+00,2026-09-11 15:03:53.290095+00,"{""orphan_list_ids"":[""list_1786807808763""]}"
+9ff7cae1-0689-4eec-bf4d-4142e2f78b76,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,camp_1786815888015,CPM SEXTOU 2,active,group,120363429733361752@g.us,Clientes Smoking Vip,"SAÍDA DO TRAMPO & PRÉ-ROLÊ — MOTOBOYS NA PISTA! 💨
+
+Salve turma do VIP! se ainda não separou seu pod, não deixa pra depois que vocês sabem que acaba rápido! os motoboys da Smoking Pods já estão nas ruas do ABC!
+
+Se você tá saindo do trampo ou se arrumando pro rolê, peça agora pra receber no conforto de casa antes de sair!
+
+⏱️ Tempo médio: 25 a 35 min pelo Uber Direct.
+📦 Cardápio Digital completo:
+🔗 https://smokingproject01.vercel.app/
+
+Fila de despacho aberta! 🚀",[],false,7,weekly,SEXTA,17:30:00,,5,45,1,,2026-09-11 15:03:53.397681+00,2026-09-11 15:03:53.397681+00,"{""orphan_list_ids"":[""list_1786807808763""]}"
+a200c5bf-c667-4a05-bafd-bdf324195cdb,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,camp_1786820824361,AVISO SALVAR CONTATO,active,group,120363429733361752@g.us,Clientes Smoking Vip,"📲 AVISO VIP: SALVE NOSSO CONTATO NA SUA AGENDA! ⚡
+
+Fala pessoal do VIP! Passando um recado importante pra vocês:
+
+Quem tem o nosso número salvo nos contatos do celular consegue acompanhar nossos Status diários no WhatsApp!
+
+É por lá que a gente posta: • 💨 Ofertas relâmpago de última hora com desconto; • 📦 Chegada de modelos raros antes de irem pro cardápio; • 🛵 Avisos rápidos de saídas do motoboy no dia a dia.
+
+👉 Salva aí no seu celular: Smoking Pods Oficial
+
+Assim você não perde nenhuma oportunidade da semana! 🥇",[],false,7,weekly,TERCA,16:00:00,2026-08-26,5,45,1,,2026-09-11 15:03:54.04839+00,2026-09-11 15:03:54.04839+00,"{""orphan_list_ids"":[""list_1786807808763""]}"
+a898626b-11df-4ea8-879c-185b88433a6e,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,camp_1786821475258,CPM  LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!,active,group,120363429733361752@g.us,Clientes Smoking Vip,"⏳ LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS! 💨
+
+Salve galera do VIP! Passando pra avisar quem gosta de se planejar com calma:
+
+Sexta e sábado a fila de despacho do Uber Direct costuma ser bem cheia. Se você já quiser garantir seu pod agora no meio da semana, seu pedido sai na hora e sem correria!
+
+📦 Cardápio 100% atualizado com os novos lotes:
+🔗 https://smokingproject01.vercel.app/
+
+⚡ Entregas em 25 a 35 min em SBC e região!
+
+Garanta seu sabor favorito antes da correria do fds! 🥇",[],false,7,weekly,QUARTA,16:00:00,2026-08-26,5,45,1,,2026-09-11 15:03:54.136387+00,2026-09-11 15:03:54.136387+00,"{""orphan_list_ids"":[""list_1786807808763""]}"
+bdbc5c95-4770-4fba-8425-4dec704098bc,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,camp_1786812557221,CPM GRUPO ESTOQUE SEMANAL,active,group,120363429733361752@g.us,Clientes Smoking Vip,"ACESSO ANTECIPADO VIP — REPOSIÇÃO DA SEMANA! 💨
+
+Fala pessoal do VIP! Passando pra avisar que o nosso estoque pro final de semana acabou de ser 100% abastecido.
+
+Vocês têm prioridade total: estamos liberando o Cardápio Digital primeiro aqui no grupo antes de soltar o aviso geral no Instagram!
+
+📦 Garanta seu modelo e sabor favorito antes de esgotar:
+🔗 https://smokingproject01.vercel.app/
+
+🚚 Delivery Uber (25 a 35 min em SBC) | Atendimento até 23h",[],false,7,weekly,SEGUNDA,14:05:00,,1,45,1,,2026-09-11 15:03:53.089535+00,2026-09-11 15:03:53.089535+00,"{""orphan_list_ids"":[""list_1786807808763""]}"
+c3558551-5f8a-4aaf-8e75-fb1ca2a966d4,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,camp_1786819959793,CPM DOMINGO 2,active,group,120363429733361752@g.us,Clientes Smoking Vip,"🚀 AMANHÃ ESTAMOS DE VOLTA + REPOSIÇÃO DE ESTOQUE! 📦
+
+Salve galera! Passando pra avisar que amanhã (segunda-feira) as entregas voltam a todo vapor logo pela manhã em SBC e região!
+
+⚡ Aviso de Estoque: Segunda-feira também é dia de chegada de novos lotes e reposição dos modelos mais pedidos!
+
+Se você já quiser deixar o seu sabor separado para o motoboy despachar amanhã cedo, acesse o link abaixo:
+
+🔗 https://smokingproject01.vercel.app/
+Uma ótima semana a todos e nos vemos amanhã! 🤝",[],false,7,weekly,DOMINGO,19:30:00,2026-08-26,5,45,1,,2026-09-11 15:03:53.951877+00,2026-09-11 15:03:53.951877+00,"{""orphan_list_ids"":[""list_1786807808763""]}"
+ccec49ef-56a2-45e5-92ce-a66e1749e275,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,camp_1786816420999,CPM SABADÃO 1,active,group,120363429733361752@g.us,Clientes Smoking Vip,"SÁBADO NA SMOKING PODS — DELIVERIES ABERTOS! 💨
+
+Salve time do VIP! O plantão de sábado já tá rodando a todo vapor em São Bernardo e região!
+
+
+Não fica na mão: peça seu pod original direto no conforto de onde você estiver!
+
+⚡ Tempo de entrega: 25 a 35 min via Uber Direct.
+📦 Cardápio Digital no ar:
+🔗 https://smokingproject01.vercel.app/
+
+",[],false,7,weekly,SABADO,14:00:00,,5,45,1,,2026-09-11 15:03:53.589803+00,2026-09-11 15:03:53.589803+00,"{""orphan_list_ids"":[""list_1786807808763""]}"
+d4046bf1-b741-40cd-b330-6ab8afc72d3e,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,camp_1786816513199,CPM SABADÃO 2,active,group,120363429733361752@g.us,Clientes Smoking Vip,"⚠️ ALERTA DE ESTOQUE DE SÁBADO — ÚLTIMAS UNIDADES! 🔥
+
+Fala pessoal do VIP! Passando pra avisar que a saída de pedidos hoje tá monstra e alguns dos sabores mais pedidos já estão nas últimas unidades!
+
+🚀 Se você vai sair pro rolê hoje à noite, garanta o seu agora pra não ter que ficar com sabor que você não curte depois!
+
+🔒 Prioridade VIP: Fila de despacho expressa pra quem pedir pelo link abaixo:
+🔗 https://smokingproject01.vercel.app/
+
+Motoboys prontos para entrega imediata! 💨",[],false,7,weekly,SABADO,17:30:00,,1,45,1,,2026-09-11 15:03:53.667722+00,2026-09-11 15:03:53.667722+00,"{""orphan_list_ids"":[""list_1786807808763""]}"
+e4cddf5e-adea-4ff2-a08e-60e659528a1c,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,camp_1786810305844,Campanha de reativação 1,paused,lists,120363283721984620@g.us,.,"Fala, tudo bem? De boa? 🤝
+Passando pra avisar que organizamos a casa e voltamos oficialmente com as entregas no ABC!
+
+Pra comemorar a volta com quem é das antigas: seu frete hoje sai pela metade do preço (50% OFF no motoboy)! 🔥
+
+Salva nosso número aí nos contatos pra não sumir da sua lista. Posso te mandar o link do cardápio pra você dar uma olhada? 📲","[""Opa, tudo bem contigo? 🔥\nComo você é da nossa base antiga, tô te avisando em primeira mão: nosso delivery tá de volta à ativa em SBC!\n\nPra essa reabertura, liberamos 50% DE DESCONTO NO SEU FRETE pra você pedir hoje sem pressa. 🛵\n\nDá uma salvada no nosso contato aí na sua agenda! Quer que eu te envie o link do catálogo novo pra você ver o que chegou?"",""Oii, quanto tempo! Tudo certo por aí? 💨\nOrganizamos tudo por aqui e reabrimos o nosso atendimento oficial com entregas rápidas!\n\nDe presente de volta pra nossa base, seu primeiro frete de hoje sai com 50% de desconto! 🎁\n\nSalva nosso contato aí no celular pra acompanhar os Status. Se quiser dar uma olhada nas opções, me avisa aqui que te mando o link!"",""Salve, beleza? 🤝\nPassando pra avisar quem é de casa: estamos com o delivery 100% ativo de novo no ABC!\n\nChegaram vários lotes novos e você tem 50% OFF NO FRETE do motoboy pra garantir hoje com prioridade. ⚡\n\nSalva nosso número aí no seu aparelho! Quer que eu te mande o link do cardápio completo pra você conferir?"",""E aí, tudo na paz? 🔥\nNotícia boa pra quem já é de casa: a loja tá aberta de novo e os motoboys já estão na pista!\n\nPra marcar esse retorno, o seu frete hoje sai com 50% DE DESCONTO! 🚀\n\nJá salva nosso contato aí na agenda pra não perder nada. Me dá um alô se posso te mandar o link do Cardápio Digital! 🥇""]",true,0,one_time,QUARTA,15:00:00,2026-08-17,5,35,425,,2026-09-11 15:02:28.648538+00,2026-09-11 15:02:28.648538+00,{}
+e939f055-0c27-4d5c-ab26-d26e04651b35,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,camp_1786992261357,FERMENTAÇÃO DE BASE ATIVA ( RELACIONAMENTO ),paused,lists,120363283721984620@g.us,.,"Opa, tudo bem? De boa? 
+Passando só pra dar uma atenção e saber se tá curtindo a sua ultima compra, Qualquer coisa que precisar é só dar um toque por aqui, estamos á disposição!","[""Fala, beleza? \nTô passando aqui só pra saber se os sabores que você pegou com a gente bateram certo com o seu gosto! Tá curtindo? se precisar de algo só chamar!"",""Salve, tudo tranquilo?\nPassando pra dar um alô e perguntar se tá curtindo seu pedido, estamos sempre por aqui! Valeu pela parceria de sempre!"",""E aí, tudo certo por aí? \nPassando rapidinho só pra saber como tá sendo sua experiência com a gente até aqui! O que tá achando dos nossos modelos? precisar estamos ai!"",""Oii, de boa? \nTô passando pra checar se tá dando tudo certo por aí e se você tá curtindo os produtos! Qualquer dúvida ou quando precisar de algo, só chamar!""]",true,21,interval,QUARTA,16:45:00,2026-08-17,3,35,3,,2026-09-11 15:03:54.271384+00,2026-09-11 15:03:54.271384+00,{}

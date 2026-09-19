@@ -39,6 +39,7 @@ export default function PartnersDashboard() {
   const [products, setProducts] = useState<any[]>([]);
   const [persistedCosts, setPersistedCosts] = useState<Record<string, number>>({});
   const [operationalExpenses, setOperationalExpenses] = useState<number>(0);
+  const [repurchases, setRepurchases] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Modals
@@ -60,39 +61,45 @@ export default function PartnersDashboard() {
     try {
       setLoading(true);
 
-      // A. Mapa de custos de produtos
-      const costs = await fetchProductCostsMap(targetCompanyId).catch(() => ({}));
-      setPersistedCosts(costs);
-
-      // B. Sócios e Transações Societárias
-      const [partnersData, txData] = await Promise.all([
+      const [
+        costs,
+        partnersData,
+        txData,
+        { data: rawOrders },
+        { data: rawProducts },
+        { data: rawRepurchases }
+      ] = await Promise.all([
+        fetchProductCostsMap(targetCompanyId).catch(() => ({})),
         fetchPartners(targetCompanyId),
-        fetchPartnerTransactions(targetCompanyId)
+        fetchPartnerTransactions(targetCompanyId),
+        supabase
+          .from("smoking_orders")
+          .select("*")
+          .or("company_id.eq." + targetCompanyId + ",company_id.is.null")
+          .neq("delivery_status", "CANCELADO"),
+        supabase
+          .from("smoking_products")
+          .select("*")
+          .or("company_id.eq." + targetCompanyId + ",company_id.is.null")
+          .eq("is_active", true),
+        supabase
+          .from("smoking_stock_repurchases")
+          .select("*")
+          .or("company_id.eq." + targetCompanyId + ",company_id.is.null")
       ]);
-      setPartners(partnersData);
-      setTransactions(txData);
 
-      // C. Pedidos Reais de Venda
-      const { data: rawOrders } = await supabase
-        .from("smoking_orders")
-        .select("*")
-        .or("company_id.eq." + targetCompanyId + ",company_id.is.null")
-        .neq("delivery_status", "CANCELADO");
-      setOrders(rawOrders || []);
-
-      // D. Produtos Ativos em Estoque
-      const { data: rawProducts } = await supabase
-        .from("smoking_products")
-        .select("*")
-        .or("company_id.eq." + targetCompanyId + ",company_id.is.null")
-        .eq("is_active", true);
-      setProducts(rawProducts || []);
-
-      // E. Despesas salvas em localStorage (Marketing / Meta Ads)
       try {
         const mkt = parseFloat(localStorage.getItem("smk_mkt_investment") || "0") || 0;
         setOperationalExpenses(mkt);
       } catch (e) {}
+
+      // Apply all states synchronously to prevent UI flashing
+      setPersistedCosts(costs as Record<string, number>);
+      setPartners(partnersData);
+      setTransactions(txData);
+      setOrders(rawOrders || []);
+      setProducts(rawProducts || []);
+      setRepurchases(rawRepurchases || []);
 
     } catch (err) {
       console.error("Erro ao carregar dados do módulo de sócios:", err);
@@ -125,11 +132,17 @@ export default function PartnersDashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partner_transactions" }, () => loadAllData())
       .subscribe();
 
+    const subRepurchases = supabase
+      .channel(`partners_repurchases_${targetCompanyId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_stock_repurchases" }, () => loadAllData())
+      .subscribe();
+
     return () => {
       supabase.removeChannel(subOrders);
       supabase.removeChannel(subProducts);
       supabase.removeChannel(subPartners);
       supabase.removeChannel(subTx);
+      supabase.removeChannel(subRepurchases);
     };
   }, [targetCompanyId]);
 
@@ -141,11 +154,31 @@ export default function PartnersDashboard() {
       orders,
       products,
       persistedCosts,
-      operationalExpenses
+      operationalExpenses,
+      repurchases
     });
-  }, [partners, transactions, orders, products, persistedCosts, operationalExpenses]);
+  }, [partners, transactions, orders, products, persistedCosts, operationalExpenses, repurchases]);
 
-  // 3. Filtragem de Transações
+  // 3. Resolução e Filtragem de Transações
+  const getPartnerName = (tx: PartnerTransaction) => {
+    if (tx.partner_name && tx.partner_name !== 'Sócio') return tx.partner_name;
+    if (tx.partner_id) {
+      const found = partners.find(p => p.id === tx.partner_id);
+      if (found?.name) return found.name;
+      if (tx.partner_id === 'p1-eduardo') return 'Eduardo';
+      if (tx.partner_id === 'p2-gabriel') return 'Gabriel';
+    }
+    if (tx.description && tx.description.includes(' - ')) {
+      const parts = tx.description.split(' - ');
+      if (parts[1]) {
+        const n = parts[1].trim();
+        if (n.toLowerCase().includes('smolking') || n.toLowerCase().includes('smoking')) return 'Smoking Pods';
+        return n;
+      }
+    }
+    return 'Sócio';
+  };
+
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
       if (txFilterType === 'APORTE' && tx.type !== 'APORTE') return false;
@@ -153,12 +186,12 @@ export default function PartnersDashboard() {
       if (txSearchQuery.trim()) {
         const q = txSearchQuery.toLowerCase();
         const descMatch = (tx.description || '').toLowerCase().includes(q);
-        const partnerMatch = (tx.partner_name || '').toLowerCase().includes(q);
+        const partnerMatch = getPartnerName(tx).toLowerCase().includes(q);
         if (!descMatch && !partnerMatch) return false;
       }
       return true;
     });
-  }, [transactions, txFilterType, txSearchQuery]);
+  }, [transactions, txFilterType, txSearchQuery, partners]);
 
   const handleOpenAporte = (partnerId?: string) => {
     setNewTxDefaultType('APORTE');
@@ -188,7 +221,7 @@ export default function PartnersDashboard() {
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Scale className="size-6 text-emerald-400" />
+              <Scale className="size-6 text-white" />
               <span>Sócios & Gestão de Equity</span>
             </h1>
             <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
@@ -216,18 +249,18 @@ export default function PartnersDashboard() {
               }
             }}
             disabled={isValidating}
-            className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+            className="px-3 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/15 border border-white/20 text-white transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
             title="Executar bateria controlada de 18 testes do Bloco 8"
           >
-            <ShieldCheck className="size-3.5 text-emerald-400" />
-            <span>{isValidating ? 'Validando 18 testes...' : 'Validar Sociedade (Bloco 8)'}</span>
+            <ShieldCheck className="size-3.5 text-white" />
+            <span>{isValidating ? 'Validando 18 testes...' : 'Validar Sociedade'}</span>
           </button>
 
           <button
             onClick={() => setShowDilutionModal(true)}
-            className="px-3 py-2 rounded-xl text-xs font-bold bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+            className="px-3 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/15 border border-white/20 text-white transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
           >
-            <Calculator className="size-3.5 text-purple-400" />
+            <Calculator className="size-3.5 text-white/80" />
             <span>Simulador de Aportes</span>
           </button>
 
@@ -235,15 +268,15 @@ export default function PartnersDashboard() {
             onClick={() => setShowNewPartnerModal(true)}
             className="px-3 py-2 rounded-xl text-xs font-bold bg-[#141416] hover:bg-[#1a1a1d] border border-white/10 text-white transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
           >
-            <UserPlus className="size-3.5 text-emerald-400" />
+            <UserPlus className="size-3.5 text-white/80" />
             <span>Cadastrar Sócio</span>
           </button>
 
           <button
             onClick={() => handleOpenAporte()}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-white transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-md shadow-emerald-500/20"
+            className="px-4 py-2 rounded-xl text-xs font-extrabold bg-white hover:bg-slate-100 text-black transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)]"
           >
-            <Plus className="size-3.5" />
+            <Plus className="size-3.5 stroke-[3]" />
             <span>Novo Aporte / Retirada</span>
           </button>
         </div>
@@ -253,7 +286,7 @@ export default function PartnersDashboard() {
       <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-4 sm:p-5 space-y-3 shadow-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <PieChart className="size-4 text-emerald-400" />
+            <PieChart className="size-4 text-white" />
             <span className="text-xs font-bold text-white uppercase tracking-wider">
               Composição Societária por Capital
             </span>
@@ -361,18 +394,25 @@ export default function PartnersDashboard() {
         </div>
 
         {/* 4. Patrimônio Real Oficial da Loja */}
-        <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-4 space-y-1 shadow-lg">
+        <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-4 space-y-1 shadow-lg relative group">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider flex items-center gap-1.5">
               Patrimônio Real da Loja
+              <Info className="size-3 text-white/30 cursor-help" />
             </span>
             <Box className="size-4 text-blue-400" />
           </div>
+          
+          {/* Tooltip Hover */}
+          <div className="absolute top-10 right-0 w-48 p-2.5 bg-[#1a1a1d] border border-white/10 rounded-xl text-[10px] text-white/70 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+            É normal este valor cair temporariamente após o pagamento de lotes ao fornecedor (pois o dinheiro sai do caixa, mas a mercadoria ainda não chegou na prateleira).
+          </div>
+
           <div className="text-xl font-extrabold text-white font-mono tracking-tight">
             {formatBRL(financials.companyEconomicEquity)}
           </div>
-          <p className="text-[10px] text-white/50">
-            Caixa ({formatBRL(financials.grossRevenue)}) + Estoque a Venda ({formatBRL(financials.stockAssetRetail)})
+          <p className="text-[10px] text-white/50 truncate">
+            Caixa ({formatBRL(financials.realCash)}) + Estoque ({formatBRL(financials.stockAssetRetail)})
           </p>
         </div>
       </div>
@@ -442,29 +482,29 @@ export default function PartnersDashboard() {
                   </div>
                 </div>
 
-                {/* Patrimônio Econômico Projetado (Capital + Lucro Projetado) */}
+                {/* Patrimônio Econômico Real (Fatia proporcional do Patrimônio da Loja) */}
                 <div className="bg-[#141416] p-4 rounded-xl border border-white/5 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] text-white/50 uppercase font-bold tracking-wider">
-                      Patrimônio Econômico Projetado
+                      Patrimônio Econômico Real
                     </span>
                     <span className="text-[10px] text-emerald-400 font-mono font-bold">
                       {pm.equityPercentage.toFixed(2)}% da empresa
                     </span>
                   </div>
                   <div className="text-2xl font-extrabold text-white font-mono tracking-tight">
-                    {formatBRL(pm.projectedEconomicEquity)}
+                    {formatBRL(pm.partnerEconomicEquity)}
                   </div>
 
-                  {/* Lucro Projetado & ROI Projetado */}
+                  {/* Ganho Econômico Real & ROI Real */}
                   <div className="flex items-center justify-between pt-1.5 border-t border-white/5 text-xs">
-                    <span className="text-white/50 text-[11px]">Lucro Projetado:</span>
+                    <span className="text-white/50 text-[11px]">Ganho Econômico Real:</span>
                     <div className="flex items-center gap-1.5">
-                      <span className="font-mono font-bold text-emerald-400">
-                        +{formatBRL(pm.projectedProfit)}
+                      <span className={`font-mono font-bold ${pm.economicGain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {pm.economicGain >= 0 ? '+' : ''}{formatBRL(pm.economicGain)}
                       </span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        {pm.projectedROI.toFixed(1)}% ROI Projetado
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${pm.simplifiedROI >= 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                        {pm.simplifiedROI.toFixed(1)}% ROI Real
                       </span>
                     </div>
                   </div>
@@ -613,7 +653,10 @@ export default function PartnersDashboard() {
                           </span>
                         </td>
                         <td className="py-3 px-4 font-semibold text-white whitespace-nowrap">
-                          {tx.partner_name || 'Sócio'}
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-white font-medium">
+                            <span className="size-1.5 rounded-full bg-emerald-400" />
+                            {getPartnerName(tx)}
+                          </span>
                         </td>
                         <td className="py-3 px-4 text-right font-mono font-bold whitespace-nowrap">
                           <span className={isEntry ? 'text-emerald-400' : 'text-rose-400'}>

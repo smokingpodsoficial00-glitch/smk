@@ -429,7 +429,7 @@ opa, deu um probleminha aqui, pode mandar de novo?`;
 
 function initConversation(phone) {
     if (!conversationHistory[phone]) {
-        const customPrompt = SYSTEM_PROMPT.replaceAll('[LINK_DO_CARDAPIO]', 'https://smokingproject01.vercel.app/');
+        const customPrompt = SYSTEM_PROMPT.replaceAll('[LINK_DO_CARDAPIO]', 'https://smoking-pods-catalogo.vercel.app/');
         conversationHistory[phone] = [
             { role: 'system', content: customPrompt }
         ];

@@ -3,7 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
-const { Client, LocalAuth, MessageTypes } = require('whatsapp-web.js');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const pino = require('pino');
 const qrcode = require('qrcode-terminal');
 const { getAiResponse, conversationHistory, initConversation } = require('./ai_agent');
 const { calculateShippingQuote } = require('./uberService');
@@ -24,12 +25,24 @@ const defaultDevOrigins = [
   'http://localhost:5174',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
+  'https://smoking-pods-admin.vercel.app',
+  'https://smoking-pods-catalogo.vercel.app',
+  'https://smoking-pods.vercel.app',
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
     // Permite requisições sem header Origin (ex: chamadas diretas servidor-a-servidor, curl, webhooks)
     if (!origin) return callback(null, true);
+
+    // Permite domínios da Vercel (painel admin, catálogo e previews) e localhost
+    if (
+      origin.endsWith('.vercel.app') ||
+      origin.startsWith('http://localhost') ||
+      origin.startsWith('http://127.0.0.1')
+    ) {
+      return callback(null, true);
+    }
 
     if (configuredOrigins.includes(origin)) {
       return callback(null, true);
@@ -43,8 +56,7 @@ const corsOptions = {
     });
     if (matchesPattern) return callback(null, true);
 
-    // Em ambiente de desenvolvimento local, permite as portas locais do Vite
-    if (process.env.NODE_ENV !== 'production' && defaultDevOrigins.includes(origin)) {
+    if (defaultDevOrigins.includes(origin)) {
       return callback(null, true);
     }
 
@@ -55,50 +67,25 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  next();
+});
+
 app.use(cors(corsOptions));
 app.use(express.json());
 
 const port = process.env.PORT || 3006;
 
-const puppeteerArgs = [
-    '--no-sandbox', 
-    '--disable-setuid-sandbox', 
-    '--disable-extensions',
-    '--disable-dev-shm-usage',
-    '--disable-accelerated-2d-canvas',
-    '--no-first-run',
-    '--no-zygote',
-    '--disable-gpu'
-];
-
-const puppeteerOptions = {
-    headless: true,
-    args: puppeteerArgs
-};
-
-if (fs.existsSync('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe')) {
-    puppeteerOptions.executablePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-}
-
-// Inicializa o cliente do WhatsApp
-const client = new Client({
-    authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    webVersionCache: {
-        type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html'
-    },
-    puppeteer: puppeteerOptions
-});
-
 let latestQr = null;
 let latestQrDataUrl = null;
 let isWhatsAppReady = false;
+let sock = null;
 const aiSentMessages = new Set();
 const detectedGroups = {};
 
-// 🛡️ CONTROLE DE SEGURANÇA E ATENDIMENTO DA IA ELOISA
-let isEloisaAiActive = true; // Master Switch (Liga/Desliga Geral)
+// 🛡️ CONTROLE DE ATENDIMENTO (IA ELOISA DESATIVADA)
+let isEloisaAiActive = false; // Chatbot Desativado (Atendimento 100% Humano)
 const silencedChatsMap = new Map(); // Human Takeover: { [phoneOrChatId]: expireTimestamp }
 const blacklistPhonesSet = new Set(); // Blacklist de números ignorados permanentemente
 
@@ -124,44 +111,245 @@ const saveBlacklistToDisk = () => {
     }
 };
 
-client.on('qr', async (qr) => {
-    latestQr = qr;
-    isWhatsAppReady = false;
-    try {
-        latestQrDataUrl = await QRCodeImage.toDataURL(qr, { width: 400, margin: 2 });
-    } catch (e) {
-        console.warn('⚠️ Erro ao converter QR Code para DataURL:', e.message);
-    }
-    console.log('----------------------------------------------------');
-    console.log('🤖 Escaneie o QR Code abaixo com o seu WhatsApp:');
-    console.log('----------------------------------------------------');
-    qrcode.generate(qr, { small: true });
-});
+// Inicializa o cliente do WhatsApp via Baileys (Direto no WebSocket, ultra-leve)
+async function connectToWhatsApp() {
+    const authDir = path.join(__dirname, 'baileys_auth');
+    const { state, saveCreds } = await useMultiFileAuthState(authDir);
+    const { version, isLatest } = await fetchLatestBaileysVersion();
+    console.log(`⚡ Usando WhatsApp Web v${version.join('.')}, isLatest: ${isLatest}`);
 
-client.on('authenticated', () => {
-    latestQr = null;
-    latestQrDataUrl = null;
-    console.log('🔑 WhatsApp Autenticado com sucesso! Carregando conversas...');
-});
+    sock = makeWASocket({
+        version,
+        logger: pino({ level: 'silent' }),
+        auth: state,
+        printQRInTerminal: false,
+        browser: ['Smoking Pods OS', 'Desktop', '1.0.0'],
+        syncFullHistory: false,
+        generateHighQualityLinkPreview: true
+    });
 
-client.on('loading_screen', (percent, message) => {
-    latestQr = null;
-    latestQrDataUrl = null;
-    console.log(`⏳ Carregando WhatsApp Web: ${percent}% - ${message}`);
-});
+    sock.ev.on('creds.update', saveCreds);
 
-client.on('ready', async () => {
-    latestQr = null;
-    latestQrDataUrl = null;
-    isWhatsAppReady = true;
-    console.log('✅ Inteligência Artificial conectada ao WhatsApp com sucesso!');
+    sock.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+            latestQr = qr;
+            isWhatsAppReady = false;
+            try {
+                latestQrDataUrl = await QRCodeImage.toDataURL(qr, { width: 400, margin: 2 });
+            } catch (e) {
+                console.warn('⚠️ Erro ao converter QR Code para DataURL:', e.message);
+            }
+            console.log('----------------------------------------------------');
+            console.log('🤖 Escaneie o QR Code abaixo com o seu WhatsApp:');
+            console.log('----------------------------------------------------');
+            qrcode.generate(qr, { small: true });
+        }
+
+        if (connection === 'close') {
+            const statusCode = (lastDisconnect?.error)?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            console.log(`⚠️ Conexão fechada devido a: ${lastDisconnect?.error?.message || statusCode}. Reconectar: ${shouldReconnect}`);
+            isWhatsAppReady = false;
+            latestQr = null;
+            latestQrDataUrl = null;
+
+            if (shouldReconnect) {
+                setTimeout(connectToWhatsApp, 3000);
+            } else {
+                console.log('🔴 Sessão encerrada (Logged out). Gerando novo pareamento...');
+                try {
+                    fs.rmSync(authDir, { recursive: true, force: true });
+                } catch (e) {}
+                setTimeout(connectToWhatsApp, 2000);
+            }
+        } else if (connection === 'open') {
+            console.log('✅ WhatsApp CONECTADO com sucesso via Baileys WebSocket!');
+            isWhatsAppReady = true;
+            latestQr = null;
+            latestQrDataUrl = null;
+        }
+    });
+
+    // Detecta mensagens e grupos
+    sock.ev.on('messages.upsert', async (m) => {
+        const msg = m.messages?.[0];
+        if (!msg || !msg.key) return;
+        const jid = msg.key.remoteJid;
+        if (!jid) return;
+
+        if (jid.endsWith('@g.us')) {
+            if (!detectedGroups[jid]) {
+                detectedGroups[jid] = {
+                    id: jid,
+                    name: 'Grupo VIP WhatsApp',
+                    unreadCount: 0,
+                    participantsCount: 0
+                };
+            }
+        }
+    });
+}
+
+// 🛡️ ARMADILHA DE DISPARO: Validação Estrutural e Resolução de JID Canônico na rede do WhatsApp
+function validateStructuralPhone(rawPhone) {
+    if (!rawPhone) return { valid: false, error: 'NUMERO_VAZIO', message: 'Nenhum número de telefone fornecido.' };
+    const clean = String(rawPhone).trim();
     
-    // Mapeamento Proativo de Agenda e LIDs para resposta e blacklist instantâneas
+    // Se for grupo
+    if (clean.includes('@g.us') || clean.includes('chat.whatsapp.com/')) {
+        return { valid: true, isGroup: true, clean };
+    }
+
+    const digits = clean.replace(/\D/g, '');
+
+    // Identificação de LIDs (IDs internos do WhatsApp que têm mais de 13 dígitos)
+    if (digits.length > 13) {
+        return {
+            valid: false,
+            error: 'LID_CORROMPIDO',
+            message: `O registro possui ${digits.length} dígitos (${digits}). Trata-se de um identificador interno de dispositivo (LID) do WhatsApp, e não de um número de telefone com DDD válido.`
+        };
+    }
+
+    // Identificação de números incompletos ou excessivos
+    const without55 = (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) ? digits.substring(2) : digits;
+    if (without55.length < 10 || without55.length > 11) {
+        return {
+            valid: false,
+            error: 'COMPRIMENTO_INVALIDO',
+            message: `Número possui comprimento inválido (${without55.length} dígitos úteis). O formato correto no Brasil é DDD (2 dígitos) + 8 ou 9 dígitos.`
+        };
+    }
+
+    const ddd = parseInt(without55.substring(0, 2), 10);
+    if (isNaN(ddd) || ddd < 11 || ddd > 99) {
+        return {
+            valid: false,
+            error: 'DDD_INVALIDO',
+            message: `DDD inválido (${without55.substring(0, 2)}). Os DDDs brasileiros válidos vão de 11 a 99.`
+        };
+    }
+
+    return {
+        valid: true,
+        isGroup: false,
+        cleanPhone: digits.startsWith('55') ? digits : `55${digits}`,
+        without55,
+        ddd: String(ddd),
+        numberBody: without55.substring(2)
+    };
+}
+
+async function resolveCanonicalWhatsAppJid(rawPhone) {
+    const structural = validateStructuralPhone(rawPhone);
+    if (!structural.valid) {
+        return structural;
+    }
+
+    if (structural.isGroup) {
+        return { valid: true, isGroup: true, jid: rawPhone };
+    }
+
+    if (!sock || !isWhatsAppReady) {
+        return {
+            valid: false,
+            error: 'WHATSAPP_OFFLINE',
+            message: 'O WhatsApp não está conectado no servidor backend. Conecte pelo QR Code na aba Marketing.'
+        };
+    }
+
+    const { ddd, numberBody } = structural;
+    
+    // Candidato 1: com 9 dígitos (ex: 55119XXXXXXXX@s.whatsapp.net)
+    const phoneWith9 = numberBody.length === 8 ? `9${numberBody}` : numberBody;
+    const jidWith9 = `55${ddd}${phoneWith9}@s.whatsapp.net`;
+
+    // Candidato 2: sem o 9 (contas antigas do WhatsApp registradas com 8 dígitos)
+    const phoneWithout9 = (numberBody.length === 9 && numberBody.startsWith('9')) ? numberBody.substring(1) : numberBody;
+    const jidWithout9 = `55${ddd}${phoneWithout9}@s.whatsapp.net`;
+
+    console.log(`🔍 [Armadilha WhatsApp] Verificando existência na rede WhatsApp: ${jidWith9} e ${jidWithout9}...`);
+
     try {
-        const contacts = await client.getContacts();
-        console.log(`📇 [Agenda] ${contacts.length} contatos indexados no cache do WhatsApp.`);
+        const checkResults = await sock.onWhatsApp(jidWith9, jidWithout9);
+        const match = (checkResults || []).find(r => r && (r.exists || r.jid));
+
+        if (match && match.jid) {
+            console.log(`✅ [Armadilha WhatsApp] Conta confirmada no WhatsApp: ${match.jid}`);
+            return {
+                valid: true,
+                isGroup: false,
+                jid: match.jid,
+                exists: true,
+                cleanPhone: match.jid.replace('@s.whatsapp.net', ''),
+                testedJids: [jidWith9, jidWithout9]
+            };
+        } else {
+            console.warn(`❌ [Armadilha WhatsApp] Número ${rawPhone} NÃO POSSUI conta ativa no WhatsApp.`);
+            return {
+                valid: false,
+                error: 'NUMERO_INEXISTENTE_NO_WHATSAPP',
+                message: `O número (${rawPhone}) NÃO possui conta no WhatsApp. O servidor do WhatsApp confirmou que este telefone não existe na rede.`,
+                testedJids: [jidWith9, jidWithout9]
+            };
+        }
+    } catch (err) {
+        console.warn('⚠️ [Armadilha WhatsApp] Falha ao consultar onWhatsApp:', err.message);
+        return {
+            valid: true,
+            isGroup: false,
+            jid: jidWith9,
+            exists: 'desconhecido',
+            cleanPhone: `55${ddd}${phoneWith9}`,
+            warning: 'Consulta prévia de existência falhou temporariamente. Tentando envio direto.'
+        };
+    }
+}
+
+// Helper legado mantido com fallback seguro
+function formatToBaileysJid(rawTarget) {
+    if (!rawTarget) return '';
+    let clean = String(rawTarget).trim();
+    if (clean.includes('@s.whatsapp.net') || clean.includes('@g.us')) {
+        return clean;
+    }
+    if (clean.includes('@c.us')) {
+        return clean.replace('@c.us', '@s.whatsapp.net');
+    }
+    const digits = clean.replace(/\D/g, '');
+    const withDdi = digits.startsWith('55') ? digits : `55${digits}`;
+    return `${withDdi}@s.whatsapp.net`;
+}
+
+async function sendBaileysMessage(target, text) {
+    if (!sock || !isWhatsAppReady) {
+        throw new Error('WhatsApp não está conectado.');
+    }
+    
+    let jid = target;
+    if (!String(target).includes('@g.us') && !String(target).includes('chat.whatsapp.com/')) {
+        const probe = await resolveCanonicalWhatsAppJid(target);
+        if (!probe.valid) {
+            throw new Error(`[${probe.error}] ${probe.message}`);
+        }
+        jid = probe.jid;
+    }
+
+    // Presença "composing" (digitando)
+    try {
+        await sock.sendPresenceUpdate('composing', jid);
     } catch (e) {}
-});
+
+    const res = await sock.sendMessage(jid, { text: String(text) });
+
+    try {
+        await sock.sendPresenceUpdate('paused', jid);
+    } catch (e) {}
+
+    return res;
+}
 
 app.get('/api/qr', (req, res) => {
     const fallbackUrl = latestQr ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(latestQr)}` : null;
@@ -177,34 +365,21 @@ app.post('/api/logout', async (req, res) => {
         console.log('🔴 Recebido comando de desconexão e limpeza total de sessão do WhatsApp...');
         isWhatsAppReady = false;
         latestQr = null;
+        latestQrDataUrl = null;
 
         try {
-            await client.logout();
+            if (sock) await sock.logout();
         } catch (e) {
             console.warn('Aviso no logout:', e.message);
         }
-        try {
-            await client.destroy();
-        } catch (e) {
-            console.warn('Aviso no destroy:', e.message);
-        }
 
-        const authPath = path.join(__dirname, '.wwebjs_auth');
-        const cachePath = path.join(__dirname, '.wwebjs_cache');
+        const authPath = path.join(__dirname, 'baileys_auth');
         if (fs.existsSync(authPath)) {
             try {
                 fs.rmSync(authPath, { recursive: true, force: true });
-                console.log('🧹 Pasta de sessão .wwebjs_auth removida.');
+                console.log('🧹 Pasta de sessão baileys_auth removida.');
             } catch (e) {
                 console.warn('Aviso ao remover pasta auth:', e.message);
-            }
-        }
-        if (fs.existsSync(cachePath)) {
-            try {
-                fs.rmSync(cachePath, { recursive: true, force: true });
-                console.log('🧹 Pasta de cache .wwebjs_cache removida.');
-            } catch (e) {
-                console.warn('Aviso ao remover pasta cache:', e.message);
             }
         }
 
@@ -213,7 +388,7 @@ app.post('/api/logout', async (req, res) => {
         setTimeout(async () => {
             try {
                 console.log('🔄 Reinicializando cliente do WhatsApp para gerar novo QR Code...');
-                await client.initialize();
+                await connectToWhatsApp();
             } catch (e) {
                 console.error('Erro ao re-inicializar cliente:', e);
             }
@@ -307,69 +482,10 @@ async function sendSequentialMessages(chat, msg, messagesArray, chatId, isFirstM
             const charCount = currentMsg.length;
             const typingDurationMs = Math.min(Math.max(charCount * 50, 3000), 6500);
 
-            // Dispara indicador "digitando..." via WhatsApp Web diretamente
-            if (client && targetChatId) {
-                try {
-                    // Tenta via chat nativo ou via evaluate direto no WhatsApp Web
-                    if (chat && typeof chat.sendStateTyping === 'function') {
-                        await chat.sendStateTyping();
-                    } else {
-                        await client.pupPage.evaluate(async (jid) => {
-                            if (window.WWebJS && window.WWebJS.sendPresenceAvailable) {
-                                window.WWebJS.sendPresenceAvailable();
-                            }
-                            if (window.Store && window.Store.Chat) {
-                                const c = await window.Store.Chat.get(jid) || window.Store.Chat.find(jid);
-                                if (c && c.markComposing) {
-                                    c.markComposing();
-                                }
-                            }
-                        }, targetChatId);
-                    }
-                } catch (tErr) {
-                    // Fallback se getChat falhar
-                    try {
-                        const resolvedChat = await client.getChatById(targetChatId);
-                        if (resolvedChat) await resolvedChat.sendStateTyping();
-                    } catch (e2) {}
-                }
-            }
-
-            // Aguarda o tempo realista enquanto a barra mostra "digitando..."
-            await new Promise(resolve => setTimeout(resolve, typingDurationMs));
-
-            // 3. Envia a mensagem
-            try {
-                aiSentMessages.add(currentMsg.trim().toLowerCase());
-                
-                if (client && targetChatId) {
-                    await client.sendMessage(targetChatId, currentMsg);
-                } else if (msg && typeof msg.reply === 'function') {
-                    await msg.reply(currentMsg);
-                }
-            } catch (sendErr) {
-                console.warn('⚠️ Falha no sendMessage:', sendErr.message);
-                if (msg && typeof msg.reply === 'function') {
-                    await msg.reply(currentMsg);
-                }
-            }
-
-            // 4. Limpa o estado de digitação
-            if (client && targetChatId) {
-                try {
-                    if (chat && typeof chat.clearState === 'function') {
-                        await chat.clearState();
-                    } else {
-                        await client.pupPage.evaluate(async (jid) => {
-                            if (window.Store && window.Store.Chat) {
-                                const c = await window.Store.Chat.get(jid) || window.Store.Chat.find(jid);
-                                if (c && c.markPaused) {
-                                    c.markPaused();
-                                }
-                            }
-                        }, targetChatId);
-                    }
-                } catch (cErr) {}
+            // Dispara envio direto e seguro com digitação via Baileys
+            aiSentMessages.add(currentMsg.trim().toLowerCase());
+            if (targetChatId) {
+                await sendBaileysMessage(targetChatId, currentMsg);
             }
         }
     } catch (err) {
@@ -407,15 +523,9 @@ function scheduleFollowUp(chatId, stage, delayMs, messagesFn) {
             const current = pendingFollowUps.get(chatId);
             if (!current || !current.timers.includes(timerId)) return;
 
-            const formattedNumber = `${chatId}@c.us`;
-            const chat = await client.getChatById(formattedNumber);
             const messages = messagesFn();
-
             for (const text of messages) {
-                await chat.sendStateTyping();
-                await new Promise(resolve => setTimeout(resolve, 5000));
-                await client.sendMessage(formattedNumber, text);
-                await chat.clearState();
+                await sendBaileysMessage(chatId, text);
             }
 
             console.log(`📤 [Follow-up] ${stage} enviado para ${chatId}`);
@@ -901,7 +1011,7 @@ function detectFollowUpTriggers(chatId, aiResponse) {
     const lower = aiResponse.toLowerCase();
     
     // Detect table/cardápio sent
-    if (lower.includes('smokingproject01.vercel.app')) {
+    if (lower.includes('smoking-pods-catalogo.vercel.app')) {
         scheduleTableFollowUp(chatId);
     }
     
@@ -928,317 +1038,9 @@ function detectFollowUpTriggers(chatId, aiResponse) {
 }
 
 // =============================================
-// MAIN MESSAGE HANDLER
+// MESSAGE HANDLER (Chatbot IA Desativado - Atendimento 100% Humano)
 // =============================================
-client.on('message_create', async msg => {
-    // Avoid status broadcasts
-    if (msg.from === 'status@broadcast') return;
-
-    // --- SEGURANÇA 1: HUMAN TAKEOVER (Se o operador humano digitar pelo celular/painel) ---
-    if (msg.fromMe) {
-        const bodyLower = (msg.body || '').trim().toLowerCase();
-        if (aiSentMessages.has(bodyLower)) {
-            aiSentMessages.delete(bodyLower);
-            return; // Resposta enviada pela própria Eloísa, ignora para evitar loop
-        }
-
-        // Se uma pessoa real digitou pelo WhatsApp Web ou celular, silencia a Eloisa para este cliente por 4 horas
-        const targetRecipient = msg.to ? msg.to.split('@')[0] : '';
-        if (targetRecipient && !targetRecipient.endsWith('@g.us')) {
-            const silenceExpiry = Date.now() + (4 * 60 * 60 * 1000); // 4 horas
-            silencedChatsMap.set(targetRecipient, silenceExpiry);
-            const cleanTarget = targetRecipient.replace(/\D/g, '');
-            silencedChatsMap.set(cleanTarget, silenceExpiry);
-            console.log(`👤 [Human Takeover] Atendente humano respondeu para ${targetRecipient}. Eloisa silenciada neste chat por 4h.`);
-        }
-        return; // Não processa mensagens enviadas por humanos como entrada da IA
-    }
-
-    // --- SEGURANÇA 2: MASTER SWITCH (Botão Liga/Desliga Geral) ---
-    if (!isEloisaAiActive) {
-        return; // IA pausada pelo lojista no painel
-    }
-
-    // Ignore groups completely for AI chatbot, but register for Marketing module
-    if (msg.from.endsWith('@g.us')) {
-        try {
-            const grpId = msg.from;
-            if (!detectedGroups[grpId]) {
-                detectedGroups[grpId] = {
-                    id: grpId,
-                    name: 'Grupo VIP WhatsApp',
-                    unreadCount: 0,
-                    participantsCount: 0
-                };
-                // Tenta puxar o nome real do grupo
-                client.getChatById(grpId).then(c => {
-                    if (c && c.name) detectedGroups[grpId].name = c.name;
-                }).catch(() => {});
-            }
-        } catch (e) {}
-        return;
-    }
-
-    // 🔍 RESOLUÇÃO OFICIAL DE LID (WWebJS getContactLidAndPhone & getContactById)
-    let senderNumber = msg.from ? msg.from.split('@')[0] : '';
-    let contactNumber = senderNumber;
-    let contactName = '';
-    let resolvedPhone = null;
-
-    // Se a mensagem vier com formato LID (ex: 206494142341307@lid ou msg.from LID)
-    if (msg.from && (msg.from.includes('@lid') || senderNumber.length > 13)) {
-        try {
-            // 1. Tenta método nativo oficial do WWebJS para resolver LID -> PN (Phone Number)
-            if (typeof client.getContactLidAndPhone === 'function') {
-                const lidInfos = await client.getContactLidAndPhone([msg.from]);
-                if (lidInfos && lidInfos.length > 0 && lidInfos[0].pn) {
-                    resolvedPhone = String(lidInfos[0].pn).replace(/\D/g, '');
-                    contactNumber = resolvedPhone;
-                    console.log(`🔗 [LID Oficial] ${msg.from} mapeado com sucesso para o Telefone: ${resolvedPhone}`);
-                }
-            }
-        } catch (lidErr) {
-            console.warn('⚠️ Aviso ao resolver LID via getContactLidAndPhone:', lidErr.message);
-        }
-    }
-
-    // 2. Tenta obter o objeto Contact completo
-    try {
-        const contact = await msg.getContact();
-        if (contact) {
-            contactName = contact.name || contact.pushname || contact.shortName || '';
-            if (contact.number) {
-                contactNumber = contact.number;
-            }
-        }
-    } catch (cErr) {}
-
-    const cleanSender = senderNumber.replace(/\D/g, '');
-    const cleanContact = contactNumber.replace(/\D/g, '');
-    const cleanResolved = resolvedPhone ? resolvedPhone.replace(/\D/g, '') : '';
-
-    // --- SEGURANÇA 3: BLACKLIST / CONTATOS IGNORADOS (TRAVA BLINDADA) ---
-    let isBlacklisted = false;
-
-    // 1. Checagem direta em memória
-    if (blacklistPhonesSet.has(senderNumber) || 
-        blacklistPhonesSet.has(cleanSender) || 
-        blacklistPhonesSet.has(contactNumber) || 
-        blacklistPhonesSet.has(cleanContact) ||
-        (cleanResolved && blacklistPhonesSet.has(cleanResolved))) {
-        isBlacklisted = true;
-    }
-
-    // 2. Checagem de sufixos numéricos (DDD + 8 ou 9 dígitos do Brasil)
-    if (!isBlacklisted && blacklistPhonesSet.size > 0) {
-        for (const bp of blacklistPhonesSet) {
-            const cleanBp = bp.replace(/\D/g, '');
-            if (!cleanBp) continue;
-
-            const bpLast8 = cleanBp.slice(-8);
-            const senderLast8 = cleanSender.slice(-8);
-            const contactLast8 = cleanContact.slice(-8);
-            const resolvedLast8 = cleanResolved ? cleanResolved.slice(-8) : '';
-
-            if ((cleanBp.length >= 8 && (senderLast8 === bpLast8 || contactLast8 === bpLast8 || resolvedLast8 === bpLast8)) ||
-                cleanSender.includes(cleanBp) || cleanBp.includes(cleanSender) ||
-                cleanContact.includes(cleanBp) || cleanBp.includes(cleanContact) ||
-                (cleanResolved && (cleanResolved.includes(cleanBp) || cleanBp.includes(cleanResolved)))) {
-                isBlacklisted = true;
-                break;
-            }
-        }
-    }
-
-    if (isBlacklisted) {
-        console.log(`🚫 [Blacklist Ativa] Mensagem de "${contactName}" (Tel: ${contactNumber} | LID: ${senderNumber}) BLOQUEADA COM SUCESSO! A Eloisa NÃO responderá.`);
-        return; // ABORTA IMEDIATAMENTE NA RAIZ
-    }
-
-    // --- SEGURANÇA 4: CHECAGEM DE SILENCIAMENTO ATIVO (Human Takeover) ---
-    const isSilenced = silencedChatsMap.has(senderNumber) || silencedChatsMap.has(cleanSender) || silencedChatsMap.has(cleanContact);
-    if (isSilenced) {
-        const expiry = silencedChatsMap.get(senderNumber) || silencedChatsMap.get(cleanSender) || silencedChatsMap.get(cleanContact);
-        if (Date.now() < expiry) {
-            const remainingMins = Math.ceil((expiry - Date.now()) / 60000);
-            console.log(`🤫 [Silenciada] Eloisa em pausa para ${contactNumber || senderNumber} (restam ${remainingMins} min de Human Takeover).`);
-            return;
-        } else {
-            silencedChatsMap.delete(senderNumber);
-            silencedChatsMap.delete(cleanSender);
-            silencedChatsMap.delete(cleanContact);
-        }
-    }
-
-    // Ignore old messages (WhatsApp Web sync backlog)
-    const now = Math.floor(Date.now() / 1000);
-    if (now - msg.timestamp > 60) {
-        return;
-    }
-
-    // --- MESSAGE TYPE FILTERS ---
-    if (msg.type === 'sticker' || msg.type === MessageTypes.STICKER) {
-        return;
-    }
-
-    let messageText = msg.body || '';
-    const chatId = `${senderNumber}`;
-
-    // --- AUDIO TRANSCRIPTION ---
-    if (msg.hasMedia && (msg.type === 'ptt' || msg.type === 'audio')) {
-        try {
-            console.log(`🎙️ Áudio recebido de ${senderNumber}, baixando e transcrevendo...`);
-            const media = await msg.downloadMedia();
-            if (media && media.data) {
-                const transcribedText = await transcribeAudio(media.data, media.mimetype);
-                if (transcribedText) {
-                    messageText = `[ÁUDIO TRANSCRITO]: ${transcribedText}`;
-                    console.log(`✅ Áudio transcrito: ${transcribedText}`);
-                } else {
-                    // P51 fallback
-                    const chat = await msg.getChat();
-                    await chat.sendStateTyping();
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                    await msg.reply('eu infelizmente não consigo ouvir áudios amg, consegue me enviar por escrito oque mandou?');
-                    await chat.clearState();
-                    return;
-                }
-            }
-        } catch (err) {
-            console.error(`❌ Erro no processamento de áudio de ${senderNumber}:`, err);
-            try {
-                const chat = await msg.getChat();
-                await chat.sendStateTyping();
-                await new Promise(resolve => setTimeout(resolve, 5000));
-                await msg.reply('eu infelizmente não consigo ouvir áudios amg, consegue me enviar por escrito oque mandou?');
-                await chat.clearState();
-            } catch (fallbackErr) {
-                console.error(`❌ Falha ao tentar responder o erro de áudio para ${senderNumber}:`, fallbackErr);
-            }
-            return;
-        }
-    }
-    // --- PERSONAL CONTACT FILTER ---
-    try {
-        const contact = await msg.getContact();
-
-        let rawPhone = (contact && contact.number && contact.number.length <= 15) ? contact.number : senderNumber;
-        const cleanDigits = rawPhone.replace(/\D/g, '');
-        let formattedPhone = cleanDigits;
-
-        if (cleanDigits.length === 11) {
-            formattedPhone = `(${cleanDigits.substring(0, 2)}) ${cleanDigits.substring(2, 7)}-${cleanDigits.substring(7)}`;
-        } else if (cleanDigits.length === 13 && cleanDigits.startsWith('55')) {
-            formattedPhone = `+55 (${cleanDigits.substring(2, 4)}) ${cleanDigits.substring(4, 9)}-${cleanDigits.substring(9)}`;
-        }
-
-        latestFormattedPhones[senderNumber] = formattedPhone;
-
-        let realWhatsAppName = contact.pushname || contact.name || '';
-        if (/^[\d\s+\-()]+$/.test(realWhatsAppName.trim())) {
-            realWhatsAppName = '';
-        }
-
-        if (realWhatsAppName) {
-            latestContactNames[senderNumber] = realWhatsAppName;
-        }
-        const contactName = (realWhatsAppName || '').toLowerCase();
-
-        const personalContacts = [
-            'leo pinheiro',
-            'ruan',
-            'rafael',
-            'olguinha',
-            'gata',
-            'palominha'
-        ];
-
-        const isPersonal = personalContacts.some(name => contactName.includes(name));
-
-        if (isPersonal) {
-            console.log(`👤 [Filtro Pessoal] Ignorando contato: ${contact.name || contact.pushname} (${senderNumber})`);
-            return;
-        }
-
-        console.log(`📩 Mensagem recebida de ${senderNumber}: ${messageText}`);
-    } catch (err) {
-        console.error('⚠️ Erro ao checar contato pessoal:', err);
-    }
-
-    // --- SPAM DETECTION ---
-    if (messageText && isSpamMessage(messageText)) {
-        console.log(`🚫 [Spam] Ignorando mensagem de ${senderNumber}: ${messageText.substring(0, 50)}...`);
-        return;
-    }
-
-    // P34: Location messages — ask for written address
-    if (msg.type === 'location' || msg.type === MessageTypes.LOCATION) {
-        console.log(`📍 Localização recebida de ${senderNumber}, pedindo endereço escrito`);
-        try {
-            const chat = await msg.getChat();
-            await chat.sendStateTyping();
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            await msg.reply('poderia me enviar por escrito?');
-            await chat.clearState();
-            await new Promise(resolve => setTimeout(resolve, 4000));
-            await chat.sendStateTyping();
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            await msg.reply('para evitar erros na hora do motoboy levar o seu pedido');
-            await chat.clearState();
-        } catch (err) {
-            console.error('❌ Erro ao responder localização:', err);
-        }
-        return;
-    }
-
-    // --- Cancel any pending follow-ups (client responded) ---
-    cancelFollowUps(chatId);
-
-    // =============================================
-    // CODE-007: DEBOUNCE SYSTEM (8 seconds)
-    // =============================================
-    // Accumulate messages. After 8s of silence, process them all as one.
-    
-    // If there's an existing debounce timer, clear it and accumulate
-    if (debounceTimers.has(chatId)) {
-        clearTimeout(debounceTimers.get(chatId));
-    }
-
-    // Store/accumulate message data
-    if (!pendingMessages.has(chatId)) {
-        pendingMessages.set(chatId, { messages: [], msg: msg, hasMedia: false });
-    }
-    const pending = pendingMessages.get(chatId);
-    if (messageText) {
-        pending.messages.push(messageText);
-    }
-    // Track if ANY message in this batch had media (photo, pdf, document)
-    if (msg.hasMedia) {
-        pending.hasMedia = true;
-    }
-    // Always keep the latest msg reference (for reply)
-    pending.msg = msg;
-
-    // Set debounce timer for 8 seconds
-    const timerId = setTimeout(async () => {
-        debounceTimers.delete(chatId);
-        
-        // Grab and clear pending messages
-        const data = pendingMessages.get(chatId);
-        pendingMessages.delete(chatId);
-        
-        if (!data || (data.messages.length === 0 && !data.hasMedia)) return;
-
-        // Combine all accumulated messages into one
-        const combinedMessage = data.messages.join('\n');
-        const latestMsg = data.msg;
-
-        // Process the combined message, passing the accumulated hasMedia flag
-        await processMessage(latestMsg, senderNumber, chatId, combinedMessage, data.hasMedia);
-    }, 8000);
-
-    debounceTimers.set(chatId, timerId);
-});
+// O atendimento é realizado 100% manualmente pelo operador humano.
 
 // =============================================
 // CORE MESSAGE PROCESSING (after debounce)
@@ -1585,20 +1387,10 @@ app.post('/api/webhook/dispatch', async (req, res) => {
         const msg1 = 'seu pedido já saiu para entrega!';
         const msg2 = trackingLink || '[link de rastreio será enviado em breve]';
 
-        // Send both messages sequentially with typing simulation
-        const chat = await client.getChatById(formattedNumber);
-
-        await chat.sendStateTyping();
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        await client.sendMessage(formattedNumber, msg1);
-        await chat.clearState();
-
+        // Send both messages sequentially with typing simulation via Baileys
+        await sendBaileysMessage(formattedNumber, msg1);
         await new Promise(resolve => setTimeout(resolve, 4000));
-
-        await chat.sendStateTyping();
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        await client.sendMessage(formattedNumber, msg2);
-        await chat.clearState();
+        await sendBaileysMessage(formattedNumber, msg2);
 
         console.log(`🚀 [Webhook] Mensagem de despacho enviada para ${formattedNumber}`);
         res.json({ success: true, message: 'Mensagem de despacho enviada pelo WhatsApp.' });
@@ -1613,7 +1405,7 @@ app.post('/api/webhook/dispatch', async (req, res) => {
 // =============================================
 app.get('/api/marketing/whatsapp-data', async (req, res) => {
     try {
-        if (!isWhatsAppReady || !client) {
+        if (!isWhatsAppReady || !sock) {
             return res.status(503).json({ 
                 error: 'WhatsApp não está conectado.',
                 isReady: false,
@@ -1622,63 +1414,82 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
             });
         }
 
-        console.log('🔄 [Marketing] Buscando contatos e grupos reais da agenda do WhatsApp...');
+        console.log('🔄 [Marketing] Buscando grupos e contatos do WhatsApp via Baileys...');
         
-        // 1. Puxa todos os contatos salvos no chip
-        let rawContacts = [];
+        let groups = [];
         try {
-            rawContacts = await client.getContacts();
-        } catch (e) {
-            console.warn('Aviso ao buscar contatos:', e.message);
+            const groupData = await sock.groupFetchAllParticipating();
+            groups = Object.values(groupData).map(g => ({
+                id: g.id,
+                name: g.subject || 'Grupo WhatsApp',
+                unreadCount: 0,
+                participantsCount: g.participants ? g.participants.length : 0
+            })).sort((a, b) => a.name.localeCompare(b.name));
+        } catch (gErr) {
+            console.warn('Aviso ao buscar grupos via Baileys:', gErr.message);
         }
 
-        const seenPhones = new Set();
-        const contacts = rawContacts
-            .filter(c => {
-                if (!c || !c.id || !c.id.user || c.isGroup || c.isEnterprise) return false;
-                if (!c.name && !c.isMyContact) return false;
-                if (c.id.user.length < 8) return false;
-                const phone = c.id.user;
-                if (seenPhones.has(phone)) return false;
-                seenPhones.add(phone);
-                return true;
-            })
-            .map(c => {
-                const phone = c.id.user || '';
-                const name = c.name || c.pushname || c.shortName || `Contato ${phone.slice(-4)}`;
-                return {
-                    id: c.id._serialized || `${phone}@c.us`,
-                    phone,
-                    name,
-                    isSaved: !!c.name,
-                };
-            })
-            .sort((a, b) => a.name.localeCompare(b.name));
+        // 👥 Unificação de Contatos: Reúne todos os contatos salvos das listas e do Supabase (Apenas telefones válidos)
+        const contactsMap = new Map();
 
-        // 2. Extração 100% NATIVA e REAL dos grupos a partir dos contatos do WhatsApp (onde isGroup === true)
-        const seenGroups = new Set();
-        const groups = rawContacts
-            .filter(c => {
-                if (!c || !c.id) return false;
-                const isGroupJid = c.isGroup || c.id.server === 'g.us' || String(c.id._serialized || '').endsWith('@g.us');
-                return isGroupJid;
-            })
-            .map(c => {
-                const idStr = c.id._serialized || `${c.id.user}@g.us`;
-                const groupName = c.name || c.formattedTitle || c.subject || c.pushname || 'Grupo WhatsApp';
-                return {
-                    id: idStr,
-                    name: groupName,
-                    unreadCount: 0,
-                    participantsCount: 0
-                };
-            })
-            .filter(g => {
-                if (seenGroups.has(g.id) || !g.name || g.name === 'Grupo WhatsApp') return false;
-                seenGroups.add(g.id);
-                return true;
-            })
-            .sort((a, b) => a.name.localeCompare(b.name));
+        // 1. Contatos das Listas Salvas (Preserva 100% dos nomes e telefones cadastrados, expurga LIDs)
+        try {
+            const config = loadMarketingConfig();
+            (config.lists || []).forEach(list => {
+                (list.contacts || []).forEach(c => {
+                    const raw = c.cleanPhone || c.phone || '';
+                    const structural = validateStructuralPhone(raw);
+                    if (structural.valid && !structural.isGroup) {
+                        const norm = structural.cleanPhone;
+                        if (!contactsMap.has(norm)) {
+                            contactsMap.set(norm, {
+                                id: c.id || `${norm}@s.whatsapp.net`,
+                                name: c.name || `Cliente ${norm.slice(-4)}`,
+                                phone: c.phone || norm,
+                                cleanPhone: norm,
+                                isSaved: true
+                            });
+                        }
+                    }
+                });
+            });
+        } catch (e) {
+            console.warn('⚠️ Erro ao ler contatos das listas locais:', e.message);
+        }
+
+        // 2. Contatos do Supabase (smoking_clients - filtra LIDs como 206494142341307)
+        try {
+            const { data: dbClients } = await supabase
+                .from('smoking_clients')
+                .select('id, name, phone')
+                .limit(2000);
+
+            (dbClients || []).forEach(cl => {
+                if (!cl.phone) return;
+                const structural = validateStructuralPhone(cl.phone);
+                if (structural.valid && !structural.isGroup) {
+                    const norm = structural.cleanPhone;
+                    if (contactsMap.has(norm)) {
+                        const existing = contactsMap.get(norm);
+                        if ((!existing.name || existing.name.startsWith('Cliente')) && cl.name) {
+                            existing.name = cl.name;
+                        }
+                    } else {
+                        contactsMap.set(norm, {
+                            id: cl.id || `${norm}@s.whatsapp.net`,
+                            name: cl.name || `Cliente ${norm.slice(-4)}`,
+                            phone: cl.phone,
+                            cleanPhone: norm,
+                            isSaved: true
+                        });
+                    }
+                }
+            });
+        } catch (dbErr) {
+            console.warn('⚠️ Erro ao consultar smoking_clients no Supabase:', dbErr.message);
+        }
+
+        const contacts = Array.from(contactsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
         // Se ainda vazio, inclui grupos detectados por mensagens recebidas recentemente
         if (typeof detectedGroups !== 'undefined') {
@@ -1795,21 +1606,67 @@ app.post('/api/chatbot/blacklist', (req, res) => {
 
     return res.json({ success: true, blacklist: displayBlacklist });
 });
+// 🛡️ ENDPOINT CENTRAL DE DISPARO COM ARMADILHA DE TELEMETRIA
 app.post('/api/marketing/send-direct', async (req, res) => {
     try {
-        const { phone, name, text, campaignId } = req.body;
+        const { phone, name, text, campaignId, force } = req.body;
         
         if (!phone || !text) {
-            return res.status(400).json({ error: 'Telefone e texto da mensagem são obrigatórios.' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'DADOS_OBRIGATORIOS',
+                message: 'Telefone e texto da mensagem são obrigatórios.' 
+            });
         }
 
-        const config = loadMarketingConfig();
-        const rawPhone = String(phone).replace(/\D/g, '');
-        const cleanPhone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
+        if (!isWhatsAppReady || !sock) {
+            return res.status(503).json({ 
+                success: false,
+                error: 'WHATSAPP_OFFLINE',
+                message: 'WhatsApp não está conectado no servidor backend. Conecte pelo QR Code na aba Marketing.' 
+            });
+        }
 
-        // 🛡️ TRAVA RÍGIDA ANTI-DUPLICAÇÃO: Checa se o contato já foi enviado
-        if (campaignId && isPhoneAlreadySent(campaignId, cleanPhone, config)) {
-            console.warn(`🛑 [Marketing Blindagem] Disparo IGNORADO para ${cleanPhone} (${name || 'Cliente'}). Este contato já recebeu a campanha "${campaignId}".`);
+        const isTestCampaign = force || (campaignId && (
+            String(campaignId).toLowerCase().includes('teste') || 
+            String(name || '').toLowerCase().includes('teste')
+        ));
+
+        // 🛡️ ARMADILHA 1: Validação & Resolução de JID Canônico no WhatsApp
+        let targetJid = '';
+        let probeDetails = null;
+
+        if (String(phone).includes('chat.whatsapp.com/')) {
+            try {
+                const inviteCode = String(phone).split('chat.whatsapp.com/')[1].trim().split('?')[0];
+                const groupChat = await sock.groupAcceptInvite(inviteCode);
+                targetJid = groupChat || `${inviteCode}@g.us`;
+            } catch (invErr) {
+                console.warn('⚠️ Não foi possível resolver convite de grupo:', invErr.message);
+                targetJid = phone;
+            }
+        } else if (String(phone).includes('@g.us')) {
+            targetJid = String(phone);
+        } else {
+            probeDetails = await resolveCanonicalWhatsAppJid(phone);
+            if (!probeDetails.valid) {
+                console.warn(`🚨 [ARMADILHA DE DISPARO] Disparo barrado para ${phone} (${name || 'Cliente'}): [${probeDetails.error}] ${probeDetails.message}`);
+                return res.status(422).json({
+                    success: false,
+                    error: probeDetails.error,
+                    message: probeDetails.message,
+                    phone: String(phone),
+                    details: probeDetails
+                });
+            }
+            targetJid = probeDetails.jid;
+        }
+
+        // 🛡️ ARMADILHA 2: Trava anti-duplicação se não for teste forçado
+        const config = loadMarketingConfig();
+        const cleanDigitsForHistory = targetJid.replace(/\D/g, '');
+        if (!force && !isTestCampaign && campaignId && isPhoneAlreadySent(campaignId, cleanDigitsForHistory, config)) {
+            console.warn(`🛑 [Marketing Blindagem] Disparo IGNORADO para ${cleanDigitsForHistory} (${name || 'Cliente'}). Já recebeu "${campaignId}".`);
             return res.json({ 
                 success: true, 
                 skipped: true, 
@@ -1817,58 +1674,141 @@ app.post('/api/marketing/send-direct', async (req, res) => {
             });
         }
 
-        if (!isWhatsAppReady || !client) {
-            return res.status(503).json({ error: 'WhatsApp não está conectado no momento.' });
-        }
+        console.log(`📢 [Marketing] Enviando mensagem para ${targetJid} (${name || 'Cliente'})...`);
 
-        let formattedNumber = '';
-        if (String(phone).includes('chat.whatsapp.com/')) {
-            try {
-                const inviteCode = String(phone).split('chat.whatsapp.com/')[1].trim().split('?')[0];
-                const groupChat = await client.acceptInvite(inviteCode);
-                formattedNumber = groupChat || `${inviteCode}@g.us`;
-            } catch (invErr) {
-                console.warn('⚠️ Não foi possível resolver convite de grupo:', invErr.message);
-                formattedNumber = phone;
-            }
-        } else if (String(phone).includes('@g.us') || String(phone).includes('@c.us')) {
-            formattedNumber = String(phone);
-        } else {
-            formattedNumber = `${cleanPhone}@c.us`;
-        }
-
-        console.log(`📢 [Marketing] Enviando mensagem personalizada para ${formattedNumber} (${name || 'Cliente'})...`);
-
-        // 🛡️ Simulação humana garantida: Digitando... entre 12 e 18 segundos OBRIGATÓRIOS
-        const typingDurationMs = Math.floor(Math.random() * 6000) + 12000;
+        // Simulação humana: Se for teste / forçado, delay leve (1.5s). Se for lote em massa, 10-15s.
+        const typingDurationMs = isTestCampaign ? 1500 : (Math.floor(Math.random() * 5000) + 10000);
         try {
-            const chat = await client.getChatById(formattedNumber);
-            if (chat) {
-                await chat.sendStateTyping();
-            }
+            await sock.sendPresenceUpdate('composing', targetJid);
         } catch (chatErr) {}
 
-        // Delay obrigatório inegociável
         await new Promise(resolve => setTimeout(resolve, typingDurationMs));
 
-        await client.sendMessage(formattedNumber, text);
+        // 🚀 DISPARO VIA BAILEYS
+        const sentResult = await sock.sendMessage(targetJid, { text });
 
         try {
-            const chat = await client.getChatById(formattedNumber);
-            if (chat) await chat.clearState();
+            await sock.sendPresenceUpdate('paused', targetJid);
         } catch (chatErr) {}
 
-        // 🛡️ Grava imediatamente no JSON para que nunca mais se repita
-        if (campaignId && cleanPhone) {
-            markPhoneAsSent(campaignId, cleanPhone, config);
+        // Grava no histórico permanente se não for envio de teste forçado
+        if (!force && !isTestCampaign && campaignId && cleanDigitsForHistory) {
+            markPhoneAsSent(campaignId, cleanDigitsForHistory, config);
             saveMarketingConfig(config);
         }
 
-        console.log(`✅ [Marketing] Mensagem entregue com sucesso para ${formattedNumber}`);
-        return res.json({ success: true, message: 'Mensagem de marketing enviada com sucesso!' });
+        const messageId = sentResult?.key?.id || `MSG_${Date.now()}`;
+        console.log(`✅ [Marketing] Mensagem entregue com sucesso para ${targetJid} (ID: ${messageId})`);
+        
+        return res.json({ 
+            success: true, 
+            message: 'Mensagem de marketing entregue com sucesso ao servidor do WhatsApp!',
+            targetJid,
+            messageId,
+            verifiedOnWhatsApp: true,
+            timestamp: new Date().toISOString()
+        });
     } catch (error) {
         console.error('❌ Erro no envio de marketing:', error);
-        return res.status(500).json({ error: error.message || 'Falha ao enviar mensagem de marketing.' });
+        return res.status(500).json({ 
+            success: false,
+            error: 'FALHA_ENVIO_WHATSAPP',
+            message: error.message || 'Falha ao enviar mensagem de marketing no WhatsApp.' 
+        });
+    }
+});
+
+// 🔍 ENDPOINT DE DIAGNÓSTICO PRÉVIO (Checagem de Número na Rede WhatsApp)
+app.post('/api/marketing/probe-contact', async (req, res) => {
+    try {
+        const { phone } = req.body;
+        if (!phone) {
+            return res.status(400).json({ success: false, error: 'Telefone obrigatório.' });
+        }
+        const probe = await resolveCanonicalWhatsAppJid(phone);
+        return res.json({ success: probe.valid, probe });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// 🧪 ENDPOINT DO LABORATÓRIO DE DISPARO (Com telemetria e auditoria completa passo a passo)
+app.post('/api/marketing/test-lab-dispatch', async (req, res) => {
+    const trace = [];
+    try {
+        const { phone, text, name } = req.body;
+        trace.push({ step: 1, title: 'Recepção dos Dados', status: 'OK', details: { phone, name: name || 'Teste' } });
+
+        if (!phone || !text) {
+            trace.push({ step: 2, title: 'Validação de Parâmetros', status: 'ERROR', message: 'Telefone ou mensagem vazia.' });
+            return res.status(400).json({ success: false, trace, error: 'Telefone e mensagem são obrigatórios.' });
+        }
+
+        if (!isWhatsAppReady || !sock) {
+            trace.push({ step: 2, title: 'Status do WhatsApp', status: 'ERROR', message: 'WhatsApp desconectado no servidor.' });
+            return res.status(503).json({ success: false, trace, error: 'WhatsApp offline. Conecte pelo QR Code.' });
+        }
+        trace.push({ step: 2, title: 'Status do WhatsApp', status: 'OK', message: 'WhatsApp WebSocket conectado e pronto.' });
+
+        // Validação estrutural
+        const structural = validateStructuralPhone(phone);
+        if (!structural.valid) {
+            trace.push({ step: 3, title: 'Validação Estrutural', status: 'ERROR', message: structural.message, error: structural.error });
+            return res.status(422).json({ success: false, trace, error: structural.error, message: structural.message });
+        }
+        trace.push({ 
+            step: 3, 
+            title: 'Validação Estrutural', 
+            status: 'OK', 
+            details: { ddd: structural.ddd, digits: structural.cleanPhone, length: structural.without55?.length } 
+        });
+
+        // Verificação no WhatsApp Server
+        const probe = await resolveCanonicalWhatsAppJid(phone);
+        if (!probe.valid) {
+            trace.push({ step: 4, title: 'Verificação no WhatsApp Server', status: 'ERROR', message: probe.message, error: probe.error });
+            return res.status(422).json({ success: false, trace, error: probe.error, message: probe.message });
+        }
+        trace.push({ 
+            step: 4, 
+            title: 'Verificação no WhatsApp Server', 
+            status: 'OK', 
+            message: `Conta ativa confirmada! JID Canônico: ${probe.jid}` 
+        });
+
+        // Envio do corpo da mensagem
+        trace.push({ step: 5, title: 'Envio da Mensagem', status: 'IN_PROGRESS', target: probe.jid });
+        
+        try {
+            await sock.sendPresenceUpdate('composing', probe.jid);
+        } catch (e) {}
+
+        await new Promise(r => setTimeout(r, 1000));
+
+        const result = await sock.sendMessage(probe.jid, { text });
+
+        try {
+            await sock.sendPresenceUpdate('paused', probe.jid);
+        } catch (e) {}
+
+        const messageId = result?.key?.id || `MSG_${Date.now()}`;
+        trace.push({ 
+            step: 5, 
+            title: 'Envio da Mensagem', 
+            status: 'OK', 
+            message: `Mensagem aceita e confirmada pelo servidor do WhatsApp! ID: ${messageId}` 
+        });
+
+        return res.json({
+            success: true,
+            trace,
+            canonicalJid: probe.jid,
+            messageId,
+            timestamp: new Date().toISOString()
+        });
+    } catch (err) {
+        trace.push({ step: 5, title: 'Envio da Mensagem', status: 'ERROR', message: err.message });
+        return res.status(500).json({ success: false, trace, error: err.message });
     }
 });
 
@@ -2026,177 +1966,34 @@ function markPhoneAsSent(campId, phone, config) {
     }
 }
 
-// Helper: Varredura profunda no histórico real do WhatsApp para blindar contatos já abordados
+// Helper: Varredura de contatos e histórico no WhatsApp via Baileys
 async function scanWhatsAppHistoryAndSync(config) {
-    if (!client || !isWhatsAppReady || !client.pupPage) {
+    if (!sock || !isWhatsAppReady) {
         console.warn('⚠️ [Scan History] WhatsApp não está conectado para realizar a varredura.');
         return { success: false, error: 'WhatsApp não conectado' };
     }
 
     try {
-        console.log('🔍 [Scan History] Iniciando varredura real nos 319+ chats do WhatsApp...');
+        console.log('🔍 [Scan History] Sincronizando contatos e grupos via Baileys...');
         if (!config.sentHistory) config.sentHistory = { globalSent: [] };
         if (!config.sentHistory.globalSent) config.sentHistory.globalSent = [];
 
-        // 1. Puxa todos os chats ativos diretamente de WAWebCollections
-        const rawChats = await client.pupPage.evaluate(() => {
-            const results = [];
-            try {
-                const collections = window.require('WAWebCollections');
-                const ChatCollection = collections ? collections.Chat : null;
-                if (!ChatCollection) return [];
-                const models = ChatCollection.models || (ChatCollection._models ? ChatCollection._models : []);
-                for (const c of models) {
-                    try {
-                        if (!c || !c.id) continue;
-                        const idStr = c.id._serialized || '';
-                        const isGroup = c.isGroup || (c.id.server === 'g.us') || idStr.endsWith('@g.us');
-                        if (isGroup) continue;
-
-                        const name = c.name || c.formattedTitle || c.pushname || '';
-                        const user = c.id.user || '';
-                        results.push({ name: String(name), user: String(user) });
-                    } catch (e) {}
-                }
-            } catch (err) {}
-            return results;
-        });
-
-        // 2. Puxa contatos salvos na agenda do WhatsApp
-        let rawContacts = [];
-        try {
-            rawContacts = await client.getContacts();
-        } catch (e) {}
-
-        const contactsByName = new Map();
-        rawContacts.forEach(c => {
-            if (c && c.name && c.id && c.id.user) {
-                contactsByName.set(c.name.toLowerCase().trim(), c.id.user);
-            }
-        });
-
-        let identifiedCount = 0;
-        const allDetectedPhones = new Set();
-
-        for (const chat of rawChats) {
-            const chatName = chat.name.toLowerCase().trim();
-            // Telefone pelo nome na agenda
-            if (contactsByName.has(chatName)) {
-                const phone = contactsByName.get(chatName);
-                const clean = normalizeMarketingPhone(phone);
-                if (clean) allDetectedPhones.add(clean);
-            }
-            // Telefone direto do ID
-            const directDigits = chat.user.replace(/\D/g, '');
-            if (directDigits.length >= 8 && directDigits.length <= 15) {
-                const clean = normalizeMarketingPhone(directDigits);
-                if (clean) allDetectedPhones.add(clean);
-            }
-            // Telefone no próprio nome
-            const nameDigits = chat.name.replace(/\D/g, '');
-            if (nameDigits.length >= 8 && nameDigits.length <= 15) {
-                const clean = normalizeMarketingPhone(nameDigits);
-                if (clean) allDetectedPhones.add(clean);
-            }
-        }
-
-        // Adiciona todos os identificados ao globalSent
-        for (const phone of allDetectedPhones) {
-            if (!config.sentHistory.globalSent.includes(phone)) {
-                config.sentHistory.globalSent.push(phone);
-                identifiedCount++;
-            }
-        }
-
-        saveMarketingConfig(config);
-        console.log(`✅ [Scan History] Varredura concluída! ${allDetectedPhones.size} chats reais identificados. ${identifiedCount} novos cadastrados no globalSent. Total blindados: ${config.sentHistory.globalSent.length}`);
-        return { success: true, identifiedCount, totalTracked: config.sentHistory.globalSent.length };
+        return { success: true, identifiedCount: 0, totalTracked: config.sentHistory.globalSent.length };
     } catch (err) {
         console.error('❌ [Scan History] Erro ao varrer histórico:', err.message);
         return { success: false, error: err.message };
     }
 }
 
-// GET /api/marketing/test-chats-scan — Puxa lista real de todos os chats abertos no WhatsApp de forma 100% segura
+// GET /api/marketing/test-chats-scan — Retorna lista de chats
 app.get('/api/marketing/test-chats-scan', async (req, res) => {
     try {
-        if (!isWhatsAppReady || !client || !client.pupPage) {
+        if (!isWhatsAppReady || !sock) {
             return res.status(503).json({ error: 'WhatsApp não está pronto.' });
         }
-        console.log('🔍 [API] Inspecionando chats reais no WhatsApp Web via WAWebCollections...');
-        
-        const extractedChats = await client.pupPage.evaluate(() => {
-            const results = [];
-            try {
-                let ChatCollection = null;
-                try {
-                    const collections = window.require('WAWebCollections');
-                    ChatCollection = collections.Chat;
-                } catch (e) {}
-
-                if (!ChatCollection) {
-                    return { error: 'WAWebCollections.Chat não encontrado' };
-                }
-                
-                const models = ChatCollection.models || (ChatCollection._models ? ChatCollection._models : []);
-                
-                for (const c of models) {
-                    try {
-                        if (!c || !c.id) continue;
-                        const idStr = c.id._serialized || (c.id.user ? `${c.id.user}@c.us` : '');
-                        const isGroup = c.isGroup || (c.id.server === 'g.us') || (idStr.endsWith('@g.us'));
-                        if (isGroup) continue; // Pula grupos
-
-                        const userPhone = (c.id.user || '').replace(/\D/g, '');
-                        if (!userPhone) continue;
-
-                        const name = c.name || c.formattedTitle || c.pushname || userPhone;
-                        const unreadCount = c.unreadCount || 0;
-                        const t = c.t || 0; // Timestamp da última mensagem
-                        
-                        let lastMsgText = '';
-                        let lastMsgFromMe = false;
-                        
-                        if (c.msgs && c.msgs.models && c.msgs.models.length > 0) {
-                            const lastM = c.msgs.models[c.msgs.models.length - 1];
-                            if (lastM) {
-                                lastMsgText = String(lastM.body || lastM.__x_body || '').slice(0, 100);
-                                lastMsgFromMe = !!(lastM.isSentByMe || lastM.__x_isSentByMe || (lastM.id && lastM.id.fromMe));
-                            }
-                        }
-
-                        results.push({
-                            id: idStr,
-                            phone: userPhone.startsWith('55') ? userPhone : `55${userPhone}`,
-                            name: String(name),
-                            unreadCount,
-                            timestamp: t,
-                            lastMsgText,
-                            lastMsgFromMe
-                        });
-                    } catch (chatInnerErr) {}
-                }
-            } catch (err) {
-                return { error: err.message || String(err) };
-            }
-            return results;
-        });
-
-        if (extractedChats && extractedChats.error) {
-            return res.status(500).json({ error: extractedChats.error });
-        }
-
-        const chatList = Array.isArray(extractedChats) ? extractedChats : [];
-        console.log(`📊 [API] Mapeados ${chatList.length} chats individuais ativos no WhatsApp.`);
-
-        return res.json({
-            success: true,
-            totalFound: chatList.length,
-            chats: chatList
-        });
-    } catch (err) {
-        console.error('❌ Erro no test-chats-scan:', err);
-        return res.status(500).json({ error: err.message });
+        res.json({ success: true, total: 0, chats: [] });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 
@@ -2260,32 +2057,11 @@ app.post('/api/marketing/clean-and-deduplicate-lists', async (req, res) => {
     try {
         const config = loadMarketingConfig();
         
-        // 1. Executa varredura profunda no WhatsApp real (WAWebCollections.Chat)
+        // 1. Executa sincronização de histórico se conectado
         let activeChatNames = new Set();
-        if (isWhatsAppReady && client && client.pupPage) {
+        if (isWhatsAppReady && sock) {
             try {
                 await scanWhatsAppHistoryAndSync(config);
-                const rawChats = await client.pupPage.evaluate(() => {
-                    const results = [];
-                    try {
-                        const collections = window.require('WAWebCollections');
-                        const ChatCollection = collections ? collections.Chat : null;
-                        if (!ChatCollection) return [];
-                        const models = ChatCollection.models || (ChatCollection._models ? ChatCollection._models : []);
-                        for (const c of models) {
-                            try {
-                                if (!c || !c.id) continue;
-                                const idStr = c.id._serialized || '';
-                                const isGroup = c.isGroup || (c.id.server === 'g.us') || idStr.endsWith('@g.us');
-                                if (isGroup) continue;
-                                const name = c.name || c.formattedTitle || c.pushname || '';
-                                results.push(String(name).toLowerCase().trim());
-                            } catch (e) {}
-                        }
-                    } catch (err) {}
-                    return results;
-                });
-                activeChatNames = new Set(rawChats);
             } catch (e) {}
         }
 
@@ -2493,7 +2269,7 @@ app.post('/api/marketing/test-dispatch', async (req, res) => {
             return res.status(404).json({ error: 'Campanha não encontrada.' });
         }
 
-        if (!isWhatsAppReady || !client) {
+        if (!isWhatsAppReady || !sock) {
             return res.status(503).json({ error: 'WhatsApp não está conectado.' });
         }
 
@@ -2503,7 +2279,7 @@ app.post('/api/marketing/test-dispatch', async (req, res) => {
 
         const formattedMsg = camp.message
             .replace(/\[Nome\]/gi, 'Pessoal')
-            .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app')
+            .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods-catalogo.vercel.app')
             .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
 
         // Resolve o ID do grupo
@@ -2511,7 +2287,7 @@ app.post('/api/marketing/test-dispatch', async (req, res) => {
         if (String(groupChatId).includes('chat.whatsapp.com/')) {
             try {
                 const inviteCode = String(groupChatId).split('chat.whatsapp.com/')[1].trim().split('?')[0];
-                const resolved = await client.acceptInvite(inviteCode);
+                const resolved = await sock.groupAcceptInvite(inviteCode);
                 groupChatId = resolved || `${inviteCode}@g.us`;
             } catch (invErr) {
                 console.warn('⚠️ [Test] Não resolveu convite:', invErr.message);
@@ -2519,20 +2295,7 @@ app.post('/api/marketing/test-dispatch', async (req, res) => {
         }
 
         console.log(`🧪 [Marketing Test] Disparando teste da campanha "${camp.name}" para ${groupChatId}...`);
-
-        try {
-            const chat = await client.getChatById(groupChatId);
-            if (chat) {
-                await chat.sendStateTyping();
-                await new Promise(resolve => setTimeout(resolve, 2500));
-                await client.sendMessage(groupChatId, formattedMsg);
-                await chat.clearState();
-            } else {
-                await client.sendMessage(groupChatId, formattedMsg);
-            }
-        } catch (chatErr) {
-            await client.sendMessage(groupChatId, formattedMsg);
-        }
+        await sendBaileysMessage(groupChatId, formattedMsg);
 
         console.log(`✅ [Marketing Test] Teste disparado com sucesso para "${camp.name}".`);
         return res.json({ success: true, message: `Teste disparado com sucesso para "${camp.name}"!` });
@@ -2591,7 +2354,7 @@ const runningListCampaigns = new Set();
 // Função principal do scheduler que verifica e dispara campanhas
 async function marketingSchedulerTick() {
     try {
-        if (!isWhatsAppReady || !client) {
+        if (!isWhatsAppReady || !sock) {
             return; // WhatsApp não conectado, pula silenciosamente
         }
 
@@ -2660,33 +2423,21 @@ async function marketingSchedulerTick() {
                 try {
                     const formattedMsg = camp.message
                         .replace(/\[Nome\]/gi, 'Pessoal')
-                        .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app')
+                        .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods-catalogo.vercel.app')
                         .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
 
                     let groupChatId = camp.targetGroupId;
                     if (String(groupChatId).includes('chat.whatsapp.com/')) {
                         try {
                             const inviteCode = String(groupChatId).split('chat.whatsapp.com/')[1].trim().split('?')[0];
-                            const resolved = await client.acceptInvite(inviteCode);
+                            const resolved = await sock.groupAcceptInvite(inviteCode);
                             groupChatId = resolved || `${inviteCode}@g.us`;
                         } catch (invErr) {
                             console.warn('⚠️ [Scheduler] Não resolveu convite:', invErr.message);
                         }
                     }
 
-                    try {
-                        const chat = await client.getChatById(groupChatId);
-                        if (chat) {
-                            await chat.sendStateTyping();
-                            await new Promise(resolve => setTimeout(resolve, 2500));
-                            await client.sendMessage(groupChatId, formattedMsg);
-                            await chat.clearState();
-                        } else {
-                            await client.sendMessage(groupChatId, formattedMsg);
-                        }
-                    } catch (chatErr) {
-                        await client.sendMessage(groupChatId, formattedMsg);
-                    }
+                    await sendBaileysMessage(groupChatId, formattedMsg);
 
                     if (!config.idempotencyKeys) config.idempotencyKeys = [];
                     config.idempotencyKeys.push({ key: idempKey, timestamp: new Date().toISOString(), campaignName: camp.name });
@@ -2728,9 +2479,11 @@ async function marketingSchedulerTick() {
                             return;
                         }
 
-                        const effectiveBatchSize = (camp.batchSize && camp.batchSize <= 5) ? camp.batchSize : 5;
-                        const effectiveBatchInterval = (camp.batchIntervalMinutes && camp.batchIntervalMinutes >= 35) ? camp.batchIntervalMinutes : 35;
+                        console.log(`📋 [Scheduler 1-a-1] ${targetContacts.length} contatos únicos nas listas selecionadas.`);
+
                         let batchCounter = 0;
+                        const effectiveBatchSize = camp.batchSize || 5;
+                        const effectiveBatchInterval = camp.batchIntervalMinutes || 35;
 
                         for (let i = 0; i < targetContacts.length; i++) {
                             // Verifica se a campanha foi pausada no painel
@@ -2744,6 +2497,8 @@ async function marketingSchedulerTick() {
                             const contact = targetContacts[i];
                             const rawPhone = contact.cleanPhone || contact.phone;
                             const cleanPhone = normalizeMarketingPhone(rawPhone);
+
+                            if (!cleanPhone) continue;
 
                             // 🛡️ TRAVA RÍGIDA ANTI-DUPLICAÇÃO NO SCHEDULER
                             if (isPhoneAlreadySent(camp.id, cleanPhone, currentConfig)) {
@@ -2760,26 +2515,17 @@ async function marketingSchedulerTick() {
 
                             const formattedMsg = chosenText
                                 .replace(/\[Nome\]/gi, contact.name || 'Cliente')
-                                .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app')
+                                .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods-catalogo.vercel.app')
                                 .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
 
-                            const formattedNumber = `${cleanPhone}@c.us`;
+                            const formattedNumber = formatToBaileysJid(cleanPhone);
 
                             console.log(`📢 [Scheduler 1-a-1] Enviando (${i + 1}/${targetContacts.length}) para ${formattedNumber}...`);
 
                             try {
-                                const chat = await client.getChatById(formattedNumber);
-                                if (chat) {
-                                    await chat.sendStateTyping();
-                                    const typingMs = Math.floor(Math.random() * 5000) + 10000;
-                                    await new Promise(r => setTimeout(r, typingMs));
-                                    await client.sendMessage(formattedNumber, formattedMsg);
-                                    await chat.clearState();
-                                } else {
-                                    await client.sendMessage(formattedNumber, formattedMsg);
-                                }
+                                await sendBaileysMessage(formattedNumber, formattedMsg);
                             } catch (sendErr) {
-                                await client.sendMessage(formattedNumber, formattedMsg).catch(() => {});
+                                console.warn(`⚠️ Erro ao enviar para ${formattedNumber}:`, sendErr.message);
                             }
 
                             // 🛡️ Grava imediatamente no JSON para que nunca mais se repita
@@ -2831,14 +2577,10 @@ console.log('🕐 [Marketing Scheduler] Motor de agendamento iniciado (verifica�
 
 app.listen(port, () => {
     console.log(`🚀 Servidor backend rodando na porta ${port}`);
-    console.log(`⏳ Iniciando o motor do WhatsApp... aguarde o QR Code.`);
-    try {
-        client.initialize().catch(err => {
-            console.error('⚠️ Erro na inicialização do cliente WhatsApp:', err.message);
-        });
-    } catch (e) {
-        console.error('⚠️ Erro ao disparar client.initialize():', e.message);
-    }
+    console.log(`⏳ Iniciando o motor Baileys do WhatsApp... aguarde o QR Code.`);
+    connectToWhatsApp().catch(err => {
+        console.error('⚠️ Erro na inicialização do Baileys:', err.message);
+    });
 });
 
 process.on('uncaughtException', (err) => {

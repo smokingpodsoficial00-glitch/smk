@@ -1,0 +1,10 @@
+id,company_id,partner_id,type,amount,date,description,destination_category,created_at
+1838f0d9-e93d-4274-8c1f-de22aca22ca3,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,5c1d1b90-2732-4a1c-b18d-76d880a4e6f4,RETIRADA_CAPITAL,24.00,2026-09-15,Retirada de capital - Smolking Pods,CAIXA_GERAL,2026-09-15 20:30:42.986217+00
+4f153861-e385-4473-b934-086338c33485,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,p2-gabriel,RETIRADA_CAPITAL,170.00,2026-09-15,Retirada de capital - Gabriel,CAIXA_GERAL,2026-09-15 01:44:26.3552+00
+89c0ccb5-34c7-47d7-9c7e-c20efd5c46cd,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,p2-gabriel,RETIRADA_CAPITAL,24.00,2026-09-15,Retirada de capital - Gabriel,CAIXA_GERAL,2026-09-15 01:44:57.160156+00
+8a136b84-dd0f-46f1-a0cb-7f09281135b9,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,5c1d1b90-2732-4a1c-b18d-76d880a4e6f4,RETIRADA_CAPITAL,15.00,2026-09-15,Retirada de capital - Smolking Pods,CAIXA_GERAL,2026-09-15 20:30:47.82319+00
+d8bc7dbd-c6c6-4eb9-9a82-cc02d480d97f,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,p2-gabriel,APORTE,40.00,2026-09-16,Aporte de capital - Gabriel,CAIXA_GERAL,2026-09-16 18:04:47.129644+00
+da49bccb-efd4-454a-8ee4-2c24f744ed25,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,p2-gabriel,RETIRADA_CAPITAL,25.00,2026-09-16,Retirada de capital - Gabriel,CAIXA_GERAL,2026-09-16 19:48:14.947531+00
+ea1c31de-26d0-451e-970a-745f90634b42,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,p2-gabriel,APORTE,24.00,2026-09-15,Aporte de capital - Gabriel,CAIXA_GERAL,2026-09-15 20:30:35.238298+00
+tx-init-1,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,p1-eduardo,APORTE,500.00,2026-08-18,Aporte inicial de capital,ESTOQUE,2026-08-18 19:09:28.561+00
+tx-init-2,d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5,p2-gabriel,APORTE,605.00,2026-08-18,Aporte inicial de capital,ESTOQUE,2026-08-18 19:09:28.561+00

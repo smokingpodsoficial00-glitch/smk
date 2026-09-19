@@ -2,9 +2,9 @@
  * Resolução centralizada da URL do backend Node.js (API).
  * 
  * Regras:
- * - Em produção (!import.meta.env.DEV), exige expressamente a configuração de VITE_BACKEND_URL.
- * - Em desenvolvimento local (import.meta.env.DEV), permite fallback seguro para 'http://localhost:3006'.
- * - Não assume localhost silenciosamente em produção.
+ * - Prioriza VITE_BACKEND_URL caso configurado.
+ * - Permite customização via localStorage ('SP_CUSTOM_BACKEND_URL').
+ * - Fornece fallback seguro para 'http://localhost:3006' sem derrubar a aplicação.
  */
 export function getBackendUrl(): string {
   const envUrl = import.meta.env.VITE_BACKEND_URL;
@@ -12,11 +12,12 @@ export function getBackendUrl(): string {
     return envUrl.trim().replace(/\/+$/, '');
   }
 
-  if (import.meta.env.DEV) {
-    return 'http://localhost:3006';
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('SP_CUSTOM_BACKEND_URL');
+    if (custom && custom.trim().length > 0) {
+      return custom.trim().replace(/\/+$/, '');
+    }
   }
 
-  const errorMsg = '[Backend Config] VITE_BACKEND_URL não configurada no ambiente de produção. Configure a URL da API da loja na Vercel.';
-  console.error(errorMsg);
-  throw new Error(errorMsg);
+  return 'http://localhost:3006';
 }

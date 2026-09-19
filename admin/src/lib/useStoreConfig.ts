@@ -13,6 +13,7 @@ async function getSupabase() {
 
 export interface StoreConfig {
   id: string;
+  company_id?: string;
   store_name: string;
   store_slug: string;
   logo_url: string | null;
@@ -65,7 +66,13 @@ try {
 function getLocalFallback(): StoreConfig {
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.store_name && (parsed.store_name.toLowerCase().includes("02") || parsed.store_name.toLowerCase().includes("smk pods 2"))) {
+        parsed.store_name = "Smoking Pods";
+      }
+      return parsed;
+    }
   } catch (e) {
     console.warn("Erro ao ler localStorage:", e);
   }
@@ -143,12 +150,12 @@ async function fetchConfig(targetCompanyId?: string): Promise<StoreConfig> {
     console.warn("Fallback smoking_products não acessível:", e);
   }
 
-  // 3. Tentar ler da tabela `companies` para garantir sincronismo total
+  // 3. Tentar ler da tabela `companies` para garantir sincronismo total da empresa correta
   try {
     const { data: compData } = await supabase
       .from("companies")
       .select("name, logo_url")
-      .limit(1)
+      .eq("id", companyId)
       .maybeSingle();
 
     if (compData && compData.name) {
@@ -262,11 +269,13 @@ export function useStoreConfig() {
       // 2. Salva na tabela dedicada `store_config` e na tabela `companies` no Supabase
       try {
         const supabase = await getSupabase();
+        const effectiveCompanyId = (typeof window !== "undefined" ? localStorage.getItem("smk_auth_company_id") : null) || config.company_id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
         const rowId = (config && config.id && config.id !== 'local-config-id') ? config.id : undefined;
         const { id: _ignoreId, ...configWithoutId } = newConfig;
         
         const payload: any = {
           ...configWithoutId,
+          company_id: effectiveCompanyId,
           updated_at: new Date().toISOString()
         };
         if (rowId) {
@@ -284,11 +293,11 @@ export function useStoreConfig() {
           cachedConfig.id = upsertData.id;
         }
 
-        if (updates.store_name) {
-          await supabase.from("companies").update({
-            name: updates.store_name,
-            ...(updates.logo_url ? { logo_url: updates.logo_url } : {})
-          }).neq("id", "00000000-0000-0000-0000-000000000000");
+        const companyUpdates: any = {};
+        if (updates.store_name) companyUpdates.name = updates.store_name;
+        if (updates.logo_url !== undefined) companyUpdates.logo_url = updates.logo_url;
+        if (Object.keys(companyUpdates).length > 0) {
+          await supabase.from("companies").update(companyUpdates).eq("id", effectiveCompanyId);
         }
       } catch (e) {
         console.info("Erro ao salvar store_config no Supabase:", e);

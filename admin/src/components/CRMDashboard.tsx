@@ -63,9 +63,9 @@ export default function CRMDashboard() {
 
   const tabs = [
     { id: 'rfm', label: 'Ranking & Fidelidade', icon: <Crown className="size-4 text-amber-400" /> },
-    { id: 'replenishment', label: 'Aviso de Fim de Pod & Recompra', icon: <RefreshCw className="size-4 text-emerald-400" /> },
-    { id: 'followups', label: 'Follow-ups de Vendas & Salário', icon: <Target className="size-4 text-purple-400" /> },
-    { id: 'sales_history', label: 'Histórico & Mural de Vendas', icon: <Receipt className="size-4 text-blue-400" /> },
+    { id: 'replenishment', label: 'Aviso de Fim de Pod & Recompra', icon: <RefreshCw className="size-4 text-white" /> },
+    { id: 'followups', label: 'Follow-ups de Vendas & Salário', icon: <Target className="size-4 text-white/80" /> },
+    { id: 'sales_history', label: 'Histórico & Mural de Vendas', icon: <Receipt className="size-4 text-white/80" /> },
   ] as const;
 
   return (
@@ -75,7 +75,7 @@ export default function CRMDashboard() {
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
           <div className="space-y-1">
             <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
-              <Users className="size-6 text-emerald-400 shrink-0" />
+              <Users className="size-6 text-white shrink-0" />
               <span>Gestão de Clientes & CRM</span>
             </h1>
             <p className="text-xs text-muted-foreground">
@@ -86,14 +86,14 @@ export default function CRMDashboard() {
           <div className="flex items-center gap-3 self-start sm:self-auto">
             <button
               onClick={() => setIsNewClientModalOpen(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-black shadow-lg shadow-emerald-500/20 transition-all cursor-pointer select-none"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold bg-white hover:bg-slate-100 text-black shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] transition-all cursor-pointer select-none active:scale-95"
             >
               <UserPlus className="size-4" />
               <span>Novo Cliente</span>
             </button>
 
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-              <div className="size-2 rounded-full bg-emerald-400 animate-ping" />
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-white/10 text-white border border-white/20 shadow-sm">
+              <div className="size-2 rounded-full bg-white animate-ping" />
               <span>Base Conectada</span>
             </div>
           </div>
@@ -107,7 +107,7 @@ export default function CRMDashboard() {
               onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment' | 'followups' | 'sales_history')}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none ${
                 activeSubTab === tab.id 
-                  ? 'bg-white/10 text-white font-bold border border-white/20 shadow-sm' 
+                  ? 'bg-white/10 text-white font-extrabold border border-white/25 shadow-[0_0_15px_rgba(255,255,255,0.15)]' 
                   : 'text-muted-foreground hover:text-white bg-[#0e0e10] border border-white/10 hover:border-white/20'
               }`}
             >

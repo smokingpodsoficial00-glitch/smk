@@ -16,8 +16,9 @@ const CRMDashboard = lazy(() => import('./components/CRMDashboard'));
 const ChatbotPage = lazy(() => import('./components/ChatbotPage'));
 const MarketingModule = lazy(() => import('./components/MarketingModule'));
 const PartnersDashboard = lazy(() => import('./components/PartnersDashboard'));
-const CompanyTasksPage = lazy(() => import('./components/CompanyTasksPage'));
+const TasksDashboard = lazy(() => import('./components/TasksDashboard'));
 const SettingsPage = lazy(() => import('./components/SettingsPage'));
+const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage })));
 
 import { AdminLayout } from './layouts/AdminLayout';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -53,6 +54,14 @@ export const router = createBrowserRouter([
   {
     path: '/esqueci-senha',
     element: <ForgotPasswordPage />,
+  },
+  {
+    path: '/lp',
+    element: <SuspenseWrap><LandingPage /></SuspenseWrap>,
+  },
+  {
+    path: '/planos',
+    element: <SuspenseWrap><LandingPage /></SuspenseWrap>,
   },
 
   // Onboarding Wizard Route
@@ -108,7 +117,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'tarefas',
-        element: <SuspenseWrap><CompanyTasksPage /></SuspenseWrap>,
+        element: <SuspenseWrap><TasksDashboard /></SuspenseWrap>,
       },
       {
         path: 'configuracoes',

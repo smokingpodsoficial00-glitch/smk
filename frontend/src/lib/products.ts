@@ -35,19 +35,76 @@ export const BRANDS = ["Ignite", "Elf Bar", "Lost Mary", "Waka", "Oxbar"] as con
 // Não gera catálogo falso localmente caso o Supabase esteja desconectado
 export const fallbackProducts: Product[] = [];
 
+let _resolvedCompanyIdPromise: Promise<string> | null = null;
+
+export async function resolveCatalogCompanyId(): Promise<string> {
+  if (_resolvedCompanyIdPromise) return _resolvedCompanyIdPromise;
+
+  _resolvedCompanyIdPromise = (async () => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramCompany = urlParams.get("company") || urlParams.get("c");
+      if (paramCompany && paramCompany.trim().length > 0) {
+        return paramCompany.trim();
+      }
+
+      let slug = urlParams.get("loja");
+      if (!slug) {
+        const host = window.location.hostname;
+        if (!host.includes("localhost") && !host.includes("127.0.0.1")) {
+          const parts = host.split(".");
+          if (parts.length >= 3 && !["www", "smoking-pods-catalogo", "admin", "app"].includes(parts[0])) {
+            slug = parts[0];
+          }
+        }
+      }
+
+      if (slug && slug !== "smoking-pods") {
+        try {
+          const { data: storeData } = await supabase
+            .from("store_config")
+            .select("company_id")
+            .eq("store_slug", slug)
+            .maybeSingle();
+
+          if (storeData?.company_id) {
+            return storeData.company_id;
+          }
+        } catch (e) {
+          console.warn("Erro ao buscar empresa por slug no catálogo:", e);
+        }
+      }
+    }
+
+    const envCompanyId = import.meta.env.VITE_COMPANY_ID;
+    if (envCompanyId && typeof envCompanyId === "string" && envCompanyId.trim().length > 0) {
+      return envCompanyId.trim();
+    }
+    return "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+  })();
+
+  return _resolvedCompanyIdPromise;
+}
+
 export function getCatalogCompanyId(): string {
+  if (typeof window !== "undefined") {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramCompany = urlParams.get("company") || urlParams.get("c");
+    if (paramCompany && paramCompany.trim().length > 0) {
+      return paramCompany.trim();
+    }
+  }
+
   const envCompanyId = import.meta.env.VITE_COMPANY_ID;
   if (!envCompanyId || typeof envCompanyId !== "string" || envCompanyId.trim().length === 0) {
-    const errorMsg = "[Catálogo Config] VITE_COMPANY_ID não configurada no ambiente. O catálogo requer uma empresa válida vinculada.";
-    console.error(errorMsg);
-    throw new Error(errorMsg);
+    return "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
   }
   return envCompanyId.trim();
 }
 
 export async function fetchProductsFromSupabase(customCompanyId?: string): Promise<Product[]> {
   try {
-    const companyId = customCompanyId || getCatalogCompanyId();
+    const companyId = customCompanyId || (await resolveCatalogCompanyId());
 
     const [productsRes, promosMap] = await Promise.all([
       supabase
