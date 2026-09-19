@@ -171,7 +171,7 @@ export function LandingPage() {
               <span className="size-1.5 rounded-full bg-white animate-ping" />
             </a>
             <a href="#kanban" className="hover:text-white transition-colors">Kanban & Entrega</a>
-            <a href="#recompra" className="hover:text-white transition-colors">Aviso de Pod Acabando</a>
+            <a href="#recompra" className="hover:text-white transition-colors">CRM & Recompra</a>
             <a href="#estoque" className="hover:text-white transition-colors">Estoque Parado</a>
             <a href="#socios" className="hover:text-white transition-colors">Sócios</a>
             <a href="#case" className="hover:text-white transition-colors">Case Real</a>
@@ -816,141 +816,92 @@ export function LandingPage() {
       </section>
 
       {/* ==================================================================== */}
-      {/* 7. ALERTA DE POD ACABANDO (MOTOR DE RECOMPRA)                        */}
+      {/* 7. GESTÃO DE CLIENTES & CRM PREDITIVO                                */}
       {/* ==================================================================== */}
       <section id="recompra" className="py-24 px-4 sm:px-6 border-t border-[#161616] relative bg-[#050505]">
         
         <div className="max-w-6xl mx-auto space-y-12">
           
-          <div className="text-center space-y-4 max-w-3xl mx-auto">
-            <span className="text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
-              Retenção Ativa de Clientes
-            </span>
+          <div className="text-center space-y-4 max-w-4xl mx-auto">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold font-mono">
+              <Users className="size-3.5 text-white" />
+              <span>Gestão de Clientes & CRM Preditivo</span>
+            </div>
 
-            {/* HEADLINE ÚNICA DO ALERTA DE RECOMPRA */}
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-              Alerta de Pod Acabando:{' '}
+            {/* HEADLINE PRINCIPAL DO CRM */}
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
+              Pare de atender como camelô.{' '}
               <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
-                Venda de novo para o mesmo cliente antes que ele compre de outra loja.
+                Transforme sua revenda de pods em um negócio profissional.
               </span>
             </h2>
 
-            <p className="text-sm sm:text-base text-white/70 leading-relaxed">
-              O cliente que já comprou de você é o dinheiro mais fácil da sua semana. Não fique dependendo de postar stories e rezar: aborde o cliente na data exata em que o pod dele está terminando.
+            <p className="text-sm sm:text-base text-white/70 max-w-3xl mx-auto leading-relaxed">
+              Vender pods não é ser feirante esperando cliente cair do céu ou disputando preço como na feirinha de São Paulo. Você sabe quanto cada cliente gasta com você por mês? Qual o tempo de vida dele? E o principal: <strong>quanto tempo falta para o pod dele acabar?</strong> O CRM do SMK Flow rastreia o ciclo de consumo de cada cliente para você entrar em contato na hora exata e vender de novo antes que ele compre em outra loja.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            <div className="space-y-5">
-              
-              <div className="p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] space-y-2">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-emerald-400" />
-                  Pod é um produto de consumo diário
-                </h3>
-                <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-                  Quando o pod de 15.000 ou 30.000 puffs está no final ou começa a dar aquele gosto característico de queimado, o cliente já entra em modo de urgência. Ele não quer ficar sem.
-                </p>
+            {/* Card 1 */}
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                <Store className="size-5 text-white" />
               </div>
-
-              <div className="p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] space-y-2">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-emerald-400" />
-                  O sistema calcula o tempo e te avisa
-                </h3>
-                <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-                  Baseado no modelo comprado e na quantidade de puffs, o SMK Flow acende um alerta na sua tela quando a estimativa de juice está nos últimos 10%. Você não precisa lembrar de cabeça.
-                </p>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] space-y-2">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-emerald-400" />
-                  Mesmo se ele não comprar na hora, ele compra com você
-                </h3>
-                <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-                  Só de você ter mandado uma mensagem atenciosa lembrando dos sabores que ele gosta, ele já se programa para a semana. Quando o pod queimar de vez, adivinha quem é a primeira loja que ele vai chamar? A sua.
-                </p>
-              </div>
-
+              <h3 className="text-base font-bold text-white">Chega de Vender como Feirante</h3>
+              <p className="text-xs text-white/60 leading-relaxed">
+                Quem atende no WhatsApp como feirante perde vendas por esquecimento e disputa centavos com concorrentes amadores. No SMK Flow, você tem a lista organizada de todos os seus clientes com histórico de compras e ticket médio.
+              </p>
             </div>
 
-            {/* Mockup do Alerta na Prática ou Print Real */}
-            <ScreenshotOrFallback
-              src="/prints/crm-recompra.png"
-              alt="Alerta de Pod Acabando SMK Flow"
-              fallback={
-                <div className="bg-[#0c0c0c] border border-white/20 rounded-3xl p-6 shadow-[0_0_40px_rgba(255,255,255,0.06)] space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-white/10 text-xs">
-                    <div className="flex items-center gap-2 font-bold text-white">
-                      <Bell className="size-4 text-white" />
-                      <span>Painel de Recompra Ativa</span>
-                    </div>
-                    <span className="text-white/60 font-mono text-[11px]">7 Clientes em Alerta</span>
-                  </div>
+            {/* Card 2 */}
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                <Clock className="size-5 text-white" />
+              </div>
+              <h3 className="text-base font-bold text-white">Radar do Ciclo de Vida do Pod</h3>
+              <p className="text-xs text-white/60 leading-relaxed">
+                O sistema calcula o tempo médio de uso baseado no modelo e puffs (5k, 15k ou 30k). Quando faltam 4 ou 5 dias para o pod queimar, o radar acende o alerta de recompra na sua tela com a porcentagem exata do ciclo.
+              </p>
+            </div>
 
-                  <div className="space-y-3">
-                    
-                    {/* Alerta 1 */}
-                    <div className="bg-[#141414] border border-[#222] rounded-xl p-3.5 space-y-2">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="text-xs font-bold text-white">Matheus Albuquerque</div>
-                          <div className="text-[11px] text-white/50">Comprou Lost Mary 35k há 23 dias</div>
-                        </div>
-                        <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-bold">
-                          ~3% Juice Restante
-                        </span>
-                      </div>
-                      <div className="pt-1 flex items-center justify-between">
-                        <span className="text-[10px] text-white/40">Gosta de: Sabores Ice (Menta / Uva)</span>
-                        <a 
-                          href={whatsappLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-3 py-1 rounded-lg text-[10px] flex items-center gap-1 transition-colors"
-                        >
-                          <MessageCircle className="size-3" />
-                          <span>Chamar no WhatsApp</span>
-                        </a>
-                      </div>
-                    </div>
+            {/* Card 3 */}
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-emerald-400">
+                <MessageCircle className="size-5" />
+              </div>
+              <h3 className="text-base font-bold text-white">Aborde Antes da Concorrência</h3>
+              <p className="text-xs text-white/60 leading-relaxed">
+                Com 1 clique no botão verde de "Recompra", você abre o WhatsApp do cliente na hora exata com o sabor favorito dele pronto. Antes mesmo do pod queimar e dele pensar em procurar outra loja no Instagram, o Pix já tá fechado.
+              </p>
+            </div>
 
-                    {/* Alerta 2 */}
-                    <div className="bg-[#141414] border border-[#222] rounded-xl p-3.5 space-y-2">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="text-xs font-bold text-white">Camila Rezende</div>
-                          <div className="text-[11px] text-white/50">Comprou Elfbar BC15k há 14 dias</div>
-                        </div>
-                        <span className="text-[10px] bg-white/10 text-white px-2 py-0.5 rounded font-bold">
-                          ~7% Juice Restante
-                        </span>
-                      </div>
-                      <div className="pt-1 flex items-center justify-between">
-                        <span className="text-[10px] text-white/40">Gosta de: Strawberry / Frutados</span>
-                        <a 
-                          href={whatsappLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-3 py-1 rounded-lg text-[10px] flex items-center gap-1 transition-colors"
-                        >
-                          <MessageCircle className="size-3" />
-                          <span>Chamar no WhatsApp</span>
-                        </a>
-                      </div>
-                    </div>
+          </div>
 
-                  </div>
+          {/* CRM Desktop Window Mockup com o Print Real */}
+          <div className="rounded-2xl sm:rounded-3xl border border-white/15 bg-[#0a0a0c] p-2 sm:p-3 shadow-[0_0_60px_rgba(255,255,255,0.07),0_20px_50px_rgba(0,0,0,0.8)] ring-1 ring-white/10 overflow-hidden group">
+            {/* Barra superior de Janela de Sistema */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/40 rounded-t-xl mb-2 text-xs text-white/50 font-mono">
+              <div className="flex items-center gap-2">
+                <div className="size-3 rounded-full bg-red-500/80" />
+                <div className="size-3 rounded-full bg-yellow-500/80" />
+                <div className="size-3 rounded-full bg-emerald-500/80" />
+                <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">smoking-pods-admin.vercel.app/clientes</span>
+              </div>
+              <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Radar Preditivo de Recompra Ativo</span>
+              </div>
+            </div>
 
-                  <div className="p-3 bg-white/5 rounded-xl text-center text-[11px] text-white/60">
-                    💡 Lojistas que usam esse alerta têm uma taxa de recompra de <strong className="text-emerald-400">74%</strong> na mesma loja.
-                  </div>
-                </div>
-              }
-            />
-
+            {/* Imagem Real do CRM */}
+            <div className="rounded-xl overflow-hidden border border-white/10 relative bg-[#0a0a0c]">
+              <ScreenshotOrFallback
+                src="/prints/crm-recompra.png"
+                alt="Gestão de Clientes e CRM Preditivo Smoking Pods"
+                className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-[1.01]"
+              />
+            </div>
           </div>
 
         </div>
