@@ -23,7 +23,7 @@ export interface TourStep {
 const TOUR_STEPS: TourStep[] = [
   {
     id: "pedidos",
-    badge: "Etapa 1 de 10 • Operação Diária",
+    badge: "Etapa 1 de 11 • Operação Diária",
     route: "/pedidos",
     title: "📦 Pedidos: Kanban & Expedição em Tempo Real",
     targetSelector: '[data-tour="kanban-pedidos"]',
@@ -34,29 +34,40 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "financeiro_caixa",
-    badge: "Etapa 2 de 10 • Saúde Financeira",
+    badge: "Etapa 2 de 11 • Saúde Financeira & Caixa",
     route: "/financeiro",
-    title: "💰 Financeiro: Raio-X do Caixa e Lucro Real",
-    targetSelector: '[data-tour="financeiro-kpis"]',
-    pointerText: "👇 CAIXA REAL & PATRIMÔNIO DA LOJA 👇",
-    description: "Esqueça métricas de vaidade! Aqui você enxerga o dinheiro de verdade: Faturamento Bruto, CMV (custo da mercadoria vendida), Lucro Líquido Real, Caixa Real disponível e o Patrimônio Total da Loja (soma do seu dinheiro em caixa com o valor em pods na prateleira).",
-    tips: ["Monitore o Lucro Líquido descontando todos os custos", "Veja seu Patrimônio Total atualizado em tempo real"],
+    title: "💰 Caixa Real & Recompras de Estoque",
+    targetSelector: '[data-tour="financeiro-recompra-caixa"]',
+    pointerText: "👇 CAIXA REAL & HISTÓRICO DE RECOMPRAS 👇",
+    description: "Aqui você tem o verdadeiro controle do seu fluxo financeiro: o Caixa Real Calculado pelo sistema (faturamento total acumulado menos todas as compras de mercadoria), o total pago em reposições e o histórico completo de recompras para conferência sem furos contábeis!",
+    tips: ["Monitore seu saldo de Caixa Real em tempo real", "Consulte a tabela de histórico de reposições"],
     icon: <CircleDollarSign className="size-6 text-emerald-400" />
   },
   {
     id: "financeiro_recompra",
-    badge: "Etapa 3 de 10 • Gestão de Compras",
+    badge: "Etapa 3 de 11 • Gestão de Compras",
     route: "/financeiro",
-    title: "🔄 Recompra de Estoque & Gráficos a Longo Prazo",
+    title: "🔄 Registrar Recompra de Estoque",
     targetSelector: '[data-tour="btn-registrar-recompra"]',
     pointerText: "👉 CLIQUE AQUI: REGISTRAR RECOMPRA 👈",
-    description: "Atenção máxima a este botão: sempre que for repor mercadoria com seu fornecedor, clique em 'Registrar Recompra' para abater do caixa sem furos contábeis. Logo abaixo, acompanhe os gráficos de evolução mensal, semestral e anual para prever seu crescimento futuro.",
-    tips: ["Clique em 'Registrar Recompra' sempre que pagar fornecedor", "Acompanhe o faturamento mensal e semestral"],
+    description: "Atenção máxima a este botão: sempre que pagar mercadorias para o seu fornecedor, clique em 'Registrar Recompra'. Aqui você informa a data, os valores e anota os pods comprados. O sistema atualiza o estoque e abate do caixa instantaneamente!",
+    tips: ["Clique sempre que fizer reposição com fornecedor", "Mantém seu Caixa Real 100% conciliado"],
     icon: <RefreshCw className="size-6 text-indigo-400" />
   },
   {
+    id: "financeiro_longo_prazo",
+    badge: "Etapa 4 de 11 • Inteligência de Escala",
+    route: "/financeiro",
+    title: "📈 Faturamento a Longo Prazo & Gráficos",
+    targetSelector: '[data-tour="financeiro-longo-prazo"]',
+    pointerText: "👇 HISTÓRICO & EVOLUÇÃO A LONGO PRAZO 👇",
+    description: "O seu mapa de crescimento! Nesta seção exclusiva, acompanhe a evolução visual do seu negócio em ciclos Mensais, Trimestrais, Semestrais e Anuais. Alterne entre 'Histórico' para ver o DRE detalhado de períodos passados e 'Evolução' para analisar gráficos e projeções de faturamento.",
+    tips: ["Alterne entre Histórico e Evolução nos gráficos", "Acompanhe seus ciclos mensais e trimestrais"],
+    icon: <BarChart3 className="size-6 text-emerald-400" />
+  },
+  {
     id: "estoque_ranking",
-    badge: "Etapa 4 de 10 • Inteligência de Estoque",
+    badge: "Etapa 5 de 11 • Inteligência de Estoque",
     route: "/estoque",
     title: "📊 Reposição: Ranking dos Campeões de Venda",
     targetSelector: '[data-tour="ranking-vendas"]',
@@ -67,7 +78,7 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "estoque_novo_produto",
-    badge: "Etapa 5 de 10 • Catálogo & Produtos",
+    badge: "Etapa 6 de 11 • Catálogo & Produtos",
     route: "/estoque",
     title: "➕ Cadastrar Novo Produto na Prateleira",
     targetSelector: '[data-tour="btn-novo-produto"]',
@@ -78,7 +89,7 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "estoque_sabores",
-    badge: "Etapa 6 de 10 • Variações & Sabores",
+    badge: "Etapa 7 de 11 • Variações & Sabores",
     route: "/estoque",
     title: "🏷️ Prateleira & Gestão Rápida de Sabores",
     targetSelector: '[data-tour="btn-ver-sabores"]',
@@ -89,7 +100,7 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "estoque_parados",
-    badge: "Etapa 7 de 10 • Queima de Estoque",
+    badge: "Etapa 8 de 11 • Queima de Estoque",
     route: "/estoque",
     title: "🔥 Radar de Produtos Parados & Modo Demonstração",
     targetSelector: '[data-tour="tab-produtos-parados"]',
@@ -100,7 +111,7 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "crm_clientes",
-    badge: "Etapa 8 de 10 • LTV & Retenção",
+    badge: "Etapa 9 de 11 • LTV & Retenção",
     route: "/clientes",
     title: "👥 Clientes & CRM Preditivo por Puffs",
     targetSelector: '[data-tour="crm-tabs"]',
@@ -111,18 +122,18 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "marketing_disparos",
-    badge: "Etapa 9 de 10 • Escala de Vendas",
+    badge: "Etapa 10 de 11 • Escala de Vendas",
     route: "/marketing",
     title: "📢 Marketing & Disparos com Cadência Segura",
     targetSelector: '[data-tour="btn-nova-campanha"]',
     pointerText: "👉 CLIQUE AQUI: NOVA CAMPANHA 👈",
-    description: "Chegou a hora de escalar! Conecte o WhatsApp oficial da sua loja no topo via QR Code. Criamos para você uma lista pronta em 'Listas de Transmissão' com contato de teste. Clique em '+ Nova Campanha' para selecionar o público, agendar o horário e enviar promoções com cadência anti-bloqueio.",
-    tips: ["Conecte o WhatsApp oficial da sua loja via QR Code", "Use a 'Lista de Teste VIP' para simular disparos"],
+    description: "Chegou a hora de escalar suas vendas! O fluxo é simples e blindado: primeiro, conecte o WhatsApp oficial da sua loja no botão do topo via QR Code. Em seguida, acesse a aba 'Listas de Transmissão' logo abaixo para criar ou sincronizar seus contatos. Por fim, clique neste botão '+ Nova Campanha' para selecionar seu público, agendar o disparo e vender com cadência anti-bloqueio inteligente!",
+    tips: ["1º: Conecte o WhatsApp pelo QR Code no topo", "2º: Monte seu público na aba 'Listas de Transmissão'", "3º: Agende a campanha com cadência segura anti-ban"],
     icon: <Megaphone className="size-6 text-pink-400" />
   },
   {
     id: "conclusao",
-    badge: "Etapa 10 de 10 • Pronto para Operar",
+    badge: "Etapa 11 de 11 • Pronto para Operar",
     route: "/configuracoes",
     title: "🚀 Tudo Pronto! Sua Operação Vai Decolar",
     targetSelector: '[data-tour="settings-store-name"]',
@@ -158,6 +169,7 @@ export function SystemTourGuide() {
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
 
   const hasCheckedAutoOpen = useRef(false);
+  const rafRef = useRef<number | null>(null);
 
   // Verificação inicial estrita: SÓ abre no primeiro acesso real
   useEffect(() => {
@@ -223,7 +235,7 @@ export function SystemTourGuide() {
     };
   }, [isOpen, currentStep, activeStep]);
 
-  // Rastreamento e Spotlight dinâmico do elemento alvo da etapa
+  // Rastreamento e Spotlight dinâmico do elemento alvo da etapa (Zero Lag no Scroll)
   useEffect(() => {
     if (!isOpen || isMinimized) {
       setTargetRect(null);
@@ -239,11 +251,15 @@ export function SystemTourGuide() {
       }
       const el = document.querySelector(activeStep.targetSelector);
       if (el) {
-        const rect = el.getBoundingClientRect();
-        setTargetRect(rect);
+        setTargetRect(el.getBoundingClientRect());
       } else {
         setTargetRect(null);
       }
+    };
+
+    const handleScrollOrResize = () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(updateRect);
     };
 
     // Ticks para aguardar transições de rota e montagem de componentes
@@ -261,14 +277,15 @@ export function SystemTourGuide() {
       setTimeout(updateRect, 1400),
     ];
 
-    window.addEventListener("scroll", updateRect, true);
-    window.addEventListener("resize", updateRect);
+    window.addEventListener("scroll", handleScrollOrResize, true);
+    window.addEventListener("resize", handleScrollOrResize);
 
     return () => {
       isMounted = false;
       timers.forEach(clearTimeout);
-      window.removeEventListener("scroll", updateRect, true);
-      window.removeEventListener("resize", updateRect);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+      window.removeEventListener("resize", handleScrollOrResize);
     };
   }, [isOpen, isMinimized, currentStep, activeStep, location.pathname]);
 
@@ -321,19 +338,26 @@ export function SystemTourGuide() {
     }
   };
 
-  // Cálculo da posição da seta / indicador flutuante
+  // Cálculo da posição da seta / indicador flutuante com guarda de visibilidade
   const badgePositionData = useMemo(() => {
     if (!targetRect) return null;
-    const badgeWidth = 320;
+    
+    // Oculta a seta caso o elemento scrollado saia completamente da tela
+    const isTargetVisible = 
+      targetRect.bottom > 20 && 
+      targetRect.top < (typeof window !== "undefined" ? window.innerHeight - 20 : 1080);
+    if (!isTargetVisible) return null;
+
+    const badgeWidth = 340;
     const screenWidth = typeof window !== "undefined" ? window.innerWidth : 1920;
     
     // Centraliza horizontalmente sobre o elemento com limites de tela
     const left = Math.max(16, Math.min(screenWidth - badgeWidth - 16, targetRect.left + (targetRect.width / 2) - (badgeWidth / 2)));
     
-    // Se o elemento estiver muito próximo do topo, posiciona a seta abaixo dele
+    // Se o elemento estiver com folga acima, posiciona a seta acima dele
     if (targetRect.top > 75) {
       return {
-        top: Math.max(12, targetRect.top - 54),
+        top: targetRect.top - 54,
         left,
         arrow: "👇",
       };
@@ -353,12 +377,12 @@ export function SystemTourGuide() {
       {/* ━━━ SPOTLIGHT + ANEL DE LUZ + SETA ANIMADA (SINALIZAÇÃO DO BOTÃO) ━━━━━ */}
       {isOpen && !isMinimized && targetRect && (
         <>
-          {/* Anel de Luz com Sombra Escura para Focar no Botão */}
+          {/* Anel de Luz cravado no elemento - Transição apenas de cor/sombra, zero atraso no scroll */}
           <div 
-            className="fixed pointer-events-none z-[99990] transition-all duration-300 rounded-2xl"
+            className="fixed pointer-events-none z-[99990] transition-[opacity,box-shadow,border-color] duration-300 rounded-2xl"
             style={{
-              top: Math.max(0, targetRect.top - 8),
-              left: Math.max(0, targetRect.left - 8),
+              top: targetRect.top - 8,
+              left: targetRect.left - 8,
               width: targetRect.width + 16,
               height: targetRect.height + 16,
               boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.55), 0 0 45px 10px rgba(245, 158, 11, 0.9), inset 0 0 20px rgba(245, 158, 11, 0.3)",
@@ -369,7 +393,7 @@ export function SystemTourGuide() {
           {/* Seta Animada Apontando Diretamente para o Botão / Card */}
           {badgePositionData && (
             <div
-              className="fixed pointer-events-none z-[99995] transition-all duration-300 flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-black text-xs sm:text-sm tracking-wide bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-black shadow-[0_0_35px_rgba(245,158,11,1)] animate-bounce select-none w-max"
+              className="fixed pointer-events-none z-[99995] transition-opacity duration-200 flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-black text-xs sm:text-sm tracking-wide bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-black shadow-[0_0_35px_rgba(245,158,11,1)] animate-bounce select-none w-max"
               style={{
                 top: badgePositionData.top,
                 left: badgePositionData.left,
@@ -465,7 +489,7 @@ export function SystemTourGuide() {
           className="fixed bottom-6 right-6 z-[99999] bg-amber-500 hover:bg-amber-400 text-black px-5 py-3 rounded-2xl shadow-[0_0_30px_rgba(245,158,11,0.6)] cursor-pointer flex items-center gap-3 font-black text-xs sm:text-sm animate-in fade-in slide-in-from-bottom-3 duration-200"
         >
           <Compass className="size-5 animate-spin-slow" />
-          <span>Tour Ativo ({currentStep + 1}/10) • Clique para Expandir</span>
+          <span>Tour Ativo ({currentStep + 1}/{TOUR_STEPS.length}) • Clique para Expandir</span>
           <Maximize2 className="size-4 ml-1" />
         </div>
       )}
