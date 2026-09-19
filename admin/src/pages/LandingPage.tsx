@@ -271,117 +271,38 @@ export function LandingPage() {
         </div>
 
         {/* ==================================================================== */}
-        {/* HERO MOCKUP: VISÃO GERAL DO ECOSSISTEMA                             */}
+        {/* HERO MOCKUP: PRINT REAL DO PAINEL FINANCEIRO                        */}
         {/* ==================================================================== */}
         <div className="max-w-6xl mx-auto mt-14 relative">
           
           <div className="absolute -inset-1 bg-gradient-to-b from-white/20 via-white/5 to-transparent rounded-3xl blur-xl opacity-70 pointer-events-none" />
 
-          <div className="relative bg-[#0b0b0b] border border-[#222] rounded-3xl p-4 sm:p-6 shadow-2xl overflow-hidden">
-            
-            {/* Window Top Bar */}
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-[#1c1c1c] text-xs">
+          {/* Janela de Sistema em Moldura macOS com Print Real */}
+          <div className="relative rounded-2xl sm:rounded-3xl border border-white/15 bg-[#0a0a0c] p-2 sm:p-3 shadow-[0_0_60px_rgba(255,255,255,0.07),0_20px_50px_rgba(0,0,0,0.8)] ring-1 ring-white/10 overflow-hidden group">
+            {/* Barra Superior da Janela */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/40 rounded-t-xl mb-2 text-xs text-white/50 font-mono">
               <div className="flex items-center gap-2">
-                <div className="flex gap-1.5">
-                  <div className="size-2.5 rounded-full bg-white/30" />
-                  <div className="size-2.5 rounded-full bg-white/30" />
-                  <div className="size-2.5 rounded-full bg-white/30" />
-                </div>
-                <span className="font-mono text-white/40 text-[11px] ml-2">
-                  SMK Flow • Central Operacional de Pods
+                <div className="size-3 rounded-full bg-red-500/80" />
+                <div className="size-3 rounded-full bg-yellow-500/80" />
+                <div className="size-3 rounded-full bg-emerald-500/80" />
+                <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">
+                  smoking-pods-admin.vercel.app/financeiro
                 </span>
               </div>
-              <div className="flex items-center gap-2 text-emerald-400 font-mono text-[11px] font-bold">
-                <span className="size-2 rounded-full bg-emerald-400 animate-ping" />
-                <span>SISTEMA ATIVO</span>
+              <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>DRE & Caixa Real em Tempo Real</span>
               </div>
             </div>
 
-            {/* Live Metrics Header Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-              <div className="bg-[#121212] border border-[#222] p-3 rounded-xl">
-                <span className="text-[10px] text-white/40 uppercase block font-mono">Catálogo na Bio</span>
-                <span className="text-sm font-bold text-white flex items-center gap-1.5 mt-0.5">
-                  <span className="size-2 rounded-full bg-emerald-400" />
-                  Estoque Sincronizado
-                </span>
-              </div>
-              <div className="bg-[#121212] border border-[#222] p-3 rounded-xl">
-                <span className="text-[10px] text-white/40 uppercase block font-mono">Pedidos em Rota</span>
-                <span className="text-sm font-bold text-white font-mono">4 Entregas em Andamento</span>
-              </div>
-              <div className="bg-[#121212] border border-[#222] p-3 rounded-xl">
-                <span className="text-[10px] text-white/40 uppercase block font-mono">Pods Prestes a Queimar</span>
-                <span className="text-sm font-bold text-white font-mono">7 Clientes p/ Chamar</span>
-              </div>
-              <div className="bg-[#121212] border border-[#222] p-3 rounded-xl">
-                <span className="text-[10px] text-white/40 uppercase block font-mono">Lucro Líquido Real</span>
-                <span className="text-sm font-bold text-emerald-400 font-mono">25.3% Auditado</span>
-              </div>
+            {/* Print Real do Financeiro */}
+            <div className="rounded-xl overflow-hidden border border-white/10 relative bg-[#0a0a0c]">
+              <ScreenshotOrFallback
+                src="/prints/financeiro-hero.png"
+                alt="Painel Financeiro Real do SMK Flow - DRE, Faturamento e Lucro Líquido"
+                className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-[1.01]"
+              />
             </div>
-
-            {/* Quick Preview Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              
-              {/* Box 1: Pedido do WhatsApp */}
-              <div className="bg-[#141414] border border-[#242424] rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between text-xs font-bold text-white/80 pb-2 border-b border-white/5">
-                  <span className="flex items-center gap-1.5 text-white">
-                    <ShoppingBag className="size-4 text-white" />
-                    Pedido Chegando do Catálogo
-                  </span>
-                  <span className="text-[10px] font-mono text-emerald-400 font-bold">PIX PAGO</span>
-                </div>
-                <div className="space-y-1.5 text-xs">
-                  <div className="font-bold text-white">#1052 • Lost Mary MO20000 Pro</div>
-                  <div className="text-white/60 text-[11px]">Sabor: Blue Baja Splash • Marina S.</div>
-                  <div className="text-emerald-400 font-bold font-mono">R$ 135,00</div>
-                  <div className="p-2 bg-black/40 rounded-lg text-[10px] text-white/50 border border-white/5">
-                    📍 Rua das Palmeiras, 140 - Apto 32 • SBC<br />
-                    🛵 Preferência: Uber Flash
-                  </div>
-                </div>
-              </div>
-
-              {/* Box 2: Motoboy em Rota */}
-              <div className="bg-[#141414] border border-[#242424] rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between text-xs font-bold text-white/80 pb-2 border-b border-white/5">
-                  <span className="flex items-center gap-1.5 text-white">
-                    <Truck className="size-4 text-white" />
-                    Despacho no Kanban
-                  </span>
-                  <span className="text-[10px] font-mono bg-white/10 text-white px-2 py-0.5 rounded font-bold">EM ROTA</span>
-                </div>
-                <div className="space-y-2 text-xs">
-                  <div className="font-bold text-white">2x Ignite V50 Watermelon Ice</div>
-                  <div className="text-white/50 text-[11px]">Cliente: Lucas Martins • Pedido #1050</div>
-                  <div className="p-2 bg-white/5 border border-white/10 rounded-lg text-[11px] text-white/80 font-medium">
-                    ⚡ Uber Flash despachado há 8 min.<br />
-                    Previsão de entrega: 12 min.
-                  </div>
-                </div>
-              </div>
-
-              {/* Box 3: Alerta de Recompra */}
-              <div className="bg-[#141414] border border-white/20 rounded-2xl p-4 space-y-3 relative overflow-hidden">
-                <div className="flex items-center justify-between text-xs font-bold text-white/80 pb-2 border-b border-white/5">
-                  <span className="flex items-center gap-1.5 text-white">
-                    <Bell className="size-4 animate-bounce text-white" />
-                    Pod Prestes a Acabar
-                  </span>
-                  <span className="text-[10px] font-mono bg-white/10 text-white px-2 py-0.5 rounded font-bold">HOJE</span>
-                </div>
-                <div className="space-y-2 text-xs">
-                  <div className="font-bold text-white">João Pedro comprou há 18 dias</div>
-                  <div className="text-white/60 text-[11px]">Elfbar BC15000 Blue Razz • Estimativa: ~5% restante</div>
-                  <div className="p-2 bg-white/5 border border-white/10 rounded-lg text-[11px] text-white/80 font-medium">
-                    💬 "Fala João! Seu Elfbar tá no finzinho, né? Chegou reposição dos seus favoritos..."
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
           </div>
         </div>
 
