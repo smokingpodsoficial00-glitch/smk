@@ -1272,6 +1272,7 @@ export default function SupplyChainDashboard() {
                 </button>
                 <button
                   type="button"
+                  data-tour="tab-produtos-parados"
                   onClick={() => setActiveMainView("PARADOS")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                     activeMainView === "PARADOS"
@@ -1300,6 +1301,7 @@ export default function SupplyChainDashboard() {
               {/* Botão Ação Principal de Venda */}
               <button
                 type="button"
+                data-tour="btn-registrar-venda"
                 onClick={() => {
                   setPreSelectedFlavorIdForSale(null);
                   setPreSelectedGroupForSale(null);
@@ -1313,6 +1315,7 @@ export default function SupplyChainDashboard() {
 
               {/* Botão Secundário Mais Discreto */}
               <button
+                data-tour="btn-novo-produto"
                 onClick={() => setShowNewProductModal(true)}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-medium border border-white/15 transition-all cursor-pointer active:scale-[0.97]"
               >
@@ -1423,7 +1426,7 @@ export default function SupplyChainDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
           {/* Ranking Top Modelos de Pods (Lista Limpa Sem Emojis) */}
-          <div className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-3">
+          <div data-tour="ranking-vendas" className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <TrendingUp className="size-4 text-emerald-400" />
@@ -1742,6 +1745,7 @@ export default function SupplyChainDashboard() {
 
                         <button
                           type="button"
+                          data-tour="btn-ver-sabores"
                           onClick={() => setViewingFlavorsGroup(group)}
                           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95"
                         >
