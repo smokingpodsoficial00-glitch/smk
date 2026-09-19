@@ -76,6 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCompanyUser(null);
     try {
       localStorage.removeItem(LOCAL_SESSION_KEY);
+      localStorage.removeItem('smk_auth_company_id');
     } catch (e) {
       console.warn('Erro ao remover sessão local:', e);
     }
@@ -86,6 +87,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const saveLocalSession = (usr: User, comp: Company, compUser: CompanyUser) => {
     try {
       localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify({ user: usr, company: comp, companyUser: compUser }));
+      if (comp?.id) {
+        localStorage.setItem('smk_auth_company_id', comp.id);
+      }
     } catch (e) {
       console.warn('Erro ao salvar sessão local:', e);
     }

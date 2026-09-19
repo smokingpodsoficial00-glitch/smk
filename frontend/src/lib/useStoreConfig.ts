@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { getCatalogCompanyId } from "@/lib/products";
+import { resolveCatalogCompanyId, getCatalogCompanyId } from "@/lib/products";
 
 export interface StoreConfig {
   id: string;
@@ -71,37 +71,7 @@ async function fetchConfig(): Promise<StoreConfig> {
   let mainConfig: StoreConfig | null = null;
   let fallbackConfig: StoreConfig | null = null;
 
-  let companyId = getCatalogCompanyId();
-
-  // Se não veio company_id explícito, tenta resolver por slug (?loja=slug ou subdomínio)
-  if (typeof window !== "undefined" && !new URLSearchParams(window.location.search).get("company")) {
-    let slug = new URLSearchParams(window.location.search).get("loja");
-    if (!slug) {
-      const host = window.location.hostname;
-      if (!host.includes("localhost") && !host.includes("127.0.0.1")) {
-        const parts = host.split(".");
-        if (parts.length >= 3 && !["www", "smoking-pods-catalogo", "admin", "app"].includes(parts[0])) {
-          slug = parts[0];
-        }
-      }
-    }
-
-    if (slug && slug !== "smoking-pods") {
-      try {
-        const { data: storeData } = await supabase
-          .from("store_config")
-          .select("company_id")
-          .eq("store_slug", slug)
-          .maybeSingle();
-
-        if (storeData?.company_id) {
-          companyId = storeData.company_id;
-        }
-      } catch (e) {
-        console.warn("Erro ao buscar empresa por slug em useStoreConfig:", e);
-      }
-    }
-  }
+  const companyId = await resolveCatalogCompanyId();
 
   // 1. Tentar ler da tabela dedicada `store_config` filtrado pela empresa atual
   try {
@@ -124,6 +94,7 @@ async function fetchConfig(): Promise<StoreConfig> {
       .from("smoking_products")
       .select("*")
       .eq("brand", "__STORE_CONFIG__")
+      .eq("company_id", companyId)
       .limit(1);
 
     if (!error && data && data.length > 0) {
@@ -149,7 +120,6 @@ async function fetchConfig(): Promise<StoreConfig> {
 
   // 3. Tentar ler da tabela `companies` para a empresa correta
   try {
-    const companyId = getCatalogCompanyId();
     const { data: compData } = await supabase
       .from("companies")
       .select("name, logo_url")

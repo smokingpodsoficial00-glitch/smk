@@ -269,11 +269,13 @@ export function useStoreConfig() {
       // 2. Salva na tabela dedicada `store_config` e na tabela `companies` no Supabase
       try {
         const supabase = await getSupabase();
+        const effectiveCompanyId = (typeof window !== "undefined" ? localStorage.getItem("smk_auth_company_id") : null) || config.company_id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
         const rowId = (config && config.id && config.id !== 'local-config-id') ? config.id : undefined;
         const { id: _ignoreId, ...configWithoutId } = newConfig;
         
         const payload: any = {
           ...configWithoutId,
+          company_id: effectiveCompanyId,
           updated_at: new Date().toISOString()
         };
         if (rowId) {
@@ -291,7 +293,6 @@ export function useStoreConfig() {
           cachedConfig.id = upsertData.id;
         }
 
-        const effectiveCompanyId = (typeof window !== "undefined" ? localStorage.getItem("smk_auth_company_id") : null) || config.company_id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
         const companyUpdates: any = {};
         if (updates.store_name) companyUpdates.name = updates.store_name;
         if (updates.logo_url !== undefined) companyUpdates.logo_url = updates.logo_url;

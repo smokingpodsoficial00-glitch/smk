@@ -35,24 +35,27 @@ export default function SettingsPage() {
   };
 
   // Dynamic Catalog Link (Neutro para SaaS: 'tabeladevalores-pods.vercel.app', 100% gratuito sem pagar domínio)
-  const isOfficial = !company?.id || company?.id === "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+  const currentCompanyId = company?.id || (typeof window !== "undefined" ? localStorage.getItem("smk_auth_company_id") : null);
+  const isOfficial = !currentCompanyId || currentCompanyId === "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
   const saasBaseUrl = (import.meta as any).env?.VITE_SAAS_CATALOG_BASE_URL || "https://tabeladevalores-pods.vercel.app";
 
   const currentSlug = generateSlug(storeName || company?.name || config?.store_name || "");
 
-  // O link só é liberado se for a loja oficial OU se o lojista já definiu e salvou um nome de loja válido
-  const isStoreConfigured = Boolean(
-    (config?.store_name && config.store_name.trim().length >= 2 && config.store_name.trim().toLowerCase() !== "minha loja") ||
-    (company?.name && company.name.trim().length >= 2 && company.name.trim().toLowerCase() !== "minha loja")
+  // Para a loja oficial, o link oficial sempre fica ativo.
+  // Para contas novas/SaaS, o link começa bloqueado até que o lojista salve o nome e gere o slug da sua loja
+  const hasSlugConfigured = Boolean(
+    config?.store_slug && 
+    config.store_slug.trim().length >= 2 && 
+    config.store_slug !== "smoking-pods"
   );
 
-  const [linkUnlocked, setLinkUnlocked] = useState(isOfficial || isStoreConfigured);
+  const [linkUnlocked, setLinkUnlocked] = useState(isOfficial || hasSlugConfigured);
 
   useEffect(() => {
-    if (isOfficial || isStoreConfigured) {
+    if (isOfficial || hasSlugConfigured) {
       setLinkUnlocked(true);
     }
-  }, [isOfficial, isStoreConfigured]);
+  }, [isOfficial, hasSlugConfigured]);
 
   const getCatalogUrl = () => {
     if (isOfficial) {
