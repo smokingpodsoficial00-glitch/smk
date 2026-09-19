@@ -102,6 +102,10 @@ export function LandingPage() {
 
   const whatsappLink = "https://wa.me/5511948487714?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20SMK%20Flow%20e%20quero%20tirar%20algumas%20d%C3%BAvidas%20sobre%20o%20sistema.";
 
+  // Integração de Checkout Asaas com Fallback Seguro para Suporte WhatsApp
+  const asaasGestaoLink = (import.meta.env.VITE_ASAAS_GESTAO_URL as string) || `${whatsappLink}&text=Ol%C3%A1!%20Quero%20assinar%20o%20Plano%20SMK%20Gest%C3%A3o%20de%20R$%2097%20via%20Asaas`;
+  const asaasComboLink = (import.meta.env.VITE_ASAAS_COMBO_URL as string) || `${whatsappLink}&text=Ol%C3%A1!%20Quero%20aproveitar%20o%20lan%C3%A7amento%20do%20SMK%20Pro%20Combo%20de%20R$%20127,90%20via%20Asaas`;
+
   return (
     <div id="topo" className="min-h-screen bg-[#050505] text-white font-sans antialiased relative selection:bg-white/20 selection:text-white overflow-x-hidden">
       
@@ -1193,7 +1197,7 @@ export function LandingPage() {
 
               <div className="pt-8">
                 <a
-                  href={`${whatsappLink}&text=Ol%C3%A1!%20Quero%20assinar%20o%20Plano%20SMK%20Gest%C3%A3o%20de%20R$%2097`}
+                  href={asaasGestaoLink}
                   target="_blank"
                   rel="noreferrer"
                   className="w-full bg-[#161616] hover:bg-[#202020] border border-[#2a2a2a] text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95"
@@ -1266,7 +1270,7 @@ export function LandingPage() {
 
               <div className="pt-8">
                 <a
-                  href={`${whatsappLink}&text=Ol%C3%A1!%20Quero%20aproveitar%20o%20lan%C3%A7amento%20do%20SMK%20Pro%20Combo%20(Sistema%20%2B%20Cat%C3%A1logo)%20de%20R$%20127,90`}
+                  href={asaasComboLink}
                   target="_blank"
                   rel="noreferrer"
                   className="w-full bg-white hover:bg-slate-100 text-black font-extrabold py-4 rounded-xl transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer"
@@ -1276,6 +1280,19 @@ export function LandingPage() {
               </div>
             </div>
 
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-6 text-center">
+            <span className="text-xs text-white/50">Dúvidas sobre o plano ideal para a sua loja?</span>
+            <a
+              href={`${whatsappLink}&text=Ol%C3%A1!%20Tenho%20d%C3%BAvidas%20sobre%20os%20planos%20do%20sistema%20Smoking%20Pods`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1.5 transition-colors underline underline-offset-4"
+            >
+              <MessageCircle className="size-3.5" />
+              <span>Fale com nosso time de especialistas no WhatsApp</span>
+            </a>
           </div>
 
           <div className="text-center text-xs text-white/40 pt-4">

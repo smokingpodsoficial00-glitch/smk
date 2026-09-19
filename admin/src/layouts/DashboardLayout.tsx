@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, Users, Settings, CircleDollarSign, 
-  Store, ChevronRight, Bot, LogOut, Shield, User as UserIcon, Megaphone, Scale, CheckSquare
+  Store, ChevronRight, Bot, LogOut, Shield, User as UserIcon, Megaphone, Scale, CheckSquare, Compass
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { useStoreConfig } from '../lib/useStoreConfig';
+import { SystemTourGuide } from '../components/tour/SystemTourGuide';
 
 export function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -265,8 +266,24 @@ export function DashboardLayout() {
           </button>
         </div>
 
-        {/* Rodapé / Configurações & Logout */}
+        {/* Rodapé / Configurações, Tour & Logout */}
         <div className={`p-3 border-t border-white/5 w-full flex flex-col gap-1 ${sidebarCollapsed ? 'items-center' : ''}`}>
+          
+          {/* Botão de Tour do Sistema */}
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('open-system-tour'));
+            }}
+            title={sidebarCollapsed ? "Tour do Sistema" : undefined}
+            className={`flex items-center gap-3 py-2 transition-all cursor-pointer w-full text-xs font-semibold rounded-xl text-amber-300 hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 ${
+              sidebarCollapsed ? 'justify-center px-3' : 'px-3'
+            }`}
+          >
+            <Compass className="size-4 shrink-0 text-amber-400 animate-spin-slow" />
+            {!sidebarCollapsed && <span className="truncate">Tour do Sistema</span>}
+          </button>
+
           {canAccess('configuracoes') && (
             <NavLink 
               to="/configuracoes"
@@ -303,6 +320,9 @@ export function DashboardLayout() {
       <main className="flex-1 flex flex-col overflow-hidden">
         <Outlet />
       </main>
+
+      {/* Assistente do Tour Guiado */}
+      <SystemTourGuide />
     </div>
   );
 }

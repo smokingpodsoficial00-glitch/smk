@@ -1,11 +1,10 @@
 import React, { Component, type ReactNode, useState } from "react";
-import { Users, Crown, RefreshCw, AlertTriangle, Target, Receipt, UserPlus } from "lucide-react";
+import { Users, Crown, RefreshCw, AlertTriangle, Receipt, UserPlus } from "lucide-react";
 import type { RealClient } from "@/lib/crm";
 
 // Componentes do CRM
 import { RFMMatrix } from "./crm/RFMMatrix";
 import { PredictiveReplenishment } from "./crm/PredictiveReplenishment";
-import { FollowUpsTab } from "./crm/FollowUpsTab";
 import { SalesHistoryTab } from "./crm/SalesHistoryTab";
 import { ClientProfileModal } from "./crm/ClientProfileModal";
 import { NewClientModal } from "./crm/NewClientModal";
@@ -56,7 +55,7 @@ class CRMErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
 }
 
 export default function CRMDashboard() {
-  const [activeSubTab, setActiveSubTab] = useState<'rfm' | 'replenishment' | 'followups' | 'sales_history'>('rfm');
+  const [activeSubTab, setActiveSubTab] = useState<'rfm' | 'replenishment' | 'sales_history'>('rfm');
   const [selectedClient, setSelectedClient] = useState<RealClient | null>(null);
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -64,7 +63,6 @@ export default function CRMDashboard() {
   const tabs = [
     { id: 'rfm', label: 'Ranking & Fidelidade', icon: <Crown className="size-4 text-amber-400" /> },
     { id: 'replenishment', label: 'Aviso de Fim de Pod & Recompra', icon: <RefreshCw className="size-4 text-white" /> },
-    { id: 'followups', label: 'Follow-ups de Vendas & Salário', icon: <Target className="size-4 text-white/80" /> },
     { id: 'sales_history', label: 'Histórico & Mural de Vendas', icon: <Receipt className="size-4 text-white/80" /> },
   ] as const;
 
@@ -79,7 +77,7 @@ export default function CRMDashboard() {
               <span>Gestão de Clientes & CRM</span>
             </h1>
             <p className="text-xs text-muted-foreground">
-              Ranking de Fidelidade, Previsão de Recompra, Follow-ups e Histórico Técnico de Vendas.
+              Ranking de Fidelidade, Previsão de Recompra e Histórico Técnico de Vendas.
             </p>
           </div>
           
@@ -104,7 +102,7 @@ export default function CRMDashboard() {
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment' | 'followups' | 'sales_history')}
+              onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment' | 'sales_history')}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none ${
                 activeSubTab === tab.id 
                   ? 'bg-white/10 text-white font-extrabold border border-white/25 shadow-[0_0_15px_rgba(255,255,255,0.15)]' 
@@ -122,7 +120,6 @@ export default function CRMDashboard() {
           <CRMErrorBoundary>
             {activeSubTab === 'rfm' && <RFMMatrix key={`rfm-${refreshKey}`} onSelectClient={setSelectedClient} />}
             {activeSubTab === 'replenishment' && <PredictiveReplenishment key={`rep-${refreshKey}`} onSelectClient={setSelectedClient} />}
-            {activeSubTab === 'followups' && <FollowUpsTab key={`fol-${refreshKey}`} />}
             {activeSubTab === 'sales_history' && <SalesHistoryTab key={`sal-${refreshKey}`} />}
           </CRMErrorBoundary>
         </div>

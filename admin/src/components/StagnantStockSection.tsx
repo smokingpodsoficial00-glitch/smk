@@ -9,6 +9,69 @@ import { VipGroupOfferModal } from "./VipGroupOfferModal";
 
 const STAGNANT_MIN_DAYS = 7; // Regra mínima obrigatória: 7 dias
 
+const INITIAL_DEMO_ITEMS = [
+  {
+    id: "demo-1",
+    brand: "Ignite",
+    name: "V150 15.000 Puffs",
+    flavor: "Menta Ice",
+    stock: 8,
+    costPrice: 60,
+    sellPrice: 110,
+    stagnantCapital: 480,
+    entryTimestamp: Date.now() - 38 * 24 * 60 * 60 * 1000,
+    formattedEntryDate: "38 dias atrás",
+    daysSinceCreation: 38,
+    latestSaleTimestamp: null,
+    diasParado: 38,
+    nuncaVendido: true,
+    totalSold: 0,
+    isPromotional: false,
+    promoData: null,
+    isDemo: true,
+  },
+  {
+    id: "demo-2",
+    brand: "Elfbar",
+    name: "BC10000 Puffs",
+    flavor: "Watermelon Ice",
+    stock: 5,
+    costPrice: 55,
+    sellPrice: 95,
+    stagnantCapital: 275,
+    entryTimestamp: Date.now() - 24 * 24 * 60 * 60 * 1000,
+    formattedEntryDate: "24 dias atrás",
+    daysSinceCreation: 24,
+    latestSaleTimestamp: null,
+    diasParado: 24,
+    nuncaVendido: true,
+    totalSold: 0,
+    isPromotional: true,
+    promoData: { isPromotional: true, promoPrice: 80.75, discountPct: 15 },
+    isDemo: true,
+  },
+  {
+    id: "demo-3",
+    brand: "Oxbar",
+    name: "G8000 Puffs",
+    flavor: "Strawberry Kiwi",
+    stock: 4,
+    costPrice: 50,
+    sellPrice: 90,
+    stagnantCapital: 200,
+    entryTimestamp: Date.now() - 15 * 24 * 60 * 60 * 1000,
+    formattedEntryDate: "15 dias atrás",
+    daysSinceCreation: 15,
+    latestSaleTimestamp: null,
+    diasParado: 15,
+    nuncaVendido: false,
+    totalSold: 2,
+    isPromotional: false,
+    promoData: null,
+    isDemo: true,
+  },
+];
+
 interface StagnantStockSectionProps {
   products: any[];
   orders: any[];
@@ -26,6 +89,8 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
   const [promotionsMap, setPromotionsMap] = useState<Record<string, PromoData>>({});
   const [selectedOfferProduct, setSelectedOfferProduct] = useState<any | null>(null);
   const [selectedVipProduct, setSelectedVipProduct] = useState<any | null>(null);
+  const [isDemoActive, setIsDemoActive] = useState(true);
+  const [demoItems, setDemoItems] = useState(INITIAL_DEMO_ITEMS);
 
   // Carregar mapa de promoções do Supabase DB
   const loadPromotions = async () => {
@@ -164,25 +229,53 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
     });
   }, [products, orders, promotionsMap]);
 
+  // Fila Efetiva (se a fila real estiver vazia e demo estiver ativo, usa os dados simulados)
+  const isSimulated = stagnantQueue.length === 0 && isDemoActive;
+
+  const effectiveQueue = useMemo(() => {
+    if (stagnantQueue.length > 0) return stagnantQueue;
+    if (isDemoActive) return demoItems;
+    return [];
+  }, [stagnantQueue, isDemoActive, demoItems]);
+
   // Filtro por busca (Marca, Modelo ou Sabor)
   const filteredQueue = useMemo(() => {
-    if (!searchQuery.trim()) return stagnantQueue;
+    if (!searchQuery.trim()) return effectiveQueue;
     const q = searchQuery.toLowerCase().trim();
-    return stagnantQueue.filter((item) => {
+    return effectiveQueue.filter((item) => {
       const b = (item.brand || "").toLowerCase();
       const n = (item.name || "").toLowerCase();
       const f = (item.flavor || "").toLowerCase();
       return b.includes(q) || n.includes(q) || f.includes(q);
     });
-  }, [stagnantQueue, searchQuery]);
+  }, [effectiveQueue, searchQuery]);
 
   // Totais do cabeçalho
-  const totalStagnantProducts = stagnantQueue.length;
-  const totalStagnantUnits = stagnantQueue.reduce((sum, item) => sum + item.stock, 0);
-  const totalStagnantCapital = stagnantQueue.reduce((sum, item) => sum + item.stagnantCapital, 0);
+  const totalStagnantProducts = effectiveQueue.length;
+  const totalStagnantUnits = effectiveQueue.reduce((sum, item) => sum + item.stock, 0);
+  const totalStagnantCapital = effectiveQueue.reduce((sum, item) => sum + item.stagnantCapital, 0);
 
   // Alternar Promoção Direta
   const handleTogglePromotion = async (product: any) => {
+    if (product.isDemo) {
+      setDemoItems((prev) =>
+        prev.map((it) => {
+          if (it.id === product.id) {
+            const newStatus = !it.isPromotional;
+            return {
+              ...it,
+              isPromotional: newStatus,
+              promoData: newStatus
+                ? { isPromotional: true, promoPrice: Number((it.sellPrice * 0.85).toFixed(2)), discountPct: 15 }
+                : null,
+            };
+          }
+          return it;
+        })
+      );
+      return;
+    }
+
     const newStatus = !product.isPromotional;
     const defaultPromoPrice = (product.sellPrice * 0.85).toFixed(2);
 
@@ -211,6 +304,11 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 📦 Produtos Parados
+                {isSimulated && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    EXEMPLO DEMO
+                  </span>
+                )}
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Fila de produtos com 7 dias ou mais sem giro no estoque (ordenados pelo maior tempo parado)
@@ -249,6 +347,37 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Banner de Demonstração para Contas Novas */}
+      {stagnantQueue.length === 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="size-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+              <Sparkles className="size-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-xs font-bold text-white">Radar de Produtos Parados</h4>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  {isDemoActive ? "MODO DEMONSTRAÇÃO ATIVO" : "SIMULAÇÃO OCULTA"}
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                {isDemoActive
+                  ? "Sua loja ainda não possui produtos sem giro há mais de 7 dias. Exibindo dados simulados para demonstrar o cálculo de capital parado e queima de estoque."
+                  : "Modo demonstração desligado. Nenhum produto com mais de 7 dias parado detectado no momento."}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsDemoActive(!isDemoActive)}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all cursor-pointer shrink-0"
+          >
+            {isDemoActive ? "Ocultar Simulação" : "💡 Ver Exemplo de Demonstração"}
+          </button>
+        </div>
+      )}
 
       {/* ━━━ BARRA DE PESQUISA ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="flex items-center justify-between gap-3 bg-[#141414] border border-white/10 rounded-2xl p-3.5">
@@ -304,6 +433,11 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
                     <div>
                       <div className="font-bold text-white flex items-center gap-1.5 flex-wrap">
                         <span>{item.brand} {item.name}</span>
+                        {item.isDemo && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            DEMO
+                          </span>
+                        )}
                         {item.isPromotional && (
                           <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 border border-red-500/40 animate-in fade-in">
                             EM PROMOÇÃO {item.promoData?.discountPct ? `(-${item.promoData.discountPct}%)` : ""}

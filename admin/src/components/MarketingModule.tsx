@@ -368,9 +368,30 @@ export default function MarketingModule() {
         ]);
 
         const sanitized = sanitizeBroadcastLists(lists);
+        let finalLists = sanitized.lists;
+
+        if (!finalLists || finalLists.length === 0) {
+          const defaultDemoList: BroadcastList = {
+            id: 'list-demo-vip',
+            name: '⭐ Lista de Teste VIP (Demonstração)',
+            description: 'Lista criada para testar campanhas com segurança sem disparar para clientes reais.',
+            color: '#10b981',
+            createdAt: new Date().toISOString(),
+            contacts: [
+              {
+                id: 'contact-demo-1',
+                name: 'Cliente Teste (Demonstração)',
+                phone: '5511999999999',
+                cleanPhone: '5511999999999',
+                isSaved: true
+              }
+            ]
+          };
+          finalLists = [defaultDemoList];
+        }
 
         if (isMounted) {
-          setBroadcastLists(sanitized.lists);
+          setBroadcastLists(finalLists);
           setCampaigns(camps);
         }
 
