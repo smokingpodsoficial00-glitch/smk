@@ -28,7 +28,9 @@ import {
   AlertCircle,
   RefreshCw,
   SlidersHorizontal,
-  Monitor
+  Monitor,
+  Menu,
+  X
 } from 'lucide-react';
 
 function InstagramIcon({ className = "size-5" }: { className?: string }) {
@@ -100,12 +102,13 @@ export function LandingPage() {
 
   // FAQ Accordion State
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const toggleFaq = (idx: number) => {
     setOpenFaq(openFaq === idx ? null : idx);
   };
 
-  const whatsappLink = "https://wa.me/5511948487714?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20SMK%20Flow%20e%20quero%20tirar%20algumas%20d%C3%BAvidas%20sobre%20o%20sistema.";
+  const whatsappLink = "https://wa.me/5511948487714?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20SMK%20System%20e%20quero%20tirar%20algumas%20d%C3%BAvidas%20sobre%20o%20sistema.";
 
   // Integração de Checkout Asaas com Fallback Seguro para Suporte WhatsApp
   const asaasGestaoLink = (import.meta.env.VITE_ASAAS_GESTAO_URL as string) || `${whatsappLink}&text=Ol%C3%A1!%20Quero%20assinar%20o%20Plano%20SMK%20Gest%C3%A3o%20de%20R$%2097%20via%20Asaas`;
@@ -121,88 +124,206 @@ export function LandingPage() {
       <div className="absolute top-[4400px] left-1/3 -translate-x-1/2 w-[700px] h-[700px] bg-white/[0.02] blur-[220px] rounded-full pointer-events-none" />
 
       {/* ==================================================================== */}
-      {/* 1. TOP ANNOUNCEMENT BANNER COM TIMER REGRESSIVO                      */}
+      {/* 1 & 2. HEADER UNIFICADO (BANNER DE LANÇAMENTO + NAVBAR RESPONSIVA)   */}
       {/* ==================================================================== */}
-      <div className="w-full bg-[#0a0a0a] border-b border-[#1c1c1c] py-2.5 px-4 text-center sticky top-0 z-50 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-xs">
-          <div className="flex items-center gap-1.5 text-white font-extrabold uppercase tracking-wider text-[11px]">
-            <Sparkles className="size-3.5 text-white animate-pulse" />
-            <span>Oferta de Lançamento:</span>
-          </div>
-          <span className="text-white/70 hidden sm:inline">Trave sua mensalidade vitalícia sem reajustes pelos próximos 30 dias:</span>
-          
-          {/* Countdown Badge */}
-          <div className="inline-flex items-center gap-1.5 bg-[#141414] border border-[#2a2a2a] px-2.5 py-0.5 rounded-lg font-mono text-[11px] font-bold text-white shadow-inner">
-            <span className="text-white">{String(timeLeft.days).padStart(2, '0')}d</span>
-            <span className="text-white/30">:</span>
-            <span className="text-white">{String(timeLeft.hours).padStart(2, '0')}h</span>
-            <span className="text-white/30">:</span>
-            <span className="text-white">{String(timeLeft.minutes).padStart(2, '0')}m</span>
-            <span className="text-white/30">:</span>
-            <span className="text-emerald-400">{String(timeLeft.seconds).padStart(2, '0')}s</span>
+      <div className="sticky top-0 z-50 w-full backdrop-blur-xl bg-[#050505]/95 border-b border-[#161616]">
+        {/* Top Announcement Banner com Timer Regressivo */}
+        <div className="w-full bg-gradient-to-r from-emerald-950/30 via-[#0c0c0c] to-emerald-950/30 border-b border-white/5 py-2 px-3 sm:px-4 text-center">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-xs">
+            <div className="flex items-center gap-1.5 text-white font-extrabold uppercase tracking-wider text-[11px] shrink-0">
+              <Sparkles className="size-3.5 text-white animate-pulse" />
+              <span>Oferta de Lançamento:</span>
+            </div>
+            <span className="text-white/70 hidden md:inline shrink-0">
+              Trave sua mensalidade vitalícia sem reajustes pelos próximos 30 dias:
+            </span>
+            
+            {/* Countdown Badge */}
+            <div className="inline-flex items-center gap-1.5 bg-[#141414] border border-[#2a2a2a] px-2.5 py-0.5 rounded-lg font-mono text-[11px] font-bold text-white shadow-inner shrink-0">
+              <span className="text-white">{String(timeLeft.days).padStart(2, '0')}d</span>
+              <span className="text-white/30">:</span>
+              <span className="text-white">{String(timeLeft.hours).padStart(2, '0')}h</span>
+              <span className="text-white/30">:</span>
+              <span className="text-white">{String(timeLeft.minutes).padStart(2, '0')}m</span>
+              <span className="text-white/30">:</span>
+              <span className="text-emerald-400">{String(timeLeft.seconds).padStart(2, '0')}s</span>
+            </div>
           </div>
         </div>
+
+        {/* Main Navbar */}
+        <header className="w-full">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3 sm:gap-4">
+            
+            {/* Logo Brand */}
+            <a href="#topo" className="flex items-center gap-2.5 sm:gap-3 shrink-0 group">
+              <div className="size-9 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(255,255,255,0.2)] group-hover:scale-105 transition-transform shrink-0">
+                <Zap className="size-4 fill-white" />
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="font-extrabold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">
+                  SMK System
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-white font-semibold whitespace-nowrap hidden sm:inline-flex">
+                  SaaS Pro
+                </span>
+              </div>
+            </a>
+
+            {/* Nav Links (Desktop) */}
+            <nav className="hidden lg:flex items-center gap-3.5 xl:gap-5 2xl:gap-6 text-xs font-medium text-white/60">
+              <a href="#dores" className="hidden 2xl:inline-block hover:text-white transition-colors whitespace-nowrap shrink-0">
+                O Caos
+              </a>
+              <a href="#catalogo" className="text-white hover:text-white transition-colors font-bold flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                <span>Catálogo na Bio</span>
+                <span className="size-1.5 rounded-full bg-white animate-ping" />
+              </a>
+              <a href="#kanban" className="hover:text-white transition-colors whitespace-nowrap shrink-0">
+                Kanban & Despacho
+              </a>
+              <a href="#recompra" className="hover:text-white transition-colors whitespace-nowrap shrink-0">
+                CRM & Recompra
+              </a>
+              <a href="#estoque" className="hover:text-white transition-colors whitespace-nowrap shrink-0">
+                Estoque Parado
+              </a>
+              <a href="#socios" className="hover:text-white transition-colors whitespace-nowrap shrink-0">
+                Sócios
+              </a>
+              <a href="#case" className="hidden 2xl:inline-block hover:text-white transition-colors whitespace-nowrap shrink-0">
+                Case Real
+              </a>
+              <a href="#planos" className="hover:text-white transition-colors font-bold text-white whitespace-nowrap shrink-0">
+                Planos
+              </a>
+            </nav>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              <Link 
+                to="/login" 
+                className="text-xs font-bold text-white/70 hover:text-white px-3 py-2 rounded-lg hover:bg-white/5 transition-colors hidden sm:inline-flex whitespace-nowrap"
+              >
+                Entrar
+              </Link>
+              <Link 
+                to="/cadastro" 
+                className="text-xs font-bold text-white/90 hover:text-white px-3 py-2 rounded-lg hover:bg-white/5 transition-colors hidden xl:inline-flex whitespace-nowrap"
+              >
+                Criar Conta
+              </Link>
+              <a 
+                href="#planos"
+                className="bg-white hover:bg-slate-100 text-black font-extrabold px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+              >
+                <span>Garantir Acesso</span>
+                <ArrowRight className="size-3.5" />
+              </a>
+
+              {/* Mobile Hamburger Button */}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+                aria-label="Abrir Menu de Navegação"
+              >
+                {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+              </button>
+            </div>
+
+          </div>
+
+          {/* Mobile Menu Dropdown */}
+          {mobileMenuOpen && (
+            <div className="lg:hidden border-t border-white/10 bg-[#070707]/95 px-4 py-4 space-y-3 shadow-2xl backdrop-blur-2xl animate-in slide-in-from-top-2 duration-200">
+              <div className="grid grid-cols-2 gap-2 text-xs font-medium">
+                <a 
+                  href="#dores" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>⚡</span>
+                  <span>O Caos</span>
+                </a>
+                <a 
+                  href="#catalogo" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white/10 border border-white/10 text-white font-bold transition-colors flex items-center gap-2"
+                >
+                  <span className="size-2 rounded-full bg-emerald-400" />
+                  <span>Catálogo na Bio</span>
+                </a>
+                <a 
+                  href="#kanban" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>📦</span>
+                  <span>Kanban & Despacho</span>
+                </a>
+                <a 
+                  href="#recompra" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>🔄</span>
+                  <span>CRM & Recompra</span>
+                </a>
+                <a 
+                  href="#estoque" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>🏷️</span>
+                  <span>Estoque Parado</span>
+                </a>
+                <a 
+                  href="#socios" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>🤝</span>
+                  <span>Sócios</span>
+                </a>
+                <a 
+                  href="#case" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>🏆</span>
+                  <span>Case Real</span>
+                </a>
+                <a 
+                  href="#planos" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white text-black font-extrabold transition-all flex items-center justify-between"
+                >
+                  <span>Ver Planos</span>
+                  <ArrowRight className="size-3.5" />
+                </a>
+              </div>
+
+              <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-3 text-xs font-bold">
+                <Link 
+                  to="/login" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex-1 py-2.5 text-center rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-colors"
+                >
+                  Fazer Login
+                </Link>
+                <Link 
+                  to="/cadastro" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex-1 py-2.5 text-center rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/20 transition-colors"
+                >
+                  Criar Conta
+                </Link>
+              </div>
+            </div>
+          )}
+        </header>
       </div>
-
-      {/* ==================================================================== */}
-      {/* 2. HEADER NAVBAR                                                     */}
-      {/* ==================================================================== */}
-      <header className="border-b border-[#161616] bg-[#070707]/90 backdrop-blur-xl sticky top-[41px] z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          
-          {/* Logo Brand */}
-          <div className="flex items-center gap-3">
-            <div className="size-9 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(255,255,255,0.2)]">
-              <Zap className="size-4 fill-white" />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-lg tracking-tight text-white">SMK Flow</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-white font-semibold">
-                SaaS Pro
-              </span>
-            </div>
-          </div>
-
-          {/* Nav Links (Desktop) */}
-          <nav className="hidden lg:flex items-center gap-6 text-xs font-medium text-white/60">
-            <a href="#dores" className="hover:text-white transition-colors">O Caos</a>
-            <a href="#catalogo" className="text-white hover:text-white transition-colors font-bold flex items-center gap-1.5">
-              <span>Catálogo na Bio</span>
-              <span className="size-1.5 rounded-full bg-white animate-ping" />
-            </a>
-            <a href="#kanban" className="hover:text-white transition-colors">Kanban & Entrega</a>
-            <a href="#recompra" className="hover:text-white transition-colors">CRM & Recompra</a>
-            <a href="#estoque" className="hover:text-white transition-colors">Estoque Parado</a>
-            <a href="#socios" className="hover:text-white transition-colors">Sócios</a>
-            <a href="#case" className="hover:text-white transition-colors">Case Real</a>
-            <a href="#planos" className="hover:text-white transition-colors font-bold text-white">Planos</a>
-          </nav>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link 
-              to="/login" 
-              className="text-xs font-bold text-white/70 hover:text-white px-3 py-2 rounded-lg hover:bg-white/5 transition-colors hidden sm:block"
-            >
-              Entrar
-            </Link>
-            <Link 
-              to="/cadastro" 
-              className="text-xs font-bold text-white/90 hover:text-white px-3 py-2 rounded-lg hover:bg-white/5 transition-colors hidden md:block"
-            >
-              Criar Conta
-            </Link>
-            <a 
-              href="#planos"
-              className="bg-white hover:bg-slate-100 text-black font-extrabold px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] active:scale-95 flex items-center gap-1.5"
-            >
-              <span>Garantir Acesso</span>
-              <ArrowRight className="size-3.5" />
-            </a>
-          </div>
-
-        </div>
-      </header>
 
       {/* ==================================================================== */}
       {/* 3. HERO PRINCIPAL                                                    */}
@@ -234,10 +355,10 @@ export function LandingPage() {
           <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
             <a
               href="#planos"
-              className="bg-white hover:bg-slate-100 text-black font-extrabold px-8 py-4 rounded-xl text-sm sm:text-base transition-all shadow-[0_0_35px_rgba(255,255,255,0.35)] hover:shadow-[0_0_45px_rgba(255,255,255,0.55)] flex items-center gap-2.5 active:scale-95 cursor-pointer"
+              className="bg-white hover:bg-slate-100 text-black font-extrabold px-8 py-4 rounded-xl text-sm sm:text-base transition-all shadow-[0_0_35px_rgba(255,255,255,0.35)] hover:shadow-[0_0_45px_rgba(255,255,255,0.55)] flex items-center justify-center gap-2.5 active:scale-95 cursor-pointer text-center"
             >
-              <span>Quero Travar Minha Vaga de Lançamento</span>
-              <ArrowRight className="size-4" />
+              <span>Compre Agora e Pague Para Sempre o Preço de Lançamento</span>
+              <ArrowRight className="size-4 shrink-0" />
             </a>
 
             <a
@@ -246,7 +367,7 @@ export function LandingPage() {
               rel="noreferrer"
               className="bg-[#0e1713] hover:bg-[#13231c] border border-emerald-500/40 text-emerald-400 hover:text-emerald-300 font-bold px-6 py-4 rounded-xl text-sm sm:text-base transition-all flex items-center gap-2.5 active:scale-95"
             >
-              <MessageCircle className="size-4 fill-emerald-400/20 text-emerald-400" />
+              <MessageCircle className="size-4 fill-emerald-400/20 text-emerald-400 shrink-0" />
               <span>Tirar Dúvidas no WhatsApp</span>
             </a>
           </div>
@@ -286,7 +407,7 @@ export function LandingPage() {
                 <div className="size-3 rounded-full bg-yellow-500/80" />
                 <div className="size-3 rounded-full bg-emerald-500/80" />
                 <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">
-                  smoking-pods-admin.vercel.app/financeiro
+                  app.smksystem.com/financeiro
                 </span>
               </div>
               <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
@@ -299,7 +420,7 @@ export function LandingPage() {
             <div className="rounded-xl overflow-hidden border border-white/10 relative bg-[#0a0a0c]">
               <ScreenshotOrFallback
                 src="/prints/financeiro-hero.png"
-                alt="Painel Financeiro Real do SMK Flow - DRE, Faturamento e Lucro Líquido"
+                alt="Painel Financeiro Real do SMK System - DRE, Faturamento e Lucro Líquido"
                 className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-[1.01]"
               />
             </div>
@@ -403,7 +524,7 @@ export function LandingPage() {
             </h2>
 
             <p className="text-sm sm:text-base text-white/70 leading-relaxed">
-              O catálogo oficial do SMK Flow transforma o link da sua bio em um cardápio profissional, interativo e com estoque sincronizado em tempo real. Você nunca mais vai perder 20 minutos escrevendo texto no WhatsApp.
+              O catálogo oficial do SMK System transforma o link da sua bio em um cardápio profissional, interativo e com estoque sincronizado em tempo real. Você nunca mais vai perder 20 minutos escrevendo texto no WhatsApp.
             </p>
           </div>
 
@@ -758,7 +879,7 @@ export function LandingPage() {
             </h2>
 
             <p className="text-sm sm:text-base text-white/70 max-w-3xl mx-auto leading-relaxed">
-              Vender pods não é ser feirante esperando cliente cair do céu ou disputando preço como na feirinha de São Paulo. Você sabe quanto cada cliente gasta com você por mês? Qual o tempo de vida dele? E o principal: <strong>quanto tempo falta para o pod dele acabar?</strong> O CRM do SMK Flow rastreia o ciclo de consumo de cada cliente para você entrar em contato na hora exata e vender de novo antes que ele compre em outra loja.
+              Vender pods não é ser feirante esperando cliente cair do céu ou disputando preço como na feirinha de São Paulo. Você sabe quanto cada cliente gasta com você por mês? Qual o tempo de vida dele? E o principal: <strong>quanto tempo falta para o pod dele acabar?</strong> O CRM do SMK System rastreia o ciclo de consumo de cada cliente para você entrar em contato na hora exata e vender de novo antes que ele compre em outra loja.
             </p>
           </div>
 
@@ -771,7 +892,7 @@ export function LandingPage() {
               </div>
               <h3 className="text-base font-bold text-white">Chega de Vender como Feirante</h3>
               <p className="text-xs text-white/60 leading-relaxed">
-                Quem atende no WhatsApp como feirante perde vendas por esquecimento e disputa centavos com concorrentes amadores. No SMK Flow, você tem a lista organizada de todos os seus clientes com histórico de compras e ticket médio.
+                Quem atende no WhatsApp como feirante perde vendas por esquecimento e disputa centavos com concorrentes amadores. No SMK System, você tem a lista organizada de todos os seus clientes com histórico de compras e ticket médio.
               </p>
             </div>
 
@@ -848,7 +969,7 @@ export function LandingPage() {
             </h2>
 
             <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              O maior erro dos lojistas é dar desconto em produtos que já vendem a preço cheio. O SMK Flow aponta o dedo exatamente para os sabores que estão encalhados na prateleira para você fazer caixa rápido.
+              O maior erro dos lojistas é dar desconto em produtos que já vendem a preço cheio. O SMK System aponta o dedo exatamente para os sabores que estão encalhados na prateleira para você fazer caixa rápido.
             </p>
           </div>
 
@@ -889,7 +1010,7 @@ export function LandingPage() {
           {/* Screenshot Container para Estoque Parado */}
           <ScreenshotOrFallback
             src="/prints/estoque-parado.png"
-            alt="Estoque Parado SMK Flow"
+            alt="Estoque Parado SMK System"
             fallback={<div className="hidden" />}
           />
 
@@ -916,7 +1037,7 @@ export function LandingPage() {
             </h2>
 
             <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              Muitos amigos abrem loja de pod juntos e brigam achando que um tirou mais dinheiro que o outro. O SMK Flow mostra com números limpos o patrimônio real da loja, quanto tem em estoque e a fatia exata de cada um.
+              Muitos amigos abrem loja de pod juntos e brigam achando que um tirou mais dinheiro que o outro. O SMK System mostra com números limpos o patrimônio real da loja, quanto tem em estoque e a fatia exata de cada um.
             </p>
           </div>
 
@@ -953,7 +1074,7 @@ export function LandingPage() {
             {/* Card Widget dos Sócios ou Print Real */}
             <ScreenshotOrFallback
               src="/prints/socios-equity.png"
-              alt="Divisão de Sócios SMK Flow"
+              alt="Divisão de Sócios SMK System"
               fallback={
                 <div className="bg-[#0c0c0c] border border-[#242424] rounded-3xl p-6 space-y-5">
                   <div className="flex justify-between items-center pb-3 border-b border-white/10 text-xs">
@@ -1023,7 +1144,7 @@ export function LandingPage() {
           </h2>
 
           <p className="text-xs sm:text-sm text-white/70 max-w-2xl mx-auto leading-relaxed">
-            O SMK Flow não foi desenhado por quem nunca pegou uma caixa de pod na mão. Ele nasceu e foi lapidado dentro da nossa própria operação em São Bernardo do Campo, resolvendo os problemas reais de entregadores, estoque e clientes exigentes.
+            O SMK System não foi desenhado por quem nunca pegou uma caixa de pod na mão. Ele nasceu e foi lapidado dentro da nossa própria operação em São Bernardo do Campo, resolvendo os problemas reais de entregadores, estoque e clientes exigentes.
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6">
@@ -1255,7 +1376,7 @@ export function LandingPage() {
             {[
               {
                 q: "Preciso instalar algum programa no computador?",
-                a: "Não! O SMK Flow é 100% online em nuvem. Você e seus sócios podem acessar de qualquer computador, notebook, tablet ou até direto do navegador do celular."
+                a: "Não! O SMK System é 100% online em nuvem. Você e seus sócios podem acessar de qualquer computador, notebook, tablet ou até direto do navegador do celular."
               },
               {
                 q: "Como funciona o Catálogo Digital na Bio?",
@@ -1310,7 +1431,7 @@ export function LandingPage() {
             Sua loja já cresceu. Agora sua operação precisa acompanhar.
           </h2>
           <p className="text-xs sm:text-sm text-white/60">
-            Pare de perder vendas por desorganização. Garanta sua vaga com preço congelado de lançamento.
+            Pare de perder vendas por desorganização. Garanta agora seu acesso com preço congelado de lançamento para sempre.
           </p>
           <div className="pt-2">
             <a
@@ -1328,10 +1449,10 @@ export function LandingPage() {
             <div className="size-6 rounded-lg bg-white/10 flex items-center justify-center">
               <Zap className="size-3 fill-white text-white" />
             </div>
-            <span>SMK Flow SaaS Pro</span>
+            <span>SMK System SaaS Pro</span>
           </div>
           <div>
-            © 2026 SMK Flow. Todos os direitos reservados.
+            © 2026 SMK System. Todos os direitos reservados.
           </div>
           <div className="flex gap-4">
             <a href="#topo" className="hover:text-white transition-colors">Voltar ao topo ↑</a>
