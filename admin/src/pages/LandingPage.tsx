@@ -218,16 +218,16 @@ export function LandingPage() {
 
           {/* Main Giant Glowing Headline */}
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.12] max-w-4xl mx-auto">
-            Você abriu uma loja de pods para botar lucro no bolso{' '}
+            A ferramenta que separa quem brinca de vender pod{' '}
             <span className="bg-gradient-to-r from-white via-slate-200 to-gray-400 bg-clip-text text-transparent underline decoration-white/30 decoration-2 underline-offset-8">
-              ou para ficar só girando dinheiro
+              de quem domina
             </span>{' '}
-            e virar escravo do WhatsApp?
+            a própria cidade.
           </h1>
 
           {/* Sub-headline Densa */}
           <p className="text-sm sm:text-base lg:text-lg text-white/70 max-w-3xl mx-auto leading-relaxed font-normal">
-            Ver Pix caindo o dia inteiro não significa lucro real. O único ecossistema profissional com catálogo na bio, despacho de entregas à prova de erros e gestão de caixa feito sob medida para quem vive da venda de pods.
+            Quem compra pod quer rapidez, confiança e atendimento impecável. Troque as mensagens amadoras por uma vitrine interativa na sua bio, sistema de despacho organizado e uma operação que venda mais com menos esforço!
           </p>
 
           {/* Hero CTAs */}
