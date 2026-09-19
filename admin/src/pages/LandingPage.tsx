@@ -213,13 +213,13 @@ export function LandingPage() {
               >
                 Criar Conta
               </Link>
-              <a 
-                href="#planos"
-                className="bg-white hover:bg-slate-100 text-black font-extrabold px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+              <Link 
+                to="/checkout?plano=combo"
+                className="bg-white hover:bg-slate-100 text-black font-extrabold px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer"
               >
                 <span>Garantir Acesso</span>
                 <ArrowRight className="size-3.5" />
-              </a>
+              </Link>
 
               {/* Mobile Hamburger Button */}
               <button
@@ -294,14 +294,14 @@ export function LandingPage() {
                   <span>🏆</span>
                   <span>Case Real</span>
                 </a>
-                <a 
-                  href="#planos" 
+                <Link 
+                  to="/checkout?plano=combo" 
                   onClick={() => setMobileMenuOpen(false)}
                   className="p-2.5 rounded-xl bg-white text-black font-extrabold transition-all flex items-center justify-between"
                 >
-                  <span>Ver Planos</span>
+                  <span>Garantir Acesso</span>
                   <ArrowRight className="size-3.5" />
-                </a>
+                </Link>
               </div>
 
               <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-3 text-xs font-bold">
@@ -353,13 +353,13 @@ export function LandingPage() {
 
           {/* Hero CTAs */}
           <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
-            <a
-              href="#planos"
+            <Link
+              to="/checkout?plano=combo"
               className="bg-white hover:bg-slate-100 text-black font-extrabold px-8 py-4 rounded-xl text-sm sm:text-base transition-all shadow-[0_0_35px_rgba(255,255,255,0.35)] hover:shadow-[0_0_45px_rgba(255,255,255,0.55)] flex items-center justify-center gap-2.5 active:scale-95 cursor-pointer text-center"
             >
               <span>Compre Agora e Pague Para Sempre o Preço de Lançamento</span>
               <ArrowRight className="size-4 shrink-0" />
-            </a>
+            </Link>
 
             <a
               href={whatsappLink}
@@ -1254,15 +1254,13 @@ export function LandingPage() {
               </div>
 
               <div className="pt-8">
-                <a
-                  href={asaasGestaoLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full bg-[#161616] hover:bg-[#202020] border border-[#2a2a2a] text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95"
+                <Link
+                  to="/checkout?plano=gestao"
+                  className="w-full bg-[#161616] hover:bg-[#202020] border border-[#2a2a2a] text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer"
                 >
                   <span>Assinar Plano Gestão</span>
                   <ArrowRight className="size-4" />
-                </a>
+                </Link>
               </div>
             </div>
 
@@ -1327,14 +1325,12 @@ export function LandingPage() {
               </div>
 
               <div className="pt-8">
-                <a
-                  href={asaasComboLink}
-                  target="_blank"
-                  rel="noreferrer"
+                <Link
+                  to="/checkout?plano=combo"
                   className="w-full bg-white hover:bg-slate-100 text-black font-extrabold py-4 rounded-xl transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer"
                 >
                   <span>Garantir Combo com Catálogo →</span>
-                </a>
+                </Link>
               </div>
             </div>
 
@@ -1434,13 +1430,13 @@ export function LandingPage() {
             Pare de perder vendas por desorganização. Garanta agora seu acesso com preço congelado de lançamento para sempre.
           </p>
           <div className="pt-2">
-            <a
-              href="#planos"
-              className="inline-flex items-center gap-2 bg-white hover:bg-slate-100 text-black font-extrabold px-8 py-4 rounded-xl text-sm transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] active:scale-95"
+            <Link
+              to="/checkout?plano=combo"
+              className="inline-flex items-center gap-2 bg-white hover:bg-slate-100 text-black font-extrabold px-8 py-4 rounded-xl text-sm transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] active:scale-95 cursor-pointer"
             >
               <span>Começar Agora com Preço Vitalício</span>
               <ArrowRight className="size-4" />
-            </a>
+            </Link>
           </div>
         </div>
 

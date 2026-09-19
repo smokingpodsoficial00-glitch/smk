@@ -19,6 +19,7 @@ const PartnersDashboard = lazy(() => import('./components/PartnersDashboard'));
 const TasksDashboard = lazy(() => import('./components/TasksDashboard'));
 const SettingsPage = lazy(() => import('./components/SettingsPage'));
 const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage })));
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage').then(m => ({ default: m.CheckoutPage })));
 
 import { AdminLayout } from './layouts/AdminLayout';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -62,6 +63,10 @@ export const router = createBrowserRouter([
   {
     path: '/planos',
     element: <SuspenseWrap><LandingPage /></SuspenseWrap>,
+  },
+  {
+    path: '/checkout',
+    element: <SuspenseWrap><CheckoutPage /></SuspenseWrap>,
   },
 
   // Onboarding Wizard Route
