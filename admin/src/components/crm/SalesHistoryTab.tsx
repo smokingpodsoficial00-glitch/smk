@@ -4,7 +4,7 @@ import {
   TrendingUp, Users, RefreshCw, Eye, ArrowUpRight, 
   ChevronRight, Phone, MapPin, Tag, Download, Sparkles,
   CheckCircle2, Clock, AlertTriangle, X, Receipt, CreditCard,
-  Flame, Layers, Box, Compass
+  Flame, Layers, Box, Compass, Trash2
 } from 'lucide-react';
 import { formatBRL } from '@/lib/cart';
 import { 
@@ -15,6 +15,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { SaleDetailModal } from './SaleDetailModal';
 import { supabase } from '@/lib/supabase';
+import { deleteOrderWithStockRestoration } from '@/lib/orders';
 
 export function SalesHistoryTab() {
   const { company } = useAuth();
@@ -29,6 +30,22 @@ export function SalesHistoryTab() {
   
   // Modal de Detalhe da Venda
   const [selectedSale, setSelectedSale] = useState<DetailedSale | null>(null);
+
+  const handleDeleteSale = async (sale: DetailedSale) => {
+    if (confirm(`Deseja realmente excluir a venda #${sale.order_code || sale.id.slice(0, 8)} (${sale.client_name}) de ${formatBRL(sale.total_amount)}? O estoque dos produtos será restaurado.`)) {
+      try {
+        const res = await deleteOrderWithStockRestoration(sale.id, { restoreStock: true });
+        if (res.success) {
+          alert('✅ Venda excluída com sucesso e estoque devolvido.');
+          loadData();
+        } else {
+          alert('Erro ao excluir venda: ' + (res.error || 'Erro desconhecido'));
+        }
+      } catch (err: any) {
+        alert('Erro ao excluir venda: ' + err.message);
+      }
+    }
+  };
 
   const loadData = async () => {
     if (!company?.id) return;
@@ -501,6 +518,17 @@ export function SalesHistoryTab() {
                     >
                       <Eye className="size-4" />
                     </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSale(sale);
+                      }}
+                      className="size-9 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 flex items-center justify-center transition-all cursor-pointer"
+                      title="Excluir Venda (Devolver ao Estoque)"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
                   </div>
                 </div>
 
@@ -514,6 +542,7 @@ export function SalesHistoryTab() {
       <SaleDetailModal
         sale={selectedSale}
         onClose={() => setSelectedSale(null)}
+        onDeleteSale={() => loadData()}
       />
 
     </div>

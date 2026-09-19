@@ -2,12 +2,13 @@ import { useState } from "react";
 import { 
   X, MessageSquare, ShoppingBag, MapPin, Phone, Crown, Calendar, 
   Sparkles, CheckCircle2, Save, Tag, Flame, ShieldAlert, HeartHandshake,
-  Send, ExternalLink
+  Send, ExternalLink, Trash2
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { type RealClient, type FlavorProfileType, type ProspectingStatusType, updateClientCrmProfile } from "@/lib/crm";
 import { useAuth } from "../../contexts/AuthContext";
 import { NewFollowUpModal } from "./NewFollowUpModal";
+import { deleteOrderWithStockRestoration, deleteClientRecord } from "@/lib/orders";
 
 export function ClientProfileModal({ 
   client, 
@@ -23,12 +24,42 @@ export function ClientProfileModal({
   // Estados Locais Editáveis
   const [flavorProfile, setFlavorProfile] = useState<FlavorProfileType>(client.flavorProfile || 'fruity');
   const [favoriteBrand, setFavoriteBrand] = useState<string>(client.favoriteBrand || 'Ignite');
-  const [inVipGroup, setInVipGroup] = useState<boolean>(client.inVipGroup || false);
+  const [inVipGroup, setInVipGroup] = useState<boolean>(Boolean(client.inVipGroup));
   const [prospectingStatus, setProspectingStatus] = useState<ProspectingStatusType>(client.prospectingStatus || 'base_antiga');
   const [customNotes, setCustomNotes] = useState<string>(client.customNotes || '');
   const [isSaving, setIsSaving] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
+
+  const handleDeleteOrder = async (orderId: string) => {
+    if (confirm(`Deseja realmente excluir este pedido do histórico? O estoque dos itens vendidos será restaurado.`)) {
+      const res = await deleteOrderWithStockRestoration(orderId, { 
+        restoreStock: true,
+        deleteClientIfNoOrders: false,
+        companyId: company?.id 
+      });
+      if (res.success) {
+        alert('✅ Pedido excluído com sucesso e estoque devolvido.');
+        if (onClientUpdated) onClientUpdated();
+        onClose();
+      } else {
+        alert('Erro ao excluir pedido: ' + (res.error || 'Erro desconhecido'));
+      }
+    }
+  };
+
+  const handleDeleteClient = async () => {
+    if (confirm(`Deseja realmente remover o cadastro de ${client.name} do CRM?`)) {
+      const res = await deleteClientRecord(client.cleanPhone || client.phone, company?.id);
+      if (res.success) {
+        alert('✅ Cliente removido do CRM.');
+        if (onClientUpdated) onClientUpdated();
+        onClose();
+      } else {
+        alert('Erro ao remover cliente: ' + (res.error || 'Erro desconhecido'));
+      }
+    }
+  };
 
   const phoneClean = client.cleanPhone || client.phone.replace(/\D/g, '');
   const waNumber = phoneClean.startsWith('55') ? phoneClean : `55${phoneClean}`;
@@ -99,12 +130,21 @@ export function ClientProfileModal({
             </div>
           </div>
 
-          <button 
-            onClick={onClose} 
-            className="p-1.5 hover:bg-white/10 rounded-lg text-muted-foreground hover:text-white transition-colors cursor-pointer"
-          >
-            <X className="size-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={handleDeleteClient} 
+              className="p-1.5 hover:bg-red-500/10 rounded-lg text-white/30 hover:text-red-400 transition-colors cursor-pointer"
+              title="Excluir este cliente do CRM"
+            >
+              <Trash2 className="size-4" />
+            </button>
+            <button 
+              onClick={onClose} 
+              className="p-1.5 hover:bg-white/10 rounded-lg text-muted-foreground hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar flex flex-col gap-6">
@@ -331,9 +371,19 @@ export function ClientProfileModal({
                         <Calendar className="size-3" />
                         {orderDate}
                       </span>
-                      <span className="text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        {order.delivery_status || 'CONCLUÍDO'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          {order.delivery_status || 'CONCLUÍDO'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOrder(order.id)}
+                          className="p-1 hover:bg-red-500/10 rounded text-white/30 hover:text-red-400 transition-colors cursor-pointer"
+                          title="Excluir esta venda (Devolver ao Estoque)"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="text-[11px] font-medium text-white/90">
