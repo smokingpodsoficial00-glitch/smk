@@ -27,7 +27,8 @@ import {
   Truck,
   AlertCircle,
   RefreshCw,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Monitor
 } from 'lucide-react';
 
 function InstagramIcon({ className = "size-5" }: { className?: string }) {
@@ -49,7 +50,7 @@ function ScreenshotOrFallback({
 }: {
   src: string;
   alt: string;
-  fallback: React.ReactNode;
+  fallback?: React.ReactNode;
   className?: string;
 }) {
   const [loaded, setLoaded] = useState(false);
@@ -66,7 +67,11 @@ function ScreenshotOrFallback({
           className={`${className} ${loaded ? 'block' : 'hidden'}`}
         />
       )}
-      {(!loaded || error) && fallback}
+      {(!loaded || error) && (fallback || (
+        <div className="h-64 bg-[#0a0a0c] flex items-center justify-center text-white/40 text-xs font-mono">
+          Visualização do Sistema
+        </div>
+      ))}
     </div>
   );
 }
@@ -213,16 +218,16 @@ export function LandingPage() {
 
           {/* Main Giant Glowing Headline */}
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.12] max-w-4xl mx-auto">
-            Pare de perder vendas no WhatsApp.{' '}
+            Você abriu uma loja de pods para botar lucro no bolso{' '}
             <span className="bg-gradient-to-r from-white via-slate-200 to-gray-400 bg-clip-text text-transparent underline decoration-white/30 decoration-2 underline-offset-8">
-              O sistema de gestão e catálogo online
+              ou para ficar só girando dinheiro
             </span>{' '}
-            feito para quem vive da venda de pods.
+            e virar escravo do WhatsApp?
           </h1>
 
           {/* Sub-headline Densa */}
           <p className="text-sm sm:text-base lg:text-lg text-white/70 max-w-3xl mx-auto leading-relaxed font-normal">
-            Chega de digitar lista de sabores todo santo dia, esquecer de despachar pedidos ou ver clientes comprando de outra loja. Tenha o controle total do seu estoque, entregas e recompra em um único lugar.
+            Ver Pix caindo o dia inteiro não significa lucro real. O único ecossistema profissional com catálogo na bio, despacho de entregas à prova de erros e gestão de caixa feito sob medida para quem vive da venda de pods.
           </p>
 
           {/* Hero CTAs */}
@@ -622,6 +627,53 @@ export function LandingPage() {
               </div>
             </div>
 
+          </div>
+
+          {/* Reforço do Catálogo com Print Desktop no Computador */}
+          <div className="pt-14 border-t border-white/10 space-y-8">
+            <div className="text-center space-y-4 max-w-4xl mx-auto">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold font-mono">
+                <Monitor className="size-3.5 text-white" />
+                <span>100% Responsivo • Celular, Tablet e Computador</span>
+              </div>
+
+              <h3 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight">
+                Enquanto você digita lista de sabores no WhatsApp,{' '}
+                <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
+                  seu cliente está fazendo Pix para o seu concorrente.
+                </span>
+              </h3>
+
+              <p className="text-sm sm:text-base text-white/70 max-w-3xl mx-auto leading-relaxed">
+                Venda de pod é vício e imediatismo. Se você demora 5 minutos para conferir estoque e atualizar sua lista de sabores, parabéns: você acabou de doar o seu cliente para a concorrência. Tanto no celular quanto no computador, seu cliente navega por fotos oficiais de cada modelo, escolhe o sabor em 10 segundos e fecha o pedido no piloto automático.
+              </p>
+            </div>
+
+            {/* Desktop Window Mockup com o Print Real do Computador */}
+            <div className="rounded-2xl sm:rounded-3xl border border-white/15 bg-[#0a0a0c] p-2 sm:p-3 shadow-[0_0_60px_rgba(255,255,255,0.07),0_20px_50px_rgba(0,0,0,0.8)] ring-1 ring-white/10 overflow-hidden group">
+              {/* Barra superior de Janela de Navegador */}
+              <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/40 rounded-t-xl mb-2 text-xs text-white/50 font-mono">
+                <div className="flex items-center gap-2">
+                  <div className="size-3 rounded-full bg-red-500/80" />
+                  <div className="size-3 rounded-full bg-yellow-500/80" />
+                  <div className="size-3 rounded-full bg-emerald-500/80" />
+                  <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">smoking-pods-catalogo.vercel.app</span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Catálogo Online no Ar</span>
+                </div>
+              </div>
+
+              {/* Imagem Real do Catálogo Desktop */}
+              <div className="rounded-xl overflow-hidden border border-white/10 relative bg-black">
+                <ScreenshotOrFallback
+                  src="/prints/catalogo-desktop.png"
+                  alt="Catálogo Oficial Smoking Pods no Computador"
+                  className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-[1.01]"
+                />
+              </div>
+            </div>
           </div>
 
         </div>
