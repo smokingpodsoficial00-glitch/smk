@@ -108,11 +108,11 @@ export function LandingPage() {
     setOpenFaq(openFaq === idx ? null : idx);
   };
 
-  const whatsappLink = "https://wa.me/5511948487714?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20SMK%20System%20e%20quero%20tirar%20algumas%20d%C3%BAvidas%20sobre%20o%20sistema.";
+  const whatsappLink = "https://wa.me/5511977300561?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20SMK%20System%20e%20quero%20tirar%20algumas%20d%C3%BAvidas%20sobre%20o%20sistema.";
 
-  // Integração de Checkout Asaas com Fallback Seguro para Suporte WhatsApp
-  const asaasGestaoLink = (import.meta.env.VITE_ASAAS_GESTAO_URL as string) || `${whatsappLink}&text=Ol%C3%A1!%20Quero%20assinar%20o%20Plano%20SMK%20Gest%C3%A3o%20de%20R$%2097%20via%20Asaas`;
-  const asaasComboLink = (import.meta.env.VITE_ASAAS_COMBO_URL as string) || `${whatsappLink}&text=Ol%C3%A1!%20Quero%20aproveitar%20o%20lan%C3%A7amento%20do%20SMK%20Pro%20Combo%20de%20R$%20127,90%20via%20Asaas`;
+  // Integração de Checkout Asaas com Fallback Seguro para Atendimento WhatsApp Oficial
+  const asaasGestaoLink = (import.meta.env.VITE_ASAAS_GESTAO_URL as string) || "https://wa.me/5511977300561?text=Ol%C3%A1!%20Quero%20assinar%20o%20Plano%20SMK%20Gest%C3%A3o%20de%20R$%2097/m%C3%AAs%20com%20o%20pre%C3%A7o%20de%20lan%C3%A7amento%20vital%C3%ADcio";
+  const asaasComboLink = (import.meta.env.VITE_ASAAS_COMBO_URL as string) || "https://wa.me/5511977300561?text=Ol%C3%A1!%20Quero%20garantir%20o%20Plano%20SMK%20Pro%20Combo%20de%20R$%20127,90/m%C3%AAs%20com%20Cat%C3%A1logo%20e%20pre%C3%A7o%20de%20lan%C3%A7amento%20vital%C3%ADcio";
 
   return (
     <div id="topo" className="min-h-screen bg-[#050505] text-white font-sans antialiased relative selection:bg-white/20 selection:text-white overflow-x-hidden">
@@ -1343,7 +1343,7 @@ export function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-6 text-center">
             <span className="text-xs text-white/50">Dúvidas sobre o plano ideal para a sua loja?</span>
             <a
-              href={`${whatsappLink}&text=Ol%C3%A1!%20Tenho%20d%C3%BAvidas%20sobre%20os%20planos%20do%20sistema%20Smoking%20Pods`}
+              href="https://wa.me/5511977300561?text=Ol%C3%A1!%20Tenho%20d%C3%BAvidas%20sobre%20os%20planos%20do%20sistema%20SMK%20System"
               target="_blank"
               rel="noreferrer"
               className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1.5 transition-colors underline underline-offset-4"
