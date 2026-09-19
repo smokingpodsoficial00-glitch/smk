@@ -688,59 +688,77 @@ export function LandingPage() {
 
           </div>
 
-          {/* Kanban Board Visual ou Print Real */}
-          <ScreenshotOrFallback
-            src="/prints/kanban-desktop.png"
-            alt="Kanban de Pedidos SMK Flow"
-            fallback={
-              <div className="bg-[#0f0f0f] border border-[#222] rounded-2xl p-4 sm:p-6 space-y-4">
-                <div className="flex items-center justify-between text-xs font-mono text-white/60 border-b border-white/5 pb-3">
-                  <span>FLUXO OPERACIONAL AO VIVO</span>
-                  <span className="text-emerald-400">3 Fases de Despacho Rápido</span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  
-                  {/* Coluna 1 */}
-                  <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
-                    <div className="text-xs font-bold text-white flex justify-between">
-                      <span>1. Novos Pedidos</span>
-                      <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">2</span>
-                    </div>
-                    <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
-                      <div className="font-bold text-white">#1055 • Ignite V50 Watermelon</div>
-                      <div className="text-[10px] text-white/50">Marina Silva • Pix Confirmado</div>
-                    </div>
-                  </div>
-
-                  {/* Coluna 2 */}
-                  <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
-                    <div className="text-xs font-bold text-white flex justify-between">
-                      <span>2. Separando Sabor</span>
-                      <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">1</span>
-                    </div>
-                    <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
-                      <div className="font-bold text-white">#1054 • Lost Mary 20k Miami Mint</div>
-                      <div className="text-[10px] text-white/50">Embalando c/ adesivo da loja</div>
-                    </div>
-                  </div>
-
-                  {/* Coluna 3 */}
-                  <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
-                    <div className="text-xs font-bold text-white flex justify-between">
-                      <span>3. Em Rota (Uber/Moto)</span>
-                      <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">2</span>
-                    </div>
-                    <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
-                      <div className="font-bold text-white">#1053 • Elfbar BC15k Blue Razz</div>
-                      <div className="text-[10px] text-white/70 font-mono">🛵 Uber Flash a caminho (7 min)</div>
-                    </div>
-                  </div>
-
-                </div>
+          {/* Kanban Board Visual com Moldura de Aplicação Real */}
+          <div className="rounded-2xl sm:rounded-3xl border border-white/15 bg-[#0a0a0c] p-2 sm:p-3 shadow-[0_0_60px_rgba(255,255,255,0.07),0_20px_50px_rgba(0,0,0,0.8)] ring-1 ring-white/10 overflow-hidden group">
+            {/* Barra superior de Janela de Sistema com os 3 botões */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/40 rounded-t-xl mb-2 text-xs text-white/50 font-mono">
+              <div className="flex items-center gap-2">
+                <div className="size-3 rounded-full bg-red-500/80" />
+                <div className="size-3 rounded-full bg-yellow-500/80" />
+                <div className="size-3 rounded-full bg-emerald-500/80" />
+                <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">smoking-pods-admin.vercel.app/pedidos</span>
               </div>
-            }
-          />
+              <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Kanban em Tempo Real</span>
+              </div>
+            </div>
+
+            {/* Imagem Real do Kanban */}
+            <div className="rounded-xl overflow-hidden border border-white/10 relative bg-[#0a0a0c]">
+              <ScreenshotOrFallback
+                src="/prints/kanban-desktop.png"
+                alt="Painel de Pedidos em Kanban Real da Smoking Pods"
+                className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-[1.01]"
+                fallback={
+                  <div className="bg-[#0f0f0f] border border-[#222] rounded-2xl p-4 sm:p-6 space-y-4">
+                    <div className="flex items-center justify-between text-xs font-mono text-white/60 border-b border-white/5 pb-3">
+                      <span>FLUXO OPERACIONAL AO VIVO</span>
+                      <span className="text-emerald-400">3 Fases de Despacho Rápido</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Coluna 1 */}
+                      <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
+                        <div className="text-xs font-bold text-white flex justify-between">
+                          <span>1. Novos Pedidos</span>
+                          <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">2</span>
+                        </div>
+                        <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
+                          <div className="font-bold text-white">#1055 • Ignite V50 Watermelon</div>
+                          <div className="text-[10px] text-white/50">Marina Silva • Pix Confirmado</div>
+                        </div>
+                      </div>
+
+                      {/* Coluna 2 */}
+                      <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
+                        <div className="text-xs font-bold text-white flex justify-between">
+                          <span>2. Separando Sabor</span>
+                          <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">1</span>
+                        </div>
+                        <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
+                          <div className="font-bold text-white">#1054 • Lost Mary 20k Miami Mint</div>
+                          <div className="text-[10px] text-white/50">Embalando c/ adesivo da loja</div>
+                        </div>
+                      </div>
+
+                      {/* Coluna 3 */}
+                      <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
+                        <div className="text-xs font-bold text-white flex justify-between">
+                          <span>3. Em Rota (Uber/Moto)</span>
+                          <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">2</span>
+                        </div>
+                        <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
+                          <div className="font-bold text-white">#1053 • Elfbar BC15k Blue Razz</div>
+                          <div className="text-[10px] text-white/70 font-mono">🛵 Uber Flash a caminho (7 min)</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                }
+              />
+            </div>
+          </div>
 
         </div>
       </section>
