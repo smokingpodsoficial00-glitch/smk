@@ -410,7 +410,7 @@ export default function KanbanBoard() {
       {/* Conteúdo da Aba: KANBAN EM ANDAMENTO (3 ETAPAS LOGÍSTICAS REAIS) */}
       {activeTab === 'kanban' && (
         <div className="flex-1 overflow-hidden p-6 flex flex-col gap-4 min-h-0 bg-[#070707]/30">
-          <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-5 xl:gap-7 min-h-0">
+          <div data-tour="kanban-pedidos" className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-5 xl:gap-7 min-h-0">
             {columns.filter(c => c.status !== 'AGUARDANDO_PAGAMENTO').map(col => {
               const colOrders = orders.filter(o => o.status === col.status);
               return (

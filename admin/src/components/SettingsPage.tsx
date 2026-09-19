@@ -244,7 +244,7 @@ export default function SettingsPage() {
               <Type className="size-3.5 text-white" />
               Nome da Loja *
             </label>
-            <div className="relative">
+            <div className="relative" data-tour="settings-store-name">
               <input
                 type="text"
                 value={storeName}

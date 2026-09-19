@@ -158,7 +158,8 @@
         "orphan_list_ids": [
           "list_1786807808763"
         ]
-      }
+      },
+      "lastRunDate": "18/09/2026"
     },
     {
       "id": "ccec49ef-56a2-45e5-92ce-a66e1749e275",
@@ -439,9 +440,14 @@
       "key": "camp_1789667033352_2026-09-17_15:00",
       "timestamp": "2026-09-17T18:00:52.648Z",
       "campaignName": "CPM TESTE GRUPO"
+    },
+    {
+      "key": "34f4e134-c7d8-4c41-8b5b-7dab1ab3a409_2026-09-19_21:30",
+      "timestamp": "2026-09-19T00:30:27.320Z",
+      "campaignName": "CPM GRUPO SEXTOU NOTURNO 3"
     }
   ],
-  "lastUpdated": "2026-09-17T19:38:06.068Z",
+  "lastUpdated": "2026-09-19T00:30:27.322Z",
   "lists": [
     {
       "id": "0d925499-da68-4a93-9591-f4b6f78744b1",

@@ -1117,6 +1117,7 @@ export default function MarketingModule() {
             </button>
 
             <button
+              data-tour="btn-nova-campanha"
               onClick={() => handleOpenCampaignModal()}
               className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-extrabold flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] active:scale-95"
             >

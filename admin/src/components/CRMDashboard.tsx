@@ -98,7 +98,7 @@ export default function CRMDashboard() {
         </header>
 
         {/* ━━━ ABAS SUPERIORES (ALTURAS, PADDING E RADIUS UNIFORMES) ━━━━━ */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div data-tour="crm-tabs" className="flex flex-wrap items-center gap-2">
           {tabs.map(tab => (
             <button
               key={tab.id}
