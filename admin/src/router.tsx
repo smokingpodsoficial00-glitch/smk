@@ -2,7 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
+import { AtivarContaPage } from './pages/AtivarContaPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 
@@ -73,8 +73,12 @@ export const router = createBrowserRouter([
     element: <LoginPage />,
   },
   {
+    path: '/ativar-conta',
+    element: <AtivarContaPage />,
+  },
+  {
     path: '/cadastro',
-    element: <RegisterPage />,
+    element: <Navigate to="/checkout" replace />,
   },
   {
     path: '/esqueci-senha',
