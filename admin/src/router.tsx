@@ -29,6 +29,8 @@ import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminLogs } from './pages/admin/AdminLogs';
 import { AdminFinance } from './pages/admin/AdminFinance';
 
+import { useAuth } from './contexts/AuthContext';
+
 function LazyFallback() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center h-full bg-[#050505] text-white/60 gap-3">
@@ -42,7 +44,23 @@ function SuspenseWrap({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<LazyFallback />}>{children}</Suspense>;
 }
 
+// Rota raiz inteligente: visitante vê a Landing Page, usuário autenticado vai direto ao painel
+function RootRoute() {
+  const { user, loading } = useAuth();
+  if (loading) return <LazyFallback />;
+  if (user) {
+    return <Navigate to="/pedidos" replace />;
+  }
+  return <SuspenseWrap><LandingPage /></SuspenseWrap>;
+}
+
 export const router = createBrowserRouter([
+  // Root Domain Route
+  {
+    path: '/',
+    element: <RootRoute />,
+  },
+
   // Public Auth Routes
   {
     path: '/login',
@@ -81,17 +99,12 @@ export const router = createBrowserRouter([
 
   // Tenant Main App Routes (Wrapped in ProtectedRoute and DashboardLayout)
   {
-    path: '/',
     element: (
       <ProtectedRoute>
         <DashboardLayout />
       </ProtectedRoute>
     ),
     children: [
-      {
-        index: true,
-        element: <Navigate to="/pedidos" replace />,
-      },
       {
         path: 'pedidos',
         element: <SuspenseWrap><KanbanBoard /></SuspenseWrap>,
@@ -174,6 +187,6 @@ export const router = createBrowserRouter([
   // Fallback Wildcard Route
   {
     path: '*',
-    element: <Navigate to="/pedidos" replace />,
+    element: <Navigate to="/" replace />,
   },
 ]);
