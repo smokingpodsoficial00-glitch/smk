@@ -171,20 +171,19 @@ export function SystemTourGuide() {
   const hasCheckedAutoOpen = useRef(false);
   const rafRef = useRef<number | null>(null);
 
-  // Verificação inicial estrita: SÓ abre no primeiro acesso real
+  // Verificação inicial estrita: Abre automaticamente no primeiro acesso real de cada empresa
   useEffect(() => {
+    if (!company?.id) return;
     if (hasCheckedAutoOpen.current) return;
     hasCheckedAutoOpen.current = true;
 
-    const isDismissed = 
-      localStorage.getItem(TOUR_DISMISSED_KEY) === "true" ||
-      localStorage.getItem("smk_tour_completed_default") === "true" ||
-      (company?.id && localStorage.getItem(`smk_tour_completed_${company.id}`) === "true");
+    const companyTourKey = `smk_tour_completed_${company.id}`;
+    const isDismissed = localStorage.getItem(companyTourKey) === "true";
 
     if (!isDismissed) {
       const t = setTimeout(() => {
         setIsWelcomeOpen(true);
-      }, 1200);
+      }, 1000);
       return () => clearTimeout(t);
     }
   }, [company?.id]);
@@ -347,10 +346,8 @@ export function SystemTourGuide() {
     setIsTyping(false);
   };
 
-  // Gravar preferência definitiva no localStorage para nunca reabrir sozinho
+  // Gravar preferência definitiva no localStorage para nunca reabrir sozinho nesta empresa
   const markTourPermanentlyDismissed = () => {
-    localStorage.setItem(TOUR_DISMISSED_KEY, "true");
-    localStorage.setItem("smk_tour_completed_default", "true");
     if (company?.id) {
       localStorage.setItem(`smk_tour_completed_${company.id}`, "true");
     }
