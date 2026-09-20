@@ -133,7 +133,22 @@ async function fetchConfig(): Promise<StoreConfig> {
   } catch (e) {}
 
   // Combina as fontes
+  const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const requestedSlug = urlParams?.get("loja");
+  
   let local = getLocalFallback();
+  if (requestedSlug && requestedSlug !== "smoking-pods") {
+    const formattedSlugTitle = requestedSlug
+      .split("-")
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ");
+    local = {
+      ...DEFAULT_CONFIG,
+      store_name: formattedSlugTitle,
+      store_slug: requestedSlug,
+    };
+  }
+
   let finalConfig: StoreConfig = mainConfig || fallbackConfig || local;
 
   const bestLogo = mainConfig?.logo_url || fallbackConfig?.logo_url || local.logo_url;

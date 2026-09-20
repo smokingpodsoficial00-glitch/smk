@@ -86,16 +86,25 @@ export function OnboardingPage() {
           .eq('company_id', company.id)
           .maybeSingle();
 
+        const generatedSlug = cleanName
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-|-$)+/g, "");
+
         if (existingConfig) {
           await supabase.from('store_config').update({
             company_id: company.id,
             store_name: cleanName,
+            store_slug: generatedSlug,
             whatsapp_number: cleanPhone,
           }).eq('company_id', company.id);
         } else {
           await supabase.from('store_config').insert({
             company_id: company.id,
             store_name: cleanName,
+            store_slug: generatedSlug,
             whatsapp_number: cleanPhone,
           });
         }
