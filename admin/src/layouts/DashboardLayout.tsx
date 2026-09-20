@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, Users, Settings, CircleDollarSign, 
-  Store, ChevronRight, Bot, LogOut, Shield, User as UserIcon, Megaphone, Scale, CheckSquare, Compass
+  Store, ChevronRight, Bot, LogOut, Shield, User as UserIcon, Megaphone, Scale, CheckSquare, Compass, Crown
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
@@ -232,6 +232,33 @@ export function DashboardLayout() {
                   Tarefas
                   <span className="text-[9px] bg-white/10 text-white border border-white/20 px-1.5 py-0.5 rounded-full font-bold shadow-sm">
                     QG
+                  </span>
+                </span>
+              )}
+            </NavLink>
+          )}
+
+          {/* Aba Exclusiva de Gestão & Vendas do SaaS (Smoking Pods Master) */}
+          {canAccess('gestao-saas') && (
+            <NavLink 
+              to="/gestao-saas"
+              title={sidebarCollapsed ? "Vendas do SaaS" : undefined}
+              className={({ isActive }) =>
+                `flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
+                  sidebarCollapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
+                } ${
+                  isActive 
+                    ? 'bg-amber-500/15 text-amber-300 font-extrabold border-l-2 border-amber-400 pl-3.5 shadow-[0_0_15px_rgba(245,158,11,0.25)]' 
+                    : 'text-amber-400/80 hover:bg-amber-500/10 hover:text-amber-300 border-l-2 border-transparent pl-4'
+                }`
+              }
+            >
+              <Crown className="size-4 shrink-0 text-amber-400" />
+              {!sidebarCollapsed && (
+                <span className="truncate flex items-center gap-2">
+                  Vendas do SaaS
+                  <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-black shadow-sm tracking-wide">
+                    MASTER
                   </span>
                 </span>
               )}

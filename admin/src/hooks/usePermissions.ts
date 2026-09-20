@@ -26,6 +26,11 @@ export function usePermissions() {
       return isSmokingPodsOfficial;
     }
 
+    // Rota de Gestão e Vendas do SaaS é 100% restrita à conta oficial da Smoking Pods
+    if (tabOrRoute === 'gestao-saas') {
+      return isSmokingPodsOfficial;
+    }
+
     if (isSuperAdmin) return true;
     const allowedTabs = ROLE_PERMISSIONS[role] || ['pedidos'];
     return allowedTabs.includes(tabOrRoute);
@@ -35,6 +40,7 @@ export function usePermissions() {
     role,
     isSuperAdmin,
     isSmokingPodsOfficial,
+    isMasterAdmin: isSmokingPodsOfficial,
     canAccess,
     allowedTabs: ROLE_PERMISSIONS[role] || ['pedidos'],
   };

@@ -18,8 +18,10 @@ const MarketingModule = lazy(() => import('./components/MarketingModule'));
 const PartnersDashboard = lazy(() => import('./components/PartnersDashboard'));
 const TasksDashboard = lazy(() => import('./components/TasksDashboard'));
 const SettingsPage = lazy(() => import('./components/SettingsPage'));
+const SaasManagementDashboard = lazy(() => import('./components/SaasManagementDashboard'));
 const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage })));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage').then(m => ({ default: m.CheckoutPage })));
+import { MasterAdminGuard } from './components/auth/MasterAdminGuard';
 
 import { AdminLayout } from './layouts/AdminLayout';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -150,6 +152,14 @@ export const router = createBrowserRouter([
       {
         path: 'configuracoes',
         element: <SuspenseWrap><SettingsPage /></SuspenseWrap>,
+      },
+      {
+        path: 'gestao-saas',
+        element: (
+          <MasterAdminGuard>
+            <SuspenseWrap><SaasManagementDashboard /></SuspenseWrap>
+          </MasterAdminGuard>
+        ),
       },
     ],
   },
