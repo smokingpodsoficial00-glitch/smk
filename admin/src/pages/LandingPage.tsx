@@ -205,18 +205,18 @@ export function LandingPage() {
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-              <Link 
-                to="/login" 
+              <a 
+                href="https://smoking-pods-admin.vercel.app/login" 
                 className="text-xs font-bold text-white/70 hover:text-white px-3 py-2 rounded-lg hover:bg-white/5 transition-colors hidden sm:inline-flex whitespace-nowrap"
               >
                 Entrar
-              </Link>
-              <Link 
-                to="/cadastro" 
+              </a>
+              <a 
+                href="https://smoking-pods-admin.vercel.app/cadastro" 
                 className="text-xs font-bold text-white/90 hover:text-white px-3 py-2 rounded-lg hover:bg-white/5 transition-colors hidden xl:inline-flex whitespace-nowrap"
               >
                 Criar Conta
-              </Link>
+              </a>
               <Link 
                 to="/checkout?plano=combo"
                 className="bg-white hover:bg-slate-100 text-black font-extrabold px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer"
@@ -309,20 +309,20 @@ export function LandingPage() {
               </div>
 
               <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-3 text-xs font-bold">
-                <Link 
-                  to="/login" 
+                <a 
+                  href="https://smoking-pods-admin.vercel.app/login" 
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex-1 py-2.5 text-center rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-colors"
                 >
                   Fazer Login
-                </Link>
-                <Link 
-                  to="/cadastro" 
+                </a>
+                <a 
+                  href="https://smoking-pods-admin.vercel.app/cadastro" 
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex-1 py-2.5 text-center rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/20 transition-colors"
                 >
                   Criar Conta
-                </Link>
+                </a>
               </div>
             </div>
           )}

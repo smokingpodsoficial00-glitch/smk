@@ -44,13 +44,19 @@ function SuspenseWrap({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<LazyFallback />}>{children}</Suspense>;
 }
 
-// Rota raiz inteligente: visitante vê a Landing Page, usuário autenticado vai direto ao painel
+// Rota raiz inteligente:
+// - No domínio do sistema da loja (smoking-pods-admin ou localhost): NUNCA exibe LP na raiz. Vai direto ao painel (/pedidos) ou login.
+// - No domínio comercial (smk-system): exibe a Landing Page oficial de vendas.
 function RootRoute() {
-  const { user, loading } = useAuth();
-  if (loading) return <LazyFallback />;
-  if (user) {
+  const isMarketingDomain = typeof window !== 'undefined' && (
+    window.location.hostname.includes('smk-system') || 
+    window.location.hostname.includes('smksystem')
+  );
+
+  if (!isMarketingDomain) {
     return <Navigate to="/pedidos" replace />;
   }
+
   return <SuspenseWrap><LandingPage /></SuspenseWrap>;
 }
 
