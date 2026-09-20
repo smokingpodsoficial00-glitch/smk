@@ -4,7 +4,7 @@ import {
   Sparkles, ChevronRight, ChevronLeft, X, Check, Compass, 
   PackageSearch, CircleDollarSign, RefreshCw, BarChart3, 
   PlusCircle, Layers, Flame, Users, Megaphone, Rocket,
-  FastForward, Minimize2, Maximize2
+  FastForward, Minimize2, Maximize2, ShieldAlert
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -18,6 +18,7 @@ export interface TourStep {
   icon: React.ReactNode;
   targetSelector?: string;
   pointerText?: string;
+  warningNote?: string;
 }
 
 const TOUR_STEPS: TourStep[] = [
@@ -127,8 +128,13 @@ const TOUR_STEPS: TourStep[] = [
     title: "📢 Marketing & Disparos com Cadência Segura",
     targetSelector: '[data-tour="btn-nova-campanha"]',
     pointerText: "👉 CLIQUE AQUI: NOVA CAMPANHA 👈",
-    description: "Chegou a hora de escalar suas vendas! O fluxo é simples e blindado: primeiro, conecte o WhatsApp oficial da sua loja no botão do topo via QR Code. Em seguida, acesse a aba 'Listas de Transmissão' logo abaixo para criar ou sincronizar seus contatos. Por fim, clique neste botão '+ Nova Campanha' para selecionar seu público, agendar o disparo e vender com cadência anti-bloqueio inteligente!",
-    tips: ["1º: Conecte o WhatsApp pelo QR Code no topo", "2º: Monte seu público na aba 'Listas de Transmissão'", "3º: Agende a campanha com cadência segura anti-ban"],
+    description: "Chegou a hora de escalar suas vendas! Conecte seu WhatsApp via QR Code e sincronize suas listas. ⚠️ ATENÇÃO MÁXIMA: Tome muito cuidado com a quantia de disparos, pois NÃO nos responsabilizamos por eventuais bloqueios do WhatsApp pela Meta! A cadência ideal e segura recomendada é de 5 disparos com pausa de 35 minutos para proteger e aquecer o seu número.",
+    warningNote: "Tome muito cuidado com a quantia de disparos. Não nos responsabilizamos por bloqueio do WhatsApp! A cadência ideal são 5 disparos com pausa de 35 minutos.",
+    tips: [
+      "⚠️ Não nos responsabilizamos por bloqueios do WhatsApp",
+      "⏱️ Cadência ideal: 5 disparos com pausa de 35 minutos",
+      "🛡️ Aquecimento seguro do chip respeitando os intervalos"
+    ],
     icon: <Megaphone className="size-6 text-pink-400" />
   },
   {
@@ -610,6 +616,23 @@ export function SystemTourGuide() {
               </div>
             )}
           </div>
+
+          {/* Alerta Destacado de Responsabilidade Anti-Ban */}
+          {activeStep.warningNote && (
+            <div className="bg-amber-500/10 border-2 border-amber-500/40 rounded-2xl p-4 text-xs sm:text-sm text-amber-200/90 flex items-start gap-3 shadow-[0_0_25px_rgba(245,158,11,0.15)] animate-in fade-in duration-200">
+              <div className="p-1.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                <ShieldAlert className="size-4 sm:size-5 text-amber-400" />
+              </div>
+              <div className="space-y-1">
+                <strong className="text-amber-300 font-black uppercase tracking-wider block text-xs">
+                  ⚠️ Aviso de Responsabilidade & Cadência Anti-Ban:
+                </strong>
+                <span className="leading-relaxed block">
+                  {activeStep.warningNote}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Dicas Rápidas da Etapa com Tamanho Legível */}
           {activeStep.tips && activeStep.tips.length > 0 && (
