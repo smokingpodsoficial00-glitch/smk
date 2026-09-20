@@ -91,7 +91,7 @@ export function CheckoutPage() {
           'Módulo de Divisão de Sócios e Proteção de Reposição',
           'Suporte Técnico VIP via WhatsApp'
         ],
-        asaasUrl: (import.meta.env.VITE_ASAAS_GESTAO_URL as string) || 'https://wa.me/5511977300561?text=Ol%C3%A1!%20Quero%20o%20link%20do%20Asaas%20para%20pagar%20com%20cart%C3%A3o%20o%20Plano%20SMK%20Gest%C3%A3o%20por%20R$%2089,90'
+        asaasUrl: 'https://www.asaas.com/c/os30j2w50xq464tt'
       };
     }
     return {
@@ -110,7 +110,7 @@ export function CheckoutPage() {
         'Chega de Digitar Lista de Sabores Todo Santo Dia',
         'Suporte Prioritário VIP via WhatsApp'
       ],
-      asaasUrl: (import.meta.env.VITE_ASAAS_COMBO_URL as string) || 'https://wa.me/5511977300561?text=Ol%C3%A1!%20Quero%20o%20link%20do%20Asaas%20para%20pagar%20com%20cart%C3%A3o%20o%20Plano%20SMK%20Pro%20Combo%20por%20R$%20119,90'
+      asaasUrl: 'https://www.asaas.com/c/57rnm1clcavvd8nc'
     };
   }, [selectedPlan]);
 
