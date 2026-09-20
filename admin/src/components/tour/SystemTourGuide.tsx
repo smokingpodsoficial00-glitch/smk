@@ -177,6 +177,16 @@ export function SystemTourGuide() {
   const hasCheckedAutoOpen = useRef(false);
   const rafRef = useRef<number | null>(null);
 
+  // Notifica o ecossistema (ex: Botão Flutuante de Suporte) quando o tour estiver ocupando o canto inferior direito
+  useEffect(() => {
+    const isTourActive = (isOpen && !isMinimized) || isWelcomeOpen;
+    window.dispatchEvent(
+      new CustomEvent("tour-visibility-change", {
+        detail: { isTourActive }
+      })
+    );
+  }, [isOpen, isMinimized, isWelcomeOpen]);
+
   // Verificação inicial estrita: Abre automaticamente no primeiro acesso real de cada empresa
   useEffect(() => {
     if (!company?.id) return;

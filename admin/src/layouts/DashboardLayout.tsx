@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { useStoreConfig } from '../lib/useStoreConfig';
 import { SystemTourGuide } from '../components/tour/SystemTourGuide';
+import { FloatingSupportButton } from '../components/FloatingSupportButton';
 
 export function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -323,6 +324,9 @@ export function DashboardLayout() {
       <main className="flex-1 flex flex-col overflow-hidden">
         <Outlet />
       </main>
+
+      {/* Botão Flutuante Global de Suporte no WhatsApp */}
+      <FloatingSupportButton />
 
       {/* Assistente do Tour Guiado */}
       <SystemTourGuide />
