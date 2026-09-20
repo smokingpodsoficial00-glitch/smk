@@ -46,6 +46,10 @@ export function CheckoutPage() {
   const pixKeyOfficial = 'cc0c1ec5-cf52-4481-ada0-af0a862a7462';
   const pixNameOfficial = 'Eduardo de Oliveira Pizza';
 
+  useEffect(() => {
+    document.title = 'Checkout Seguro | SMK System';
+  }, []);
+
   // Sync with URL query param
   useEffect(() => {
     const p = searchParams.get('plano');

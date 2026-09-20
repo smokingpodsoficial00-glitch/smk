@@ -88,6 +88,10 @@ export function LandingPage() {
   });
 
   useEffect(() => {
+    document.title = 'SMK System | A Ferramenta que Domina a Venda de Pods';
+  }, []);
+
+  useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
