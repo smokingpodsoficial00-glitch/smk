@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
-import { Loader2, ShieldAlert, MessageCircle } from 'lucide-react';
+import { Loader2, ShieldAlert, MessageCircle, CreditCard, ExternalLink } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -74,19 +74,31 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
               O acesso ao painel do sistema da loja <strong className="text-white">{company.name}</strong> está temporariamente pausado devido a pendência na renovação ou cancelamento.
             </p>
           </div>
-          <div className="w-full pt-3 flex flex-col gap-2.5">
+          <div className="w-full pt-2 flex flex-col gap-2.5">
             <a
-              href="https://wa.me/5511977300561?text=Ol%C3%A1!%20Sou%20o%20respons%C3%A1vel%20pela%20loja%20e%20meu%20painel%20est%C3%A1%20com%20aviso%20de%20suspens%C3%A3o.%20Gostaria%20de%20regularizar%20o%20acesso."
+              href="https://www.asaas.com/c/57rnm1clcavvd8nc"
               target="_blank"
               rel="noreferrer"
-              className="w-full py-3.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-black text-xs font-black transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(37,211,102,0.3)] active:scale-95 cursor-pointer"
+              className="w-full py-3.5 px-4 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-black transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-95 cursor-pointer text-center"
             >
-              <MessageCircle className="size-4 fill-black" />
-              <span>Regularizar Acesso no WhatsApp</span>
+              <CreditCard className="size-4 text-black shrink-0" />
+              <span>Renovar Assinatura no Cartão (Asaas)</span>
+              <ExternalLink className="size-3 text-black/60 shrink-0" />
             </a>
+
+            <a
+              href="https://wa.me/5511977300561?text=Ol%C3%A1!%20Sou%20o%20respons%C3%A1vel%20pela%20loja%20e%20meu%20painel%20est%C3%A1%20com%20aviso%20de%20suspens%C3%A3o.%20Gostaria%20de%20regularizar%20o%20acesso%20via%20Pix."
+              target="_blank"
+              rel="noreferrer"
+              className="w-full py-3 px-4 rounded-xl bg-[#25D366]/20 hover:bg-[#25D366]/30 border border-[#25D366]/40 text-[#25D366] text-xs font-black transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+            >
+              <MessageCircle className="size-4 fill-[#25D366]" />
+              <span>Regularizar via Pix no WhatsApp</span>
+            </a>
+
             <button
               onClick={() => signOut()}
-              className="w-full py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-xs font-semibold transition-colors cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-white/50 hover:text-white text-xs font-semibold transition-colors cursor-pointer"
             >
               Sair da Conta
             </button>

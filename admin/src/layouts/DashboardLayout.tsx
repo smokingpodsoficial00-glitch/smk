@@ -264,17 +264,6 @@ export function DashboardLayout() {
               )}
             </NavLink>
           )}
-
-          {/* Atalho Super Admin */}
-          {isSuperAdmin && (
-            <button
-              onClick={() => navigate('/admin/dashboard')}
-              className="mt-2 mx-3 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-[11px] font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm"
-            >
-              <Shield className="size-3.5 shrink-0 text-white" />
-              {!sidebarCollapsed && <span>Painel Super Admin</span>}
-            </button>
-          )}
         </nav>
 
         {/* Toggle Collapse Button */}

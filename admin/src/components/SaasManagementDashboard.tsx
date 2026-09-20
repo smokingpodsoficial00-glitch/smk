@@ -25,7 +25,9 @@ import {
   X, 
   ShoppingBag,
   Zap,
-  Package
+  Package,
+  Trash2,
+  CreditCard
 } from 'lucide-react';
 
 interface CompanyData {
@@ -50,6 +52,7 @@ interface StoreStats {
 
 export function SaasManagementDashboard() {
   const [companies, setCompanies] = useState<CompanyData[]>([]);
+  const [ordersByCompany, setOrdersByCompany] = useState<Record<string, number>>({});
   const [totalOrders, setTotalOrders] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,6 +63,10 @@ export function SaasManagementDashboard() {
   const [actionCompany, setActionCompany] = useState<CompanyData | null>(null);
   const [actionType, setActionType] = useState<'block' | 'unblock' | null>(null);
   const [processingAction, setProcessingAction] = useState(false);
+
+  // Modal de Exclusão de Loja (Apenas para lojas de teste)
+  const [companyToDelete, setCompanyToDelete] = useState<CompanyData | null>(null);
+  const [deletingCompany, setDeletingCompany] = useState(false);
 
   // Modal de Detalhes da Loja
   const [selectedCompanyDetails, setSelectedCompanyDetails] = useState<CompanyData | null>(null);
@@ -74,6 +81,16 @@ export function SaasManagementDashboard() {
   const [pixEmail, setPixEmail] = useState('');
   const [pixPlan, setPixPlan] = useState<'gestao' | 'combo'>('combo');
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Função Canônica para identificar a loja matriz oficial Smoking Pods
+  const isOfficialStore = (c: CompanyData): boolean => {
+    return (
+      c.id === 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5' ||
+      c.email?.toLowerCase().trim() === 'smokingpodsoficial00@gmail.com' ||
+      c.name?.toLowerCase().includes('smoking pods 01') ||
+      c.name?.toLowerCase().trim() === 'smoking pods'
+    );
+  };
 
   const loadData = async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
@@ -92,13 +109,22 @@ export function SaasManagementDashboard() {
         setCompanies(companiesData as CompanyData[]);
       }
 
-      // 2. Carrega total de pedidos em toda a rede (desconsiderando testes de sistema)
-      const { count: ordersCount } = await supabase
+      // 2. Carrega pedidos em lote agrupados por empresa para a coluna de métricas
+      const { data: ordersData, error: ordersErr } = await supabase
         .from('smoking_orders')
-        .select('*', { count: 'exact', head: true })
+        .select('company_id')
         .not('client_phone', 'like', '__SYSTEM_%');
 
-      setTotalOrders(ordersCount || 0);
+      if (!ordersErr && ordersData) {
+        setTotalOrders(ordersData.length);
+        const map: Record<string, number> = {};
+        ordersData.forEach(o => {
+          if (o.company_id) {
+            map[o.company_id] = (map[o.company_id] || 0) + 1;
+          }
+        });
+        setOrdersByCompany(map);
+      }
     } catch (err) {
       console.error('Erro ao carregar dados do SaaS:', err);
     } finally {
@@ -111,12 +137,12 @@ export function SaasManagementDashboard() {
     loadData();
   }, []);
 
-  // Lojas de clientes parceiros (excluindo a própria matriz Smoking Pods dos cálculos de MRR de terceiros)
+  // Lojas de clientes parceiros (EXCLUI COMPULSORIAMENTE A SMOKING PODS MATRIZ DO MRR E MÉTRICAS DE CLIENTES)
   const partnerCompanies = useMemo(() => {
-    return companies.filter(c => c.id !== 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5');
+    return companies.filter(c => !isOfficialStore(c));
   }, [companies]);
 
-  // Contagem de ativas vs bloqueadas
+  // Contagem de ativas vs bloqueadas (Apenas clientes pagantes)
   const activeCompanies = useMemo(() => {
     return partnerCompanies.filter(c => c.is_active !== false);
   }, [partnerCompanies]);
@@ -131,14 +157,13 @@ export function SaasManagementDashboard() {
     return ((blockedCompanies.length / partnerCompanies.length) * 100).toFixed(1);
   }, [partnerCompanies, blockedCompanies]);
 
-  // Cálculo de MRR (com base nos planos: Combo R$ 119,90 ou Gestão R$ 89,90)
+  // Cálculo de MRR (ESTRITAMENTE CLIENTES PARCEIROS — A MATRIZ SMOKING PODS NÃO PAGA MENSALIDADE)
   const mrrData = useMemo(() => {
     let comboCount = 0;
     let gestaoCount = 0;
     let totalMrr = 0;
 
     activeCompanies.forEach(comp => {
-      // Se tiver plano explícito ou template específico
       const isGestao = comp.template_type === 'gestao' || comp.payment_gateway?.plan === 'gestao';
       if (isGestao) {
         gestaoCount++;
@@ -155,11 +180,9 @@ export function SaasManagementDashboard() {
   // Filtro de Busca e Status na Tabela
   const filteredCompanies = useMemo(() => {
     return companies.filter(c => {
-      // Filtro de status
       if (statusFilter === 'active' && c.is_active === false) return false;
       if (statusFilter === 'blocked' && c.is_active !== false) return false;
 
-      // Filtro de busca textual
       const query = searchTerm.toLowerCase().trim();
       if (!query) return true;
 
@@ -175,6 +198,11 @@ export function SaasManagementDashboard() {
   // Ação de Bloqueio ou Desbloqueio
   const handleToggleStatus = async () => {
     if (!actionCompany || !actionType) return;
+    if (isOfficialStore(actionCompany)) {
+      alert('A loja matriz oficial não pode ser bloqueada.');
+      return;
+    }
+
     setProcessingAction(true);
 
     try {
@@ -187,7 +215,6 @@ export function SaasManagementDashboard() {
       if (error) {
         alert('Erro ao atualizar status da loja: ' + error.message);
       } else {
-        // Atualiza o estado local imediatamente
         setCompanies(prev => prev.map(c => c.id === actionCompany.id ? { ...c, is_active: newStatus } : c));
         setActionCompany(null);
         setActionType(null);
@@ -196,6 +223,46 @@ export function SaasManagementDashboard() {
       alert('Erro inesperado: ' + err.message);
     } finally {
       setProcessingAction(false);
+    }
+  };
+
+  // Ação de Exclusão Definitiva de Loja (Com limpeza em cascata)
+  const handleDeleteCompany = async () => {
+    if (!companyToDelete) return;
+    if (isOfficialStore(companyToDelete)) {
+      alert('A loja matriz oficial Smoking Pods não pode ser excluída sob nenhuma circunstância.');
+      return;
+    }
+
+    setDeletingCompany(true);
+
+    try {
+      const targetId = companyToDelete.id;
+
+      // 1. Limpeza em cascata de dados vinculados
+      await supabase.from('smoking_orders').delete().eq('company_id', targetId);
+      await supabase.from('smoking_products').delete().eq('company_id', targetId);
+      await supabase.from('smoking_clients').delete().eq('company_id', targetId);
+      await supabase.from('store_config').delete().eq('company_id', targetId);
+      await supabase.from('shipping_config').delete().eq('company_id', targetId);
+      await supabase.from('company_users').delete().eq('company_id', targetId);
+
+      // 2. Exclusão da empresa
+      const { error } = await supabase
+        .from('companies')
+        .delete()
+        .eq('id', targetId);
+
+      if (error) {
+        alert('Erro ao excluir loja do banco: ' + error.message);
+      } else {
+        setCompanies(prev => prev.filter(c => c.id !== targetId));
+        setCompanyToDelete(null);
+      }
+    } catch (err: any) {
+      alert('Erro inesperado na exclusão: ' + err.message);
+    } finally {
+      setDeletingCompany(false);
     }
   };
 
@@ -225,7 +292,7 @@ export function SaasManagementDashboard() {
     }
   };
 
-  // Geração do Link de Ativação
+  // Geração do Link de Ativação Inicial
   const generatedActivationLink = useMemo(() => {
     const params = new URLSearchParams();
     params.set('origem', 'pix');
@@ -314,7 +381,7 @@ export function SaasManagementDashboard() {
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* Card 1: MRR Ativo */}
+        {/* Card 1: MRR Ativo Real (Clientes Pagantes) */}
         <div className="bg-[#0b0b0b] border border-amber-500/30 p-5 rounded-2xl flex flex-col justify-between shadow-[0_0_30px_rgba(245,158,11,0.08)] relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
           <div>
@@ -330,7 +397,7 @@ export function SaasManagementDashboard() {
           </div>
           <div className="text-[11px] text-amber-400/90 font-medium flex items-center gap-1 mt-3">
             <TrendingUp className="size-3" />
-            <span>{activeCompanies.length} assinaturas ativas</span>
+            <span>{activeCompanies.length} lojas parceiras pagantes</span>
           </div>
         </div>
 
@@ -338,7 +405,7 @@ export function SaasManagementDashboard() {
         <div className="bg-[#0b0b0b] border border-emerald-500/20 p-5 rounded-2xl flex flex-col justify-between shadow-sm relative overflow-hidden">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-white/50">Lojas Ativas</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-white/50">Lojas Clientes Ativas</span>
               <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <Building2 className="size-4" />
               </div>
@@ -349,7 +416,7 @@ export function SaasManagementDashboard() {
           </div>
           <div className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1 mt-3">
             <CheckCircle2 className="size-3" />
-            <span>Operando normalmente</span>
+            <span>Assinaturas adimplentes</span>
           </div>
         </div>
 
@@ -413,7 +480,7 @@ export function SaasManagementDashboard() {
           </div>
           <div className="text-right">
             <div className="text-xl font-black text-white font-mono">{mrrData.comboCount}</div>
-            <span className="text-[10px] text-white/40">Lojas ativas</span>
+            <span className="text-[10px] text-white/40">Lojas clientes</span>
           </div>
         </div>
 
@@ -432,7 +499,7 @@ export function SaasManagementDashboard() {
           </div>
           <div className="text-right">
             <div className="text-xl font-black text-white font-mono">{mrrData.gestaoCount}</div>
-            <span className="text-[10px] text-white/40">Lojas ativas</span>
+            <span className="text-[10px] text-white/40">Lojas clientes</span>
           </div>
         </div>
 
@@ -449,7 +516,7 @@ export function SaasManagementDashboard() {
               <span>Diretório de Lojas & Controle de Acesso</span>
             </h2>
             <p className="text-xs text-white/40 mt-0.5">
-              Gerencie, audite ou bloqueie o acesso de qualquer loja parceira em tempo real
+              Audite métricas de vendas dos concorrentes, gerencie permissões ou exclua lojas de teste
             </p>
           </div>
 
@@ -506,16 +573,26 @@ export function SaasManagementDashboard() {
                 <th className="px-5 py-3.5">Plano</th>
                 <th className="px-5 py-3.5">Cadastro</th>
                 <th className="px-5 py-3.5">Status</th>
+                <th className="px-5 py-3.5">Pedidos da Loja</th>
                 <th className="px-5 py-3.5 text-right">Ações Soberanas</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-white/80">
               {filteredCompanies.map((c) => {
-                const isMasterStore = c.id === 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+                const isMasterStore = isOfficialStore(c);
                 const isBlocked = c.is_active === false;
                 const cleanPhone = (c.phone || '').replace(/\D/g, '');
                 const createdDate = c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : 'N/A';
-                const planName = c.template_type === 'gestao' ? 'SMK Gestão' : 'SMK Pro Combo';
+                const storeOrdersCount = ordersByCompany[c.id] || 0;
+                const planName = isMasterStore 
+                  ? 'Matriz Oficial' 
+                  : (c.template_type === 'gestao' ? 'SMK Gestão' : 'SMK Pro Combo');
+
+                const renewalWhatsAppText = `Olá ${c.manager_name || c.name}! Identificamos que a assinatura do seu sistema *SMK System* está suspensa.\n\n` +
+                  `Para regularizar seu acesso imediato:\n` +
+                  `💳 *Cartão de Crédito com Desconto*: https://www.asaas.com/c/57rnm1clcavvd8nc\n` +
+                  `📱 *Pix Chave*: cc0c1ec5-cf52-4481-ada0-af0a862a7462 (Eduardo de Oliveira Pizza)\n\n` +
+                  `Basta responder aqui com o comprovante que desbloqueamos seu sistema na hora com todos os seus produtos salvos! 🚀`;
 
                 return (
                   <tr key={c.id} className="hover:bg-white/[0.02] transition-colors">
@@ -534,8 +611,8 @@ export function SaasManagementDashboard() {
                           <div className="flex items-center gap-1.5 font-bold text-white text-sm">
                             <span>{c.name}</span>
                             {isMasterStore && (
-                              <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded-full font-black uppercase">
-                                MATRIZ
+                              <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
+                                MATRIZ (ISENTA)
                               </span>
                             )}
                           </div>
@@ -594,14 +671,16 @@ export function SaasManagementDashboard() {
                     <td className="px-5 py-4">
                       <div className="flex flex-col gap-1">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold w-fit ${
-                          planName === 'SMK Pro Combo'
-                            ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
-                            : 'bg-white/10 text-white/80 border border-white/20'
+                          isMasterStore
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                            : planName === 'SMK Pro Combo'
+                              ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
+                              : 'bg-white/10 text-white/80 border border-white/20'
                         }`}>
                           <Sparkles className="size-2.5" /> {planName}
                         </span>
                         <span className="text-[10px] text-white/40 font-mono">
-                          {planName === 'SMK Pro Combo' ? 'R$ 119,90/mês' : 'R$ 89,90/mês'}
+                          {isMasterStore ? 'Isenta (Própria Loja)' : (planName === 'SMK Pro Combo' ? 'R$ 119,90/mês' : 'R$ 89,90/mês')}
                         </span>
                       </div>
                     </td>
@@ -629,10 +708,32 @@ export function SaasManagementDashboard() {
                       )}
                     </td>
 
+                    {/* Nova Coluna: Pedidos da Loja (Monitor de Desempenho) */}
+                    <td className="px-5 py-4">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 font-mono text-[11px] font-bold">
+                        <ShoppingBag className="size-3.5 text-blue-400" />
+                        <span>{storeOrdersCount} {storeOrdersCount === 1 ? 'pedido' : 'pedidos'}</span>
+                      </div>
+                    </td>
+
                     {/* Ações Soberanas */}
                     <td className="px-5 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
                         
+                        {/* Botão de Cobrança / Regularização no WhatsApp (Aparece se bloqueada) */}
+                        {isBlocked && !isMasterStore && cleanPhone && (
+                          <a
+                            href={`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(renewalWhatsAppText)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Enviar mensagem de regularização de assinatura no WhatsApp"
+                            className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-[11px] font-bold transition-colors flex items-center gap-1"
+                          >
+                            <CreditCard className="size-3 text-amber-400" />
+                            <span>Cobrar</span>
+                          </a>
+                        )}
+
                         {/* Botão Ver Detalhes */}
                         <button
                           onClick={() => handleOpenDetails(c)}
@@ -641,7 +742,7 @@ export function SaasManagementDashboard() {
                           Detalhes
                         </button>
 
-                        {/* Botão Bloquear / Desbloquear (Matriz não pode ser bloqueada) */}
+                        {/* Botão Bloquear / Desbloquear (Matriz protegida) */}
                         {!isMasterStore && (
                           isBlocked ? (
                             <button
@@ -649,7 +750,7 @@ export function SaasManagementDashboard() {
                                 setActionCompany(c);
                                 setActionType('unblock');
                               }}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                             >
                               <Unlock className="size-3 text-emerald-400" />
                               <span>Desbloquear</span>
@@ -660,12 +761,23 @@ export function SaasManagementDashboard() {
                                 setActionCompany(c);
                                 setActionType('block');
                               }}
-                              className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                              className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                             >
-                              <Lock className="size-3 text-red-400" />
+                              <Lock className="size-3 text-amber-400" />
                               <span>Bloquear</span>
                             </button>
                           )
+                        )}
+
+                        {/* Botão Excluir Loja de Teste (Matriz protegida rigorosamente) */}
+                        {!isMasterStore && (
+                          <button
+                            onClick={() => setCompanyToDelete(c)}
+                            title="Excluir loja de teste definitivamente"
+                            className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 transition-colors cursor-pointer active:scale-95"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
                         )}
 
                       </div>
@@ -677,7 +789,7 @@ export function SaasManagementDashboard() {
 
               {filteredCompanies.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-white/40">
+                  <td colSpan={7} className="px-5 py-10 text-center text-white/40">
                     {loading ? 'Carregando lojas...' : 'Nenhuma empresa encontrada com os filtros selecionados.'}
                   </td>
                 </tr>
@@ -697,7 +809,7 @@ export function SaasManagementDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className={`p-2 rounded-xl ${
-                  actionType === 'block' ? 'bg-red-500/10 text-red-400 border border-red-500/30' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                  actionType === 'block' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                 }`}>
                   {actionType === 'block' ? <Lock className="size-5" /> : <Unlock className="size-5" />}
                 </div>
@@ -718,15 +830,15 @@ export function SaasManagementDashboard() {
 
             <div className="text-xs text-white/70 space-y-2 leading-relaxed bg-[#141414] p-4 rounded-xl border border-white/5">
               <p>
-                Você está prestes a {actionType === 'block' ? <strong className="text-red-400">BLOQUEAR</strong> : <strong className="text-emerald-400">DESBLOQUEAR</strong>} o sistema da loja <strong className="text-white">{actionCompany.name}</strong> ({actionCompany.email}).
+                Você está prestes a {actionType === 'block' ? <strong className="text-amber-400">BLOQUEAR</strong> : <strong className="text-emerald-400">DESBLOQUEAR</strong>} o sistema da loja <strong className="text-white">{actionCompany.name}</strong> ({actionCompany.email}).
               </p>
               {actionType === 'block' ? (
                 <p className="text-white/50 text-[11px]">
-                  ⚠️ O lojista e todos os atendentes desta loja serão imediatamente desconectados e verão uma tela de bloqueio com botão para regularizar a assinatura via WhatsApp.
+                  ⚠️ O lojista e todos os atendentes desta loja serão impedidos de usar o painel e verão a tela de suspensão com botão para regularizar a assinatura via Cartão ou Pix.
                 </p>
               ) : (
                 <p className="text-white/50 text-[11px]">
-                  ✅ O acesso ao painel do ERP e ao catálogo desta loja será restabelecido instantaneamente.
+                  ✅ O acesso ao painel do ERP e ao catálogo desta loja será restabelecido instantaneamente com todos os produtos preservados.
                 </p>
               )}
             </div>
@@ -749,7 +861,7 @@ export function SaasManagementDashboard() {
                 onClick={handleToggleStatus}
                 className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 shadow-lg active:scale-95 disabled:opacity-50 ${
                   actionType === 'block'
-                    ? 'bg-red-600 hover:bg-red-500 text-white shadow-red-600/30'
+                    ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/30'
                     : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'
                 }`}
               >
@@ -773,7 +885,63 @@ export function SaasManagementDashboard() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 2: DETALHES COMPLETOS DA LOJA                                       */}
+      {/* MODAL 2: CONFIRMAÇÃO DE EXCLUSÃO DEFINITIVA (LOJAS DE TESTE)              */}
+      {/* ========================================================================= */}
+      {companyToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e0e] border border-red-500/30 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in-50 duration-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400">
+                  <Trash2 className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Excluir Loja Definitivamente</h3>
+                  <span className="text-[10px] text-red-400 font-mono uppercase tracking-wider font-semibold">Ação Irreversível</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setCompanyToDelete(null)}
+                className="text-white/40 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="text-xs text-white/80 space-y-2.5 leading-relaxed bg-red-950/20 p-4 rounded-xl border border-red-500/20">
+              <p>
+                Tem certeza que deseja apagar a loja <strong className="text-white underline">{companyToDelete.name}</strong> ({companyToDelete.email})?
+              </p>
+              <p className="text-white/60 text-[11px]">
+                ⚠️ Todos os dados de pedidos, produtos, catálogo, usuários e configurações vinculadas a esta loja serão permanentemente excluídos do banco de dados.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setCompanyToDelete(null)}
+                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={deletingCompany}
+                onClick={handleDeleteCompany}
+                className="px-5 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 shadow-lg bg-red-600 hover:bg-red-500 text-white shadow-red-600/30 active:scale-95 disabled:opacity-50"
+              >
+                <Trash2 className="size-3.5" />
+                <span>{deletingCompany ? 'Excluindo loja...' : 'Sim, Excluir Definitivamente'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3: DETALHES COMPLETOS DA LOJA                                       */}
       {/* ========================================================================= */}
       {selectedCompanyDetails && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -844,7 +1012,7 @@ export function SaasManagementDashboard() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 3: GERADOR DE LINK DE ATIVAÇÃO MANUAL (PIX)                        */}
+      {/* MODAL 4: GERADOR DE LINK DE ATIVAÇÃO MANUAL (PIX)                        */}
       {/* ========================================================================= */}
       {showPixLinkModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -857,7 +1025,7 @@ export function SaasManagementDashboard() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">Gerar Link de Ativação (Pix)</h3>
-                  <p className="text-[11px] text-white/50">Crie o link de liberação para enviar ao cliente no WhatsApp</p>
+                  <p className="text-[11px] text-white/50">Crie o link de liberação para enviar ao novo cliente no WhatsApp</p>
                 </div>
               </div>
               <button
