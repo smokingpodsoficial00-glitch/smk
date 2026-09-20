@@ -32,24 +32,30 @@ const DEFAULT_CONFIG: StoreConfig = {
   description: "",
 };
 
-const LOCAL_STORAGE_KEY = "store_config_fallback_v4";
+// Limpa chave legada não escopada que causava contaminação cruzada
+if (typeof window !== "undefined") {
+  try {
+    localStorage.removeItem("store_config_fallback_v4");
+  } catch {}
+}
 
 let broadcastChannel: BroadcastChannel | null = null;
 try {
   if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-    broadcastChannel = new BroadcastChannel("store_config_channel_v4");
+    broadcastChannel = new BroadcastChannel("store_config_channel_v5");
   }
-} catch (e) {
-  console.warn("BroadcastChannel não disponível:", e);
-}
+} catch (e) {}
 
-function getLocalFallback(): StoreConfig {
+const getCatalogStorageKey = (companyId?: string) => `store_config_catalog_v5_${companyId || "default"}`;
+
+function getLocalFallback(companyId?: string): StoreConfig {
   try {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const saved = localStorage.getItem(getCatalogStorageKey(companyId));
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (parsed.store_name && (parsed.store_name.toLowerCase().includes("02") || parsed.store_name.toLowerCase().includes("smk pods 2"))) {
+      if (companyId === "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5") {
         parsed.store_name = "Smoking Pods";
+        parsed.store_slug = "smoking-pods";
       }
       return parsed;
     }
@@ -136,7 +142,7 @@ async function fetchConfig(): Promise<StoreConfig> {
   const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const requestedSlug = urlParams?.get("loja");
   
-  let local = getLocalFallback();
+  let local = getLocalFallback(companyId);
   if (requestedSlug && requestedSlug !== "smoking-pods") {
     const formattedSlugTitle = requestedSlug
       .split("-")
@@ -157,7 +163,7 @@ async function fetchConfig(): Promise<StoreConfig> {
   }
 
   cachedConfig = finalConfig;
-  try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cachedConfig)); } catch {}
+  try { localStorage.setItem(getCatalogStorageKey(companyId), JSON.stringify(cachedConfig)); } catch {}
   notifyListeners();
   return cachedConfig;
 }
@@ -177,7 +183,7 @@ export function useStoreConfig() {
         if (e.data && typeof e.data === "object") {
           cachedConfig = e.data as StoreConfig;
           setConfig(cachedConfig);
-          try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cachedConfig)); } catch {}
+          try { localStorage.setItem(getCatalogStorageKey(cachedConfig.id), JSON.stringify(cachedConfig)); } catch {}
         }
       };
       broadcastChannel.addEventListener("message", handleBroadcast);

@@ -17,7 +17,10 @@ export function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const displayName = config?.store_name || company?.name || "Smoking Pods";
+  const isOfficial = !company?.id || company?.id === 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+  const displayName = isOfficial 
+    ? 'Smoking Pods' 
+    : (company?.name || config?.store_name || 'Minha Loja');
 
   return (
     <div className="flex h-screen bg-[#050505] text-white overflow-hidden font-sans">

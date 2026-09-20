@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Store, Phone, Globe,
   Save, CheckCircle2, AlertCircle, Loader2,
@@ -67,15 +67,23 @@ export default function SettingsPage() {
 
   const catalogUrl = getCatalogUrl();
 
-  // Sync form state when config loads
+  const lastCompanyIdRef = useRef<string | null>(null);
+
+  // Sync form state strictly with active company and ensure official store isolation
   useEffect(() => {
-    if (config && !loading) {
-      if (!storeName && !whatsappNumber) {
-        setStoreName(config.store_name || "");
-        setWhatsappNumber(formatBrazilianPhone(config.whatsapp_number || ""));
+    if (!loading && (company || config)) {
+      if (company?.id && company.id !== lastCompanyIdRef.current) {
+        lastCompanyIdRef.current = company.id;
+        const initialName = isOfficial ? "Smoking Pods" : (company.name || config?.store_name || "");
+        setStoreName(initialName);
+        setWhatsappNumber(formatBrazilianPhone(config?.whatsapp_number || company.phone || ""));
+      } else if (!storeName) {
+        const initialName = isOfficial ? "Smoking Pods" : (company?.name || config?.store_name || "");
+        setStoreName(initialName);
+        setWhatsappNumber(formatBrazilianPhone(config?.whatsapp_number || company?.phone || ""));
       }
     }
-  }, [config, loading]);
+  }, [company?.id, company?.name, config, loading, isOfficial]);
 
   const handleSaveWhatsAppOnly = async () => {
     setWaFeedback(null);

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { resetStoreConfigCache } from '../lib/useStoreConfig';
 
 export type UserRole = 'admin' | 'gerente' | 'atendente' | 'financeiro' | 'estoquista';
 
@@ -77,9 +78,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       localStorage.removeItem(LOCAL_SESSION_KEY);
       localStorage.removeItem('smk_auth_company_id');
+      localStorage.removeItem('store_config_fallback_v4');
     } catch (e) {
       console.warn('Erro ao remover sessão local:', e);
     }
+    resetStoreConfigCache();
     setLoading(false);
   };
 
@@ -244,6 +247,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
+    resetStoreConfigCache();
     setUser(authData.user);
     await fetchUserData(authData.user);
     return { error: null };
@@ -335,6 +339,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    resetStoreConfigCache();
     try {
       await supabase.auth.signOut();
     } catch (e) {}

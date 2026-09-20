@@ -63,28 +63,23 @@ export function OnboardingPage() {
     // 1. Atualiza a sessão e estado de onboarding no AuthContext sincronizadamente
     completeOnboarding(onboardingData);
 
-    // 2. Atualiza o cache local do store_config (para useStoreConfig e SettingsPage)
+    // 2. Atualiza o cache local do store_config isolado por ID de empresa
     const storeConfigObj = {
+      company_id: company?.id,
       store_name: cleanName,
       whatsapp_number: cleanPhone,
     };
     try {
-      localStorage.setItem('store_config_fallback_v4', JSON.stringify(storeConfigObj));
-      const bc = new BroadcastChannel('store_config_channel_v4');
-      bc.postMessage(storeConfigObj);
-      bc.close();
+      if (company?.id) {
+        localStorage.setItem(`store_config_v5_${company.id}`, JSON.stringify(storeConfigObj));
+      }
+      localStorage.removeItem('store_config_fallback_v4');
     } catch (e) {}
 
-    // 3. Salva no banco de dados do Supabase
+    // 3. Salva no banco de dados do Supabase com isolamento de tenant
     try {
       if (company?.id) {
         await supabase.from('companies').update(onboardingData).eq('id', company.id);
-
-        const { data: existingConfig } = await supabase
-          .from('store_config')
-          .select('id')
-          .eq('company_id', company.id)
-          .maybeSingle();
 
         const generatedSlug = cleanName
           .toLowerCase()
@@ -93,21 +88,13 @@ export function OnboardingPage() {
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/(^-|-$)+/g, "");
 
-        if (existingConfig) {
-          await supabase.from('store_config').update({
-            company_id: company.id,
-            store_name: cleanName,
-            store_slug: generatedSlug,
-            whatsapp_number: cleanPhone,
-          }).eq('company_id', company.id);
-        } else {
-          await supabase.from('store_config').insert({
-            company_id: company.id,
-            store_name: cleanName,
-            store_slug: generatedSlug,
-            whatsapp_number: cleanPhone,
-          });
-        }
+        await supabase.from('store_config').upsert({
+          company_id: company.id,
+          store_name: cleanName,
+          store_slug: generatedSlug,
+          whatsapp_number: cleanPhone,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'company_id' });
       }
     } catch (err) {
       console.warn('Aviso ao sincronizar ativação com Supabase:', err);
