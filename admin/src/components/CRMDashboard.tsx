@@ -1,13 +1,14 @@
 import React, { Component, type ReactNode, useState } from "react";
-import { Users, Crown, RefreshCw, AlertTriangle, Receipt, UserPlus } from "lucide-react";
+import { Users, Crown, RefreshCw, AlertTriangle, Receipt, ShoppingCart } from "lucide-react";
 import type { RealClient } from "@/lib/crm";
+import { useAuth } from "../contexts/AuthContext";
 
 // Componentes do CRM
 import { RFMMatrix } from "./crm/RFMMatrix";
 import { PredictiveReplenishment } from "./crm/PredictiveReplenishment";
 import { SalesHistoryTab } from "./crm/SalesHistoryTab";
 import { ClientProfileModal } from "./crm/ClientProfileModal";
-import { NewClientModal } from "./crm/NewClientModal";
+import { ManualSaleModal } from "./ManualSaleModal";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -55,9 +56,10 @@ class CRMErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
 }
 
 export default function CRMDashboard() {
+  const { company } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState<'rfm' | 'replenishment' | 'sales_history'>('rfm');
   const [selectedClient, setSelectedClient] = useState<RealClient | null>(null);
-  const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
+  const [isManualSaleModalOpen, setIsManualSaleModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const tabs = [
@@ -83,11 +85,11 @@ export default function CRMDashboard() {
           
           <div className="flex items-center gap-3 self-start sm:self-auto">
             <button
-              onClick={() => setIsNewClientModalOpen(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold bg-white hover:bg-slate-100 text-black shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] transition-all cursor-pointer select-none active:scale-95"
+              onClick={() => setIsManualSaleModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] cursor-pointer active:scale-[0.97]"
             >
-              <UserPlus className="size-4" />
-              <span>Novo Cliente</span>
+              <ShoppingCart className="size-3.5 text-black" />
+              <span>Registrar Venda</span>
             </button>
 
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-white/10 text-white border border-white/20 shadow-sm">
@@ -124,13 +126,14 @@ export default function CRMDashboard() {
           </CRMErrorBoundary>
         </div>
 
-        {/* Modal Novo Cliente */}
-        <NewClientModal 
-          isOpen={isNewClientModalOpen}
-          onClose={() => setIsNewClientModalOpen(false)}
-          onClientCreated={() => {
+        {/* Modal de Registro de Venda Manual */}
+        <ManualSaleModal 
+          isOpen={isManualSaleModalOpen}
+          onClose={() => setIsManualSaleModalOpen(false)}
+          onSaleSuccess={() => {
             setRefreshKey(prev => prev + 1);
           }}
+          companyId={company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5"}
         />
 
         {/* Modal 360 do Cliente */}
