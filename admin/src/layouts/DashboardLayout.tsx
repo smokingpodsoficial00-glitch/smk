@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, Users, Settings, CircleDollarSign, 
-  Store, ChevronRight, Bot, LogOut, Shield, User as UserIcon, Megaphone, Scale, CheckSquare, Compass, Crown
+  Store, ChevronRight, Bot, LogOut, Shield, User as UserIcon, Megaphone, Scale, CheckSquare, Compass, Crown, Sun, Moon
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { useStoreConfig } from '../lib/useStoreConfig';
 import { SystemTourGuide } from '../components/tour/SystemTourGuide';
@@ -12,6 +13,7 @@ import { FloatingSupportButton } from '../components/FloatingSupportButton';
 
 export function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   const { config } = useStoreConfig();
   const { company, companyUser, signOut, isSuperAdmin } = useAuth();
   const { canAccess } = usePermissions();
@@ -289,6 +291,28 @@ export function DashboardLayout() {
         {/* Rodapé / Configurações, Tour & Logout */}
         <div className={`p-3 border-t border-white/5 w-full flex flex-col gap-1 ${sidebarCollapsed ? 'items-center' : ''}`}>
           
+          {/* Botão Alternador Modo Claro / Modo Escuro */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            title={sidebarCollapsed ? (theme === 'dark' ? "Ativar Modo Claro" : "Ativar Modo Escuro") : undefined}
+            className={`flex items-center gap-3 py-2 transition-all cursor-pointer w-full text-xs font-semibold rounded-xl text-white/70 hover:text-white hover:bg-white/5 border border-white/5 ${
+              sidebarCollapsed ? 'justify-center px-3' : 'px-3'
+            }`}
+          >
+            {theme === 'dark' ? (
+              <>
+                <Sun className="size-4 shrink-0 text-amber-400" />
+                {!sidebarCollapsed && <span className="truncate">Modo Claro</span>}
+              </>
+            ) : (
+              <>
+                <Moon className="size-4 shrink-0 text-sky-400" />
+                {!sidebarCollapsed && <span className="truncate">Modo Escuro</span>}
+              </>
+            )}
+          </button>
+
           {/* Botão de Tour do Sistema */}
           <button
             type="button"

@@ -2,14 +2,16 @@ import { useState, useEffect, useRef } from "react";
 import {
   Store, Phone, Globe,
   Save, CheckCircle2, AlertCircle, Loader2,
-  Type, Smartphone, Copy, Check, Sparkles, Lock, ExternalLink
+  Type, Smartphone, Copy, Check, Sparkles, Lock, ExternalLink, Sun, Moon
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { validateAndNormalizeBrazilianPhone, formatBrazilianPhone } from "@/lib/phoneUtils";
 
 export default function SettingsPage() {
+  const { theme, setTheme } = useTheme();
   const { config, loading, saving, saveStatus, updateConfig, updateStoreWhatsApp } = useStoreConfig();
   const { company, refreshCompany } = (useAuth() as any) || {};
 
@@ -487,6 +489,76 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+          </div>
+        </section>
+
+        {/* ─── Seção: Tema e Aparência do Sistema ─── */}
+        <section className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 sm:p-7 space-y-6 shadow-2xl relative overflow-hidden">
+          <div className="flex items-center justify-between pb-4 border-b border-white/10">
+            <div className="flex items-center gap-2.5">
+              <div className="size-8 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                <Sun className="size-4 text-amber-400" />
+              </div>
+              <div>
+                <h2 className="font-bold text-base text-white">Aparência do Sistema</h2>
+                <p className="text-xs text-white/50">Alterne entre o Modo Escuro clássico ou o Modo Claro (Branco)</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-white/5 text-white/70 border border-white/10 uppercase">
+              Tema: {theme === 'light' ? 'Claro' : 'Escuro'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={() => setTheme('dark')}
+              className={`p-4 rounded-2xl border text-left flex items-start gap-3.5 transition-all cursor-pointer ${
+                theme === 'dark'
+                  ? 'border-white bg-white/10 ring-1 ring-white/40 shadow-lg'
+                  : 'border-white/10 bg-[#121212] hover:border-white/20 text-white/60'
+              }`}
+            >
+              <div className="p-2.5 rounded-xl bg-black border border-white/10 text-white mt-0.5 shrink-0">
+                <Moon className="size-5 text-white" />
+              </div>
+              <div>
+                <div className="font-bold text-sm text-white">Modo Escuro (Padrão)</div>
+                <p className="text-xs text-white/50 mt-1 leading-relaxed">
+                  Visual clássico escuro com alto contraste, ideal para ambientes de baixa luminosidade e economia de energia.
+                </p>
+                {theme === 'dark' && (
+                  <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-bold text-emerald-400">
+                    <CheckCircle2 className="size-3" /> Ativo no momento
+                  </span>
+                )}
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTheme('light')}
+              className={`p-4 rounded-2xl border text-left flex items-start gap-3.5 transition-all cursor-pointer ${
+                theme === 'light'
+                  ? 'border-white bg-white/10 ring-1 ring-white/40 shadow-lg'
+                  : 'border-white/10 bg-[#121212] hover:border-white/20 text-white/60'
+              }`}
+            >
+              <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 mt-0.5 shrink-0">
+                <Sun className="size-5" />
+              </div>
+              <div>
+                <div className="font-bold text-sm text-white">Modo Claro (Branco)</div>
+                <p className="text-xs text-white/50 mt-1 leading-relaxed">
+                  Superfícies claras e arejadas com inversão inteligente, excelente para ambientes bem iluminados e trabalho diurno.
+                </p>
+                {theme === 'light' && (
+                  <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-bold text-emerald-400">
+                    <CheckCircle2 className="size-3" /> Ativo no momento
+                  </span>
+                )}
+              </div>
+            </button>
           </div>
         </section>
 
