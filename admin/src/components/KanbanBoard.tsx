@@ -9,7 +9,8 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { getBackendUrl } from "@/lib/backend";
 import { ManualSaleModal } from "./ManualSaleModal";
-// stockSync: trigger SQL trg_stock_on_order_delete cuida da devolução automática
+import { deleteOrderWithStockRestoration } from "@/lib/orders";
+// stockSync: centralizada em deleteOrderWithStockRestoration
 
 export interface AdminOrder {
   id: string;
@@ -70,18 +71,32 @@ export default function KanbanBoard() {
         .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
         .order('created_at', { ascending: false });
 
+      const isOfficialStore = !company?.id || company.id === 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+
       if (company?.id) {
-        query = query.or(`company_id.eq.${company.id},company_id.is.null`);
+        if (isOfficialStore) {
+          query = query.or(`company_id.eq.${company.id},company_id.is.null`);
+        } else {
+          query = query.eq('company_id', company.id);
+        }
       }
 
       let { data, error } = await query;
       if (error && company?.id) {
-        console.warn("Erro na busca com company_id, buscando todos os pedidos:", error);
-        const fallbackRes = await supabase
+        console.warn("Erro na busca com company_id, buscando fallback:", error);
+        let fallbackQuery = supabase
           .from('smoking_orders')
           .select('*')
           .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
           .order('created_at', { ascending: false });
+
+        if (isOfficialStore) {
+          fallbackQuery = fallbackQuery.or(`company_id.eq.${company.id},company_id.is.null`);
+        } else {
+          fallbackQuery = fallbackQuery.eq('company_id', company.id);
+        }
+
+        const fallbackRes = await fallbackQuery;
         data = fallbackRes.data;
       }
 
@@ -222,17 +237,17 @@ export default function KanbanBoard() {
     const targetOrder = orders.find(o => o.realId === realId);
     if (!targetOrder) return;
     
-    if (confirm(`Deseja realmente recusar/excluir o pedido #${targetOrder.id}? Os itens serão devolvidos ao estoque.`)) {
-      // A trigger SQL trg_stock_on_order_delete já devolve o estoque automaticamente ao deletar a row
-      const { error } = await supabase
-        .from('smoking_orders')
-        .delete()
-        .eq('id', realId);
+    if (confirm(`Deseja realmente excluir/cancelar o pedido #${targetOrder.id} (${targetOrder.clientName})? Os itens serão devolvidos ao estoque.`)) {
+      const res = await deleteOrderWithStockRestoration(realId, { 
+        restoreStock: true,
+        companyId: company?.id 
+      });
         
-      if (!error) {
+      if (res.success) {
         setOrders(prev => prev.filter(o => o.realId !== realId));
+        saveCompletedIds(getCompletedIds().filter(id => id !== realId));
       } else {
-        alert("Erro ao excluir do banco de dados: " + error.message);
+        alert("Erro ao excluir do banco de dados: " + (res.error || 'Erro desconhecido'));
       }
     }
   };
@@ -663,26 +678,14 @@ export default function KanbanBoard() {
                                       <div className="h-px bg-border my-1" />
 
                                       <button
-                                        onClick={async () => {
-                                          if (confirm(`Deseja realmente excluir o histórico do pedido #${order.id}?`)) {
-                                            const { error } = await supabase
-                                              .from('smoking_orders')
-                                              .delete()
-                                              .eq('id', order.realId);
-                                            
-                                            if (!error) {
-                                              saveCompletedIds(getCompletedIds().filter(id => id !== order.realId));
-                                              setOrders(prev => prev.filter(o => o.realId !== order.realId));
-                                            } else {
-                                              alert("Erro ao excluir do banco de dados: " + error.message);
-                                            }
-                                          }
+                                        onClick={() => {
                                           setActiveActionMenuId(null);
+                                          handleDeleteOrder(order.realId);
                                         }}
                                         className="w-full text-left px-3 py-2 hover:bg-red-500/10 flex items-center gap-2 text-red-400 cursor-pointer"
                                       >
                                         <Trash2 className="size-3.5" />
-                                        Excluir registro
+                                        Excluir pedido (Restaurar estoque)
                                       </button>
                                     </div>
                                   )}
@@ -878,9 +881,18 @@ function OrderCard({
             </a>
           )}
         </div>
-        <div className="flex items-center gap-1.5 text-white/40 text-[10px] font-semibold tracking-wider uppercase bg-[#141414] border border-[#222] px-2.5 py-1 rounded-lg shrink-0">
-          <Clock className="size-3" />
-          {getRelativeTime(order.createdAt)}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 text-white/40 text-[10px] font-semibold tracking-wider uppercase bg-[#141414] border border-[#222] px-2.5 py-1 rounded-lg shrink-0">
+            <Clock className="size-3" />
+            {getRelativeTime(order.createdAt)}
+          </div>
+          <button
+            onClick={() => onDelete(order.realId)}
+            className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg border border-transparent hover:border-red-500/20 transition-all cursor-pointer"
+            title="Excluir este pedido (Devolver ao Estoque)"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
         </div>
       </div>
 
@@ -1032,6 +1044,13 @@ function OrderCard({
             >
               Despachar →
             </button>
+            <button
+              onClick={() => onDelete(order.realId)}
+              className="px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-[0.98]"
+              title="Excluir Venda (Devolver Estoque)"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
           </div>
         )}
 
@@ -1049,6 +1068,13 @@ function OrderCard({
               className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(16,185,129,0.15)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
             >
               ✓ Marcar Entregue
+            </button>
+            <button
+              onClick={() => onDelete(order.realId)}
+              className="px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-[0.98]"
+              title="Excluir Venda (Devolver Estoque)"
+            >
+              <Trash2 className="size-3.5" />
             </button>
           </div>
         )}
@@ -1068,16 +1094,32 @@ function OrderCard({
             >
               ✓ Concluir
             </button>
+            <button
+              onClick={() => onDelete(order.realId)}
+              className="px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-[0.98]"
+              title="Excluir Venda (Devolver Estoque)"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
           </div>
         )}
 
         {order.status === 'CONCLUIDO' && (
-          <button 
-            onClick={() => onUpdate(order.realId, 'ENTREGUE')}
-            className="w-full bg-[#161616] hover:bg-[#222] text-white/50 hover:text-white text-[11px] font-semibold py-2.5 rounded-xl border border-[#2e2e2e] transition-colors cursor-pointer"
-          >
-            Reabrir Pedido
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => onUpdate(order.realId, 'ENTREGUE')}
+              className="flex-1 bg-[#161616] hover:bg-[#222] text-white/50 hover:text-white text-[11px] font-semibold py-2.5 rounded-xl border border-[#2e2e2e] transition-colors cursor-pointer"
+            >
+              Reabrir Pedido
+            </button>
+            <button
+              onClick={() => onDelete(order.realId)}
+              className="px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-[0.98]"
+              title="Excluir Venda (Devolver Estoque)"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
         )}
       </div>
     </div>

@@ -27,7 +27,10 @@ import {
   Truck,
   AlertCircle,
   RefreshCw,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Monitor,
+  Menu,
+  X
 } from 'lucide-react';
 
 function InstagramIcon({ className = "size-5" }: { className?: string }) {
@@ -49,7 +52,7 @@ function ScreenshotOrFallback({
 }: {
   src: string;
   alt: string;
-  fallback: React.ReactNode;
+  fallback?: React.ReactNode;
   className?: string;
 }) {
   const [loaded, setLoaded] = useState(false);
@@ -66,7 +69,11 @@ function ScreenshotOrFallback({
           className={`${className} ${loaded ? 'block' : 'hidden'}`}
         />
       )}
-      {(!loaded || error) && fallback}
+      {(!loaded || error) && (fallback || (
+        <div className="h-64 bg-[#0a0a0c] flex items-center justify-center text-white/40 text-xs font-mono">
+          Visualização do Sistema
+        </div>
+      ))}
     </div>
   );
 }
@@ -79,6 +86,10 @@ export function LandingPage() {
     minutes: 35,
     seconds: 22,
   });
+
+  useEffect(() => {
+    document.title = 'SMK System | A Ferramenta que Domina a Venda de Pods';
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -95,16 +106,17 @@ export function LandingPage() {
 
   // FAQ Accordion State
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const toggleFaq = (idx: number) => {
     setOpenFaq(openFaq === idx ? null : idx);
   };
 
-  const whatsappLink = "https://wa.me/5511948487714?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20SMK%20Flow%20e%20quero%20tirar%20algumas%20d%C3%BAvidas%20sobre%20o%20sistema.";
+  const whatsappLink = "https://wa.me/5511977300561?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20SMK%20System%20e%20quero%20tirar%20algumas%20d%C3%BAvidas%20sobre%20o%20sistema.";
 
-  // Integração de Checkout Asaas com Fallback Seguro para Suporte WhatsApp
-  const asaasGestaoLink = (import.meta.env.VITE_ASAAS_GESTAO_URL as string) || `${whatsappLink}&text=Ol%C3%A1!%20Quero%20assinar%20o%20Plano%20SMK%20Gest%C3%A3o%20de%20R$%2097%20via%20Asaas`;
-  const asaasComboLink = (import.meta.env.VITE_ASAAS_COMBO_URL as string) || `${whatsappLink}&text=Ol%C3%A1!%20Quero%20aproveitar%20o%20lan%C3%A7amento%20do%20SMK%20Pro%20Combo%20de%20R$%20127,90%20via%20Asaas`;
+  // Integração de Checkout Asaas com Fallback Seguro para Atendimento WhatsApp Oficial
+  const asaasGestaoLink = (import.meta.env.VITE_ASAAS_GESTAO_URL as string) || "https://wa.me/5511977300561?text=Ol%C3%A1!%20Quero%20assinar%20o%20Plano%20SMK%20Gest%C3%A3o%20de%20R$%2097/m%C3%AAs%20com%20o%20pre%C3%A7o%20de%20lan%C3%A7amento%20vital%C3%ADcio";
+  const asaasComboLink = (import.meta.env.VITE_ASAAS_COMBO_URL as string) || "https://wa.me/5511977300561?text=Ol%C3%A1!%20Quero%20garantir%20o%20Plano%20SMK%20Pro%20Combo%20de%20R$%20127,90/m%C3%AAs%20com%20Cat%C3%A1logo%20e%20pre%C3%A7o%20de%20lan%C3%A7amento%20vital%C3%ADcio";
 
   return (
     <div id="topo" className="min-h-screen bg-[#050505] text-white font-sans antialiased relative selection:bg-white/20 selection:text-white overflow-x-hidden">
@@ -116,88 +128,193 @@ export function LandingPage() {
       <div className="absolute top-[4400px] left-1/3 -translate-x-1/2 w-[700px] h-[700px] bg-white/[0.02] blur-[220px] rounded-full pointer-events-none" />
 
       {/* ==================================================================== */}
-      {/* 1. TOP ANNOUNCEMENT BANNER COM TIMER REGRESSIVO                      */}
+      {/* 1 & 2. HEADER UNIFICADO (BANNER DE LANÇAMENTO + NAVBAR RESPONSIVA)   */}
       {/* ==================================================================== */}
-      <div className="w-full bg-[#0a0a0a] border-b border-[#1c1c1c] py-2.5 px-4 text-center sticky top-0 z-50 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-xs">
-          <div className="flex items-center gap-1.5 text-white font-extrabold uppercase tracking-wider text-[11px]">
-            <Sparkles className="size-3.5 text-white animate-pulse" />
-            <span>Oferta de Lançamento:</span>
-          </div>
-          <span className="text-white/70 hidden sm:inline">Trave sua mensalidade vitalícia sem reajustes pelos próximos 30 dias:</span>
-          
-          {/* Countdown Badge */}
-          <div className="inline-flex items-center gap-1.5 bg-[#141414] border border-[#2a2a2a] px-2.5 py-0.5 rounded-lg font-mono text-[11px] font-bold text-white shadow-inner">
-            <span className="text-white">{String(timeLeft.days).padStart(2, '0')}d</span>
-            <span className="text-white/30">:</span>
-            <span className="text-white">{String(timeLeft.hours).padStart(2, '0')}h</span>
-            <span className="text-white/30">:</span>
-            <span className="text-white">{String(timeLeft.minutes).padStart(2, '0')}m</span>
-            <span className="text-white/30">:</span>
-            <span className="text-emerald-400">{String(timeLeft.seconds).padStart(2, '0')}s</span>
+      <div className="sticky top-0 z-50 w-full backdrop-blur-xl bg-[#050505]/95 border-b border-[#161616]">
+        {/* Top Announcement Banner com Timer Regressivo */}
+        <div className="w-full bg-gradient-to-r from-emerald-950/30 via-[#0c0c0c] to-emerald-950/30 border-b border-white/5 py-2 px-3 sm:px-4 text-center">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-xs">
+            <div className="flex items-center gap-1.5 text-white font-extrabold uppercase tracking-wider text-[11px] shrink-0">
+              <Sparkles className="size-3.5 text-white animate-pulse" />
+              <span>Oferta de Lançamento:</span>
+            </div>
+            <span className="text-white/70 hidden md:inline shrink-0">
+              Trave sua mensalidade vitalícia sem reajustes pelos próximos 30 dias:
+            </span>
+            
+            {/* Countdown Badge */}
+            <div className="inline-flex items-center gap-1.5 bg-[#141414] border border-[#2a2a2a] px-2.5 py-0.5 rounded-lg font-mono text-[11px] font-bold text-white shadow-inner shrink-0">
+              <span className="text-white">{String(timeLeft.days).padStart(2, '0')}d</span>
+              <span className="text-white/30">:</span>
+              <span className="text-white">{String(timeLeft.hours).padStart(2, '0')}h</span>
+              <span className="text-white/30">:</span>
+              <span className="text-white">{String(timeLeft.minutes).padStart(2, '0')}m</span>
+              <span className="text-white/30">:</span>
+              <span className="text-emerald-400">{String(timeLeft.seconds).padStart(2, '0')}s</span>
+            </div>
           </div>
         </div>
+
+        {/* Main Navbar */}
+        <header className="w-full">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3 sm:gap-4">
+            
+            {/* Logo Brand */}
+            <a href="#topo" className="flex items-center gap-2.5 sm:gap-3 shrink-0 group">
+              <div className="size-9 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(255,255,255,0.2)] group-hover:scale-105 transition-transform shrink-0">
+                <Zap className="size-4 fill-white" />
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="font-extrabold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">
+                  SMK System
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-white font-semibold whitespace-nowrap hidden sm:inline-flex">
+                  SaaS Pro
+                </span>
+              </div>
+            </a>
+
+            {/* Nav Links (Desktop) */}
+            <nav className="hidden lg:flex items-center gap-3.5 xl:gap-5 2xl:gap-6 text-xs font-medium text-white/60">
+              <a href="#dores" className="hidden 2xl:inline-block hover:text-white transition-colors whitespace-nowrap shrink-0">
+                O Caos
+              </a>
+              <a href="#catalogo" className="text-white hover:text-white transition-colors font-bold flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                <span>Catálogo na Bio</span>
+                <span className="size-1.5 rounded-full bg-white animate-ping" />
+              </a>
+              <a href="#kanban" className="hover:text-white transition-colors whitespace-nowrap shrink-0">
+                Kanban & Despacho
+              </a>
+              <a href="#recompra" className="hover:text-white transition-colors whitespace-nowrap shrink-0">
+                CRM & Recompra
+              </a>
+              <a href="#estoque" className="hover:text-white transition-colors whitespace-nowrap shrink-0">
+                Estoque Parado
+              </a>
+              <a href="#socios" className="hover:text-white transition-colors whitespace-nowrap shrink-0">
+                Sócios
+              </a>
+              <a href="#case" className="hidden 2xl:inline-block hover:text-white transition-colors whitespace-nowrap shrink-0">
+                Case Real
+              </a>
+              <a href="#planos" className="hover:text-white transition-colors font-bold text-white whitespace-nowrap shrink-0">
+                Planos
+              </a>
+            </nav>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              <a 
+                href="https://smoking-pods-admin.vercel.app/login" 
+                className="text-xs font-bold text-white/70 hover:text-white px-3 py-2 rounded-lg hover:bg-white/5 transition-colors hidden sm:inline-flex whitespace-nowrap"
+              >
+                Entrar
+              </a>
+              <Link 
+                to="/checkout?plano=combo"
+                className="bg-white hover:bg-slate-100 text-black font-extrabold px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer"
+              >
+                <span>Garantir Acesso</span>
+                <ArrowRight className="size-3.5" />
+              </Link>
+
+              {/* Mobile Hamburger Button */}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+                aria-label="Abrir Menu de Navegação"
+              >
+                {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+              </button>
+            </div>
+
+          </div>
+
+          {/* Mobile Menu Dropdown */}
+          {mobileMenuOpen && (
+            <div className="lg:hidden border-t border-white/10 bg-[#070707]/95 px-4 py-4 space-y-3 shadow-2xl backdrop-blur-2xl animate-in slide-in-from-top-2 duration-200">
+              <div className="grid grid-cols-2 gap-2 text-xs font-medium">
+                <a 
+                  href="#dores" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>⚡</span>
+                  <span>O Caos</span>
+                </a>
+                <a 
+                  href="#catalogo" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white/10 border border-white/10 text-white font-bold transition-colors flex items-center gap-2"
+                >
+                  <span className="size-2 rounded-full bg-emerald-400" />
+                  <span>Catálogo na Bio</span>
+                </a>
+                <a 
+                  href="#kanban" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>📦</span>
+                  <span>Kanban & Despacho</span>
+                </a>
+                <a 
+                  href="#recompra" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>🔄</span>
+                  <span>CRM & Recompra</span>
+                </a>
+                <a 
+                  href="#estoque" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>🏷️</span>
+                  <span>Estoque Parado</span>
+                </a>
+                <a 
+                  href="#socios" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>🤝</span>
+                  <span>Sócios</span>
+                </a>
+                <a 
+                  href="#case" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>🏆</span>
+                  <span>Case Real</span>
+                </a>
+                <Link 
+                  to="/checkout?plano=combo" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl bg-white text-black font-extrabold transition-all flex items-center justify-between"
+                >
+                  <span>Garantir Acesso</span>
+                  <ArrowRight className="size-3.5" />
+                </Link>
+              </div>
+
+              <div className="pt-2 border-t border-white/10 text-xs font-bold">
+                <a 
+                  href="https://smoking-pods-admin.vercel.app/login" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full block py-2.5 text-center rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-colors"
+                >
+                  Fazer Login no Meu Painel →
+                </a>
+              </div>
+            </div>
+          )}
+        </header>
       </div>
-
-      {/* ==================================================================== */}
-      {/* 2. HEADER NAVBAR                                                     */}
-      {/* ==================================================================== */}
-      <header className="border-b border-[#161616] bg-[#070707]/90 backdrop-blur-xl sticky top-[41px] z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          
-          {/* Logo Brand */}
-          <div className="flex items-center gap-3">
-            <div className="size-9 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shadow-[0_0_20px_rgba(255,255,255,0.2)]">
-              <Zap className="size-4 fill-white" />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-lg tracking-tight text-white">SMK Flow</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-white font-semibold">
-                SaaS Pro
-              </span>
-            </div>
-          </div>
-
-          {/* Nav Links (Desktop) */}
-          <nav className="hidden lg:flex items-center gap-6 text-xs font-medium text-white/60">
-            <a href="#dores" className="hover:text-white transition-colors">O Caos</a>
-            <a href="#catalogo" className="text-white hover:text-white transition-colors font-bold flex items-center gap-1.5">
-              <span>Catálogo na Bio</span>
-              <span className="size-1.5 rounded-full bg-white animate-ping" />
-            </a>
-            <a href="#kanban" className="hover:text-white transition-colors">Kanban & Entrega</a>
-            <a href="#recompra" className="hover:text-white transition-colors">Aviso de Pod Acabando</a>
-            <a href="#estoque" className="hover:text-white transition-colors">Estoque Parado</a>
-            <a href="#socios" className="hover:text-white transition-colors">Sócios</a>
-            <a href="#case" className="hover:text-white transition-colors">Case Real</a>
-            <a href="#planos" className="hover:text-white transition-colors font-bold text-white">Planos</a>
-          </nav>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link 
-              to="/login" 
-              className="text-xs font-bold text-white/70 hover:text-white px-3 py-2 rounded-lg hover:bg-white/5 transition-colors hidden sm:block"
-            >
-              Entrar
-            </Link>
-            <Link 
-              to="/cadastro" 
-              className="text-xs font-bold text-white/90 hover:text-white px-3 py-2 rounded-lg hover:bg-white/5 transition-colors hidden md:block"
-            >
-              Criar Conta
-            </Link>
-            <a 
-              href="#planos"
-              className="bg-white hover:bg-slate-100 text-black font-extrabold px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] active:scale-95 flex items-center gap-1.5"
-            >
-              <span>Garantir Acesso</span>
-              <ArrowRight className="size-3.5" />
-            </a>
-          </div>
-
-        </div>
-      </header>
 
       {/* ==================================================================== */}
       {/* 3. HERO PRINCIPAL                                                    */}
@@ -213,27 +330,27 @@ export function LandingPage() {
 
           {/* Main Giant Glowing Headline */}
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.12] max-w-4xl mx-auto">
-            Pare de perder vendas no WhatsApp.{' '}
+            A ferramenta que separa quem brinca de vender pod{' '}
             <span className="bg-gradient-to-r from-white via-slate-200 to-gray-400 bg-clip-text text-transparent underline decoration-white/30 decoration-2 underline-offset-8">
-              O sistema de gestão e catálogo online
+              de quem domina
             </span>{' '}
-            feito para quem vive da venda de pods.
+            a própria cidade.
           </h1>
 
           {/* Sub-headline Densa */}
           <p className="text-sm sm:text-base lg:text-lg text-white/70 max-w-3xl mx-auto leading-relaxed font-normal">
-            Chega de digitar lista de sabores todo santo dia, esquecer de despachar pedidos ou ver clientes comprando de outra loja. Tenha o controle total do seu estoque, entregas e recompra em um único lugar.
+            Quem compra pod quer rapidez, confiança e atendimento impecável. Troque as mensagens amadoras por uma vitrine interativa na sua bio, sistema de despacho organizado e uma operação que venda mais com menos esforço!
           </p>
 
           {/* Hero CTAs */}
           <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
-            <a
-              href="#planos"
-              className="bg-white hover:bg-slate-100 text-black font-extrabold px-8 py-4 rounded-xl text-sm sm:text-base transition-all shadow-[0_0_35px_rgba(255,255,255,0.35)] hover:shadow-[0_0_45px_rgba(255,255,255,0.55)] flex items-center gap-2.5 active:scale-95 cursor-pointer"
+            <Link
+              to="/checkout?plano=combo"
+              className="bg-white hover:bg-slate-100 text-black font-extrabold px-8 py-4 rounded-xl text-sm sm:text-base transition-all shadow-[0_0_35px_rgba(255,255,255,0.35)] hover:shadow-[0_0_45px_rgba(255,255,255,0.55)] flex items-center justify-center gap-2.5 active:scale-95 cursor-pointer text-center"
             >
-              <span>Quero Travar Minha Vaga de Lançamento</span>
-              <ArrowRight className="size-4" />
-            </a>
+              <span>Compre Agora e Pague Para Sempre o Preço de Lançamento</span>
+              <ArrowRight className="size-4 shrink-0" />
+            </Link>
 
             <a
               href={whatsappLink}
@@ -241,7 +358,7 @@ export function LandingPage() {
               rel="noreferrer"
               className="bg-[#0e1713] hover:bg-[#13231c] border border-emerald-500/40 text-emerald-400 hover:text-emerald-300 font-bold px-6 py-4 rounded-xl text-sm sm:text-base transition-all flex items-center gap-2.5 active:scale-95"
             >
-              <MessageCircle className="size-4 fill-emerald-400/20 text-emerald-400" />
+              <MessageCircle className="size-4 fill-emerald-400/20 text-emerald-400 shrink-0" />
               <span>Tirar Dúvidas no WhatsApp</span>
             </a>
           </div>
@@ -266,117 +383,38 @@ export function LandingPage() {
         </div>
 
         {/* ==================================================================== */}
-        {/* HERO MOCKUP: VISÃO GERAL DO ECOSSISTEMA                             */}
+        {/* HERO MOCKUP: PRINT REAL DO PAINEL FINANCEIRO                        */}
         {/* ==================================================================== */}
         <div className="max-w-6xl mx-auto mt-14 relative">
           
           <div className="absolute -inset-1 bg-gradient-to-b from-white/20 via-white/5 to-transparent rounded-3xl blur-xl opacity-70 pointer-events-none" />
 
-          <div className="relative bg-[#0b0b0b] border border-[#222] rounded-3xl p-4 sm:p-6 shadow-2xl overflow-hidden">
-            
-            {/* Window Top Bar */}
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-[#1c1c1c] text-xs">
+          {/* Janela de Sistema em Moldura macOS com Print Real */}
+          <div className="relative rounded-2xl sm:rounded-3xl border border-white/15 bg-[#0a0a0c] p-2 sm:p-3 shadow-[0_0_60px_rgba(255,255,255,0.07),0_20px_50px_rgba(0,0,0,0.8)] ring-1 ring-white/10 overflow-hidden group">
+            {/* Barra Superior da Janela */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/40 rounded-t-xl mb-2 text-xs text-white/50 font-mono">
               <div className="flex items-center gap-2">
-                <div className="flex gap-1.5">
-                  <div className="size-2.5 rounded-full bg-white/30" />
-                  <div className="size-2.5 rounded-full bg-white/30" />
-                  <div className="size-2.5 rounded-full bg-white/30" />
-                </div>
-                <span className="font-mono text-white/40 text-[11px] ml-2">
-                  SMK Flow • Central Operacional de Pods
+                <div className="size-3 rounded-full bg-red-500/80" />
+                <div className="size-3 rounded-full bg-yellow-500/80" />
+                <div className="size-3 rounded-full bg-emerald-500/80" />
+                <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">
+                  app.smksystem.com/financeiro
                 </span>
               </div>
-              <div className="flex items-center gap-2 text-emerald-400 font-mono text-[11px] font-bold">
-                <span className="size-2 rounded-full bg-emerald-400 animate-ping" />
-                <span>SISTEMA ATIVO</span>
+              <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>DRE & Caixa Real em Tempo Real</span>
               </div>
             </div>
 
-            {/* Live Metrics Header Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-              <div className="bg-[#121212] border border-[#222] p-3 rounded-xl">
-                <span className="text-[10px] text-white/40 uppercase block font-mono">Catálogo na Bio</span>
-                <span className="text-sm font-bold text-white flex items-center gap-1.5 mt-0.5">
-                  <span className="size-2 rounded-full bg-emerald-400" />
-                  Estoque Sincronizado
-                </span>
-              </div>
-              <div className="bg-[#121212] border border-[#222] p-3 rounded-xl">
-                <span className="text-[10px] text-white/40 uppercase block font-mono">Pedidos em Rota</span>
-                <span className="text-sm font-bold text-white font-mono">4 Entregas em Andamento</span>
-              </div>
-              <div className="bg-[#121212] border border-[#222] p-3 rounded-xl">
-                <span className="text-[10px] text-white/40 uppercase block font-mono">Pods Prestes a Queimar</span>
-                <span className="text-sm font-bold text-white font-mono">7 Clientes p/ Chamar</span>
-              </div>
-              <div className="bg-[#121212] border border-[#222] p-3 rounded-xl">
-                <span className="text-[10px] text-white/40 uppercase block font-mono">Lucro Líquido Real</span>
-                <span className="text-sm font-bold text-emerald-400 font-mono">25.3% Auditado</span>
-              </div>
+            {/* Print Real do Financeiro */}
+            <div className="rounded-xl overflow-hidden border border-white/10 relative bg-[#0a0a0c]">
+              <ScreenshotOrFallback
+                src="/prints/financeiro-hero.png"
+                alt="Painel Financeiro Real do SMK System - DRE, Faturamento e Lucro Líquido"
+                className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-[1.01]"
+              />
             </div>
-
-            {/* Quick Preview Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              
-              {/* Box 1: Pedido do WhatsApp */}
-              <div className="bg-[#141414] border border-[#242424] rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between text-xs font-bold text-white/80 pb-2 border-b border-white/5">
-                  <span className="flex items-center gap-1.5 text-white">
-                    <ShoppingBag className="size-4 text-white" />
-                    Pedido Chegando do Catálogo
-                  </span>
-                  <span className="text-[10px] font-mono text-emerald-400 font-bold">PIX PAGO</span>
-                </div>
-                <div className="space-y-1.5 text-xs">
-                  <div className="font-bold text-white">#1052 • Lost Mary MO20000 Pro</div>
-                  <div className="text-white/60 text-[11px]">Sabor: Blue Baja Splash • Marina S.</div>
-                  <div className="text-emerald-400 font-bold font-mono">R$ 135,00</div>
-                  <div className="p-2 bg-black/40 rounded-lg text-[10px] text-white/50 border border-white/5">
-                    📍 Rua das Palmeiras, 140 - Apto 32 • SBC<br />
-                    🛵 Preferência: Uber Flash
-                  </div>
-                </div>
-              </div>
-
-              {/* Box 2: Motoboy em Rota */}
-              <div className="bg-[#141414] border border-[#242424] rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between text-xs font-bold text-white/80 pb-2 border-b border-white/5">
-                  <span className="flex items-center gap-1.5 text-white">
-                    <Truck className="size-4 text-white" />
-                    Despacho no Kanban
-                  </span>
-                  <span className="text-[10px] font-mono bg-white/10 text-white px-2 py-0.5 rounded font-bold">EM ROTA</span>
-                </div>
-                <div className="space-y-2 text-xs">
-                  <div className="font-bold text-white">2x Ignite V50 Watermelon Ice</div>
-                  <div className="text-white/50 text-[11px]">Cliente: Lucas Martins • Pedido #1050</div>
-                  <div className="p-2 bg-white/5 border border-white/10 rounded-lg text-[11px] text-white/80 font-medium">
-                    ⚡ Uber Flash despachado há 8 min.<br />
-                    Previsão de entrega: 12 min.
-                  </div>
-                </div>
-              </div>
-
-              {/* Box 3: Alerta de Recompra */}
-              <div className="bg-[#141414] border border-white/20 rounded-2xl p-4 space-y-3 relative overflow-hidden">
-                <div className="flex items-center justify-between text-xs font-bold text-white/80 pb-2 border-b border-white/5">
-                  <span className="flex items-center gap-1.5 text-white">
-                    <Bell className="size-4 animate-bounce text-white" />
-                    Pod Prestes a Acabar
-                  </span>
-                  <span className="text-[10px] font-mono bg-white/10 text-white px-2 py-0.5 rounded font-bold">HOJE</span>
-                </div>
-                <div className="space-y-2 text-xs">
-                  <div className="font-bold text-white">João Pedro comprou há 18 dias</div>
-                  <div className="text-white/60 text-[11px]">Elfbar BC15000 Blue Razz • Estimativa: ~5% restante</div>
-                  <div className="p-2 bg-white/5 border border-white/10 rounded-lg text-[11px] text-white/80 font-medium">
-                    💬 "Fala João! Seu Elfbar tá no finzinho, né? Chegou reposição dos seus favoritos..."
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
           </div>
         </div>
 
@@ -477,7 +515,7 @@ export function LandingPage() {
             </h2>
 
             <p className="text-sm sm:text-base text-white/70 leading-relaxed">
-              O catálogo oficial do SMK Flow transforma o link da sua bio em um cardápio profissional, interativo e com estoque sincronizado em tempo real. Você nunca mais vai perder 20 minutos escrevendo texto no WhatsApp.
+              O catálogo oficial do SMK System transforma o link da sua bio em um cardápio profissional, interativo e com estoque sincronizado em tempo real. Você nunca mais vai perder 20 minutos escrevendo texto no WhatsApp.
             </p>
           </div>
 
@@ -540,93 +578,135 @@ export function LandingPage() {
 
             </div>
 
-            {/* MOCKUP VISUAL DO SMARTPHONE DO CATÁLOGO COM SUPORTE A PRINT REAL */}
+            {/* MOCKUP VISUAL DO SMARTPHONE DO CATÁLOGO COM O PRINT REAL EMBUTIDO */}
             <div className="flex justify-center">
-              <ScreenshotOrFallback
-                src="/prints/catalogo-mobile.png"
-                alt="Catálogo Mobile Smoking Pods"
-                className="w-full max-w-[340px] rounded-[36px] border-[4px] border-white/20 shadow-[0_0_50px_rgba(255,255,255,0.15)] mx-auto"
-                fallback={
-                  <div className="w-full max-w-[340px] bg-[#0c0c0c] border-[6px] border-[#222] rounded-[44px] p-3.5 shadow-[0_0_50px_rgba(255,255,255,0.1)] relative mx-auto">
-                    {/* Speaker notch */}
-                    <div className="w-24 h-4 bg-[#222] rounded-full mx-auto mb-3" />
+              <div className="w-full max-w-[340px] bg-[#0c0c0c] border-[7px] sm:border-[8px] border-[#222] rounded-[46px] sm:rounded-[48px] p-2.5 sm:p-3 shadow-[0_0_60px_rgba(255,255,255,0.12),0_25px_50px_rgba(0,0,0,0.85)] relative mx-auto select-none group ring-1 ring-white/10">
+                {/* Speaker notch */}
+                <div className="w-24 h-3.5 bg-[#1c1c1e] rounded-full mx-auto mb-2 flex items-center justify-center gap-1.5 shadow-inner">
+                  <div className="size-1 rounded-full bg-white/20" />
+                  <div className="w-6 h-0.5 bg-white/10 rounded-full" />
+                </div>
 
-                    {/* Catalog Header */}
-                    <div className="space-y-2 pb-3 border-b border-white/10 text-center">
-                      <div className="inline-flex items-center gap-1 text-[10px] text-white bg-white/10 border border-white/15 px-2 py-0.5 rounded-full font-bold">
-                        <span>⚡ Entrega Express em 25-35min</span>
-                      </div>
-                      <div className="font-extrabold text-sm text-white">Smoking Pods • Catálogo Oficial</div>
-                      <div className="text-[10px] text-white/50">Toque no pod para ver os sabores disponíveis</div>
-                    </div>
-
-                    {/* Filter Pills */}
-                    <div className="flex gap-1.5 py-2 overflow-x-auto text-[10px] font-bold no-scrollbar">
-                      <span className="px-2.5 py-1 rounded-lg bg-white text-black shrink-0">Todos</span>
-                      <span className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] text-white/70 shrink-0">Ignite V50</span>
-                      <span className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] text-white/70 shrink-0">Lost Mary</span>
-                      <span className="px-2.5 py-1 rounded-lg bg-[#1a1a1a] text-white/70 shrink-0">Elfbar</span>
-                    </div>
-
-                    {/* Products List inside Phone */}
-                    <div className="space-y-2.5 pt-1">
-                      
-                      {/* Product 1 */}
-                      <div className="bg-[#141414] border border-[#262626] rounded-xl p-2.5 flex items-center justify-between">
-                        <div>
-                          <div className="text-xs font-bold text-white">Ignite V50</div>
-                          <div className="text-[10px] text-white/70 font-mono">5.000 Puffs • R$ 115,00</div>
-                          <div className="text-[9px] text-emerald-400 mt-0.5">8 sabores disponíveis</div>
+                {/* Tela do Celular com Print Real do Catálogo */}
+                <div className="rounded-[34px] overflow-hidden border border-white/10 relative bg-black shadow-inner">
+                  <ScreenshotOrFallback
+                    src="/prints/catalogo-mobile.png"
+                    alt="Catálogo Oficial Smoking Pods no Celular"
+                    className="w-full h-auto object-cover object-top block transition-transform duration-500 group-hover:scale-[1.02]"
+                    fallback={
+                      <div className="p-3 space-y-2">
+                        {/* Catalog Header */}
+                        <div className="space-y-1.5 pb-2.5 border-b border-white/10 text-center">
+                          <div className="inline-flex items-center gap-1 text-[9px] text-white bg-white/10 border border-white/15 px-2 py-0.5 rounded-full font-bold">
+                            <span>⚡ Entrega Express em 25-35min</span>
+                          </div>
+                          <div className="font-extrabold text-xs text-white">Smoking Pods • Catálogo Oficial</div>
+                          <div className="text-[9px] text-white/50">Toque no pod para ver os sabores disponíveis</div>
                         </div>
-                        <span className="px-2 py-1 rounded-md bg-white/10 text-[10px] font-bold text-white border border-white/20">
-                          Escolher
-                        </span>
-                      </div>
 
-                      {/* Product 2 */}
-                      <div className="bg-[#141414] border border-white/40 rounded-xl p-2.5 flex items-center justify-between shadow-[0_0_15px_rgba(255,255,255,0.08)]">
-                        <div>
-                          <span className="text-[9px] bg-white text-black px-1.5 py-0.2 rounded font-black uppercase tracking-wider">Mais Vendido</span>
-                          <div className="text-xs font-bold text-white mt-0.5">Lost Mary MO20000 Pro</div>
-                          <div className="text-[10px] text-white/70 font-mono">20.000 Puffs • R$ 135,00</div>
-                          <div className="text-[9px] text-emerald-400">Blue Baja, Miami Mint...</div>
+                        {/* Filter Pills */}
+                        <div className="flex gap-1 py-1.5 overflow-x-auto text-[9px] font-bold no-scrollbar">
+                          <span className="px-2 py-0.5 rounded-md bg-white text-black shrink-0">Todos</span>
+                          <span className="px-2 py-0.5 rounded-md bg-[#1a1a1a] text-white/70 shrink-0">Ignite V50</span>
+                          <span className="px-2 py-0.5 rounded-md bg-[#1a1a1a] text-white/70 shrink-0">Lost Mary</span>
+                          <span className="px-2 py-0.5 rounded-md bg-[#1a1a1a] text-white/70 shrink-0">Elfbar</span>
                         </div>
-                        <span className="px-2 py-1 rounded-md bg-white text-[10px] font-bold text-black shadow">
-                          Escolher
-                        </span>
-                      </div>
 
-                      {/* Product 3 */}
-                      <div className="bg-[#141414] border border-[#262626] rounded-xl p-2.5 flex items-center justify-between">
-                        <div>
-                          <div className="text-xs font-bold text-white">Elfbar BC15000</div>
-                          <div className="text-[10px] text-white/70 font-mono">15.000 Puffs • R$ 125,00</div>
-                          <div className="text-[9px] text-emerald-400 mt-0.5">Blackberry, Blue Razz...</div>
+                        {/* Products List inside Phone */}
+                        <div className="space-y-2 pt-0.5">
+                          <div className="bg-[#141414] border border-[#262626] rounded-xl p-2 flex items-center justify-between">
+                            <div>
+                              <div className="text-[11px] font-bold text-white">Ignite V50</div>
+                              <div className="text-[9px] text-white/70 font-mono">5.000 Puffs • R$ 115,00</div>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-md bg-white/10 text-[9px] font-bold text-white border border-white/20">
+                              Escolher
+                            </span>
+                          </div>
+
+                          <div className="bg-[#141414] border border-white/40 rounded-xl p-2 flex items-center justify-between">
+                            <div>
+                              <span className="text-[8px] bg-white text-black px-1 rounded font-black uppercase">Mais Vendido</span>
+                              <div className="text-[11px] font-bold text-white mt-0.5">Lost Mary MO20000 Pro</div>
+                              <div className="text-[9px] text-white/70 font-mono">20.000 Puffs • R$ 135,00</div>
+                            </div>
+                            <span className="px-2 py-1 rounded-md bg-white text-[9px] font-bold text-black shadow">
+                              Escolher
+                            </span>
+                          </div>
                         </div>
-                        <span className="px-2 py-1 rounded-md bg-white/10 text-[10px] font-bold text-white border border-white/20">
-                          Escolher
-                        </span>
+
+                        {/* Floating Bottom Cart Bar */}
+                        <div className="mt-2.5 bg-white text-black font-extrabold p-2 rounded-xl text-center text-xs flex items-center justify-between shadow-lg">
+                          <div className="text-left">
+                            <span className="text-[8px] block text-black/70 uppercase">Sacola (1 item)</span>
+                            <span className="text-xs">R$ 135,00</span>
+                          </div>
+                          <span className="flex items-center gap-1 text-[10px] bg-black text-white px-2.5 py-1 rounded-lg">
+                            <span>Pedir no WhatsApp</span>
+                            <ArrowRight className="size-2.5" />
+                          </span>
+                        </div>
                       </div>
+                    }
+                  />
 
-                    </div>
+                  {/* Reflexo sutil de vidro da tela */}
+                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.02] to-white/[0.06] pointer-events-none" />
+                </div>
 
-                    {/* Floating Bottom Cart Bar */}
-                    <div className="mt-4 bg-white text-black font-extrabold p-2.5 rounded-xl text-center text-xs flex items-center justify-between shadow-lg">
-                      <div className="text-left">
-                        <span className="text-[9px] block text-black/70 uppercase">Sacola (1 item)</span>
-                        <span>R$ 135,00</span>
-                      </div>
-                      <span className="flex items-center gap-1 text-[11px] bg-black text-white px-3 py-1 rounded-lg">
-                        <span>Pedir no WhatsApp</span>
-                        <ArrowRight className="size-3" />
-                      </span>
-                    </div>
-
-                  </div>
-                }
-              />
+                {/* Home indicator bar at bottom */}
+                <div className="w-24 h-1 bg-white/30 rounded-full mx-auto mt-2" />
+              </div>
             </div>
 
+          </div>
+
+          {/* Reforço do Catálogo com Print Desktop no Computador */}
+          <div className="pt-14 border-t border-white/10 space-y-8">
+            <div className="text-center space-y-4 max-w-4xl mx-auto">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold font-mono">
+                <Monitor className="size-3.5 text-white" />
+                <span>100% Responsivo • Celular, Tablet e Computador</span>
+              </div>
+
+              <h3 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight">
+                Enquanto você digita lista de sabores no WhatsApp,{' '}
+                <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
+                  seu cliente está fazendo Pix para o seu concorrente.
+                </span>
+              </h3>
+
+              <p className="text-sm sm:text-base text-white/70 max-w-3xl mx-auto leading-relaxed">
+                Venda de pod é vício e imediatismo. Se você demora 5 minutos para conferir estoque e atualizar sua lista de sabores, parabéns: você acabou de doar o seu cliente para a concorrência. Tanto no celular quanto no computador, seu cliente navega por fotos oficiais de cada modelo, escolhe o sabor em 10 segundos e fecha o pedido no piloto automático.
+              </p>
+            </div>
+
+            {/* Desktop Window Mockup com o Print Real do Computador */}
+            <div className="rounded-2xl sm:rounded-3xl border border-white/15 bg-[#0a0a0c] p-2 sm:p-3 shadow-[0_0_60px_rgba(255,255,255,0.07),0_20px_50px_rgba(0,0,0,0.8)] ring-1 ring-white/10 overflow-hidden group">
+              {/* Barra superior de Janela de Navegador */}
+              <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/40 rounded-t-xl mb-2 text-xs text-white/50 font-mono">
+                <div className="flex items-center gap-2">
+                  <div className="size-3 rounded-full bg-red-500/80" />
+                  <div className="size-3 rounded-full bg-yellow-500/80" />
+                  <div className="size-3 rounded-full bg-emerald-500/80" />
+                  <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">smoking-pods-catalogo.vercel.app</span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Catálogo Online no Ar</span>
+                </div>
+              </div>
+
+              {/* Imagem Real do Catálogo Desktop */}
+              <div className="rounded-xl overflow-hidden border border-white/10 relative bg-black">
+                <ScreenshotOrFallback
+                  src="/prints/catalogo-desktop.png"
+                  alt="Catálogo Oficial Smoking Pods no Computador"
+                  className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-[1.01]"
+                />
+              </div>
+            </div>
           </div>
 
         </div>
@@ -693,199 +773,168 @@ export function LandingPage() {
 
           </div>
 
-          {/* Kanban Board Visual ou Print Real */}
-          <ScreenshotOrFallback
-            src="/prints/kanban-desktop.png"
-            alt="Kanban de Pedidos SMK Flow"
-            fallback={
-              <div className="bg-[#0f0f0f] border border-[#222] rounded-2xl p-4 sm:p-6 space-y-4">
-                <div className="flex items-center justify-between text-xs font-mono text-white/60 border-b border-white/5 pb-3">
-                  <span>FLUXO OPERACIONAL AO VIVO</span>
-                  <span className="text-emerald-400">3 Fases de Despacho Rápido</span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  
-                  {/* Coluna 1 */}
-                  <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
-                    <div className="text-xs font-bold text-white flex justify-between">
-                      <span>1. Novos Pedidos</span>
-                      <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">2</span>
-                    </div>
-                    <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
-                      <div className="font-bold text-white">#1055 • Ignite V50 Watermelon</div>
-                      <div className="text-[10px] text-white/50">Marina Silva • Pix Confirmado</div>
-                    </div>
-                  </div>
-
-                  {/* Coluna 2 */}
-                  <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
-                    <div className="text-xs font-bold text-white flex justify-between">
-                      <span>2. Separando Sabor</span>
-                      <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">1</span>
-                    </div>
-                    <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
-                      <div className="font-bold text-white">#1054 • Lost Mary 20k Miami Mint</div>
-                      <div className="text-[10px] text-white/50">Embalando c/ adesivo da loja</div>
-                    </div>
-                  </div>
-
-                  {/* Coluna 3 */}
-                  <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
-                    <div className="text-xs font-bold text-white flex justify-between">
-                      <span>3. Em Rota (Uber/Moto)</span>
-                      <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">2</span>
-                    </div>
-                    <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
-                      <div className="font-bold text-white">#1053 • Elfbar BC15k Blue Razz</div>
-                      <div className="text-[10px] text-white/70 font-mono">🛵 Uber Flash a caminho (7 min)</div>
-                    </div>
-                  </div>
-
-                </div>
+          {/* Kanban Board Visual com Moldura de Aplicação Real */}
+          <div className="rounded-2xl sm:rounded-3xl border border-white/15 bg-[#0a0a0c] p-2 sm:p-3 shadow-[0_0_60px_rgba(255,255,255,0.07),0_20px_50px_rgba(0,0,0,0.8)] ring-1 ring-white/10 overflow-hidden group">
+            {/* Barra superior de Janela de Sistema com os 3 botões */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/40 rounded-t-xl mb-2 text-xs text-white/50 font-mono">
+              <div className="flex items-center gap-2">
+                <div className="size-3 rounded-full bg-red-500/80" />
+                <div className="size-3 rounded-full bg-yellow-500/80" />
+                <div className="size-3 rounded-full bg-emerald-500/80" />
+                <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">smoking-pods-admin.vercel.app/pedidos</span>
               </div>
-            }
-          />
+              <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Kanban em Tempo Real</span>
+              </div>
+            </div>
+
+            {/* Imagem Real do Kanban */}
+            <div className="rounded-xl overflow-hidden border border-white/10 relative bg-[#0a0a0c]">
+              <ScreenshotOrFallback
+                src="/prints/kanban-desktop.png"
+                alt="Painel de Pedidos em Kanban Real da Smoking Pods"
+                className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-[1.01]"
+                fallback={
+                  <div className="bg-[#0f0f0f] border border-[#222] rounded-2xl p-4 sm:p-6 space-y-4">
+                    <div className="flex items-center justify-between text-xs font-mono text-white/60 border-b border-white/5 pb-3">
+                      <span>FLUXO OPERACIONAL AO VIVO</span>
+                      <span className="text-emerald-400">3 Fases de Despacho Rápido</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Coluna 1 */}
+                      <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
+                        <div className="text-xs font-bold text-white flex justify-between">
+                          <span>1. Novos Pedidos</span>
+                          <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">2</span>
+                        </div>
+                        <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
+                          <div className="font-bold text-white">#1055 • Ignite V50 Watermelon</div>
+                          <div className="text-[10px] text-white/50">Marina Silva • Pix Confirmado</div>
+                        </div>
+                      </div>
+
+                      {/* Coluna 2 */}
+                      <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
+                        <div className="text-xs font-bold text-white flex justify-between">
+                          <span>2. Separando Sabor</span>
+                          <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">1</span>
+                        </div>
+                        <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
+                          <div className="font-bold text-white">#1054 • Lost Mary 20k Miami Mint</div>
+                          <div className="text-[10px] text-white/50">Embalando c/ adesivo da loja</div>
+                        </div>
+                      </div>
+
+                      {/* Coluna 3 */}
+                      <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
+                        <div className="text-xs font-bold text-white flex justify-between">
+                          <span>3. Em Rota (Uber/Moto)</span>
+                          <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">2</span>
+                        </div>
+                        <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
+                          <div className="font-bold text-white">#1053 • Elfbar BC15k Blue Razz</div>
+                          <div className="text-[10px] text-white/70 font-mono">🛵 Uber Flash a caminho (7 min)</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                }
+              />
+            </div>
+          </div>
 
         </div>
       </section>
 
       {/* ==================================================================== */}
-      {/* 7. ALERTA DE POD ACABANDO (MOTOR DE RECOMPRA)                        */}
+      {/* 7. GESTÃO DE CLIENTES & CRM PREDITIVO                                */}
       {/* ==================================================================== */}
       <section id="recompra" className="py-24 px-4 sm:px-6 border-t border-[#161616] relative bg-[#050505]">
         
         <div className="max-w-6xl mx-auto space-y-12">
           
-          <div className="text-center space-y-4 max-w-3xl mx-auto">
-            <span className="text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
-              Retenção Ativa de Clientes
-            </span>
+          <div className="text-center space-y-4 max-w-4xl mx-auto">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold font-mono">
+              <Users className="size-3.5 text-white" />
+              <span>Gestão de Clientes & CRM Preditivo</span>
+            </div>
 
-            {/* HEADLINE ÚNICA DO ALERTA DE RECOMPRA */}
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-              Alerta de Pod Acabando:{' '}
+            {/* HEADLINE PRINCIPAL DO CRM */}
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
+              Pare de atender como camelô.{' '}
               <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
-                Venda de novo para o mesmo cliente antes que ele compre de outra loja.
+                Transforme sua revenda de pods em um negócio profissional.
               </span>
             </h2>
 
-            <p className="text-sm sm:text-base text-white/70 leading-relaxed">
-              O cliente que já comprou de você é o dinheiro mais fácil da sua semana. Não fique dependendo de postar stories e rezar: aborde o cliente na data exata em que o pod dele está terminando.
+            <p className="text-sm sm:text-base text-white/70 max-w-3xl mx-auto leading-relaxed">
+              Vender pods não é ser feirante esperando cliente cair do céu ou disputando preço como na feirinha de São Paulo. Você sabe quanto cada cliente gasta com você por mês? Qual o tempo de vida dele? E o principal: <strong>quanto tempo falta para o pod dele acabar?</strong> O CRM do SMK System rastreia o ciclo de consumo de cada cliente para você entrar em contato na hora exata e vender de novo antes que ele compre em outra loja.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            <div className="space-y-5">
-              
-              <div className="p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] space-y-2">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-emerald-400" />
-                  Pod é um produto de consumo diário
-                </h3>
-                <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-                  Quando o pod de 15.000 ou 30.000 puffs está no final ou começa a dar aquele gosto característico de queimado, o cliente já entra em modo de urgência. Ele não quer ficar sem.
-                </p>
+            {/* Card 1 */}
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                <Store className="size-5 text-white" />
               </div>
-
-              <div className="p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] space-y-2">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-emerald-400" />
-                  O sistema calcula o tempo e te avisa
-                </h3>
-                <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-                  Baseado no modelo comprado e na quantidade de puffs, o SMK Flow acende um alerta na sua tela quando a estimativa de juice está nos últimos 10%. Você não precisa lembrar de cabeça.
-                </p>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] space-y-2">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-emerald-400" />
-                  Mesmo se ele não comprar na hora, ele compra com você
-                </h3>
-                <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-                  Só de você ter mandado uma mensagem atenciosa lembrando dos sabores que ele gosta, ele já se programa para a semana. Quando o pod queimar de vez, adivinha quem é a primeira loja que ele vai chamar? A sua.
-                </p>
-              </div>
-
+              <h3 className="text-base font-bold text-white">Chega de Vender como Feirante</h3>
+              <p className="text-xs text-white/60 leading-relaxed">
+                Quem atende no WhatsApp como feirante perde vendas por esquecimento e disputa centavos com concorrentes amadores. No SMK System, você tem a lista organizada de todos os seus clientes com histórico de compras e ticket médio.
+              </p>
             </div>
 
-            {/* Mockup do Alerta na Prática ou Print Real */}
-            <ScreenshotOrFallback
-              src="/prints/crm-recompra.png"
-              alt="Alerta de Pod Acabando SMK Flow"
-              fallback={
-                <div className="bg-[#0c0c0c] border border-white/20 rounded-3xl p-6 shadow-[0_0_40px_rgba(255,255,255,0.06)] space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-white/10 text-xs">
-                    <div className="flex items-center gap-2 font-bold text-white">
-                      <Bell className="size-4 text-white" />
-                      <span>Painel de Recompra Ativa</span>
-                    </div>
-                    <span className="text-white/60 font-mono text-[11px]">7 Clientes em Alerta</span>
-                  </div>
+            {/* Card 2 */}
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                <Clock className="size-5 text-white" />
+              </div>
+              <h3 className="text-base font-bold text-white">Radar do Ciclo de Vida do Pod</h3>
+              <p className="text-xs text-white/60 leading-relaxed">
+                O sistema calcula o tempo médio de uso baseado no modelo e puffs (5k, 15k ou 30k). Quando faltam 4 ou 5 dias para o pod queimar, o radar acende o alerta de recompra na sua tela com a porcentagem exata do ciclo.
+              </p>
+            </div>
 
-                  <div className="space-y-3">
-                    
-                    {/* Alerta 1 */}
-                    <div className="bg-[#141414] border border-[#222] rounded-xl p-3.5 space-y-2">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="text-xs font-bold text-white">Matheus Albuquerque</div>
-                          <div className="text-[11px] text-white/50">Comprou Lost Mary 35k há 23 dias</div>
-                        </div>
-                        <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-bold">
-                          ~3% Juice Restante
-                        </span>
-                      </div>
-                      <div className="pt-1 flex items-center justify-between">
-                        <span className="text-[10px] text-white/40">Gosta de: Sabores Ice (Menta / Uva)</span>
-                        <a 
-                          href={whatsappLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-3 py-1 rounded-lg text-[10px] flex items-center gap-1 transition-colors"
-                        >
-                          <MessageCircle className="size-3" />
-                          <span>Chamar no WhatsApp</span>
-                        </a>
-                      </div>
-                    </div>
+            {/* Card 3 */}
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-emerald-400">
+                <MessageCircle className="size-5" />
+              </div>
+              <h3 className="text-base font-bold text-white">Aborde Antes da Concorrência</h3>
+              <p className="text-xs text-white/60 leading-relaxed">
+                Com 1 clique no botão verde de "Recompra", você abre o WhatsApp do cliente na hora exata com o sabor favorito dele pronto. Antes mesmo do pod queimar e dele pensar em procurar outra loja no Instagram, o Pix já tá fechado.
+              </p>
+            </div>
 
-                    {/* Alerta 2 */}
-                    <div className="bg-[#141414] border border-[#222] rounded-xl p-3.5 space-y-2">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="text-xs font-bold text-white">Camila Rezende</div>
-                          <div className="text-[11px] text-white/50">Comprou Elfbar BC15k há 14 dias</div>
-                        </div>
-                        <span className="text-[10px] bg-white/10 text-white px-2 py-0.5 rounded font-bold">
-                          ~7% Juice Restante
-                        </span>
-                      </div>
-                      <div className="pt-1 flex items-center justify-between">
-                        <span className="text-[10px] text-white/40">Gosta de: Strawberry / Frutados</span>
-                        <a 
-                          href={whatsappLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-3 py-1 rounded-lg text-[10px] flex items-center gap-1 transition-colors"
-                        >
-                          <MessageCircle className="size-3" />
-                          <span>Chamar no WhatsApp</span>
-                        </a>
-                      </div>
-                    </div>
+          </div>
 
-                  </div>
+          {/* CRM Desktop Window Mockup com o Print Real */}
+          <div className="rounded-2xl sm:rounded-3xl border border-white/15 bg-[#0a0a0c] p-2 sm:p-3 shadow-[0_0_60px_rgba(255,255,255,0.07),0_20px_50px_rgba(0,0,0,0.8)] ring-1 ring-white/10 overflow-hidden group">
+            {/* Barra superior de Janela de Sistema */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/40 rounded-t-xl mb-2 text-xs text-white/50 font-mono">
+              <div className="flex items-center gap-2">
+                <div className="size-3 rounded-full bg-red-500/80" />
+                <div className="size-3 rounded-full bg-yellow-500/80" />
+                <div className="size-3 rounded-full bg-emerald-500/80" />
+                <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">smoking-pods-admin.vercel.app/clientes</span>
+              </div>
+              <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Radar Preditivo de Recompra Ativo</span>
+              </div>
+            </div>
 
-                  <div className="p-3 bg-white/5 rounded-xl text-center text-[11px] text-white/60">
-                    💡 Lojistas que usam esse alerta têm uma taxa de recompra de <strong className="text-emerald-400">74%</strong> na mesma loja.
-                  </div>
-                </div>
-              }
-            />
-
+            {/* Imagem Real do CRM */}
+            <div className="rounded-xl overflow-hidden border border-white/10 relative bg-[#0a0a0c]">
+              <ScreenshotOrFallback
+                src="/prints/crm-recompra.png"
+                alt="Gestão de Clientes e CRM Preditivo Smoking Pods"
+                className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-[1.01]"
+              />
+            </div>
           </div>
 
         </div>
@@ -911,7 +960,7 @@ export function LandingPage() {
             </h2>
 
             <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              O maior erro dos lojistas é dar desconto em produtos que já vendem a preço cheio. O SMK Flow aponta o dedo exatamente para os sabores que estão encalhados na prateleira para você fazer caixa rápido.
+              O maior erro dos lojistas é dar desconto em produtos que já vendem a preço cheio. O SMK System aponta o dedo exatamente para os sabores que estão encalhados na prateleira para você fazer caixa rápido.
             </p>
           </div>
 
@@ -952,7 +1001,7 @@ export function LandingPage() {
           {/* Screenshot Container para Estoque Parado */}
           <ScreenshotOrFallback
             src="/prints/estoque-parado.png"
-            alt="Estoque Parado SMK Flow"
+            alt="Estoque Parado SMK System"
             fallback={<div className="hidden" />}
           />
 
@@ -979,7 +1028,7 @@ export function LandingPage() {
             </h2>
 
             <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              Muitos amigos abrem loja de pod juntos e brigam achando que um tirou mais dinheiro que o outro. O SMK Flow mostra com números limpos o patrimônio real da loja, quanto tem em estoque e a fatia exata de cada um.
+              Muitos amigos abrem loja de pod juntos e brigam achando que um tirou mais dinheiro que o outro. O SMK System mostra com números limpos o patrimônio real da loja, quanto tem em estoque e a fatia exata de cada um.
             </p>
           </div>
 
@@ -1016,7 +1065,7 @@ export function LandingPage() {
             {/* Card Widget dos Sócios ou Print Real */}
             <ScreenshotOrFallback
               src="/prints/socios-equity.png"
-              alt="Divisão de Sócios SMK Flow"
+              alt="Divisão de Sócios SMK System"
               fallback={
                 <div className="bg-[#0c0c0c] border border-[#242424] rounded-3xl p-6 space-y-5">
                   <div className="flex justify-between items-center pb-3 border-b border-white/10 text-xs">
@@ -1086,13 +1135,13 @@ export function LandingPage() {
           </h2>
 
           <p className="text-xs sm:text-sm text-white/70 max-w-2xl mx-auto leading-relaxed">
-            O SMK Flow não foi desenhado por quem nunca pegou uma caixa de pod na mão. Ele nasceu e foi lapidado dentro da nossa própria operação em São Bernardo do Campo, resolvendo os problemas reais de entregadores, estoque e clientes exigentes.
+            O SMK System não foi desenhado por quem nunca pegou uma caixa de pod na mão. Ele nasceu e foi lapidado dentro da nossa própria operação real, resolvendo os problemas diários de entregadores, estoque e clientes exigentes.
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6">
             <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-5 rounded-2xl">
               <div className="text-2xl sm:text-4xl font-extrabold text-white">+10.000</div>
-              <div className="text-[11px] text-white/50 mt-1">Pedidos entregues no ABC</div>
+              <div className="text-[11px] text-white/50 mt-1">Pedidos entregues com sucesso</div>
             </div>
             <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-5 rounded-2xl">
               <div className="text-2xl sm:text-4xl font-extrabold text-white">0 minutos</div>
@@ -1196,15 +1245,13 @@ export function LandingPage() {
               </div>
 
               <div className="pt-8">
-                <a
-                  href={asaasGestaoLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full bg-[#161616] hover:bg-[#202020] border border-[#2a2a2a] text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95"
+                <Link
+                  to="/checkout?plano=gestao"
+                  className="w-full bg-[#161616] hover:bg-[#202020] border border-[#2a2a2a] text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer"
                 >
                   <span>Assinar Plano Gestão</span>
                   <ArrowRight className="size-4" />
-                </a>
+                </Link>
               </div>
             </div>
 
@@ -1269,14 +1316,12 @@ export function LandingPage() {
               </div>
 
               <div className="pt-8">
-                <a
-                  href={asaasComboLink}
-                  target="_blank"
-                  rel="noreferrer"
+                <Link
+                  to="/checkout?plano=combo"
                   className="w-full bg-white hover:bg-slate-100 text-black font-extrabold py-4 rounded-xl transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer"
                 >
                   <span>Garantir Combo com Catálogo →</span>
-                </a>
+                </Link>
               </div>
             </div>
 
@@ -1285,7 +1330,7 @@ export function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-6 text-center">
             <span className="text-xs text-white/50">Dúvidas sobre o plano ideal para a sua loja?</span>
             <a
-              href={`${whatsappLink}&text=Ol%C3%A1!%20Tenho%20d%C3%BAvidas%20sobre%20os%20planos%20do%20sistema%20Smoking%20Pods`}
+              href="https://wa.me/5511977300561?text=Ol%C3%A1!%20Tenho%20d%C3%BAvidas%20sobre%20os%20planos%20do%20sistema%20SMK%20System"
               target="_blank"
               rel="noreferrer"
               className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1.5 transition-colors underline underline-offset-4"
@@ -1318,7 +1363,7 @@ export function LandingPage() {
             {[
               {
                 q: "Preciso instalar algum programa no computador?",
-                a: "Não! O SMK Flow é 100% online em nuvem. Você e seus sócios podem acessar de qualquer computador, notebook, tablet ou até direto do navegador do celular."
+                a: "Não! O SMK System é 100% online em nuvem. Você e seus sócios podem acessar de qualquer computador, notebook, tablet ou até direto do navegador do celular."
               },
               {
                 q: "Como funciona o Catálogo Digital na Bio?",
@@ -1373,16 +1418,16 @@ export function LandingPage() {
             Sua loja já cresceu. Agora sua operação precisa acompanhar.
           </h2>
           <p className="text-xs sm:text-sm text-white/60">
-            Pare de perder vendas por desorganização. Garanta sua vaga com preço congelado de lançamento.
+            Pare de perder vendas por desorganização. Garanta agora seu acesso com preço congelado de lançamento para sempre.
           </p>
           <div className="pt-2">
-            <a
-              href="#planos"
-              className="inline-flex items-center gap-2 bg-white hover:bg-slate-100 text-black font-extrabold px-8 py-4 rounded-xl text-sm transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] active:scale-95"
+            <Link
+              to="/checkout?plano=combo"
+              className="inline-flex items-center gap-2 bg-white hover:bg-slate-100 text-black font-extrabold px-8 py-4 rounded-xl text-sm transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] active:scale-95 cursor-pointer"
             >
               <span>Começar Agora com Preço Vitalício</span>
               <ArrowRight className="size-4" />
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -1391,10 +1436,10 @@ export function LandingPage() {
             <div className="size-6 rounded-lg bg-white/10 flex items-center justify-center">
               <Zap className="size-3 fill-white text-white" />
             </div>
-            <span>SMK Flow SaaS Pro</span>
+            <span>SMK System SaaS Pro</span>
           </div>
           <div>
-            © 2026 SMK Flow. Todos os direitos reservados.
+            © 2026 SMK System. Todos os direitos reservados.
           </div>
           <div className="flex gap-4">
             <a href="#topo" className="hover:text-white transition-colors">Voltar ao topo ↑</a>

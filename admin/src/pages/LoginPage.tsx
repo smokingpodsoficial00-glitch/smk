@@ -90,21 +90,14 @@ export function LoginPage() {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-4 pt-2">
-            <Link
-              to="/cadastro"
+            <a
+              href="https://smk-system.vercel.app"
               className="bg-white hover:bg-slate-100 text-black font-extrabold px-7 py-3.5 rounded-xl transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] flex items-center gap-2 active:scale-95 text-xs sm:text-sm"
             >
-              <span>Criar Nova Empresa</span>
-              <ArrowRight className="size-4" />
-            </Link>
-
-            <Link
-              to="/lp"
-              className="bg-[#121212] hover:bg-[#1c1c1c] border border-[#262626] text-white/90 hover:text-white font-semibold px-6 py-3.5 rounded-xl transition-all flex items-center gap-2 text-xs sm:text-sm active:scale-95"
-            >
-              <Sparkles className="size-4 text-white" />
-              <span>Conhecer Plataforma</span>
-            </Link>
+              <Sparkles className="size-4 text-black" />
+              <span>Conhecer Plataforma & Planos</span>
+              <ArrowRight className="size-4 text-black" />
+            </a>
           </div>
 
           {/* Glass Feature Highlights Cards */}
@@ -250,15 +243,17 @@ export function LoginPage() {
           {/* Footer Register Link */}
           <div className="mt-8 pt-6 border-t border-[#1a1a1a] flex flex-col items-center gap-2.5 text-xs text-white/50">
             <div>
-              Ainda não tem uma conta?{' '}
-              <Link to="/cadastro" className="font-bold text-white hover:underline underline-offset-4 ml-1">
-                Cadastre sua empresa
-              </Link>
+              Ainda não é assinante?{' '}
+              <a 
+                href="https://smk-system.vercel.app" 
+                className="font-bold text-white hover:underline underline-offset-4 ml-1"
+              >
+                Conheça os planos no SMK System →
+              </a>
             </div>
-            <div>
-              <Link to="/lp" className="text-white/40 hover:text-white/80 transition-colors text-[11px]">
-                Conhecer a página de planos e recursos →
-              </Link>
+            <div className="text-[11px] text-white/40 flex items-center gap-1.5 mt-1">
+              <ShieldCheck className="size-3.5 text-emerald-400" />
+              <span>Ambiente seguro e restrito a assinantes</span>
             </div>
           </div>
         </div>

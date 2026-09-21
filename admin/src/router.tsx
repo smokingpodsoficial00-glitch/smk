@@ -2,7 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
+import { AtivarContaPage } from './pages/AtivarContaPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 
@@ -18,7 +18,10 @@ const MarketingModule = lazy(() => import('./components/MarketingModule'));
 const PartnersDashboard = lazy(() => import('./components/PartnersDashboard'));
 const TasksDashboard = lazy(() => import('./components/TasksDashboard'));
 const SettingsPage = lazy(() => import('./components/SettingsPage'));
+const SaasManagementDashboard = lazy(() => import('./components/SaasManagementDashboard'));
 const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage })));
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage').then(m => ({ default: m.CheckoutPage })));
+import { MasterAdminGuard } from './components/auth/MasterAdminGuard';
 
 import { AdminLayout } from './layouts/AdminLayout';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -27,6 +30,8 @@ import { AdminPlans } from './pages/admin/AdminPlans';
 import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminLogs } from './pages/admin/AdminLogs';
 import { AdminFinance } from './pages/admin/AdminFinance';
+
+import { useAuth } from './contexts/AuthContext';
 
 function LazyFallback() {
   return (
@@ -41,15 +46,41 @@ function SuspenseWrap({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<LazyFallback />}>{children}</Suspense>;
 }
 
+// Rota raiz inteligente:
+// - No domínio do sistema da loja (smoking-pods-admin ou localhost): NUNCA exibe LP na raiz. Vai direto ao painel (/pedidos) ou login.
+// - No domínio comercial (smk-system): exibe a Landing Page oficial de vendas.
+function RootRoute() {
+  const isMarketingDomain = typeof window !== 'undefined' && (
+    window.location.hostname.includes('smk-system') || 
+    window.location.hostname.includes('smksystem')
+  );
+
+  if (!isMarketingDomain) {
+    return <Navigate to="/pedidos" replace />;
+  }
+
+  return <SuspenseWrap><LandingPage /></SuspenseWrap>;
+}
+
 export const router = createBrowserRouter([
+  // Root Domain Route
+  {
+    path: '/',
+    element: <RootRoute />,
+  },
+
   // Public Auth Routes
   {
     path: '/login',
     element: <LoginPage />,
   },
   {
+    path: '/ativar-conta',
+    element: <AtivarContaPage />,
+  },
+  {
     path: '/cadastro',
-    element: <RegisterPage />,
+    element: <Navigate to="/checkout" replace />,
   },
   {
     path: '/esqueci-senha',
@@ -62,6 +93,10 @@ export const router = createBrowserRouter([
   {
     path: '/planos',
     element: <SuspenseWrap><LandingPage /></SuspenseWrap>,
+  },
+  {
+    path: '/checkout',
+    element: <SuspenseWrap><CheckoutPage /></SuspenseWrap>,
   },
 
   // Onboarding Wizard Route
@@ -76,17 +111,12 @@ export const router = createBrowserRouter([
 
   // Tenant Main App Routes (Wrapped in ProtectedRoute and DashboardLayout)
   {
-    path: '/',
     element: (
       <ProtectedRoute>
         <DashboardLayout />
       </ProtectedRoute>
     ),
     children: [
-      {
-        index: true,
-        element: <Navigate to="/pedidos" replace />,
-      },
       {
         path: 'pedidos',
         element: <SuspenseWrap><KanbanBoard /></SuspenseWrap>,
@@ -122,6 +152,14 @@ export const router = createBrowserRouter([
       {
         path: 'configuracoes',
         element: <SuspenseWrap><SettingsPage /></SuspenseWrap>,
+      },
+      {
+        path: 'gestao-saas',
+        element: (
+          <MasterAdminGuard>
+            <SuspenseWrap><SaasManagementDashboard /></SuspenseWrap>
+          </MasterAdminGuard>
+        ),
       },
     ],
   },
@@ -169,6 +207,6 @@ export const router = createBrowserRouter([
   // Fallback Wildcard Route
   {
     path: '*',
-    element: <Navigate to="/pedidos" replace />,
+    element: <Navigate to="/" replace />,
   },
 ]);

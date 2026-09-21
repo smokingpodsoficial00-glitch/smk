@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { validateAndNormalizeBrazilianPhone } from "@/lib/phoneUtils";
+import { useAuth } from "@/contexts/AuthContext";
 
-// Supabase é carregado sob demanda para habilitar code-splitting (~70% redução no bundle inicial)
+export const OFFICIAL_SMOKING_PODS_COMPANY_ID = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+
+// Supabase é carregado sob demanda para habilitar code-splitting
 let _sb: any = null;
 async function getSupabase() {
   if (!_sb) {
@@ -33,8 +36,9 @@ export interface StoreConfig {
   updated_at?: string;
 }
 
-const DEFAULT_CONFIG: StoreConfig = {
-  id: "local-config-id",
+const DEFAULT_SMOKING_PODS_CONFIG: StoreConfig = {
+  id: "local-config-smoking-pods",
+  company_id: OFFICIAL_SMOKING_PODS_COMPANY_ID,
   store_name: "Smoking Pods",
   store_slug: "smoking-pods",
   logo_url: null,
@@ -52,61 +56,82 @@ const DEFAULT_CONFIG: StoreConfig = {
   description: "",
 };
 
-const LOCAL_STORAGE_KEY = "store_config_fallback_v4";
-
-let broadcastChannel: BroadcastChannel | null = null;
-try {
-  if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-    broadcastChannel = new BroadcastChannel("store_config_channel_v4");
+function getDefaultConfigForCompany(companyId: string, companyName?: string): StoreConfig {
+  if (companyId === OFFICIAL_SMOKING_PODS_COMPANY_ID) {
+    return { ...DEFAULT_SMOKING_PODS_CONFIG };
   }
-} catch (e) {
-  console.warn("BroadcastChannel não disponível:", e);
+  const name = companyName || "Minha Loja";
+  return {
+    ...DEFAULT_SMOKING_PODS_CONFIG,
+    id: `local-config-${companyId}`,
+    company_id: companyId,
+    store_name: name,
+    store_slug: name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "") || "minha-loja",
+    address: "",
+  };
 }
 
-function getLocalFallback(): StoreConfig {
+const getStorageKey = (companyId: string) => `store_config_v5_${companyId}`;
+
+// Limpeza de chave legada não escopada que causava contaminação cruzada
+if (typeof window !== "undefined") {
   try {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+    localStorage.removeItem("store_config_fallback_v4");
+  } catch {}
+}
+
+// Cache em memória multi-tenant isolado por ID da empresa
+const cachedConfigs = new Map<string, StoreConfig>();
+const listeners = new Set<(companyId?: string) => void>();
+
+export function resetStoreConfigCache() {
+  cachedConfigs.clear();
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem("store_config_fallback_v4");
+    } catch {}
+  }
+}
+
+function notifyListeners(companyId?: string) {
+  listeners.forEach((fn) => fn(companyId));
+}
+
+function getLocalFallback(companyId: string, companyName?: string): StoreConfig {
+  try {
+    const saved = localStorage.getItem(getStorageKey(companyId));
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (parsed.store_name && (parsed.store_name.toLowerCase().includes("02") || parsed.store_name.toLowerCase().includes("smk pods 2"))) {
+      // Blindagem absoluta da loja principal Smoking Pods
+      if (companyId === OFFICIAL_SMOKING_PODS_COMPANY_ID) {
         parsed.store_name = "Smoking Pods";
+        parsed.store_slug = "smoking-pods";
+      } else if (companyName) {
+        parsed.store_name = companyName;
       }
       return parsed;
     }
   } catch (e) {
     console.warn("Erro ao ler localStorage:", e);
   }
-  return DEFAULT_CONFIG;
+  return getDefaultConfigForCompany(companyId, companyName);
 }
 
-function saveLocalFallback(cfg: StoreConfig) {
+function saveLocalFallback(companyId: string, cfg: StoreConfig) {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cfg));
+    localStorage.setItem(getStorageKey(companyId), JSON.stringify(cfg));
   } catch (e) {
     console.warn("Erro ao salvar localStorage:", e);
   }
 }
 
-let cachedConfig: StoreConfig | null = null;
-let fetchPromise: Promise<StoreConfig> | null = null;
-const listeners = new Set<() => void>();
-
-function notifyListeners() {
-  listeners.forEach((fn) => fn());
-  if (broadcastChannel && cachedConfig) {
-    try {
-      broadcastChannel.postMessage(cachedConfig);
-    } catch {}
-  }
-}
-
-async function fetchConfig(targetCompanyId?: string): Promise<StoreConfig> {
+export async function fetchStoreConfig(targetCompanyId?: string, targetCompanyName?: string): Promise<StoreConfig> {
   const supabase = await getSupabase();
+  const companyId = targetCompanyId || (typeof window !== 'undefined' ? localStorage.getItem('smk_auth_company_id') : null) || OFFICIAL_SMOKING_PODS_COMPANY_ID;
+  
   let mainConfig: StoreConfig | null = null;
-  let fallbackConfig: StoreConfig | null = null;
-  const companyId = targetCompanyId || (typeof window !== 'undefined' ? localStorage.getItem('smk_auth_company_id') : null) || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
 
-  // 1. Tentar ler da tabela dedicada `store_config` no Supabase filtrado por company_id
+  // 1. Tentar ler da tabela dedicada `store_config` no Supabase filtrado estritamente por company_id
   try {
     const { data, error } = await supabase
       .from("store_config")
@@ -121,133 +146,93 @@ async function fetchConfig(targetCompanyId?: string): Promise<StoreConfig> {
     console.warn("Tabela store_config não acessível:", e);
   }
 
-  // 2. Tentar ler da tabela `smoking_products` (__STORE_CONFIG__)
-  try {
-    const { data, error } = await supabase
-      .from("smoking_products")
-      .select("*")
-      .eq("brand", "__STORE_CONFIG__")
-      .limit(1);
-
-    if (!error && data && data.length > 0) {
-      const row = data[0];
-      if (row.flavor) {
-        try {
-          fallbackConfig = JSON.parse(row.flavor);
-        } catch {}
-      }
-      if (!fallbackConfig) {
-        fallbackConfig = {
-          ...DEFAULT_CONFIG,
-          store_name: row.name || DEFAULT_CONFIG.store_name,
-          logo_url: row.image_url || null,
-        };
-      } else if (row.image_url && !fallbackConfig.logo_url) {
-        fallbackConfig.logo_url = row.image_url;
-      }
-    }
-  } catch (e) {
-    console.warn("Fallback smoking_products não acessível:", e);
-  }
-
-  // 3. Tentar ler da tabela `companies` para garantir sincronismo total da empresa correta
+  // 2. Tentar ler da tabela `companies` para garantir nome canônico no banco
+  let companyCanonicalName = targetCompanyName;
   try {
     const { data: compData } = await supabase
       .from("companies")
-      .select("name, logo_url")
+      .select("name, logo_url, phone")
       .eq("id", companyId)
       .maybeSingle();
 
     if (compData && compData.name) {
-      if (mainConfig) mainConfig.store_name = compData.name;
-      if (fallbackConfig) fallbackConfig.store_name = compData.name;
+      companyCanonicalName = compData.name;
     }
   } catch (e) {}
 
-  // Combina as fontes
-  let local = getLocalFallback();
-  let finalConfig: StoreConfig = mainConfig || fallbackConfig || local;
+  // 3. Fallback seguro isolado por empresa
+  const local = getLocalFallback(companyId, companyCanonicalName);
+  let finalConfig: StoreConfig = mainConfig || local;
 
-  const bestLogo = mainConfig?.logo_url || fallbackConfig?.logo_url || local.logo_url;
-  if (bestLogo) {
-    finalConfig.logo_url = bestLogo;
+  // 🛡️ Blindagem estrita de identidade:
+  if (companyId === OFFICIAL_SMOKING_PODS_COMPANY_ID) {
+    finalConfig.store_name = "Smoking Pods";
+    finalConfig.store_slug = "smoking-pods";
+  } else if (companyCanonicalName) {
+    finalConfig.store_name = companyCanonicalName;
   }
 
-  cachedConfig = finalConfig;
-  saveLocalFallback(cachedConfig);
-  notifyListeners();
-  return cachedConfig;
+  finalConfig.company_id = companyId;
+
+  // Atualiza cache específico desta empresa
+  cachedConfigs.set(companyId, finalConfig);
+  saveLocalFallback(companyId, finalConfig);
+  notifyListeners(companyId);
+  return finalConfig;
 }
 
-export function useStoreConfig() {
-  const [config, setConfig] = useState<StoreConfig>(cachedConfig || getLocalFallback());
-  const [loading, setLoading] = useState(!cachedConfig);
+export function useStoreConfig(companyIdOverride?: string) {
+  let authCompanyId: string | undefined;
+  let authCompanyName: string | undefined;
+  try {
+    const auth = useAuth();
+    authCompanyId = auth?.company?.id;
+    authCompanyName = auth?.company?.name;
+  } catch {}
+
+  const activeCompanyId = companyIdOverride || authCompanyId || (typeof window !== "undefined" ? localStorage.getItem("smk_auth_company_id") : null) || OFFICIAL_SMOKING_PODS_COMPANY_ID;
+
+  const [config, setConfig] = useState<StoreConfig>(() => {
+    return cachedConfigs.get(activeCompanyId) || getLocalFallback(activeCompanyId, authCompanyName);
+  });
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
 
   useEffect(() => {
-    const onUpdate = () => {
-      if (cachedConfig) setConfig(cachedConfig);
+    let isMounted = true;
+
+    // Resgata o cache da empresa ativa imediatamente
+    const current = cachedConfigs.get(activeCompanyId) || getLocalFallback(activeCompanyId, authCompanyName);
+    setConfig(current);
+
+    // Carrega dados frescos do Supabase para esta empresa ativa
+    setLoading(true);
+    fetchStoreConfig(activeCompanyId, authCompanyName).then((result) => {
+      if (isMounted) {
+        setConfig(result);
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (isMounted) setLoading(false);
+    });
+
+    // Listener isolado por companyId
+    const onUpdate = (updatedCompanyId?: string) => {
+      if (!updatedCompanyId || updatedCompanyId === activeCompanyId) {
+        const fresh = cachedConfigs.get(activeCompanyId);
+        if (fresh && isMounted) {
+          setConfig(fresh);
+        }
+      }
     };
     listeners.add(onUpdate);
 
-    if (broadcastChannel) {
-      const handleBroadcast = (e: MessageEvent) => {
-        if (e.data && typeof e.data === "object") {
-          cachedConfig = e.data as StoreConfig;
-          setConfig(cachedConfig);
-          saveLocalFallback(cachedConfig);
-        }
-      };
-      broadcastChannel.addEventListener("message", handleBroadcast);
-    }
-
-    let channel: any = null;
-    let supabaseRef: any = null;
-    (async () => {
-      try {
-        supabaseRef = await getSupabase();
-        channel = supabaseRef
-          .channel(`admin-cfg-${Math.random().toString(36).substring(2, 7)}`)
-          .on(
-            "postgres_changes" as any,
-            { event: "*", schema: "public", table: "store_config" },
-            () => { fetchConfig().then(cfg => setConfig(cfg)); }
-          )
-          .on(
-            "postgres_changes" as any,
-            { event: "*", schema: "public", table: "smoking_products" },
-            () => { fetchConfig().then(cfg => setConfig(cfg)); }
-          );
-
-        channel.subscribe();
-      } catch (e) {
-        console.warn("Realtime error:", e);
-      }
-    })();
-
-    if (cachedConfig) {
-      setConfig(cachedConfig);
-      setLoading(false);
-    } else {
-      if (!fetchPromise) {
-        fetchPromise = fetchConfig().finally(() => {
-          fetchPromise = null;
-        });
-      }
-      fetchPromise.then((result) => {
-        setConfig(result);
-        setLoading(false);
-      });
-    }
-
     return () => {
+      isMounted = false;
       listeners.delete(onUpdate);
-      if (channel && supabaseRef) {
-        try { supabaseRef.removeChannel(channel); } catch {}
-      }
     };
-  }, []);
+  }, [activeCompanyId, authCompanyName]);
 
   const updateConfig = useCallback(
     async (updates: Partial<Omit<StoreConfig, "created_at" | "updated_at">>) => {
@@ -257,47 +242,34 @@ export function useStoreConfig() {
       const newConfig: StoreConfig = {
         ...config,
         ...updates,
+        company_id: activeCompanyId,
         updated_at: new Date().toISOString(),
       };
 
-      // 1. Atualiza cache local e BroadcastChannel
-      saveLocalFallback(newConfig);
-      cachedConfig = newConfig;
+      // 1. Atualiza cache local da empresa específica
+      saveLocalFallback(activeCompanyId, newConfig);
+      cachedConfigs.set(activeCompanyId, newConfig);
       setConfig(newConfig);
-      notifyListeners();
+      notifyListeners(activeCompanyId);
 
       // 2. Salva na tabela dedicada `store_config` e na tabela `companies` no Supabase
       try {
         const supabase = await getSupabase();
-        const effectiveCompanyId = (typeof window !== "undefined" ? localStorage.getItem("smk_auth_company_id") : null) || config.company_id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
-        const rowId = (config && config.id && config.id !== 'local-config-id') ? config.id : undefined;
         const { id: _ignoreId, ...configWithoutId } = newConfig;
-        
-        const payload: any = {
-          ...configWithoutId,
-          company_id: effectiveCompanyId,
-          updated_at: new Date().toISOString()
-        };
-        if (rowId) {
-          payload.id = rowId;
-        }
 
-        const { data: upsertData, error: upsertError } = await supabase
+        await supabase
           .from("store_config")
-          .upsert(payload)
-          .select("id")
-          .single();
-
-        if (!upsertError && upsertData?.id) {
-          newConfig.id = upsertData.id;
-          cachedConfig.id = upsertData.id;
-        }
+          .upsert({
+            ...configWithoutId,
+            company_id: activeCompanyId,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'company_id' });
 
         const companyUpdates: any = {};
         if (updates.store_name) companyUpdates.name = updates.store_name;
         if (updates.logo_url !== undefined) companyUpdates.logo_url = updates.logo_url;
         if (Object.keys(companyUpdates).length > 0) {
-          await supabase.from("companies").update(companyUpdates).eq("id", effectiveCompanyId);
+          await supabase.from("companies").update(companyUpdates).eq("id", activeCompanyId);
         }
       } catch (e) {
         console.info("Erro ao salvar store_config no Supabase:", e);
@@ -308,7 +280,7 @@ export function useStoreConfig() {
       setTimeout(() => setSaveStatus("idle"), 3000);
       return true;
     },
-    [config]
+    [config, activeCompanyId]
   );
 
   const updateStoreWhatsApp = useCallback(
@@ -319,18 +291,18 @@ export function useStoreConfig() {
       }
 
       setSaving(true);
+      const effectiveCompanyId = targetCompanyId || activeCompanyId;
+
       try {
         const supabase = await getSupabase();
-        const companyId = targetCompanyId || (typeof window !== "undefined" ? localStorage.getItem("smk_auth_company_id") : null) || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
 
-        // Atualização cirúrgica: SOMENTE whatsapp_number e updated_at em store_config
         const { error: updateError } = await supabase
           .from("store_config")
           .update({
             whatsapp_number: val.normalized,
             updated_at: new Date().toISOString()
           })
-          .eq("company_id", companyId);
+          .eq("company_id", effectiveCompanyId);
 
         if (updateError) {
           console.error("Erro ao atualizar whatsapp_number em store_config:", updateError);
@@ -338,22 +310,20 @@ export function useStoreConfig() {
           return { success: false, error: updateError.message };
         }
 
-        // Também atualiza o campo phone na tabela companies para manter sincronismo
         await supabase
           .from("companies")
           .update({ phone: val.normalized })
-          .eq("id", companyId);
+          .eq("id", effectiveCompanyId);
 
-        // Atualiza cache em memória e estado
         const updatedConfig = {
           ...config,
           whatsapp_number: val.normalized,
           updated_at: new Date().toISOString()
         };
-        cachedConfig = updatedConfig;
+        cachedConfigs.set(effectiveCompanyId, updatedConfig);
+        saveLocalFallback(effectiveCompanyId, updatedConfig);
         setConfig(updatedConfig);
-        saveLocalFallback(updatedConfig);
-        notifyListeners();
+        notifyListeners(effectiveCompanyId);
 
         setSaving(false);
         return { success: true, normalized: val.normalized };
@@ -363,7 +333,7 @@ export function useStoreConfig() {
         return { success: false, error: err.message || "Erro ao conectar ao banco" };
       }
     },
-    [config]
+    [config, activeCompanyId]
   );
 
   const uploadLogo = useCallback(
@@ -423,10 +393,10 @@ export function useStoreConfig() {
 
   const refreshConfig = useCallback(async () => {
     setLoading(true);
-    const result = await fetchConfig();
+    const result = await fetchStoreConfig(activeCompanyId, authCompanyName);
     setConfig(result);
     setLoading(false);
-  }, []);
+  }, [activeCompanyId, authCompanyName]);
 
   return {
     config,

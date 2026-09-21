@@ -81,24 +81,40 @@ export function ManualSaleModal({
       setErrorMessage("");
       setSuccessMessage("");
       try {
+        const isOfficialStore = !companyId || companyId === "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+
         // 1. Buscar Produtos Ativos
-        const { data: prods, error: pErr } = await supabase
+        let prodsQuery = supabase
           .from("smoking_products")
           .select("*")
           .eq("is_active", true)
-          .or(`company_id.eq.${companyId},company_id.is.null`)
           .order("brand", { ascending: true });
+
+        if (isOfficialStore) {
+          prodsQuery = prodsQuery.or(`company_id.eq.${companyId},company_id.is.null`);
+        } else {
+          prodsQuery = prodsQuery.eq("company_id", companyId);
+        }
+
+        const { data: prods, error: pErr } = await prodsQuery;
 
         if (!pErr && prods) {
           setProductsList(prods);
         }
 
-        // 2. Buscar Clientes Oficiais de smoking_clients (com fallback para smoking_orders)
-        const { data: dbClients } = await supabase
+        // 2. Buscar Clientes Oficiais de smoking_clients (com fallback seguro para smoking_orders)
+        let clientsQuery = supabase
           .from("smoking_clients")
           .select("name, phone, address")
-          .or(`company_id.eq.${companyId},company_id.is.null`)
           .order("name", { ascending: true });
+
+        if (isOfficialStore) {
+          clientsQuery = clientsQuery.or(`company_id.eq.${companyId},company_id.is.null`);
+        } else {
+          clientsQuery = clientsQuery.eq("company_id", companyId);
+        }
+
+        const { data: dbClients } = await clientsQuery;
 
         if (dbClients && dbClients.length > 0) {
           const uniqueClients = dbClients.map((c) => ({
@@ -108,11 +124,19 @@ export function ManualSaleModal({
           }));
           setClientsList(uniqueClients);
         } else {
-          const { data: orders } = await supabase
+          let ordersQuery = supabase
             .from("smoking_orders")
             .select("client_name, client_phone, shipping_address")
             .order("created_at", { ascending: false })
             .limit(100);
+
+          if (isOfficialStore) {
+            ordersQuery = ordersQuery.or(`company_id.eq.${companyId},company_id.is.null`);
+          } else {
+            ordersQuery = ordersQuery.eq("company_id", companyId);
+          }
+
+          const { data: orders } = await ordersQuery;
 
           if (orders) {
             const uniqueClients = new Map<string, any>();

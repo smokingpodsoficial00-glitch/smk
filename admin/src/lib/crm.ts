@@ -108,22 +108,46 @@ export async function updateClientCrmProfile(
 export async function fetchLiveClients(companyId?: string): Promise<RealClient[]> {
   if (!companyId) return [];
   try {
+    const isOfficialStore = companyId === 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+
+    let ordersQuery = supabase
+      .from('smoking_orders')
+      .select('*')
+      .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
+      .order('created_at', { ascending: false });
+
+    if (isOfficialStore) {
+      ordersQuery = ordersQuery.or(`company_id.eq.${companyId},company_id.is.null`);
+    } else {
+      ordersQuery = ordersQuery.eq('company_id', companyId);
+    }
+
+    let clientsQuery = supabase
+      .from('smoking_clients')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (isOfficialStore) {
+      clientsQuery = clientsQuery.or(`company_id.eq.${companyId},company_id.is.null`);
+    } else {
+      clientsQuery = clientsQuery.eq('company_id', companyId);
+    }
+
+    let prodsQuery = supabase
+      .from('smoking_products')
+      .select('id, name, flavor, brand, puffs');
+
+    if (isOfficialStore) {
+      prodsQuery = prodsQuery.or(`company_id.eq.${companyId},company_id.is.null`);
+    } else {
+      prodsQuery = prodsQuery.eq('company_id', companyId);
+    }
+
     // Executa as 3 consultas ao Supabase em paralelo para carregamento ultrarrápido do CRM
     const [ordersRes, clientsRes, productsRes] = await Promise.all([
-      supabase
-        .from('smoking_orders')
-        .select('*')
-        .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
-        .or(`company_id.eq.${companyId},company_id.is.null`)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('smoking_clients')
-        .select('*')
-        .or(`company_id.eq.${companyId},company_id.is.null`)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('smoking_products')
-        .select('id, name, flavor, brand, puffs')
+      ordersQuery,
+      clientsQuery,
+      prodsQuery
     ]);
 
     const rawOrders = ordersRes.data || [];

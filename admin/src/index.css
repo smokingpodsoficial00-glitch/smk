@@ -71,3 +71,49 @@ input[type="number"] {
     background: rgba(255, 255, 255, 0.4);
   }
 }
+
+/* ========================================================================== */
+/* MODO CLARO GLOBAL (LIGHT MODE)                                              */
+/* Inverte inteligentemente o esquema de cores escuras para superfícies claras */
+/* Preserva 100% das cores de marca e protege imagens contra efeito negativo   */
+/* ========================================================================== */
+html.light-mode {
+  filter: invert(0.92) hue-rotate(180deg);
+  background-color: #f4f5f7 !important;
+  color-scheme: light;
+}
+
+/* Dupla inversão para fotos de produtos, logos, vídeos e canvas */
+html.light-mode img,
+html.light-mode video,
+html.light-mode picture,
+html.light-mode canvas,
+html.light-mode [data-no-invert],
+html.light-mode .no-invert {
+  filter: invert(1) hue-rotate(180deg) !important;
+}
+
+/* Proteção de arquivos ou inputs de arquivo */
+html.light-mode input[type="file"] {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Scrollbars no modo claro */
+html.light-mode .custom-scrollbar {
+  scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+}
+
+html.light-mode .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+html.light-mode .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/* Seleção de texto no modo claro */
+html.light-mode ::selection {
+  background: rgba(16, 185, 129, 0.3);
+  color: #000;
+}
+

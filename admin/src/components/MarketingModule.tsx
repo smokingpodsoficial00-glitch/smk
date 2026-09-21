@@ -154,8 +154,8 @@ export default function MarketingModule() {
   const [campaignFormWeekday, setCampaignFormWeekday] = useState<string>('QUARTA');
   const [campaignFormTime, setCampaignFormTime] = useState<string>('15:00');
   const [campaignFormStartDate, setCampaignFormStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [campaignFormBatchSize, setCampaignFormBatchSize] = useState<number>(10);
-  const [campaignFormInterval, setCampaignFormInterval] = useState<number>(25);
+  const [campaignFormBatchSize, setCampaignFormBatchSize] = useState<number>(5);
+  const [campaignFormInterval, setCampaignFormInterval] = useState<number>(35);
   const [cardapioUrl, setCardapioUrl] = useState('https://smoking-pods.vercel.app');
   const [grupoVipUrl, setGrupoVipUrl] = useState('');
 
@@ -573,8 +573,8 @@ export default function MarketingModule() {
       setCampaignFormWeekday(campToEdit.scheduledWeekday || 'QUARTA');
       setCampaignFormTime(campToEdit.scheduledTime || '15:00');
       setCampaignFormStartDate(campToEdit.startDate || new Date().toISOString().split('T')[0]);
-      setCampaignFormBatchSize(campToEdit.batchSize || 10);
-      setCampaignFormInterval(campToEdit.batchIntervalMinutes || 25);
+      setCampaignFormBatchSize(campToEdit.batchSize || 5);
+      setCampaignFormInterval(campToEdit.batchIntervalMinutes || 35);
     } else {
       setEditingCampaign(null);
       setCampaignFormName('');
@@ -589,8 +589,8 @@ export default function MarketingModule() {
       setCampaignFormWeekday('QUARTA');
       setCampaignFormTime('15:00');
       setCampaignFormStartDate(new Date().toISOString().split('T')[0]);
-      setCampaignFormBatchSize(10);
-      setCampaignFormInterval(25);
+      setCampaignFormBatchSize(5);
+      setCampaignFormInterval(35);
     }
     setIsCampaignModalOpen(true);
   };
@@ -2133,25 +2133,49 @@ export default function MarketingModule() {
                 )}
 
                 {campaignFormTargetType === 'lists' && (
-                  <div className="col-span-full">
-                    <label className="text-xs font-bold text-white/70 block mb-1">Cadência Anti-Ban</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        value={campaignFormBatchSize}
-                        onChange={(e) => setCampaignFormBatchSize(Number(e.target.value))}
-                        className="w-1/2 bg-[#050505] border border-white/10 rounded-xl p-2.5 text-xs text-white font-mono"
-                        placeholder="Lote (ex: 20)"
-                      />
-                      <input
-                        type="number"
-                        value={campaignFormInterval}
-                        onChange={(e) => setCampaignFormInterval(Number(e.target.value))}
-                        className="w-1/2 bg-[#050505] border border-white/10 rounded-xl p-2.5 text-xs text-white font-mono"
-                        placeholder="Min (ex: 45)"
-                      />
+                  <div className="col-span-full bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                      <label className="text-xs font-black text-amber-300 flex items-center gap-2">
+                        <ShieldAlert className="size-4 text-amber-400" />
+                        <span>Cadência Anti-Ban Recomendada (Segurança do Chip)</span>
+                      </label>
+                      <span className="text-[11px] font-bold text-amber-400 font-mono bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 rounded-lg w-fit">
+                        Ideal: 5 disparos a cada 35 min
+                      </span>
                     </div>
-                    <span className="text-[10px] text-white/40 mt-1 block">Lote de contatos e intervalo em minutos</span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <span className="text-[11px] text-white/70 block mb-1 font-semibold">Envios por lote (Contatos)</span>
+                        <input
+                          type="number"
+                          value={campaignFormBatchSize}
+                          onChange={(e) => setCampaignFormBatchSize(Number(e.target.value))}
+                          className="w-full bg-[#050505] border border-white/15 focus:border-amber-400 rounded-xl p-2.5 text-xs text-white font-mono"
+                          placeholder="Recomendado: 5"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-white/70 block mb-1 font-semibold">Intervalo de Pausa (Minutos)</span>
+                        <input
+                          type="number"
+                          value={campaignFormInterval}
+                          onChange={(e) => setCampaignFormInterval(Number(e.target.value))}
+                          className="w-full bg-[#050505] border border-white/15 focus:border-amber-400 rounded-xl p-2.5 text-xs text-white font-mono"
+                          placeholder="Recomendado: 35"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-black/50 rounded-xl border border-amber-500/20 text-[11px] text-amber-200/90 leading-relaxed space-y-1">
+                      <p className="font-bold text-amber-300 flex items-center gap-1.5">
+                        <ShieldAlert className="size-3.5 text-amber-400 shrink-0" />
+                        <span>Aviso Importante: Não nos responsabilizamos por bloqueios do WhatsApp!</span>
+                      </p>
+                      <p className="text-white/70">
+                        Tome muito cuidado com a quantia de disparos. A cadência ideal e segura são <strong>5 disparos com pausa de 35 minutos</strong> entre cada lote para aquecer e blindar o número da sua loja contra banimentos da Meta.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>

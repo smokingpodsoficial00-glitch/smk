@@ -1,24 +1,50 @@
-import React from 'react';
+import { useState } from 'react';
 import { 
   X, ShoppingBag, MapPin, Phone, Calendar, Clock, 
   CheckCircle2, DollarSign, User, MessageSquare, Copy, 
-  Truck, ShieldCheck, Sparkles, Tag, ExternalLink, Receipt
+  Truck, ShieldCheck, Sparkles, Tag, ExternalLink, Receipt, Trash2, Loader2
 } from 'lucide-react';
 import { formatBRL } from '@/lib/cart';
 import type { DetailedSale } from '@/lib/salesHistory';
+import { deleteOrderWithStockRestoration } from '@/lib/orders';
 
 interface SaleDetailModalProps {
   sale: DetailedSale | null;
   onClose: () => void;
   onSelectClient?: (phone: string) => void;
+  onDeleteSale?: (saleId: string) => void;
 }
 
-export function SaleDetailModal({ sale, onClose }: SaleDetailModalProps) {
+export function SaleDetailModal({ sale, onClose, onDeleteSale }: SaleDetailModalProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
   if (!sale) return null;
 
   const orderDate = new Date(sale.created_at).toLocaleDateString('pt-BR');
   const orderTime = new Date(sale.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const waNumber = sale.clean_phone.startsWith('55') ? sale.clean_phone : ('55' + sale.clean_phone);
+
+  const handleDelete = async () => {
+    if (!sale) return;
+    if (confirm(`Deseja realmente excluir a venda #${sale.order_code || sale.id.slice(0, 8)} (${sale.client_name}) de ${formatBRL(sale.total_amount)}? Os produtos vendidos serão devolvidos ao estoque.`)) {
+      setIsDeleting(true);
+      try {
+        const res = await deleteOrderWithStockRestoration(sale.id, { restoreStock: true });
+        if (res.success) {
+          alert('✅ Venda excluída com sucesso e estoque devolvido.');
+          if (onDeleteSale) {
+            onDeleteSale(sale.id);
+          }
+          onClose();
+        } else {
+          alert('Erro ao excluir venda: ' + (res.error || 'Erro desconhecido'));
+        }
+      } catch (err: any) {
+        alert('Erro ao excluir venda: ' + err.message);
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
 
   const copyOrderSummary = () => {
     const itemsText = sale.items
@@ -208,14 +234,26 @@ export function SaleDetailModal({ sale, onClose }: SaleDetailModalProps) {
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-white/10 bg-[#141416] flex items-center justify-between gap-3">
-          <button
-            onClick={copyOrderSummary}
-            className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border border-white/5"
-          >
-            <Copy className="size-4" />
-            <span>Copiar Resumo</span>
-          </button>
+        <div className="px-6 py-4 border-t border-white/10 bg-[#141416] flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={copyOrderSummary}
+              className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border border-white/5"
+            >
+              <Copy className="size-4" />
+              <span>Copiar Resumo</span>
+            </button>
+
+            <button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="px-4 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer border border-red-500/20 disabled:opacity-50"
+              title="Excluir Venda e Restaurar Estoque"
+            >
+              {isDeleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              <span>Excluir Venda</span>
+            </button>
+          </div>
 
           <a
             href={`https://wa.me/${waNumber}?text=${encodeURIComponent(`Fala ${sale.client_name}, tudo certo? 💨 Passando pra falar sobre seu pedido na Smoking Pods!`)}`}

@@ -71,8 +71,14 @@ export async function fetchSalesHistory(companyId?: string): Promise<{ sales: De
       .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
       .order('created_at', { ascending: false });
 
+    const isOfficialStore = !companyId || companyId === 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+
     if (companyId) {
-      query = query.or(`company_id.eq.${companyId},company_id.is.null`);
+      if (isOfficialStore) {
+        query = query.or(`company_id.eq.${companyId},company_id.is.null`);
+      } else {
+        query = query.eq('company_id', companyId);
+      }
     }
 
     const { data: rawOrders, error: ordersErr } = await query;
@@ -90,7 +96,11 @@ export async function fetchSalesHistory(companyId?: string): Promise<{ sales: De
     try {
       let clientsQuery = supabase.from('smoking_clients').select('*');
       if (companyId) {
-        clientsQuery = clientsQuery.or(`company_id.eq.${companyId},company_id.is.null`);
+        if (isOfficialStore) {
+          clientsQuery = clientsQuery.or(`company_id.eq.${companyId},company_id.is.null`);
+        } else {
+          clientsQuery = clientsQuery.eq('company_id', companyId);
+        }
       }
       const { data: clientsData } = await clientsQuery;
       if (clientsData && Array.isArray(clientsData)) {

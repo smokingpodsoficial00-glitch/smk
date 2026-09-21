@@ -61,6 +61,7 @@ export async function resolveCatalogCompanyId(): Promise<string> {
 
       if (slug && slug !== "smoking-pods") {
         try {
+          // 1. Tenta buscar pelo store_slug exato em store_config
           const { data: storeData } = await supabase
             .from("store_config")
             .select("company_id")
@@ -70,8 +71,25 @@ export async function resolveCatalogCompanyId(): Promise<string> {
           if (storeData?.company_id) {
             return storeData.company_id;
           }
+
+          // 2. Se não achou em store_config, busca na tabela companies pelo nome correspondente ao slug
+          const formattedName = slug.replace(/-/g, " ");
+          const { data: compData } = await supabase
+            .from("companies")
+            .select("id")
+            .ilike("name", formattedName)
+            .maybeSingle();
+
+          if (compData?.id) {
+            return compData.id;
+          }
+
+          // 3. SEGURANÇA TOTAL: Se o cliente acessou uma loja específica (?loja=...) e ela não existe,
+          // NUNCA cair no estoque da Smoking Pods! Retorna tenant vazio isolado.
+          return "00000000-0000-0000-0000-000000000000";
         } catch (e) {
           console.warn("Erro ao buscar empresa por slug no catálogo:", e);
+          return "00000000-0000-0000-0000-000000000000";
         }
       }
     }
