@@ -122,7 +122,7 @@ export function DashboardLayout() {
           {canAccess('estoque') && (
             <NavLink 
               to="/estoque"
-              title={sidebarCollapsed ? "Reposição" : undefined}
+              title={sidebarCollapsed ? "Estoque" : undefined}
               className={({ isActive }) =>
                 `flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
                   sidebarCollapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
@@ -134,14 +134,14 @@ export function DashboardLayout() {
               }
             >
               <PackageSearch className="size-4 shrink-0" />
-              {!sidebarCollapsed && <span className="truncate">Reposição</span>}
+              {!sidebarCollapsed && <span className="truncate">Estoque</span>}
             </NavLink>
           )}
 
           {canAccess('clientes') && (
             <NavLink 
               to="/clientes"
-              title={sidebarCollapsed ? "Clientes" : undefined}
+              title={sidebarCollapsed ? "CRM" : undefined}
               className={({ isActive }) =>
                 `flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
                   sidebarCollapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
@@ -153,7 +153,7 @@ export function DashboardLayout() {
               }
             >
               <Users className="size-4 shrink-0" />
-              {!sidebarCollapsed && <span className="truncate">Clientes</span>}
+              {!sidebarCollapsed && <span className="truncate">CRM</span>}
             </NavLink>
           )}
 

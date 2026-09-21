@@ -33,28 +33,23 @@
     {
       "id": "bdbc5c95-4770-4fba-8425-4dec704098bc",
       "name": "CPM GRUPO ESTOQUE SEMANAL",
-      "message": "ACESSO ANTECIPADO VIP — REPOSIÇÃO DA SEMANA! 💨\n\nFala pessoal do VIP! Passando pra avisar que o nosso estoque pro final de semana acabou de ser 100% abastecido.\n\nVocês têm prioridade total: estamos liberando o Cardápio Digital primeiro aqui no grupo antes de soltar o aviso geral no Instagram!\n\n📦 Garanta seu modelo e sabor favorito antes de esgotar:\n🔗 https://smokingproject01.vercel.app/\n\n🚚 Delivery Uber (25 a 35 min em SBC) | Atendimento até 23h",
+      "message": "ACESSO ANTECIPADO VIP — REPOSIÇÃO DA SEMANA! 💨\n\nFala pessoal do VIP! Passando pra avisar que o nosso estoque pro final de semana acabou de ser 100% abastecido.\n\nVocês têm prioridade total: estamos liberando o Cardápio Digital primeiro aqui no grupo antes de soltar o aviso geral no Instagram!\n\n📦 Garanta seu modelo e sabor favorito antes de esgotar:\n🔗 https://smoking-pods-catalogo.vercel.app/\n\n🚚 Delivery Uber (25 a 35 min em SBC) | Atendimento até 23h",
       "variations": [],
       "useVariations": false,
       "targetType": "group",
       "selectedListIds": [],
       "targetGroupId": "120363429733361752@g.us",
       "targetGroupName": "Clientes Smoking Vip",
-      "frequencyDays": 7,
-      "scheduledWeekday": "SEGUNDA",
-      "scheduledTime": "14:05",
+      "status": "active",
+      "totalRecipients": 48,
       "batchSize": 1,
       "batchIntervalMinutes": 45,
-      "status": "active",
-      "totalRecipients": 1,
+      "scheduledWeekday": "SEGUNDA",
+      "scheduledTime": "14:05",
+      "startDate": "2026-09-21",
       "createdAt": "2026-09-11T15:03:53.089535+00:00",
-      "updatedAt": "2026-09-11T15:03:53.089535+00:00",
-      "legacyId": "camp_1786812557221",
-      "legacyMetadata": {
-        "orphan_list_ids": [
-          "list_1786807808763"
-        ]
-      }
+      "frequencyDays": 7,
+      "updatedAt": "2026-09-21T18:04:44.094Z"
     },
     {
       "id": "4e4a393c-5a6b-44cf-9488-ec5e3c025937",
@@ -66,152 +61,120 @@
       "selectedListIds": [],
       "targetGroupId": "120363429733361752@g.us",
       "targetGroupName": "Clientes Smoking Vip",
-      "frequencyDays": 14,
-      "scheduledWeekday": "QUARTA",
-      "scheduledTime": "15:00",
+      "status": "active",
+      "totalRecipients": 48,
       "batchSize": 1,
       "batchIntervalMinutes": 45,
-      "status": "active",
-      "totalRecipients": 1,
+      "scheduledTime": "15:00",
+      "startDate": "2026-09-21",
       "createdAt": "2026-09-11T15:03:53.192241+00:00",
-      "updatedAt": "2026-09-11T15:03:53.192241+00:00",
-      "legacyId": "camp_1786814768806",
-      "legacyMetadata": {
-        "orphan_list_ids": [
-          "list_1786807808763"
-        ]
-      }
+      "frequencyDays": 14,
+      "updatedAt": "2026-09-21T18:04:48.085Z"
     },
     {
       "id": "7374d4ba-9031-446f-9c7b-d001608641bf",
       "name": "REATIVAÇÃO SEXTOU/ESCASSEZ",
-      "message": "SEXTOU NO ABC FÁMILIA, NÃO FIQUE NA MÃO NO ROLÊ 🥇\n\nAs entregas de hoje já estão on! não espere esgotar..\n\nDelivery Expresso rápido de sempre 25 a 35 min pelo Uber. Prioridade VIP: Pedidos feitos pelo grupo entram no topo da fila de despacho do motoboy.\n\n📦 Cardápio Digital no ar:\n🔗 https://smokingproject01.vercel.app/",
+      "message": "SEXTOU NO ABC FÁMILIA, NÃO FIQUE NA MÃO NO ROLÊ 🥇\n\nAs entregas de hoje já estão on! não espere esgotar..\n\nDelivery Expresso rápido de sempre 25 a 35 min pelo Uber. Prioridade VIP: Pedidos feitos pelo grupo entram no topo da fila de despacho do motoboy.\n\n📦 Cardápio Digital no ar:\n🔗 https://smoking-pods-catalogo.vercel.app/",
       "variations": [],
       "useVariations": false,
       "targetType": "group",
       "selectedListIds": [],
       "targetGroupId": "120363429733361752@g.us",
       "targetGroupName": "Clientes Smoking Vip",
-      "frequencyDays": 7,
-      "scheduledWeekday": "SEXTA",
-      "scheduledTime": "13:00",
+      "status": "active",
+      "totalRecipients": 48,
       "batchSize": 5,
       "batchIntervalMinutes": 45,
-      "status": "active",
-      "totalRecipients": 1,
+      "scheduledWeekday": "SEXTA",
+      "scheduledTime": "13:00",
+      "startDate": "2026-09-21",
       "createdAt": "2026-09-11T15:03:53.290095+00:00",
-      "updatedAt": "2026-09-11T15:03:53.290095+00:00",
-      "legacyId": "camp_1786815404807",
-      "legacyMetadata": {
-        "orphan_list_ids": [
-          "list_1786807808763"
-        ]
-      }
+      "frequencyDays": 7,
+      "updatedAt": "2026-09-21T18:04:55.317Z"
     },
     {
       "id": "9ff7cae1-0689-4eec-bf4d-4142e2f78b76",
       "name": "CPM SEXTOU 2",
-      "message": "SAÍDA DO TRAMPO & PRÉ-ROLÊ — MOTOBOYS NA PISTA! 💨\n\nSalve turma do VIP! se ainda não separou seu pod, não deixa pra depois que vocês sabem que acaba rápido! os motoboys da Smoking Pods já estão nas ruas do ABC!\n\nSe você tá saindo do trampo ou se arrumando pro rolê, peça agora pra receber no conforto de casa antes de sair!\n\n⏱️ Tempo médio: 25 a 35 min pelo Uber Direct.\n📦 Cardápio Digital completo:\n🔗 https://smokingproject01.vercel.app/\n\nFila de despacho aberta! 🚀",
+      "message": "SAÍDA DO TRAMPO & PRÉ-ROLÊ — MOTOBOYS NA PISTA! 💨\n\nSalve turma do VIP! se ainda não separou seu pod, não deixa pra depois que vocês sabem que acaba rápido! os motoboys da Smoking Pods já estão nas ruas do ABC!\n\nSe você tá saindo do trampo ou se arrumando pro rolê, peça agora pra receber no conforto de casa antes de sair!\n\n⏱️ Tempo médio: 25 a 35 min pelo Uber Direct.\n📦 Cardápio Digital completo:\n🔗 https://smoking-pods-catalogo.vercel.app/\n\nFila de despacho aberta! 🚀",
       "variations": [],
       "useVariations": false,
       "targetType": "group",
       "selectedListIds": [],
       "targetGroupId": "120363429733361752@g.us",
       "targetGroupName": "Clientes Smoking Vip",
-      "frequencyDays": 7,
-      "scheduledWeekday": "SEXTA",
-      "scheduledTime": "17:30",
+      "status": "active",
+      "totalRecipients": 48,
       "batchSize": 5,
       "batchIntervalMinutes": 45,
-      "status": "active",
-      "totalRecipients": 1,
+      "scheduledWeekday": "SEXTA",
+      "scheduledTime": "17:30",
+      "startDate": "2026-09-21",
       "createdAt": "2026-09-11T15:03:53.397681+00:00",
-      "updatedAt": "2026-09-11T15:03:53.397681+00:00",
-      "legacyId": "camp_1786815888015",
-      "legacyMetadata": {
-        "orphan_list_ids": [
-          "list_1786807808763"
-        ]
-      }
+      "frequencyDays": 7,
+      "updatedAt": "2026-09-21T18:05:03.636Z"
     },
     {
       "id": "34f4e134-c7d8-4c41-8b5b-7dab1ab3a409",
       "name": "CPM GRUPO SEXTOU NOTURNO 3",
-      "message": "PLANTÃO NOTURNO ATIVO — SMOKING PODS 💨\n\nSalve galera da noite! Faltou pod no rolê ou acabou o seu no meio da resenha?\n\nPlantão de Sexta rolando até as 23:30!\nEntregamos direto na sua casa, na adega, no bar ou onde você estiver NO ABC e região!\n\n📦 Escolha seu modelo e receba rápido:\n🔗 https://smokingproject01.vercel.app/\n\nAtendimento jajá vai ser encerrado pessoal!",
+      "message": "PLANTÃO NOTURNO ATIVO — SMOKING PODS 💨\n\nSalve galera da noite! Faltou pod no rolê ou acabou o seu no meio da resenha?\n\nPlantão de Sexta rolando até as 23:30!\nEntregamos direto na sua casa, na adega, no bar ou onde você estiver NO ABC e região!\n\n📦 Escolha seu modelo e receba rápido:\n🔗 https://smoking-pods-catalogo.vercel.app/\n\nAtendimento jajá vai ser encerrado pessoal!",
       "variations": [],
       "useVariations": false,
       "targetType": "group",
       "selectedListIds": [],
       "targetGroupId": "120363429733361752@g.us",
       "targetGroupName": "Clientes Smoking Vip",
-      "frequencyDays": 7,
-      "scheduledWeekday": "SEXTA",
-      "scheduledTime": "21:30",
+      "status": "active",
+      "totalRecipients": 48,
       "batchSize": 5,
       "batchIntervalMinutes": 45,
-      "status": "active",
-      "totalRecipients": 1,
+      "scheduledWeekday": "SEXTA",
+      "scheduledTime": "21:30",
+      "startDate": "2026-09-21",
       "createdAt": "2026-09-11T15:03:53.485782+00:00",
-      "updatedAt": "2026-09-11T15:03:53.485782+00:00",
-      "legacyId": "camp_1786816065551",
-      "legacyMetadata": {
-        "orphan_list_ids": [
-          "list_1786807808763"
-        ]
-      },
-      "lastRunDate": "18/09/2026"
+      "frequencyDays": 7,
+      "updatedAt": "2026-09-21T18:05:12.003Z"
     },
     {
       "id": "ccec49ef-56a2-45e5-92ce-a66e1749e275",
       "name": "CPM SABADÃO 1",
-      "message": "SÁBADO NA SMOKING PODS — DELIVERIES ABERTOS! 💨\n\nSalve time do VIP! O plantão de sábado já tá rodando a todo vapor em São Bernardo e região!\n\n\nNão fica na mão: peça seu pod original direto no conforto de onde você estiver!\n\n⚡ Tempo de entrega: 25 a 35 min via Uber Direct.\n📦 Cardápio Digital no ar:\n🔗 https://smokingproject01.vercel.app/\n\n",
+      "message": "SÁBADO NA SMOKING PODS — DELIVERIES ABERTOS! 💨\n\nSalve time do VIP! O plantão de sábado já tá rodando a todo vapor em São Bernardo e região!\n\n\nNão fica na mão: peça seu pod original direto no conforto de onde você estiver!\n\n⚡ Tempo de entrega: 25 a 35 min via Uber Direct.\n📦 Cardápio Digital no ar:\n🔗 https://smoking-pods-catalogo.vercel.app/\n\n",
       "variations": [],
       "useVariations": false,
       "targetType": "group",
       "selectedListIds": [],
       "targetGroupId": "120363429733361752@g.us",
       "targetGroupName": "Clientes Smoking Vip",
-      "frequencyDays": 7,
-      "scheduledWeekday": "SABADO",
-      "scheduledTime": "14:00",
+      "status": "active",
+      "totalRecipients": 48,
       "batchSize": 5,
       "batchIntervalMinutes": 45,
-      "status": "active",
-      "totalRecipients": 1,
+      "scheduledWeekday": "SABADO",
+      "scheduledTime": "14:00",
+      "startDate": "2026-09-21",
       "createdAt": "2026-09-11T15:03:53.589803+00:00",
-      "updatedAt": "2026-09-11T15:03:53.589803+00:00",
-      "legacyId": "camp_1786816420999",
-      "legacyMetadata": {
-        "orphan_list_ids": [
-          "list_1786807808763"
-        ]
-      }
+      "frequencyDays": 7,
+      "updatedAt": "2026-09-21T18:05:18.800Z"
     },
     {
       "id": "d4046bf1-b741-40cd-b330-6ab8afc72d3e",
       "name": "CPM SABADÃO 2",
-      "message": "⚠️ ALERTA DE ESTOQUE DE SÁBADO — ÚLTIMAS UNIDADES! 🔥\n\nFala pessoal do VIP! Passando pra avisar que a saída de pedidos hoje tá monstra e alguns dos sabores mais pedidos já estão nas últimas unidades!\n\n🚀 Se você vai sair pro rolê hoje à noite, garanta o seu agora pra não ter que ficar com sabor que você não curte depois!\n\n🔒 Prioridade VIP: Fila de despacho expressa pra quem pedir pelo link abaixo:\n🔗 https://smokingproject01.vercel.app/\n\nMotoboys prontos para entrega imediata! 💨",
+      "message": "⚠️ ALERTA DE ESTOQUE DE SÁBADO — ÚLTIMAS UNIDADES! 🔥\n\nFala pessoal do VIP! Passando pra avisar que a saída de pedidos hoje tá monstra e alguns dos sabores mais pedidos já estão nas últimas unidades!\n\n🚀 Se você vai sair pro rolê hoje à noite, garanta o seu agora pra não ter que ficar com sabor que você não curte depois!\n\n🔒 Prioridade VIP: Fila de despacho expressa pra quem pedir pelo link abaixo:\n🔗 https://smoking-pods-catalogo.vercel.app/\n\nMotoboys prontos para entrega imediata! 💨",
       "variations": [],
       "useVariations": false,
       "targetType": "group",
       "selectedListIds": [],
       "targetGroupId": "120363429733361752@g.us",
       "targetGroupName": "Clientes Smoking Vip",
-      "frequencyDays": 7,
-      "scheduledWeekday": "SABADO",
-      "scheduledTime": "17:30",
+      "status": "active",
+      "totalRecipients": 48,
       "batchSize": 1,
       "batchIntervalMinutes": 45,
-      "status": "active",
-      "totalRecipients": 1,
+      "scheduledWeekday": "SABADO",
+      "scheduledTime": "17:30",
+      "startDate": "2026-09-21",
       "createdAt": "2026-09-11T15:03:53.667722+00:00",
-      "updatedAt": "2026-09-11T15:03:53.667722+00:00",
-      "legacyId": "camp_1786816513199",
-      "legacyMetadata": {
-        "orphan_list_ids": [
-          "list_1786807808763"
-        ]
-      }
+      "frequencyDays": 7,
+      "updatedAt": "2026-09-21T18:05:28.671Z"
     },
     {
       "id": "28d26f94-c2ff-4268-b5ff-d7e65674dd62",
@@ -223,76 +186,58 @@
       "selectedListIds": [],
       "targetGroupId": "120363429733361752@g.us",
       "targetGroupName": "Clientes Smoking Vip",
-      "frequencyDays": 7,
+      "status": "active",
+      "totalRecipients": 48,
+      "batchSize": 5,
+      "batchIntervalMinutes": 45,
       "scheduledWeekday": "SABADO",
       "scheduledTime": "19:30",
       "startDate": "2026-08-26",
-      "batchSize": 5,
-      "batchIntervalMinutes": 45,
-      "status": "active",
-      "totalRecipients": 1,
       "createdAt": "2026-09-11T15:03:53.754434+00:00",
-      "updatedAt": "2026-09-11T15:03:53.754434+00:00",
-      "legacyId": "camp_1786817784280",
-      "legacyMetadata": {
-        "orphan_list_ids": [
-          "list_1786807808763"
-        ]
-      }
+      "frequencyDays": 7,
+      "updatedAt": "2026-09-21T18:05:36.235Z"
     },
     {
       "id": "68573283-0eff-42fe-9a39-c6dc16f446c0",
       "name": "CPM DOMINGO 1",
-      "message": "🛋️ DOMINGO OFF — AGENDAMENTO PARA SEGUNDA-FEIRA! 💨\n\nSalve turma do VIP! Passando pra avisar que aos domingos nossa operação de delivery fica fechada para descanso do time.\n\n📦 Quer garantir seu pod pro início da semana?\nO nosso Cardápio Digital fica aberto normalmente para você agendar seu pedido! Deixando seu pedido feito hoje, o motoboy já sai com a sua entrega logo no primeiro horário de segunda-feira!\n\n📲 Agende seu pedido no Cardápio:\n🔗 https://smokingproject01.vercel.app/\n\nBom descanso a todos! 🥇",
+      "message": "🛋️ DOMINGO OFF — AGENDAMENTO PARA SEGUNDA-FEIRA! 💨\n\nSalve turma do VIP! Passando pra avisar que aos domingos nossa operação de delivery fica fechada para descanso do time.\n\n📦 Quer garantir seu pod pro início da semana?\nO nosso Cardápio Digital fica aberto normalmente para você agendar seu pedido! Deixando seu pedido feito hoje, o motoboy já sai com a sua entrega logo no primeiro horário de segunda-feira!\n\n📲 Agende seu pedido no Cardápio:\n🔗 https://smoking-pods-catalogo.vercel.app/\n\nBom descanso a todos! 🥇",
       "variations": [],
       "useVariations": false,
       "targetType": "group",
       "selectedListIds": [],
       "targetGroupId": "120363429733361752@g.us",
       "targetGroupName": "Clientes Smoking Vip",
-      "frequencyDays": 7,
+      "status": "active",
+      "totalRecipients": 48,
+      "batchSize": 5,
+      "batchIntervalMinutes": 45,
       "scheduledWeekday": "DOMINGO",
       "scheduledTime": "12:00",
       "startDate": "2026-08-26",
-      "batchSize": 5,
-      "batchIntervalMinutes": 45,
-      "status": "active",
-      "totalRecipients": 1,
       "createdAt": "2026-09-11T15:03:53.84567+00:00",
-      "updatedAt": "2026-09-11T15:03:53.84567+00:00",
-      "legacyId": "camp_1786818802616",
-      "legacyMetadata": {
-        "orphan_list_ids": [
-          "list_1786807808763"
-        ]
-      }
+      "frequencyDays": 7,
+      "updatedAt": "2026-09-21T18:05:42.337Z"
     },
     {
       "id": "c3558551-5f8a-4aaf-8e75-fb1ca2a966d4",
       "name": "CPM DOMINGO 2",
-      "message": "🚀 AMANHÃ ESTAMOS DE VOLTA + REPOSIÇÃO DE ESTOQUE! 📦\n\nSalve galera! Passando pra avisar que amanhã (segunda-feira) as entregas voltam a todo vapor logo pela manhã em SBC e região!\n\n⚡ Aviso de Estoque: Segunda-feira também é dia de chegada de novos lotes e reposição dos modelos mais pedidos!\n\nSe você já quiser deixar o seu sabor separado para o motoboy despachar amanhã cedo, acesse o link abaixo:\n\n🔗 https://smokingproject01.vercel.app/\nUma ótima semana a todos e nos vemos amanhã! 🤝",
+      "message": "🚀 AMANHÃ ESTAMOS DE VOLTA + REPOSIÇÃO DE ESTOQUE! 📦\n\nSalve galera! Passando pra avisar que amanhã (segunda-feira) as entregas voltam a todo vapor logo pela manhã em SBC e região!\n\n⚡ Aviso de Estoque: Segunda-feira também é dia de chegada de novos lotes e reposição dos modelos mais pedidos!\n\nSe você já quiser deixar o seu sabor separado para o motoboy despachar amanhã cedo, acesse o link abaixo:\n\n🔗 https://smoking-pods-catalogo.vercel.app/\nUma ótima semana a todos e nos vemos amanhã! 🤝",
       "variations": [],
       "useVariations": false,
       "targetType": "group",
       "selectedListIds": [],
       "targetGroupId": "120363429733361752@g.us",
       "targetGroupName": "Clientes Smoking Vip",
-      "frequencyDays": 7,
+      "status": "active",
+      "totalRecipients": 48,
+      "batchSize": 5,
+      "batchIntervalMinutes": 45,
       "scheduledWeekday": "DOMINGO",
       "scheduledTime": "19:30",
       "startDate": "2026-08-26",
-      "batchSize": 5,
-      "batchIntervalMinutes": 45,
-      "status": "active",
-      "totalRecipients": 1,
       "createdAt": "2026-09-11T15:03:53.951877+00:00",
-      "updatedAt": "2026-09-11T15:03:53.951877+00:00",
-      "legacyId": "camp_1786819959793",
-      "legacyMetadata": {
-        "orphan_list_ids": [
-          "list_1786807808763"
-        ]
-      }
+      "frequencyDays": 7,
+      "updatedAt": "2026-09-21T18:05:50.039Z"
     },
     {
       "id": "a200c5bf-c667-4a05-bafd-bdf324195cdb",
@@ -304,49 +249,37 @@
       "selectedListIds": [],
       "targetGroupId": "120363429733361752@g.us",
       "targetGroupName": "Clientes Smoking Vip",
-      "frequencyDays": 7,
+      "status": "active",
+      "totalRecipients": 48,
+      "batchSize": 5,
+      "batchIntervalMinutes": 45,
       "scheduledWeekday": "TERCA",
       "scheduledTime": "16:00",
       "startDate": "2026-08-26",
-      "batchSize": 5,
-      "batchIntervalMinutes": 45,
-      "status": "active",
-      "totalRecipients": 1,
       "createdAt": "2026-09-11T15:03:54.04839+00:00",
-      "updatedAt": "2026-09-11T15:03:54.04839+00:00",
-      "legacyId": "camp_1786820824361",
-      "legacyMetadata": {
-        "orphan_list_ids": [
-          "list_1786807808763"
-        ]
-      }
+      "frequencyDays": 7,
+      "updatedAt": "2026-09-21T18:05:57.406Z"
     },
     {
       "id": "a898626b-11df-4ea8-879c-185b88433a6e",
       "name": "CPM  LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!",
-      "message": "⏳ LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS! 💨\n\nSalve galera do VIP! Passando pra avisar quem gosta de se planejar com calma:\n\nSexta e sábado a fila de despacho do Uber Direct costuma ser bem cheia. Se você já quiser garantir seu pod agora no meio da semana, seu pedido sai na hora e sem correria!\n\n📦 Cardápio 100% atualizado com os novos lotes:\n🔗 https://smokingproject01.vercel.app/\n\n⚡ Entregas em 25 a 35 min em SBC e região!\n\nGaranta seu sabor favorito antes da correria do fds! 🥇",
+      "message": "⏳ LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS! 💨\n\nSalve galera do VIP! Passando pra avisar quem gosta de se planejar com calma:\n\nSexta e sábado a fila de despacho do Uber Direct costuma ser bem cheia. Se você já quiser garantir seu pod agora no meio da semana, seu pedido sai na hora e sem correria!\n\n📦 Cardápio 100% atualizado com os novos lotes:\n🔗 https://smoking-pods-catalogo.vercel.app/\n\n⚡ Entregas em 25 a 35 min em SBC e região!\n\nGaranta seu sabor favorito antes da correria do fds! 🥇",
       "variations": [],
       "useVariations": false,
       "targetType": "group",
       "selectedListIds": [],
       "targetGroupId": "120363429733361752@g.us",
       "targetGroupName": "Clientes Smoking Vip",
-      "frequencyDays": 7,
+      "status": "active",
+      "totalRecipients": 48,
+      "batchSize": 5,
+      "batchIntervalMinutes": 45,
       "scheduledWeekday": "QUARTA",
       "scheduledTime": "16:00",
       "startDate": "2026-08-26",
-      "batchSize": 5,
-      "batchIntervalMinutes": 45,
-      "status": "active",
-      "totalRecipients": 1,
       "createdAt": "2026-09-11T15:03:54.136387+00:00",
-      "updatedAt": "2026-09-11T15:03:54.136387+00:00",
-      "legacyId": "camp_1786821475258",
-      "legacyMetadata": {
-        "orphan_list_ids": [
-          "list_1786807808763"
-        ]
-      }
+      "frequencyDays": 7,
+      "updatedAt": "2026-09-21T18:06:03.607Z"
     },
     {
       "id": "e939f055-0c27-4d5c-ab26-d26e04651b35",
@@ -402,31 +335,6 @@
   ],
   "idempotencyKeys": [
     {
-      "key": "camp_1786816065551_2026-09-05_21:30",
-      "timestamp": "2026-09-05T00:30:54.304Z",
-      "campaignName": "CPM GRUPO SEXTOU NOTURNO 3"
-    },
-    {
-      "key": "camp_1786816420999_2026-09-05_14:00",
-      "timestamp": "2026-09-05T17:00:54.677Z",
-      "campaignName": "CPM SABADÃO 1"
-    },
-    {
-      "key": "camp_1786814768806_2026-09-05_15:00",
-      "timestamp": "2026-09-05T18:00:55.179Z",
-      "campaignName": "CPM GRUPO INSTAGRAM"
-    },
-    {
-      "key": "camp_1786816513199_2026-09-05_17:30",
-      "timestamp": "2026-09-05T20:30:56.307Z",
-      "campaignName": "CPM SABADÃO 2"
-    },
-    {
-      "key": "camp_1786817784280_2026-09-05_19:30",
-      "timestamp": "2026-09-05T22:30:57.281Z",
-      "campaignName": "CPM SABADÃO 3"
-    },
-    {
       "key": "4e4a393c-5a6b-44cf-9488-ec5e3c025937_2026-09-17_15:00",
       "timestamp": "2026-09-17T18:00:52.240Z",
       "campaignName": "CPM GRUPO INSTAGRAM"
@@ -445,9 +353,19 @@
       "key": "34f4e134-c7d8-4c41-8b5b-7dab1ab3a409_2026-09-19_21:30",
       "timestamp": "2026-09-19T00:30:27.320Z",
       "campaignName": "CPM GRUPO SEXTOU NOTURNO 3"
+    },
+    {
+      "key": "bdbc5c95-4770-4fba-8425-4dec704098bc_2026-09-21_14:05",
+      "timestamp": "2026-09-21T17:05:34.904Z",
+      "campaignName": "CPM GRUPO ESTOQUE SEMANAL"
+    },
+    {
+      "key": "4e4a393c-5a6b-44cf-9488-ec5e3c025937_2026-09-21_15:00",
+      "timestamp": "2026-09-21T18:00:34.784Z",
+      "campaignName": "CPM GRUPO INSTAGRAM"
     }
   ],
-  "lastUpdated": "2026-09-19T00:30:27.322Z",
+  "lastUpdated": "2026-09-21T18:06:03.610Z",
   "lists": [
     {
       "id": "0d925499-da68-4a93-9591-f4b6f78744b1",
