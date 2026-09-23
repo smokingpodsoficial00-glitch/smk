@@ -37,6 +37,11 @@ import {
   History,
   FileText,
   CheckCircle2,
+  GitCompare,
+  ChevronDown,
+  ChevronUp,
+  Zap,
+  Scale,
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { supabase } from "@/lib/supabase";
@@ -630,6 +635,441 @@ function RevenueEvolutionChart({
   );
 }
 
+interface ComparisonDayRecord {
+  dayIndex: number;
+  relativeLabel: string;
+  baseDateFormatted: string;
+  baseFullDate: string;
+  baseRevenue: number;
+  baseProfit: number;
+  baseOrders: number;
+  basePods: number;
+  baseAccumRevenue: number;
+  isBaseFuture: boolean;
+  isBaseToday: boolean;
+
+  compDateFormatted: string;
+  compFullDate: string;
+  compRevenue: number;
+  compProfit: number;
+  compOrders: number;
+  compPods: number;
+  compAccumRevenue: number;
+
+  diffRevenue: number;
+  diffPercentRevenue: number;
+  diffAccumRevenue: number;
+  diffAccumPercentRevenue: number;
+}
+
+/**
+ * Componente Gráfico Comparativo Mês a Mês (MoM Benchmark)
+ * Estilo Day Trade / Terminal Financeiro Ultracompacto (180px de altura)
+ * Cruza o Mês Atual (Verde Esmeralda) com o Mês Passado (Roxo/Violeta Neon)
+ */
+function MonthComparisonChart({
+  records,
+  baseCycleName,
+  compCycleName,
+  mode,
+  onModeChange,
+}: {
+  records: ComparisonDayRecord[];
+  baseCycleName: string;
+  compCycleName: string;
+  mode: "diario" | "acumulado";
+  onModeChange: (m: "diario" | "acumulado") => void;
+}) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  if (!records || records.length === 0) {
+    return (
+      <div className="p-6 text-center text-white/40 text-xs italic bg-[#0f1115] border border-white/10 rounded-xl">
+        Selecione dois ciclos para visualizar o comparativo mês a mês.
+      </div>
+    );
+  }
+
+  // Dimensões compactas exatas (180px de altura) — evita gráficos enormes
+  const width = 740;
+  const height = 180;
+  const padLeft = 52;
+  const padRight = 20;
+  const padTop = 14;
+  const padBottom = 26;
+  const chartW = width - padLeft - padRight;
+  const chartH = height - padTop - padBottom;
+
+  const isAcum = mode === "acumulado";
+
+  // Identificar valor máximo para escala Y
+  const maxVal = Math.max(
+    ...records.map((r) => {
+      const bVal = isAcum ? r.baseAccumRevenue : (r.isBaseFuture ? 0 : r.baseRevenue);
+      const cVal = isAcum ? r.compAccumRevenue : r.compRevenue;
+      return Math.max(bVal, cVal);
+    }),
+    50
+  );
+  const yMax = Math.ceil(maxVal * 1.12);
+
+  // Mapear pontos do Mês Atual (apenas dias já decorridos)
+  const validBaseRecords = records.filter((r) => !r.isBaseFuture);
+  const basePoints = validBaseRecords.map((r) => {
+    const x = records.length <= 1
+      ? padLeft + chartW / 2
+      : padLeft + ((r.dayIndex - 1) / (records.length - 1)) * chartW;
+    const val = isAcum ? r.baseAccumRevenue : r.baseRevenue;
+    const y = padTop + chartH - (Math.max(0, val) / yMax) * chartH;
+    return { ...r, x, y, val };
+  });
+
+  // Mapear pontos do Mês Anterior (todos os dias do ciclo histórico)
+  const compPoints = records.map((r) => {
+    const x = records.length <= 1
+      ? padLeft + chartW / 2
+      : padLeft + ((r.dayIndex - 1) / (records.length - 1)) * chartW;
+    const val = isAcum ? r.compAccumRevenue : r.compRevenue;
+    const y = padTop + chartH - (Math.max(0, val) / yMax) * chartH;
+    return { ...r, x, y, val };
+  });
+
+  const baseLinePath = generateSmoothPath(basePoints);
+  const baseAreaPath = generateSmoothArea(basePoints, padTop + chartH);
+  const compLinePath = generateSmoothPath(compPoints);
+
+  const gridLevels = [0, 0.33, 0.66, 1];
+  const xLabelStep = Math.max(1, Math.ceil(records.length / 8));
+
+  const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (!rect.width) return;
+    const svgX = ((e.clientX - rect.left) / rect.width) * width;
+    const clampedX = Math.max(padLeft, Math.min(width - padRight, svgX));
+    let best = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < records.length; i++) {
+      const px = padLeft + (i / (records.length - 1)) * chartW;
+      const d = Math.abs(px - clampedX);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    setHoveredIdx(best);
+  };
+
+  const handlePointerLeave = () => setHoveredIdx(null);
+
+  const activeRecord = hoveredIdx !== null ? records[hoveredIdx] : null;
+
+  return (
+    <div className="bg-[#0f1115] border border-white/10 rounded-xl p-3 sm:p-3.5 shadow-xl relative select-none">
+      {/* Header Compacto com Legenda e Alternador */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2 pb-2 border-b border-white/5">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-[#10b981] shadow-sm shadow-emerald-500/40" />
+            <span className="text-white/90 font-bold text-[11px]">{baseCycleName}</span>
+            <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-extrabold uppercase">Atual</span>
+          </div>
+          <span className="text-white/30 text-xs font-mono">vs</span>
+          <div className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-[#a855f7] shadow-sm shadow-purple-500/40" />
+            <span className="text-white/80 font-medium text-[11px]">{compCycleName}</span>
+            <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-bold uppercase">Anterior</span>
+          </div>
+        </div>
+
+        {/* Alternador de Modo do Gráfico */}
+        <div className="inline-flex p-0.5 rounded-lg bg-black/60 border border-white/15 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => onModeChange("diario")}
+            className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+              mode === "diario"
+                ? "bg-white text-black shadow-sm font-extrabold"
+                : "text-white/60 hover:text-white"
+            }`}
+          >
+            📊 Vendas Diárias
+          </button>
+          <button
+            type="button"
+            onClick={() => onModeChange("acumulado")}
+            className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+              mode === "acumulado"
+                ? "bg-gradient-to-r from-emerald-500 to-teal-400 text-black shadow-sm font-extrabold"
+                : "text-white/60 hover:text-white"
+            }`}
+          >
+            📈 Faturamento Acumulado (Ritmo)
+          </button>
+        </div>
+      </div>
+
+      {/* SVG Chart Compacto (180px) */}
+      <div className="relative w-full overflow-visible">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="w-full h-auto min-w-[480px] cursor-crosshair overflow-visible"
+          onPointerMove={handlePointerMove}
+          onPointerLeave={handlePointerLeave}
+        >
+          <defs>
+            <linearGradient id="compBaseGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.18" />
+              <stop offset="60%" stopColor="#10b981" stopOpacity="0.04" />
+              <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+            </linearGradient>
+            <linearGradient id="compTargetGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#a855f7" stopOpacity="0.10" />
+              <stop offset="100%" stopColor="#a855f7" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+
+          {/* Rótulo lateral Y */}
+          <text
+            transform="rotate(-90)"
+            x={-(padTop + chartH / 2)}
+            y="12"
+            textAnchor="middle"
+            fill="rgba(255,255,255,0.3)"
+            fontSize="7.5"
+            fontWeight="500"
+          >
+            {isAcum ? "Acumulado (R$)" : "Receita Diária (R$)"}
+          </text>
+
+          {/* Grade Horizontal + Labels Y */}
+          {gridLevels.map((lvl) => {
+            const yVal = padTop + chartH - lvl * chartH;
+            const val = lvl * yMax;
+            return (
+              <g key={`cg-${lvl}`}>
+                <line x1={padLeft} y1={yVal} x2={width - padRight} y2={yVal} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+                <text x={padLeft - 5} y={yVal + 3} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize="8.5" fontFamily="monospace">
+                  {lvl === 0 ? "0" : formatBRL(val).replace(",00", "")}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Grade Vertical */}
+          {records.map((r, i) => {
+            if (i % xLabelStep !== 0 && i !== records.length - 1) return null;
+            const x = padLeft + (i / (records.length - 1)) * chartW;
+            return (
+              <line key={`cvg-${i}`} x1={x} y1={padTop} x2={x} y2={padTop + chartH} stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+            );
+          })}
+
+          {/* Área sob a curva do mês atual */}
+          {baseAreaPath && <path d={baseAreaPath} fill="url(#compBaseGrad)" />}
+
+          {/* Linha Mês Anterior (Violeta Neon tracejada elegante) */}
+          {compLinePath && (
+            <path
+              d={compLinePath}
+              fill="none"
+              stroke="#a855f7"
+              strokeWidth="2"
+              strokeDasharray={isAcum ? "none" : "5 2.5"}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.85"
+            />
+          )}
+
+          {/* Linha Mês Atual (Verde Esmeralda sólida destacada) */}
+          {baseLinePath && (
+            <path
+              d={baseLinePath}
+              fill="none"
+              stroke="#10b981"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
+
+          {/* Crosshair vertical no hover */}
+          {hoveredIdx !== null && (
+            <>
+              {(() => {
+                const hovX = padLeft + (hoveredIdx / (records.length - 1)) * chartW;
+                return (
+                  <line
+                    x1={hovX}
+                    y1={padTop}
+                    x2={hovX}
+                    y2={padTop + chartH}
+                    stroke="rgba(255,255,255,0.35)"
+                    strokeWidth="1"
+                    strokeDasharray="3 3"
+                  />
+                );
+              })()}
+            </>
+          )}
+
+          {/* Dots Mês Anterior */}
+          {compPoints.map((p, i) => {
+            const isHov = hoveredIdx === i;
+            const show = p.val > 0 || isHov;
+            if (!show && records.length > 15) return null;
+            return (
+              <circle
+                key={`cpd-${i}`}
+                cx={p.x}
+                cy={p.y}
+                r={isHov ? 4.5 : 2}
+                fill={isHov ? "#ffffff" : "#a855f7"}
+                stroke={isHov ? "#a855f7" : "none"}
+                strokeWidth={isHov ? 2 : 0}
+              />
+            );
+          })}
+
+          {/* Dots Mês Atual */}
+          {basePoints.map((p, i) => {
+            const isHov = hoveredIdx === (p.dayIndex - 1);
+            const show = p.val > 0 || isHov;
+            if (!show && records.length > 15) return null;
+            return (
+              <circle
+                key={`bpd-${i}`}
+                cx={p.x}
+                cy={p.y}
+                r={isHov ? 5 : 2.5}
+                fill={isHov ? "#ffffff" : "#10b981"}
+                stroke={isHov ? "#10b981" : "#0f1115"}
+                strokeWidth={isHov ? 2 : 1}
+              />
+            );
+          })}
+
+          {/* Labels do Eixo X */}
+          {records.map((r, i) => {
+            const isHov = hoveredIdx === i;
+            if (!isHov && i % xLabelStep !== 0 && i !== records.length - 1) return null;
+            const x = padLeft + (i / (records.length - 1)) * chartW;
+            return (
+              <text
+                key={`cxl-${i}`}
+                x={x}
+                y={padTop + chartH + 13}
+                textAnchor="middle"
+                fill={isHov ? "#ffffff" : "rgba(255,255,255,0.45)"}
+                fontSize={isHov ? "8.5" : "7.5"}
+                fontWeight={isHov ? "bold" : "normal"}
+                fontFamily="monospace"
+              >
+                {r.baseDateFormatted !== "—" ? r.baseDateFormatted : r.compDateFormatted}
+              </text>
+            );
+          })}
+
+          {/* Legenda do Eixo X */}
+          <text
+            x={padLeft + chartW / 2}
+            y={height - 2}
+            textAnchor="middle"
+            fill="rgba(255,255,255,0.25)"
+            fontSize="8"
+            fontWeight="500"
+          >
+            Dias do Ciclo (14 → 13) · Datas de Vendas nos Dois Meses
+          </text>
+        </svg>
+
+        {/* HUD / Tooltip Flutuante Duplo */}
+        {hoveredIdx !== null && activeRecord && (() => {
+          const hovX = padLeft + (hoveredIdx / (records.length - 1)) * chartW;
+          const isNearRight = hovX > width * 0.70;
+          const isNearLeft = hovX < width * 0.30;
+          const xTranslate = isNearRight ? "-95%" : isNearLeft ? "-5%" : "-50%";
+
+          const baseVal = isAcum ? activeRecord.baseAccumRevenue : activeRecord.baseRevenue;
+          const compVal = isAcum ? activeRecord.compAccumRevenue : activeRecord.compRevenue;
+          const diff = baseVal - compVal;
+          const diffPerc = compVal > 0 ? (diff / compVal) * 100 : 0;
+
+          return (
+            <div
+              className="pointer-events-none absolute z-30 transition-transform duration-75 ease-out"
+              style={{
+                left: `${(hovX / width) * 100}%`,
+                top: "10px",
+                transform: `translateX(${xTranslate})`,
+              }}
+            >
+              <div className="bg-[#12141a]/95 border border-white/20 rounded-xl p-3 shadow-2xl backdrop-blur-md min-w-[210px] text-[11px] space-y-1.5">
+                <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1">
+                  <span className="font-extrabold text-white text-[11px]">
+                    Dia {activeRecord.dayIndex} do Ciclo
+                  </span>
+                  <span className="text-[9px] text-white/50 font-mono">
+                    {activeRecord.baseDateFormatted} vs {activeRecord.compDateFormatted}
+                  </span>
+                </div>
+
+                {/* Mês Atual */}
+                <div className="space-y-0.5">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-white/60 flex items-center gap-1 font-medium">
+                      <span className="size-1.5 rounded-full bg-[#10b981]" />
+                      {baseCycleName}:
+                    </span>
+                    <span className="font-black text-emerald-400">
+                      {activeRecord.isBaseFuture ? "Ainda não decorrido" : formatBRL(baseVal)}
+                    </span>
+                  </div>
+                  {!activeRecord.isBaseFuture && (
+                    <div className="text-[9px] text-white/40 pl-2.5">
+                      {activeRecord.basePods} pods em {activeRecord.baseOrders} ped
+                    </div>
+                  )}
+                </div>
+
+                {/* Mês Anterior */}
+                <div className="space-y-0.5">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-white/60 flex items-center gap-1 font-medium">
+                      <span className="size-1.5 rounded-full bg-[#a855f7]" />
+                      {compCycleName}:
+                    </span>
+                    <span className="font-bold text-purple-300">
+                      {formatBRL(compVal)}
+                    </span>
+                  </div>
+                  <div className="text-[9px] text-white/40 pl-2.5">
+                    {activeRecord.compPods} pods em {activeRecord.compOrders} ped
+                  </div>
+                </div>
+
+                {/* Diferença */}
+                {!activeRecord.isBaseFuture && (
+                  <div className="pt-1 border-t border-white/10 flex items-center justify-between text-[10px]">
+                    <span className="text-white/60 font-semibold">Variação:</span>
+                    <span
+                      className={`font-black flex items-center gap-0.5 ${
+                        diff >= 0 ? "text-emerald-400" : "text-red-400"
+                      }`}
+                    >
+                      {diff >= 0 ? "+" : ""}{formatBRL(diff)} ({diff >= 0 ? "+" : ""}{diffPerc.toFixed(1)}%)
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
 export default function FinanceDashboard() {
   const { user, company, companyUser, loading: authLoading, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -656,8 +1096,8 @@ export default function FinanceDashboard() {
   const [allValidOrders, setAllValidOrders] = useState<any[]>([]);
   const [persistedProductCosts, setPersistedProductCosts] = useState<Record<string, number>>({});
 
-  // Seletores da Área: Faturamento a Longo Prazo (2 Abas: Histórico e Evolução)
-  const [longTermTab, setLongTermTab] = useState<"historico" | "evolucao">("historico");
+  // Seletores da Área: Faturamento a Longo Prazo (3 Abas: Histórico, Evolução e Comparativo)
+  const [longTermTab, setLongTermTab] = useState<"historico" | "evolucao" | "comparativo">("historico");
   const [historyTab, setHistoryTab] = useState<"mensal" | "trimestral" | "semestral" | "anual">("mensal");
   const [evolutionTab, setEvolutionTab] = useState<"mensal" | "anual">("mensal");
   const [selectedEvolutionCycleId, setSelectedEvolutionCycleId] = useState<string>("");
@@ -665,6 +1105,12 @@ export default function FinanceDashboard() {
   const [selectedQuarterId, setSelectedQuarterId] = useState<string>("");
   const [selectedSemesterId, setSelectedSemesterId] = useState<string>("");
   const [selectedYearId, setSelectedYearId] = useState<string>("");
+
+  // Seletores da Área de Comparação Mês a Mês
+  const [compBaseCycleId, setCompBaseCycleId] = useState<string>("");
+  const [compTargetCycleId, setCompTargetCycleId] = useState<string>("");
+  const [compChartMode, setCompChartMode] = useState<"diario" | "acumulado">("diario");
+  const [showCompDailyTable, setShowCompDailyTable] = useState<boolean>(false);
 
   // Financial Metrics State (Correspondente ao Ciclo Vigente)
   const [grossRevenue, setGrossRevenue] = useState(0);
@@ -1361,6 +1807,266 @@ export default function FinanceDashboard() {
     allValidOrders,
     persistedProductCosts,
   ]);
+
+  // ─── Lógica Especializada de Comparação Mês a Mês (MoM Benchmark) ────────
+  const getCycleDailyRecords = (
+    cycleMetric: CycleFinancialMetrics,
+    orders: any[],
+    costsMap: Record<string, number>
+  ) => {
+    const cycleDef = cycleMetric.cycle;
+    const [startD, startM, startY] = cycleDef.startDateStr.split("/").map(Number);
+    const [endD, endM, endY] = cycleDef.endDateStr.split("/").map(Number);
+
+    const startDate = new Date(startY, startM - 1, startD, 12, 0, 0);
+    const endDate = new Date(endY, endM - 1, endD, 12, 0, 0);
+
+    const nowSP = getSaoPauloDateParts(new Date());
+    const todayStr = `${nowSP.year}-${String(nowSP.month).padStart(2, "0")}-${String(nowSP.day).padStart(2, "0")}`;
+
+    const ordersByDay = new Map<string, any[]>();
+    for (const order of orders || []) {
+      if (!order.created_at) continue;
+      const p = getSaoPauloDateParts(order.created_at);
+      const key = `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+      if (!ordersByDay.has(key)) ordersByDay.set(key, []);
+      ordersByDay.get(key)!.push(order);
+    }
+
+    const days: {
+      dayIndex: number;
+      dateKey: string;
+      dateFormatted: string;
+      fullDate: string;
+      revenue: number;
+      profit: number;
+      orders: number;
+      pods: number;
+      accumRevenue: number;
+      accumProfit: number;
+      accumPods: number;
+      isFuture: boolean;
+      isToday: boolean;
+    }[] = [];
+
+    let cur = new Date(startDate);
+    let dayIdx = 1;
+    let accumRev = 0;
+    let accumProf = 0;
+    let accumP = 0;
+
+    while (cur <= endDate) {
+      const parts = getSaoPauloDateParts(cur);
+      const dateKey = `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+      const dayOrders = ordersByDay.get(dateKey) || [];
+
+      const isToday = dateKey === todayStr;
+      const isFuture = cycleDef.isCurrent && dateKey > todayStr;
+
+      let dayRev = 0;
+      let dayCmv = 0;
+      let dayPods = 0;
+
+      if (!isFuture) {
+        for (const o of dayOrders) {
+          const items = Array.isArray(o.items) ? o.items : [];
+          if (items.length > 0) {
+            for (const item of items) {
+              const qty = Number(item.quantity) || 1;
+              const brand = (item.brand || "OUTROS").toUpperCase();
+              const modelName = (item.name || "POD").toUpperCase();
+              const itemPrice = Number(item.price || item.unit_price) || 0;
+              const modelKey = (item.modelKey || `${brand}__${modelName}`).toLowerCase();
+
+              let itemCost = Number(item.cost_price || item.costPrice) || 0;
+              if (!itemCost && item.product_id && costsMap[item.product_id]) {
+                itemCost = costsMap[item.product_id];
+              }
+              if (!itemCost && modelKey && DEFAULT_MODEL_COSTS[modelKey]) {
+                itemCost = DEFAULT_MODEL_COSTS[modelKey];
+              }
+              if (!itemCost) itemCost = 65;
+
+              dayRev += qty * itemPrice;
+              dayCmv += qty * itemCost;
+              dayPods += qty;
+            }
+          } else {
+            dayRev += Number(o.total_amount) || 0;
+            dayCmv += (Number(o.total_amount) || 0) * 0.45;
+            dayPods += 1;
+          }
+        }
+        accumRev += dayRev;
+        accumProf += (dayRev - dayCmv);
+        accumP += dayPods;
+      }
+
+      const dayFormatted = `${String(parts.day).padStart(2, "0")}/${String(parts.month).padStart(2, "0")}`;
+
+      days.push({
+        dayIndex: dayIdx,
+        dateKey,
+        dateFormatted: dayFormatted,
+        fullDate: `${parts.day} de ${MONTH_NAMES[parts.month]} de ${parts.year}`,
+        revenue: Number(dayRev.toFixed(2)),
+        profit: Number((dayRev - dayCmv).toFixed(2)),
+        orders: isFuture ? 0 : dayOrders.length,
+        pods: isFuture ? 0 : dayPods,
+        accumRevenue: Number(accumRev.toFixed(2)),
+        accumProfit: Number(accumProf.toFixed(2)),
+        accumPods: accumP,
+        isFuture,
+        isToday,
+      });
+
+      cur.setDate(cur.getDate() + 1);
+      dayIdx++;
+      if (dayIdx > 35) break;
+    }
+
+    return days;
+  };
+
+  // Ciclo Base Selecionado (Padrão: Ciclo Vigente ou o 1º da lista)
+  const compBaseCycle = useMemo(() => {
+    if (compBaseCycleId) {
+      const found = monthlyCycles.find((m) => m.cycle.id === compBaseCycleId);
+      if (found) return found;
+    }
+    return monthlyCycles.find((m) => m.cycle.isCurrent) || monthlyCycles[0] || null;
+  }, [monthlyCycles, compBaseCycleId]);
+
+  // Ciclo de Comparação Selecionado (Padrão: Ciclo Anterior ao Base)
+  const compTargetCycle = useMemo(() => {
+    if (compTargetCycleId) {
+      const found = monthlyCycles.find((m) => m.cycle.id === compTargetCycleId);
+      if (found) return found;
+    }
+    if (compBaseCycle) {
+      const { year, month } = compBaseCycle.cycle;
+      const prevYear = month === 1 ? year - 1 : year;
+      const prevMonth = month === 1 ? 12 : month - 1;
+      const prevId = `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
+      const found = monthlyCycles.find((m) => m.cycle.id === prevId);
+      if (found) return found;
+    }
+    return monthlyCycles.find((m) => m.cycle.id !== compBaseCycle?.cycle.id) || null;
+  }, [monthlyCycles, compTargetCycleId, compBaseCycle]);
+
+  // Registros Diários Comparativos Pareados
+  const comparisonRecords = useMemo<ComparisonDayRecord[]>(() => {
+    if (!compBaseCycle || !compTargetCycle) return [];
+
+    const baseDays = getCycleDailyRecords(compBaseCycle, allValidOrders, persistedProductCosts);
+    const compDays = getCycleDailyRecords(compTargetCycle, allValidOrders, persistedProductCosts);
+
+    const totalDays = Math.max(baseDays.length, compDays.length);
+    const records: ComparisonDayRecord[] = [];
+
+    for (let i = 0; i < totalDays; i++) {
+      const b = baseDays[i] || {
+        dayIndex: i + 1,
+        dateFormatted: "—",
+        fullDate: "—",
+        revenue: 0,
+        profit: 0,
+        orders: 0,
+        pods: 0,
+        accumRevenue: baseDays[baseDays.length - 1]?.accumRevenue || 0,
+        isFuture: true,
+        isToday: false,
+      };
+
+      const c = compDays[i] || {
+        dayIndex: i + 1,
+        dateFormatted: "—",
+        fullDate: "—",
+        revenue: 0,
+        profit: 0,
+        orders: 0,
+        pods: 0,
+        accumRevenue: compDays[compDays.length - 1]?.accumRevenue || 0,
+      };
+
+      const diffRev = b.revenue - c.revenue;
+      const diffPercRev = c.revenue > 0 ? (diffRev / c.revenue) * 100 : 0;
+      const diffAccum = b.accumRevenue - c.accumRevenue;
+      const diffPercAccum = c.accumRevenue > 0 ? (diffAccum / c.accumRevenue) * 100 : 0;
+
+      records.push({
+        dayIndex: i + 1,
+        relativeLabel: `Dia ${i + 1}`,
+        baseDateFormatted: b.dateFormatted,
+        baseFullDate: b.fullDate,
+        baseRevenue: b.revenue,
+        baseProfit: b.profit,
+        baseOrders: b.orders,
+        basePods: b.pods,
+        baseAccumRevenue: b.accumRevenue,
+        isBaseFuture: b.isFuture,
+        isBaseToday: b.isToday,
+
+        compDateFormatted: c.dateFormatted,
+        compFullDate: c.fullDate,
+        compRevenue: c.revenue,
+        compProfit: c.profit,
+        compOrders: c.orders,
+        compPods: c.pods,
+        compAccumRevenue: c.accumRevenue,
+
+        diffRevenue: diffRev,
+        diffPercentRevenue: diffPercRev,
+        diffAccumRevenue: diffAccum,
+        diffAccumPercentRevenue: diffPercAccum,
+      });
+    }
+
+    return records;
+  }, [compBaseCycle, compTargetCycle, allValidOrders, persistedProductCosts]);
+
+  // Cálculos de Resumo Head-to-Head
+  const compMetrics = useMemo(() => {
+    if (!compBaseCycle || !compTargetCycle) return null;
+
+    const revDiff = compBaseCycle.grossRevenue - compTargetCycle.grossRevenue;
+    const revDiffPerc = compTargetCycle.grossRevenue > 0 ? (revDiff / compTargetCycle.grossRevenue) * 100 : 0;
+
+    const profitDiff = compBaseCycle.netProfit - compTargetCycle.netProfit;
+    const profitDiffPerc = compTargetCycle.netProfit > 0 ? (profitDiff / compTargetCycle.netProfit) * 100 : 0;
+
+    const podsDiff = compBaseCycle.totalPodsSold - compTargetCycle.totalPodsSold;
+    const podsDiffPerc = compTargetCycle.totalPodsSold > 0 ? (podsDiff / compTargetCycle.totalPodsSold) * 100 : 0;
+
+    const ticketDiff = compBaseCycle.averageTicket - compTargetCycle.averageTicket;
+    const ticketDiffPerc = compTargetCycle.averageTicket > 0 ? (ticketDiff / compTargetCycle.averageTicket) * 100 : 0;
+
+    const marginDiff = compBaseCycle.profitMargin - compTargetCycle.profitMargin;
+
+    // Cálculo de Ritmo / Pacing
+    const elapsedDays = comparisonRecords.filter((r) => !r.isBaseFuture).length || 1;
+    const dailyPace = compBaseCycle.grossRevenue / elapsedDays;
+    const projectedTotal = dailyPace * comparisonRecords.length;
+    const projectedDiff = projectedTotal - compTargetCycle.grossRevenue;
+    const projectedDiffPerc = compTargetCycle.grossRevenue > 0 ? (projectedDiff / compTargetCycle.grossRevenue) * 100 : 0;
+
+    return {
+      revDiff,
+      revDiffPerc,
+      profitDiff,
+      profitDiffPerc,
+      podsDiff,
+      podsDiffPerc,
+      ticketDiff,
+      ticketDiffPerc,
+      marginDiff,
+      elapsedDays,
+      dailyPace,
+      projectedTotal,
+      projectedDiff,
+      projectedDiffPerc,
+    };
+  }, [compBaseCycle, compTargetCycle, comparisonRecords]);
 
   // Modal Handlers de Recompra
   const handleOpenRepurchaseModal = () => {
@@ -2069,12 +2775,12 @@ export default function FinanceDashboard() {
             </p>
           </div>
 
-          {/* Abas Principais: [ Histórico ] [ Evolução ] */}
-          <div className="inline-flex p-1 rounded-2xl bg-black/60 border border-white/15 self-start sm:self-auto">
+          {/* Abas Principais: [ Histórico ] [ Evolução ] [ Comparar Mês a Mês ] */}
+          <div className="inline-flex p-1 rounded-2xl bg-black/60 border border-white/15 self-start sm:self-auto flex-wrap gap-1">
             <button
               type="button"
               onClick={() => setLongTermTab("historico")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 longTermTab === "historico"
                   ? "bg-white text-black shadow-md font-extrabold"
                   : "text-white/70 hover:text-white hover:bg-white/5"
@@ -2086,7 +2792,7 @@ export default function FinanceDashboard() {
             <button
               type="button"
               onClick={() => setLongTermTab("evolucao")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 longTermTab === "evolucao"
                   ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 font-extrabold"
                   : "text-white/70 hover:text-white hover:bg-white/5"
@@ -2094,6 +2800,18 @@ export default function FinanceDashboard() {
             >
               <TrendingUp className="size-4" />
               <span>Evolução</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setLongTermTab("comparativo")}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                longTermTab === "comparativo"
+                  ? "bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-lg shadow-purple-500/25 font-extrabold"
+                  : "text-white/70 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <GitCompare className="size-4" />
+              <span>Comparar Mês a Mês</span>
             </button>
           </div>
         </div>
@@ -2797,6 +3515,245 @@ export default function FinanceDashboard() {
               selectedCycleId={selectedEvolutionCycleId}
               onCycleChange={setSelectedEvolutionCycleId}
             />
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* ABA 3 — COMPARAR COM MÊS ANTERIOR (MoM BENCHMARK)                */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {longTermTab === "comparativo" && (
+          <div className="space-y-4">
+            {/* 1. Barra Superior de Seleção dos Dois Ciclos para Benchmark */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3 rounded-2xl">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                {/* Seletor Mês Base (Verde) */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-white/70">Mês Base:</span>
+                  <select
+                    value={compBaseCycle?.cycle.id}
+                    onChange={(e) => setCompBaseCycleId(e.target.value)}
+                    className="bg-black/90 border border-emerald-500/50 rounded-xl px-2.5 py-1 text-xs font-bold text-emerald-400 focus:outline-none focus:border-emerald-400 cursor-pointer"
+                  >
+                    {monthlyCycles.map((m) => (
+                      <option key={`base-${m.cycle.id}`} value={m.cycle.id} className="bg-[#121214] text-white">
+                        {m.cycle.name} {m.cycle.isCurrent ? "(Vigente)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <span className="text-white/30 text-xs font-mono font-bold">vs</span>
+
+                {/* Seletor Mês Comparado (Roxo) */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-white/70">Comparar com:</span>
+                  <select
+                    value={compTargetCycle?.cycle.id}
+                    onChange={(e) => setCompTargetCycleId(e.target.value)}
+                    className="bg-black/90 border border-purple-500/50 rounded-xl px-2.5 py-1 text-xs font-bold text-purple-300 focus:outline-none focus:border-purple-400 cursor-pointer"
+                  >
+                    {monthlyCycles.map((m) => (
+                      <option key={`comp-${m.cycle.id}`} value={m.cycle.id} className="bg-[#121214] text-white">
+                        {m.cycle.name} {m.cycle.isCurrent ? "(Vigente)" : "(Fechado)"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <span className="text-[11px] text-white/40 hidden md:inline-block">
+                Comparativo normalizado dia a dia do ciclo oficial (14 → 13)
+              </span>
+            </div>
+
+            {/* 2. Placar Executivo Head-to-Head (5 KPIs Compactos) */}
+            {compMetrics && compBaseCycle && compTargetCycle && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+                {/* 1. Faturamento Bruto */}
+                <div className="bg-black/40 border border-white/10 rounded-2xl p-3 space-y-1">
+                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider block">
+                    Faturamento Bruto
+                  </span>
+                  <div className="text-base sm:text-lg font-black text-white">
+                    {formatBRL(compBaseCycle.grossRevenue)}
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] pt-0.5">
+                    <span className="text-white/40">Ant: {formatBRL(compTargetCycle.grossRevenue).replace(",00", "")}</span>
+                    <span className={`font-extrabold flex items-center gap-0.5 ${compMetrics.revDiff >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {compMetrics.revDiff >= 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                      {compMetrics.revDiff >= 0 ? "+" : ""}{compMetrics.revDiffPerc.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Lucro Líquido Real */}
+                <div className="bg-black/40 border border-white/10 rounded-2xl p-3 space-y-1">
+                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider block">
+                    Lucro Líquido Real
+                  </span>
+                  <div className="text-base sm:text-lg font-black text-emerald-400">
+                    {formatBRL(compBaseCycle.netProfit)}
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] pt-0.5">
+                    <span className="text-white/40">Ant: {formatBRL(compTargetCycle.netProfit).replace(",00", "")}</span>
+                    <span className={`font-extrabold flex items-center gap-0.5 ${compMetrics.profitDiff >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {compMetrics.profitDiff >= 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                      {compMetrics.profitDiff >= 0 ? "+" : ""}{compMetrics.profitDiffPerc.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Pods Vendidos */}
+                <div className="bg-black/40 border border-white/10 rounded-2xl p-3 space-y-1">
+                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider block">
+                    Pods Vendidos
+                  </span>
+                  <div className="text-base sm:text-lg font-black text-white">
+                    {compBaseCycle.totalPodsSold} pods
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] pt-0.5">
+                    <span className="text-white/40">Ant: {compTargetCycle.totalPodsSold}</span>
+                    <span className={`font-extrabold flex items-center gap-0.5 ${compMetrics.podsDiff >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {compMetrics.podsDiff >= 0 ? "+" : ""}{compMetrics.podsDiff} ({compMetrics.podsDiff >= 0 ? "+" : ""}{compMetrics.podsDiffPerc.toFixed(1)}%)
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4. Ticket Médio */}
+                <div className="bg-black/40 border border-white/10 rounded-2xl p-3 space-y-1">
+                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider block">
+                    Ticket Médio
+                  </span>
+                  <div className="text-base sm:text-lg font-black text-white">
+                    {formatBRL(compBaseCycle.averageTicket)}
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] pt-0.5">
+                    <span className="text-white/40">Ant: {formatBRL(compTargetCycle.averageTicket)}</span>
+                    <span className={`font-extrabold flex items-center gap-0.5 ${compMetrics.ticketDiff >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {compMetrics.ticketDiff >= 0 ? "+" : ""}{compMetrics.ticketDiffPerc.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* 5. Margem Líquida */}
+                <div className="bg-black/40 border border-white/10 rounded-2xl p-3 space-y-1 col-span-2 sm:col-span-1">
+                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider block">
+                    Margem Líquida
+                  </span>
+                  <div className="text-base sm:text-lg font-black text-cyan-300">
+                    {compBaseCycle.profitMargin}%
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] pt-0.5">
+                    <span className="text-white/40">Ant: {compTargetCycle.profitMargin}%</span>
+                    <span className={`font-extrabold ${compMetrics.marginDiff >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {compMetrics.marginDiff >= 0 ? "+" : ""}{compMetrics.marginDiff.toFixed(1)} p.p.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 3. Pílula de Ritmo & Velocidade (Sleek Compact Bar) */}
+            {compMetrics && compBaseCycle && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-gradient-to-r from-emerald-500/10 via-purple-500/10 to-transparent border border-white/10 px-3.5 py-2 rounded-xl text-xs">
+                <div className="flex items-center gap-3.5 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <Zap className="size-3.5 text-amber-400 shrink-0" />
+                    <span className="text-white/60">Ritmo de Venda:</span>
+                    <span className="font-extrabold text-white">{formatBRL(compMetrics.dailyPace)}/dia</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="size-3.5 text-emerald-400 shrink-0" />
+                    <span className="text-white/60">Ciclo:</span>
+                    <span className="font-bold text-white/90">{compMetrics.elapsedDays} de {comparisonRecords.length} dias</span>
+                  </div>
+                </div>
+                {compBaseCycle.cycle.isCurrent && (
+                  <div className="flex items-center gap-1.5 text-[11px]">
+                    <span className="text-white/60">Projeção de Fechamento:</span>
+                    <span className="font-black text-emerald-300">{formatBRL(compMetrics.projectedTotal)}</span>
+                    <span className={`font-extrabold px-1.5 py-0.5 rounded text-[10px] ${compMetrics.projectedDiff >= 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"}`}>
+                      {compMetrics.projectedDiff >= 0 ? "+" : ""}{compMetrics.projectedDiffPerc.toFixed(1)}% vs anterior
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 4. O Gráfico Compacto (180px de Altura - Proporcional e Leve) */}
+            <MonthComparisonChart
+              records={comparisonRecords}
+              baseCycleName={compBaseCycle ? compBaseCycle.cycle.name : "Mês Atual"}
+              compCycleName={compTargetCycle ? compTargetCycle.cycle.name : "Mês Anterior"}
+              mode={compChartMode}
+              onModeChange={setCompChartMode}
+            />
+
+            {/* 5. Acordeão da Tabela Detalhada Dia a Dia */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowCompDailyTable(!showCompDailyTable)}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-black/40 hover:bg-white/5 border border-white/10 transition-colors text-xs font-bold text-white/80 cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <FileSpreadsheet className="size-3.5 text-purple-400" />
+                  <span>Ver Detalhamento e Auditoria Dia a Dia ({comparisonRecords.length} dias)</span>
+                </span>
+                {showCompDailyTable ? <ChevronUp className="size-4 text-white/50" /> : <ChevronDown className="size-4 text-white/50" />}
+              </button>
+
+              {showCompDailyTable && (
+                <div className="mt-2.5 overflow-x-auto rounded-2xl border border-white/10 bg-black/40">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-white/5 text-white/60 font-bold uppercase text-[10px]">
+                        <th className="py-2 px-3">Dia</th>
+                        <th className="py-2 px-3">Data Atual</th>
+                        <th className="py-2 px-3 text-right">Venda Atual (R$)</th>
+                        <th className="py-2 px-3 text-center">Pods</th>
+                        <th className="py-2 px-3">Data Anterior</th>
+                        <th className="py-2 px-3 text-right">Venda Anterior (R$)</th>
+                        <th className="py-2 px-3 text-center">Pods</th>
+                        <th className="py-2 px-3 text-right">Variação (R$)</th>
+                        <th className="py-2 px-3 text-right">Acumulado Atual</th>
+                        <th className="py-2 px-3 text-right">Acumulado Anterior</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 font-medium text-[11px]">
+                      {comparisonRecords.map((r) => (
+                        <tr key={`comp-row-${r.dayIndex}`} className="hover:bg-white/5 transition-colors">
+                          <td className="py-2 px-3 font-bold text-white/70">{r.dayIndex}º</td>
+                          <td className="py-2 px-3 font-mono text-emerald-400 font-bold">{r.baseDateFormatted}</td>
+                          <td className="py-2 px-3 text-right font-bold text-white">
+                            {r.isBaseFuture ? <span className="text-white/30 italic text-[10px]">Pendente</span> : formatBRL(r.baseRevenue)}
+                          </td>
+                          <td className="py-2 px-3 text-center text-white/80">{r.isBaseFuture ? "—" : r.basePods}</td>
+                          <td className="py-2 px-3 font-mono text-purple-300">{r.compDateFormatted}</td>
+                          <td className="py-2 px-3 text-right text-white/80">{formatBRL(r.compRevenue)}</td>
+                          <td className="py-2 px-3 text-center text-white/70">{r.compPods}</td>
+                          <td className="py-2 px-3 text-right font-bold">
+                            {r.isBaseFuture ? (
+                              <span className="text-white/30">—</span>
+                            ) : (
+                              <span className={r.diffRevenue >= 0 ? "text-emerald-400" : "text-red-400"}>
+                                {r.diffRevenue >= 0 ? "+" : ""}{formatBRL(r.diffRevenue)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-right font-extrabold text-emerald-300">
+                            {r.isBaseFuture ? "—" : formatBRL(r.baseAccumRevenue)}
+                          </td>
+                          <td className="py-2 px-3 text-right text-purple-300">
+                            {formatBRL(r.compAccumRevenue)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
