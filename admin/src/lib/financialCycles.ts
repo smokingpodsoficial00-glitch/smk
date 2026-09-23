@@ -5,6 +5,8 @@
  * Exemplo: 14/08/2026 -> 13/09/2026 (Ciclo de Agosto/2026).
  */
 
+import { isOrderNational } from "./nationalSales";
+
 export interface CycleDefinition {
   id: string; // Ex: "2026-08"
   year: number;
@@ -248,7 +250,10 @@ export function calculateMetricsForCycle(
 
   for (const order of cycleOrders) {
     const shippingFee = parseFloat(order.shipping_fee || 0);
-    shippingSum += shippingFee;
+    // Vendas Nacionais (Correios/fora de SP) não somam no frete de entregas locais (motoboy)
+    if (!isOrderNational(order)) {
+      shippingSum += shippingFee;
+    }
 
     const items = Array.isArray(order.items) ? order.items : [];
     for (const item of items) {

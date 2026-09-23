@@ -42,11 +42,15 @@ import {
   ChevronUp,
   Zap,
   Scale,
+  Globe,
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchProductCostsMap } from "../lib/productCosts";
+import { NationalSalesModal } from "./NationalSalesModal";
+import { ManualSaleModal } from "./ManualSaleModal";
+import { isOrderNational } from "@/lib/nationalSales";
 import {
   fetchStockRepurchases,
   createStockRepurchase,
@@ -1112,6 +1116,10 @@ export default function FinanceDashboard() {
   const [compChartMode, setCompChartMode] = useState<"diario" | "acumulado">("diario");
   const [showCompDailyTable, setShowCompDailyTable] = useState<boolean>(false);
 
+  // Vendas Nacionais (Fora de SP / Correios)
+  const [isNationalModalOpen, setIsNationalModalOpen] = useState(false);
+  const [isNationalManualSaleOpen, setIsNationalManualSaleOpen] = useState(false);
+
   // Financial Metrics State (Correspondente ao Ciclo Vigente)
   const [grossRevenue, setGrossRevenue] = useState(0);
   const [cmv, setCmv] = useState(0);
@@ -2068,6 +2076,11 @@ export default function FinanceDashboard() {
     };
   }, [compBaseCycle, compTargetCycle, comparisonRecords]);
 
+  // Contagem de Vendas Nacionais no histórico
+  const nationalOrdersCount = useMemo(() => {
+    return allValidOrders.filter((o) => isOrderNational(o)).length;
+  }, [allValidOrders]);
+
   // Modal Handlers de Recompra
   const handleOpenRepurchaseModal = () => {
     setStockAmountInput("");
@@ -2246,7 +2259,23 @@ export default function FinanceDashboard() {
             Visão consolidada do ciclo atual, caixa disponível e inteligência comercial.
           </p>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+          {/* Botão Vendas Nacionais (Fora de SP) */}
+          <button
+            type="button"
+            onClick={() => setIsNationalModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-all cursor-pointer shadow-sm hover:scale-[1.02] active:scale-95"
+            title="Abrir Painel Financeiro de Vendas Nacionais (Fora de SP)"
+          >
+            <Globe className="size-3.5 text-amber-400" />
+            <span>Envios Nacionais</span>
+            {nationalOrdersCount > 0 && (
+              <span className="bg-amber-400 text-black text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                {nationalOrdersCount}
+              </span>
+            )}
+          </button>
+
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/5 text-white/90 border border-white/10">
             <Calendar className="size-3.5 text-white/70" />
             <span>Ciclo atual: {currentCycle.startDateStr.slice(0, 5)} → {currentCycle.endDateStr.slice(0, 5)}</span>
@@ -2346,7 +2375,7 @@ export default function FinanceDashboard() {
                 {formatBRL(logisticsFee)}
               </div>
               <p className="text-xs font-medium text-white/50 mt-1">
-                Fretes das entregas
+                Entregas locais (motoboy/Uber)
               </p>
             </div>
           </div>
@@ -4051,6 +4080,28 @@ export default function FinanceDashboard() {
           </div>
         </div>
       )}
+
+      {/* Modal Especializado de Inteligência em Vendas Nacionais */}
+      <NationalSalesModal
+        isOpen={isNationalModalOpen}
+        onClose={() => setIsNationalModalOpen(false)}
+        orders={allValidOrders}
+        persistedCosts={persistedProductCosts}
+        onOpenNewSale={() => {
+          setIsNationalManualSaleOpen(true);
+        }}
+      />
+
+      {/* Modal de Registro de Venda Manual com Suporte a Envio Nacional */}
+      <ManualSaleModal
+        isOpen={isNationalManualSaleOpen}
+        onClose={() => setIsNationalManualSaleOpen(false)}
+        defaultIsNational={true}
+        onSaleSuccess={() => {
+          setIsNationalManualSaleOpen(false);
+          fetchFinanceData();
+        }}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ensureBuyerInBroadcastList } from "@/lib/marketingLists";
+import { BRAZILIAN_STATES } from "@/lib/nationalSales";
 import {
   ShoppingCart,
   User,
@@ -12,6 +13,9 @@ import {
   Plus,
   Trash2,
   Megaphone,
+  Globe,
+  MapPin,
+  Truck,
 } from "lucide-react";
 
 interface ManualSaleModalProps {
@@ -21,6 +25,7 @@ interface ManualSaleModalProps {
   companyId?: string;
   preSelectedFlavorId?: string | null;
   preSelectedGroup?: any;
+  defaultIsNational?: boolean;
 }
 
 export function ManualSaleModal({
@@ -30,6 +35,7 @@ export function ManualSaleModal({
   companyId: propCompanyId,
   preSelectedFlavorId,
   preSelectedGroup,
+  defaultIsNational = false,
 }: ManualSaleModalProps) {
   const { company } = useAuth();
   const companyId = propCompanyId || company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
@@ -46,6 +52,13 @@ export function ManualSaleModal({
   const [shippingCost, setShippingCost] = useState<string>("0"); // Custo real pago ao motoboy/Uber
   const [autoAddToMarketingList, setAutoAddToMarketingList] = useState(true);
   const [isNoWhatsApp, setIsNoWhatsApp] = useState(false);
+
+  // Venda Nacional (Fora de SP / Correios)
+  const [isNationalSale, setIsNationalSale] = useState(defaultIsNational);
+  const [nationalState, setNationalState] = useState("RJ");
+  const [nationalCity, setNationalCity] = useState("");
+  const [nationalStreetAddress, setNationalStreetAddress] = useState("");
+  const [nationalTrackingCode, setNationalTrackingCode] = useState("");
 
   // Lista de Itens no Pedido
   const [items, setItems] = useState<
@@ -303,7 +316,19 @@ export function ManualSaleModal({
         setIsNoWhatsApp(false);
         setClientPhone(found.client_phone || "");
       }
-      setShippingAddress(found.shipping_address || "");
+
+      const rawAddr = found.shipping_address || "";
+      const match = rawAddr.match(/\[(?:ENVIO )?NACIONAL:\s*([A-Za-z]{2})(?:\s*-\s*([^\]]+))?\]/i);
+      if (match) {
+        setIsNationalSale(true);
+        if (match[1]) setNationalState(match[1].toUpperCase());
+        if (match[2]) setNationalCity(match[2].trim());
+        const clean = rawAddr.replace(/\[(?:ENVIO )?NACIONAL:[^\]]+\]\s*/gi, "").replace(/\|\s*Rastreio:[^|]+$/gi, "").trim();
+        setNationalStreetAddress(clean);
+        setShippingAddress(clean);
+      } else {
+        setShippingAddress(rawAddr);
+      }
     }
   };
 
@@ -338,12 +363,20 @@ export function ManualSaleModal({
       }
 
       let clientSaveWarning: string | null = null;
+      const finalAddress = isNationalSale
+        ? `[ENVIO NACIONAL: ${nationalState} - ${nationalCity.trim() || "Destino"}] ${nationalStreetAddress.trim() || shippingAddress.trim() || "Envio Correios"}${nationalTrackingCode.trim() ? ` | Rastreio: ${nationalTrackingCode.trim().toUpperCase()}` : ""}`
+        : (shippingAddress.trim() || "Atendimento Balcão / WhatsApp");
+
+      const clientAddressToSave = isNationalSale
+        ? `${nationalCity.trim() || "Nacional"} - ${nationalState}`
+        : (shippingAddress.trim() || "Atendimento Balcão / WhatsApp");
+
       try {
         const { data: _clientData, error: clientErr } = await supabase.from("smoking_clients").upsert(
           {
             phone: formattedPhone,
             name: clientName.trim(),
-            address: shippingAddress.trim() || "Atendimento Balcão / WhatsApp",
+            address: clientAddressToSave,
             company_id: companyId,
             updated_at: new Date().toISOString(),
           },
@@ -372,6 +405,13 @@ export function ManualSaleModal({
           price: item.price,
           unit_price: item.price,
           modelKey: modelKey,
+          ...(isNationalSale && {
+            is_national: true,
+            national_state: nationalState,
+            national_city: nationalCity.trim() || undefined,
+            tracking_code: nationalTrackingCode.trim().toUpperCase() || undefined,
+            shipping_cost_real: numericShippingCost || undefined,
+          }),
         };
       });
 
@@ -384,7 +424,7 @@ export function ManualSaleModal({
       const payload: any = {
         client_name: clientName.trim(),
         client_phone: formattedPhone,
-        shipping_address: shippingAddress.trim() || "Atendimento Balcão / WhatsApp",
+        shipping_address: finalAddress,
         items: orderItems,
         total_amount: grandTotal,
         shipping_fee: numericShippingFee,
@@ -632,6 +672,105 @@ export function ManualSaleModal({
               </div>
             </div>
 
+            {/* TOGGLE & CARD: 📦 VENDA NACIONAL (FORA DE SP / CORREIOS) */}
+            <div
+              className={`border rounded-2xl p-4 transition-all space-y-3 ${
+                isNationalSale
+                  ? "bg-amber-500/10 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+                  : "bg-white/5 border-white/10 hover:border-white/20"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isNationalSale}
+                    onChange={(e) => setIsNationalSale(e.target.checked)}
+                    className="size-4 rounded accent-amber-500 cursor-pointer"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Globe className={`size-4 ${isNationalSale ? "text-amber-400" : "text-white/60"}`} />
+                    <div>
+                      <span className={`text-xs font-bold ${isNationalSale ? "text-amber-300" : "text-white/90"}`}>
+                        Venda Nacional (Fora de São Paulo / Correios)
+                      </span>
+                      <span className="text-[10px] text-white/50 block">
+                        Isola o frete dos motoboys locais de SBC e contabiliza no Painel de Vendas Nacionais
+                      </span>
+                    </div>
+                  </div>
+                </label>
+                {isNationalSale && (
+                  <span className="text-[10px] font-black uppercase bg-amber-500/20 text-amber-400 border border-amber-500/40 px-2 py-0.5 rounded-full shrink-0">
+                    Correios / BR
+                  </span>
+                )}
+              </div>
+
+              {/* Card de Região e Destino */}
+              {isNationalSale && (
+                <div className="pt-3 border-t border-amber-500/20 space-y-3 animate-in fade-in duration-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] text-silver font-medium block mb-1">
+                        Estado de Destino (UF) *
+                      </label>
+                      <select
+                        value={nationalState}
+                        onChange={(e) => setNationalState(e.target.value)}
+                        className="w-full bg-black/60 border border-amber-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 font-semibold cursor-pointer"
+                      >
+                        {BRAZILIAN_STATES.map((st) => (
+                          <option key={st.uf} value={st.uf}>
+                            {st.uf} - {st.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] text-silver font-medium block mb-1">
+                        Cidade de Destino *
+                      </label>
+                      <input
+                        type="text"
+                        value={nationalCity}
+                        onChange={(e) => setNationalCity(e.target.value)}
+                        placeholder="Ex: Rio de Janeiro, Curitiba..."
+                        className="w-full bg-black/40 border border-amber-500/30 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400 font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] text-silver font-medium block mb-1">
+                      Endereço Completo & CEP (Destino dos Correios)
+                    </label>
+                    <input
+                      type="text"
+                      value={nationalStreetAddress}
+                      onChange={(e) => setNationalStreetAddress(e.target.value)}
+                      placeholder="Ex: Av. Atlântica, 1500, Apto 402 - Copacabana, CEP 22021-001"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] text-silver font-medium block mb-1">
+                      Código de Rastreio dos Correios (Opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={nationalTrackingCode}
+                      onChange={(e) => setNationalTrackingCode(e.target.value.toUpperCase())}
+                      placeholder="Ex: QC123456789BR"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-amber-400 font-mono placeholder:text-muted-foreground/40 focus:outline-none focus:border-amber-400 font-bold"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* 2. SELEÇÃO DE PODS (MODELO -> SABOR SIMPLIFICADO) */}
             <div className="space-y-3 bg-white/5 border border-white/10 rounded-2xl p-4">
               <span className="text-xs uppercase font-bold text-amber-400 tracking-wider flex items-center gap-1.5">
@@ -807,7 +946,7 @@ export function ManualSaleModal({
 
                 <div>
                   <label className="text-[11px] text-silver font-medium block mb-1">
-                    Custo Real do Motoboy/Uber (R$)
+                    {isNationalSale ? "Custo Real Envio Correios (R$)" : "Custo Real do Motoboy/Uber (R$)"}
                   </label>
                   <input
                     type="text"
@@ -817,7 +956,7 @@ export function ManualSaleModal({
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-amber-300 focus:outline-none focus:border-amber-400/50 font-bold"
                   />
                   <span className="text-[9px] text-white/40 block mt-1">
-                    Gasto que você terá na entrega
+                    {isNationalSale ? "Gasto real com postagem/PAC/Sedex" : "Gasto que você terá na entrega"}
                   </span>
                 </div>
               </div>

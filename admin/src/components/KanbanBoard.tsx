@@ -957,6 +957,12 @@ function OrderCard({
 
       {/* Endereço e Taxa de Entrega */}
       <div className="flex flex-col gap-2 bg-[#121212]/40 p-3 rounded-xl border border-white/5">
+        {(order.address.includes("[ENVIO NACIONAL") || order.address.includes("[NACIONAL")) && (
+          <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-extrabold">
+            <span>🇧🇷 ENVIO NACIONAL (CORREIOS)</span>
+            <span className="text-[9px] font-mono text-amber-400/80 uppercase">Fora de SP</span>
+          </div>
+        )}
         <div className="flex items-start justify-between gap-2 text-xs text-white/60">
           <div className="flex items-start gap-2 min-w-0 flex-1">
             <MapPin className="size-3.5 shrink-0 mt-0.5 text-white/40" />
@@ -967,7 +973,15 @@ function OrderCard({
         {/* Badge da Taxa de Entrega */}
         <div className="flex items-center justify-between pt-1 border-t border-white/5 text-[11px]">
           <span className="text-white/40 flex items-center gap-1 font-medium">
-            <Bike className="size-3 text-emerald-400" /> Taxa de Entrega:
+            {(order.address.includes("[ENVIO NACIONAL") || order.address.includes("[NACIONAL")) ? (
+              <>
+                <Truck className="size-3 text-amber-400" /> Frete Correios:
+              </>
+            ) : (
+              <>
+                <Bike className="size-3 text-emerald-400" /> Taxa de Entrega:
+              </>
+            )}
           </span>
           <span className={`font-semibold px-2 py-0.5 rounded-md text-[10px] ${
             order.shippingFee > 0 
