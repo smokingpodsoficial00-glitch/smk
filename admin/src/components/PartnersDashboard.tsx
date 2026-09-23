@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Users, UserPlus, DollarSign, ArrowUpDown, PieChart, ShieldCheck,
   TrendingUp, Box, Plus, Trash2, Edit3, Sparkles,
@@ -56,10 +56,21 @@ export default function PartnersDashboard() {
   const [txFilterType, setTxFilterType] = useState<string>('TODOS');
   const [txSearchQuery, setTxSearchQuery] = useState<string>('');
 
+  // Performance & Debounce refs
+  const realtimeDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isFetchingRef = useRef(false);
+  const hasPendingFetchRef = useRef(false);
+
   // 1. Carregar todos os dados reais integrados da empresa (Apenas Leitura)
-  const loadAllData = async () => {
+  const loadAllData = async (silent = false) => {
+    if (isFetchingRef.current) {
+      hasPendingFetchRef.current = true;
+      return;
+    }
+    isFetchingRef.current = true;
+
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
 
       const [
         costs,
@@ -79,7 +90,7 @@ export default function PartnersDashboard() {
           .neq("delivery_status", "CANCELADO"),
         supabase
           .from("smoking_products")
-          .select("*")
+          .select("id, name, brand, stock, price, cost_price, flavor, is_active")
           .or("company_id.eq." + targetCompanyId + ",company_id.is.null")
           .eq("is_active", true),
         supabase
@@ -105,39 +116,56 @@ export default function PartnersDashboard() {
       console.error("Erro ao carregar dados do módulo de sócios:", err);
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
+      if (hasPendingFetchRef.current) {
+        hasPendingFetchRef.current = false;
+        loadAllData(true);
+      }
     }
   };
 
   useEffect(() => {
-    loadAllData();
+    loadAllData(false);
 
-    // Supabase Realtime Channels para sincronização instantânea
+    const debouncedReload = () => {
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
+      realtimeDebounceTimerRef.current = setTimeout(() => {
+        loadAllData(true);
+      }, 500);
+    };
+
+    // Supabase Realtime Channels com Debounce de 500ms
     const subOrders = supabase
       .channel(`partners_orders_${targetCompanyId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, () => loadAllData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, () => debouncedReload())
       .subscribe();
 
     const subProducts = supabase
       .channel(`partners_products_${targetCompanyId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => loadAllData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => debouncedReload())
       .subscribe();
 
     const subPartners = supabase
       .channel(`partners_partners_${targetCompanyId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partners" }, () => loadAllData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partners" }, () => debouncedReload())
       .subscribe();
 
     const subTx = supabase
       .channel(`partners_tx_${targetCompanyId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partner_transactions" }, () => loadAllData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partner_transactions" }, () => debouncedReload())
       .subscribe();
 
     const subRepurchases = supabase
       .channel(`partners_repurchases_${targetCompanyId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_stock_repurchases" }, () => loadAllData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_stock_repurchases" }, () => debouncedReload())
       .subscribe();
 
     return () => {
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
       supabase.removeChannel(subOrders);
       supabase.removeChannel(subProducts);
       supabase.removeChannel(subPartners);

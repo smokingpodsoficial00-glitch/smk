@@ -244,15 +244,37 @@ export default function SupplyChainDashboard() {
     if (file && file.type.startsWith("image/")) processSelectedFile(file);
   };
 
+  // ─── Otimização de Performance, Cache de Imagens e Debounce ─────────────
+  const productImageCacheRef = useRef<Record<string, string>>({});
+  const isFetchingRef = useRef(false);
+  const hasPendingFetchRef = useRef(false);
+  const realtimeDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // ─── Data Fetching ──────────────────────────────────────
-  const fetchData = async () => {
+  const fetchData = async (forceRefreshImages = false) => {
+    // Evita chamadas concorrentes duplicadas que sobrecarregam o pool do Supabase
+    if (isFetchingRef.current) {
+      hasPendingFetchRef.current = true;
+      return;
+    }
+    isFetchingRef.current = true;
+
     const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
     try {
+      // Se não temos nenhuma imagem em cache ou forçado, busca com imagem.
+      // Se já temos o cache, busca apenas colunas leves (reduzindo de 3.5MB para ~12KB por requisição)
+      const hasCachedImages = Object.keys(productImageCacheRef.current).length > 0;
+      const shouldFetchImages = forceRefreshImages || !hasCachedImages;
+
+      const productsSelectCols = shouldFetchImages
+        ? "*"
+        : "id, name, brand, flavor, price, cost_price, stock, puffs, is_active, created_at, company_id";
+
       // Executa todas as consultas ao Supabase em paralelo para carregamento ultrarrápido
       const [prodRes, ordersRes, costsMap, cats, catMapRes] = await Promise.all([
         supabase
           .from("smoking_products")
-          .select("*")
+          .select(productsSelectCols)
           .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
           .neq("brand", "__STORE_CONFIG__")
           .order("created_at", { ascending: false })
@@ -306,6 +328,15 @@ export default function SupplyChainDashboard() {
       }
 
       if (prodData) {
+        // Popula cache de imagens se vieram dados completos
+        if (shouldFetchImages) {
+          prodData.forEach((p: any) => {
+            if (p.image_url) {
+              productImageCacheRef.current[p.id] = p.image_url;
+            }
+          });
+        }
+
         const mergedProducts = prodData.map((p: any) => {
           const brandName = (p.brand || "Genérico").trim();
           const modelName = (p.name || "Pod").trim();
@@ -324,8 +355,11 @@ export default function SupplyChainDashboard() {
           }
 
           const stagedStock = pendingStockChangesRef.current[p.id];
+          const finalImageUrl = p.image_url || productImageCacheRef.current[p.id] || "";
+
           return {
             ...p,
+            image_url: finalImageUrl,
             cost_price: costVal,
             stock: stagedStock !== undefined ? stagedStock : p.stock
           };
@@ -340,25 +374,43 @@ export default function SupplyChainDashboard() {
       console.error("Erro ao carregar dados do Supabase:", err);
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
+      // Se houve requisição enfileirada durante a execução, executa uma última vez de forma limpa
+      if (hasPendingFetchRef.current) {
+        hasPendingFetchRef.current = false;
+        fetchData(false);
+      }
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(true); // Carga inicial completa com imagens
 
-    // Inscrição Realtime no Supabase para atualização instantânea sem sobrecarga de rede
+    const debouncedRealtimeFetch = () => {
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
+      realtimeDebounceTimerRef.current = setTimeout(() => {
+        fetchData(false); // Refetch leve sem rebaixar os 3.5MB de imagens
+      }, 500);
+    };
+
+    // Inscrição Realtime no Supabase para atualização com Debounce protetor
     const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
     const channel = supabase
       .channel(`supply_chain_realtime_${targetCompanyId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => {
-        fetchData();
+        debouncedRealtimeFetch();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, () => {
-        fetchData();
+        debouncedRealtimeFetch();
       })
       .subscribe();
 
     return () => {
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
       supabase.removeChannel(channel);
     };
   }, [company?.id]);
@@ -506,11 +558,14 @@ export default function SupplyChainDashboard() {
     try {
       const newImageUrl = await uploadProductImage(file);
       const ids = group.flavors.map((f: any) => f.id);
+      ids.forEach((id: string) => {
+        productImageCacheRef.current[id] = newImageUrl;
+      });
       setProducts(prev => prev.map(p => ids.includes(p.id) ? { ...p, image_url: newImageUrl } : p));
       await supabase.from("smoking_products").update({ image_url: newImageUrl }).in("id", ids).eq("company_id", targetCompanyId);
     } catch (err) {
       console.error("Erro ao atualizar imagem do modelo:", err);
-      fetchData();
+      fetchData(false);
     } finally {
       setUploadingGroupKey(null);
     }
@@ -727,16 +782,16 @@ export default function SupplyChainDashboard() {
       if (error) {
         console.error("Erro do Supabase ao atualizar preços:", error);
         alert("Não foi possível atualizar o preço. Tente novamente.");
-        await fetchData();
+        await fetchData(false);
       } else {
         alert("Preço atualizado com sucesso.");
-        await fetchData();
+        await fetchData(false);
         setEditingGroup(null);
       }
     } catch (err: any) {
       console.error("Erro técnico inesperado ao salvar preço:", err);
       alert("Não foi possível atualizar o preço. Tente novamente.");
-      await fetchData();
+      await fetchData(false);
     } finally {
       setIsSavingBatchPrice(false);
     }
@@ -827,6 +882,10 @@ export default function SupplyChainDashboard() {
         updatePayload.cost_price = parsedCost;
       }
 
+      ids.forEach((id: string) => {
+        productImageCacheRef.current[id] = finalImageUrl;
+      });
+
       let query = supabase.from("smoking_products").update(updatePayload).in("id", ids);
       if (company?.id) query = query.eq("company_id", company.id);
       let { error } = await query;
@@ -843,16 +902,16 @@ export default function SupplyChainDashboard() {
       if (error) {
         console.error("Erro do Supabase ao atualizar produto completo:", error);
         alert("Não foi possível salvar as alterações no banco de dados. Tente novamente.");
-        await fetchData();
+        await fetchData(false);
       } else {
         alert("Produto atualizado com sucesso.");
-        await fetchData();
+        await fetchData(false);
         setEditingFullProduct(null);
       }
     } catch (err: any) {
       console.error("Erro técnico inesperado ao editar produto:", err);
       alert("Não foi possível salvar as alterações do produto. Tente novamente.");
-      await fetchData();
+      await fetchData(false);
     } finally {
       setIsSavingFullProduct(false);
     }
