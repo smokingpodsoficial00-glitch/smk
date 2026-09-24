@@ -50,6 +50,8 @@ export default function KanbanBoard() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrderForDispatch, setSelectedOrderForDispatch] = useState<string | null>(null);
+  const [notifyCustomerOnDispatch, setNotifyCustomerOnDispatch] = useState(false);
+  const [isDispatching, setIsDispatching] = useState(false);
   const [isManualSaleOpen, setIsManualSaleOpen] = useState(false);
 
   // Estados para o histórico ERP de Concluídos
@@ -157,7 +159,12 @@ export default function KanbanBoard() {
 
   const [activeTab, setActiveTab] = useState<'kanban' | 'concluidos'>('kanban');
 
-  const updateStatus = async (realId: string, newDeliveryStatus: AdminOrder['status'], deliveryType?: 'uber' | 'proprio') => {
+  const updateStatus = async (
+    realId: string, 
+    newDeliveryStatus: AdminOrder['status'], 
+    deliveryType?: 'uber' | 'proprio',
+    options?: { notifyWhatsApp?: boolean }
+  ) => {
     let paymentUpdate: any = {};
     if (newDeliveryStatus === 'PREPARANDO') {
       paymentUpdate.payment_status = 'PAGO';
@@ -177,6 +184,21 @@ export default function KanbanBoard() {
       }
     }
 
+    const currentOrder = orders.find(o => o.realId === realId);
+
+    // 🛡️ TRAVA DE SEGURANÇA 1: Só dispara webhook se a transição for FORWARD a partir de PREPARANDO
+    // (Impede terminantemente disparos ao clicar "← Voltar" em ENTREGUE ou reabrir pedido)
+    const isForwardFromPreparing = currentOrder?.status === 'PREPARANDO' && newDeliveryStatus === 'EM_ROTA';
+
+    // 🛡️ TRAVA DE SEGURANÇA 2: Identifica se é Envio Nacional (Sedex / Correios / PAC)
+    const isNationalOrder = Boolean(
+      currentOrder?.address?.includes('[ENVIO NACIONAL') ||
+      currentOrder?.paymentMethod?.toLowerCase().includes('nacional')
+    );
+
+    // 🛡️ TRAVA DE SEGURANÇA 3: Consentimento explícito do operador no modal (não envia se notifyWhatsApp for false)
+    const shouldNotify = options?.notifyWhatsApp === true;
+
     try {
       // Otimista
       setOrders(prev => prev.map(o => o.realId === realId ? { ...o, status: newDeliveryStatus } : o));
@@ -190,8 +212,7 @@ export default function KanbanBoard() {
         updatePayload.receipt_url = 'CONCLUIDO';
       } else {
         updatePayload.delivery_status = newDeliveryStatus;
-        const target = orders.find(o => o.realId === realId);
-        if (target?.receiptUrl === 'CONCLUIDO') {
+        if (currentOrder?.receiptUrl === 'CONCLUIDO') {
           updatePayload.receipt_url = null;
         }
       }
@@ -213,17 +234,17 @@ export default function KanbanBoard() {
           .eq('id', realId);
       }
 
-      // Disparar Webhook caso despache para Rota (Assíncrono, sem bloquear a transação)
-      if (newDeliveryStatus === 'EM_ROTA') {
-        const order = orders.find(o => o.realId === realId);
-        if (order) {
+      // Disparar Webhook caso despache para Rota com validação e segurança reforçada
+      if (isForwardFromPreparing && !isNationalOrder && shouldNotify) {
+        if (currentOrder && currentOrder.phone) {
           fetch(`${getBackendUrl()}/api/webhook/dispatch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              orderId: order.id,
-              clientPhone: order.phone,
-              deliveryType: deliveryType || 'proprio'
+              orderId: currentOrder.id,
+              clientPhone: currentOrder.phone,
+              deliveryType: deliveryType || 'proprio',
+              isNational: false
             })
           }).catch(e => console.error('Falha ao disparar webhook de despacho:', e));
         }
@@ -446,7 +467,11 @@ export default function KanbanBoard() {
                         key={order.realId} 
                         order={order} 
                         onUpdate={(realId, newStatus) => updateStatus(realId, newStatus)} 
-                        onDispatchClick={() => setSelectedOrderForDispatch(order.realId)}
+                        onDispatchClick={() => {
+                          setSelectedOrderForDispatch(order.realId);
+                          setNotifyCustomerOnDispatch(false);
+                          setIsDispatching(false);
+                        }}
                         onDelete={handleDeleteOrder}
                         onGrantDiscount={handleGrantDiscount}
                         onOpenWhatsAppDiscount={handleOpenWhatsAppDiscount}
@@ -756,64 +781,138 @@ export default function KanbanBoard() {
         </div>
       )}
 
-      {/* Modal de Despacho Logístico */}
-      {selectedOrderForDispatch && (
-        <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#121212] border border-border rounded-2xl w-full max-w-md shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
-            <button 
-              onClick={() => setSelectedOrderForDispatch(null)}
-              className="absolute top-4 right-4 text-muted-foreground hover:text-white transition-colors"
-            >
-              <X className="size-5" />
-            </button>
-            
-            <div className="flex items-center gap-3 mb-2">
-              <div className="bg-primary/20 p-2 rounded-lg text-primary">
-                <Truck className="size-5" />
+      {/* Modal de Despacho Logístico Seguro */}
+      {selectedOrderForDispatch && (() => {
+        const targetOrder = orders.find(o => o.realId === selectedOrderForDispatch);
+        const isNational = Boolean(
+          targetOrder?.address?.includes('[ENVIO NACIONAL') ||
+          targetOrder?.paymentMethod?.toLowerCase().includes('nacional')
+        );
+
+        return (
+          <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-[#121212] border border-border rounded-2xl w-full max-w-md shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
+              <button 
+                onClick={() => {
+                  setSelectedOrderForDispatch(null);
+                  setIsDispatching(false);
+                }}
+                disabled={isDispatching}
+                className="absolute top-4 right-4 text-muted-foreground hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="size-5" />
+              </button>
+              
+              <div className="flex items-center gap-3 mb-2">
+                <div className="bg-primary/20 p-2 rounded-lg text-primary">
+                  <Truck className="size-5" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">Despacho Logístico</h2>
+                  {targetOrder && (
+                    <p className="text-xs text-silver mt-0.5">Pedido #{targetOrder.id} • {targetOrder.clientName}</p>
+                  )}
+                </div>
               </div>
-              <h2 className="text-xl font-semibold">Despacho Logístico</h2>
-            </div>
-            
-            <p className="text-sm text-muted-foreground mb-6">
-              Este pedido está pronto para entrega. Como você deseja enviá-lo?
-            </p>
+              
+              {isNational ? (
+                <div className="my-4 p-3.5 bg-blue-500/10 border border-blue-500/30 rounded-xl space-y-1.5">
+                  <div className="flex items-center gap-2 text-blue-400 font-semibold text-xs">
+                    <Package className="size-4 shrink-0" />
+                    <span>Envio Nacional (Correios / Sedex / PAC)</span>
+                  </div>
+                  <p className="text-[11px] text-silver leading-relaxed">
+                    Este pedido é nacional. O disparo automático de motoboy local no WhatsApp está <b>bloqueado por segurança</b> para não confundir o cliente com mensagens de entrega imediata.
+                  </p>
+                </div>
+              ) : (
+                <div className="my-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Este pedido está pronto para entrega. Escolha a modalidade de envio:
+                  </p>
 
-            <div className="flex flex-col gap-3">
-              <button 
-                onClick={() => {
-                  updateStatus(selectedOrderForDispatch, 'EM_ROTA', 'proprio');
-                  setSelectedOrderForDispatch(null);
-                }}
-                className="flex items-center gap-4 bg-elevated hover:bg-white/10 border border-border p-4 rounded-xl transition-all group cursor-pointer"
-              >
-                <div className="bg-white/5 p-2 rounded-lg group-hover:bg-white/10 transition-colors">
-                  <Bike className="size-5 text-white" />
+                  {/* Toggle seguro de notificação no WhatsApp */}
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl bg-card border border-border/80 cursor-pointer hover:border-primary/40 transition-colors select-none">
+                    <input 
+                      type="checkbox"
+                      checked={notifyCustomerOnDispatch}
+                      onChange={(e) => setNotifyCustomerOnDispatch(e.target.checked)}
+                      disabled={isDispatching}
+                      className="mt-0.5 rounded border-silver/30 text-primary focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                    />
+                    <div className="text-xs">
+                      <span className="font-semibold text-white block">
+                        Avisar cliente no WhatsApp agora
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        Envia: <i>"seu pedido já saiu para entrega!"</i>
+                      </span>
+                    </div>
+                  </label>
                 </div>
-                <div className="text-left">
-                  <h3 className="font-semibold text-white">Entregador Próprio da Casa</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">Motoboy exclusivo (sem rastreio)</p>
-                </div>
-              </button>
+              )}
 
-              <button 
-                onClick={() => {
-                  updateStatus(selectedOrderForDispatch, 'EM_ROTA', 'uber');
-                  setSelectedOrderForDispatch(null);
-                }}
-                className="flex items-center gap-4 bg-[#0F0F0F] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-green-500/50 p-4 rounded-xl transition-all group cursor-pointer"
-              >
-                <div className="bg-black p-2 rounded-lg">
-                  <div className="w-5 h-5 bg-white rounded-sm" />
-                </div>
-                <div className="text-left">
-                  <h3 className="font-semibold text-white">Uber Direct</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">Integração API com Rastreio em Tempo Real</p>
-                </div>
-              </button>
+              <div className="flex flex-col gap-3 mt-2">
+                {isNational ? (
+                  <button 
+                    disabled={isDispatching}
+                    onClick={async () => {
+                      setIsDispatching(true);
+                      await updateStatus(selectedOrderForDispatch, 'EM_ROTA', 'proprio', { notifyWhatsApp: false });
+                      setSelectedOrderForDispatch(null);
+                      setIsDispatching(false);
+                    }}
+                    className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold p-3.5 rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                  >
+                    <CheckCircle2 className="size-4" />
+                    {isDispatching ? 'Despachando...' : 'Confirmar Despacho (Postado nos Correios)'}
+                  </button>
+                ) : (
+                  <>
+                    <button 
+                      disabled={isDispatching}
+                      onClick={async () => {
+                        setIsDispatching(true);
+                        await updateStatus(selectedOrderForDispatch, 'EM_ROTA', 'proprio', { notifyWhatsApp: notifyCustomerOnDispatch });
+                        setSelectedOrderForDispatch(null);
+                        setIsDispatching(false);
+                      }}
+                      className="flex items-center gap-4 bg-elevated hover:bg-white/10 border border-border p-4 rounded-xl transition-all group cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="bg-white/5 p-2 rounded-lg group-hover:bg-white/10 transition-colors">
+                        <Bike className="size-5 text-white" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="font-semibold text-white">Entregador Próprio da Casa</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">Motoboy exclusivo (sem rastreio)</p>
+                      </div>
+                    </button>
+
+                    <button 
+                      disabled={isDispatching}
+                      onClick={async () => {
+                        setIsDispatching(true);
+                        await updateStatus(selectedOrderForDispatch, 'EM_ROTA', 'uber', { notifyWhatsApp: notifyCustomerOnDispatch });
+                        setSelectedOrderForDispatch(null);
+                        setIsDispatching(false);
+                      }}
+                      className="flex items-center gap-4 bg-[#0F0F0F] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-green-500/50 p-4 rounded-xl transition-all group cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="bg-black p-2 rounded-lg">
+                        <div className="w-5 h-5 bg-white rounded-sm" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="font-semibold text-white">Uber Direct</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">Integração API com Rastreio em Tempo Real</p>
+                      </div>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
