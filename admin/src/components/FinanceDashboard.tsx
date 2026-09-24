@@ -56,6 +56,7 @@ import { isOrderNational } from "@/lib/nationalSales";
 import {
   type WeeklyGoalsConfig,
   loadWeeklyGoals,
+  syncWeeklyGoalsFromOrders,
   calculateWeeklyPerformances,
 } from "@/lib/weeklyGoals";
 import {
@@ -1338,6 +1339,10 @@ export default function FinanceDashboard() {
       const curCycle = getCurrentCycle();
       setCurrentCycle(curCycle);
 
+      // Sincronizar Metas Semanais/Mensais da empresa diretamente do Supabase (compartilhado entre todos os sócios)
+      const syncedGoals = syncWeeklyGoalsFromOrders(rawOrders, targetCompanyId, curCycle.id);
+      setWeeklyGoalsConfig(syncedGoals);
+
       const curCycleMetrics = calculateMetricsForCycle(curCycle, validOrders, loadedRepurchases, persistedCosts);
       setGrossRevenue(curCycleMetrics.grossRevenue);
       setCmv(curCycleMetrics.cmv);
@@ -1506,6 +1511,7 @@ export default function FinanceDashboard() {
 
   // Sincronizar configuração de Metas Semanais
   useEffect(() => {
+    setWeeklyGoalsConfig(loadWeeklyGoals(company?.id, currentCycle.id));
     const handleGoalsUpdate = () => {
       setWeeklyGoalsConfig(loadWeeklyGoals(company?.id, currentCycle.id));
     };

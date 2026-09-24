@@ -38,20 +38,20 @@ export const WeeklyGoalsModal: React.FC<WeeklyGoalsModalProps> = ({
     String(currentGoals.monthlyTarget || DEFAULT_WEEKLY_GOALS.monthlyTarget)
   );
 
-  const [w1, setW1] = useState<string>(String(currentGoals.week1 || 2000));
-  const [w2, setW2] = useState<string>(String(currentGoals.week2 || 2000));
-  const [w3, setW3] = useState<string>(String(currentGoals.week3 || 2000));
-  const [w4, setW4] = useState<string>(String(currentGoals.week4 || 2000));
+  const [w1, setW1] = useState<string>(String(currentGoals.week1 || 1750));
+  const [w2, setW2] = useState<string>(String(currentGoals.week2 || 1750));
+  const [w3, setW3] = useState<string>(String(currentGoals.week3 || 1750));
+  const [w4, setW4] = useState<string>(String(currentGoals.week4 || 1750));
 
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setMonthlyTotal(String(currentGoals.monthlyTarget || DEFAULT_WEEKLY_GOALS.monthlyTarget));
-      setW1(String(currentGoals.week1 || 2000));
-      setW2(String(currentGoals.week2 || 2000));
-      setW3(String(currentGoals.week3 || 2000));
-      setW4(String(currentGoals.week4 || 2000));
+      setW1(String(currentGoals.week1 || 1750));
+      setW2(String(currentGoals.week2 || 1750));
+      setW3(String(currentGoals.week3 || 1750));
+      setW4(String(currentGoals.week4 || 1750));
       setSavedSuccess(false);
     }
   }, [isOpen, currentGoals]);
@@ -67,7 +67,7 @@ export const WeeklyGoalsModal: React.FC<WeeklyGoalsModalProps> = ({
     setW4(String(quarter));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const numW1 = parseFloat(w1.replace(",", ".")) || 0;
     const numW2 = parseFloat(w2.replace(",", ".")) || 0;
     const numW3 = parseFloat(w3.replace(",", ".")) || 0;
@@ -84,14 +84,14 @@ export const WeeklyGoalsModal: React.FC<WeeklyGoalsModalProps> = ({
       week4: numW4,
     };
 
-    saveWeeklyGoals(updated, companyId, cycle.id);
     onGoalsSaved(updated);
     setSavedSuccess(true);
+    await saveWeeklyGoals(updated, companyId, cycle.id);
 
     setTimeout(() => {
       setSavedSuccess(false);
       onClose();
-    }, 800);
+    }, 600);
   };
 
   if (!isOpen) return null;

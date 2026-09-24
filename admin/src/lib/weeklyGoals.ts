@@ -4,7 +4,11 @@
  * Divide o ciclo oficial (14 → 13) em 4 semanas estratégicas de operação.
  */
 
+import { supabase } from "@/lib/supabase";
 import { type CycleDefinition, getSaoPauloDateParts } from "./financialCycles";
+
+export const SYSTEM_WEEKLY_GOALS_KEY = "__SYSTEM_SMK_WEEKLY_GOALS__";
+const DEFAULT_COMPANY_ID = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
 
 export interface WeekDefinition {
   weekNumber: 1 | 2 | 3 | 4;
@@ -36,16 +40,17 @@ export interface WeeklyGoalsConfig {
   week2: number;
   week3: number;
   week4: number;
+  cycleId?: string;
   updatedAt?: string;
 }
 
-// Meta padrão inicial recomendada (R$ 8.000 mensal / R$ 2.000 por semana)
+// Meta padrão oficial da empresa (R$ 7.000 mensal / R$ 1.750 por semana)
 export const DEFAULT_WEEKLY_GOALS: WeeklyGoalsConfig = {
-  monthlyTarget: 8000,
-  week1: 2000,
-  week2: 2000,
-  week3: 2000,
-  week4: 2000,
+  monthlyTarget: 7000,
+  week1: 1750,
+  week2: 1750,
+  week3: 1750,
+  week4: 1750,
 };
 
 /**
@@ -121,16 +126,42 @@ export function getCycleWeeks(cycle: CycleDefinition): WeekDefinition[] {
 }
 
 /**
- * Chave de armazenamento persistente multi-tenant
+ * Chave de armazenamento persistente multi-tenant (v2 sincronizada com Supabase)
  */
 function getStorageKey(companyId?: string, cycleId?: string): string {
+  const cId = companyId || DEFAULT_COMPANY_ID;
+  const cyc = cycleId || "current";
+  return `smk_weekly_goals_v2_${cId}_${cyc}`;
+}
+
+function getLegacyStorageKey(companyId?: string, cycleId?: string): string {
   const cId = companyId || "default";
   const cyc = cycleId || "current";
   return `smk_weekly_goals_${cId}_${cyc}`;
 }
 
+function saveLocalWeeklyGoalsCache(goals: WeeklyGoalsConfig, companyId?: string, cycleId?: string): void {
+  try {
+    const key = getStorageKey(companyId, cycleId);
+    localStorage.setItem(key, JSON.stringify(goals));
+
+    // Também mantém o planejador de reposição sincronizado no mesmo navegador
+    const rawPlannerGoals = localStorage.getItem("smk_financial_goals_v1");
+    const parsedPlanner = rawPlannerGoals ? JSON.parse(rawPlannerGoals) : {};
+    localStorage.setItem(
+      "smk_financial_goals_v1",
+      JSON.stringify({
+        ...parsedPlanner,
+        monthlyRevenueGoal: goals.monthlyTarget,
+      })
+    );
+  } catch (e) {
+    console.warn("Erro ao atualizar cache local de metas semanais:", e);
+  }
+}
+
 /**
- * Carrega a configuração de metas semanais
+ * Carrega a configuração de metas semanais do cache local (com migração limpa)
  */
 export function loadWeeklyGoals(companyId?: string, cycleId?: string): WeeklyGoalsConfig {
   try {
@@ -142,6 +173,26 @@ export function loadWeeklyGoals(companyId?: string, cycleId?: string): WeeklyGoa
         return parsed;
       }
     }
+
+    // Migrar configuração personalizada da v1 caso não seja o antigo fallback de 8000/2000
+    const legacyKeys = [
+      getLegacyStorageKey(companyId, cycleId),
+      getLegacyStorageKey("default", cycleId),
+    ];
+    for (const lKey of legacyKeys) {
+      const legacyRaw = localStorage.getItem(lKey);
+      if (legacyRaw) {
+        const parsed = JSON.parse(legacyRaw);
+        if (
+          typeof parsed.monthlyTarget === "number" &&
+          typeof parsed.week1 === "number" &&
+          !(parsed.monthlyTarget === 8000 && parsed.week1 === 2000)
+        ) {
+          saveLocalWeeklyGoalsCache(parsed, companyId, cycleId);
+          return parsed;
+        }
+      }
+    }
   } catch (e) {
     console.warn("Erro ao ler metas semanais do localStorage:", e);
   }
@@ -149,26 +200,170 @@ export function loadWeeklyGoals(companyId?: string, cycleId?: string): WeeklyGoa
 }
 
 /**
- * Salva a configuração de metas semanais e dispara evento global
+ * Persiste as metas semanais da empresa no Supabase (compartilhado entre todos os sócios e computadores)
  */
-export function saveWeeklyGoals(
+export async function persistWeeklyGoalsToSupabase(
   goals: WeeklyGoalsConfig,
   companyId?: string,
   cycleId?: string
-): void {
-  try {
-    const key = getStorageKey(companyId, cycleId);
-    const toSave: WeeklyGoalsConfig = {
-      ...goals,
-      updatedAt: new Date().toISOString(),
-    };
-    localStorage.setItem(key, JSON.stringify(toSave));
+): Promise<boolean> {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const targetCycleId = cycleId || "current";
 
-    // Notificar abas e componentes
-    window.dispatchEvent(new CustomEvent("smk-weekly-goals-updated", { detail: toSave }));
-  } catch (e) {
-    console.error("Erro ao salvar metas semanais no localStorage:", e);
+  const payloadItem: WeeklyGoalsConfig = {
+    monthlyTarget: Number(goals.monthlyTarget) || 7000,
+    week1: Number(goals.week1) || 1750,
+    week2: Number(goals.week2) || 1750,
+    week3: Number(goals.week3) || 1750,
+    week4: Number(goals.week4) || 1750,
+    cycleId: targetCycleId,
+    updatedAt: goals.updatedAt || new Date().toISOString(),
+  };
+
+  try {
+    const { data: existingRows, error: fetchErr } = await supabase
+      .from("smoking_orders")
+      .select("id, items")
+      .eq("client_phone", SYSTEM_WEEKLY_GOALS_KEY)
+      .eq("company_id", targetCompanyId)
+      .limit(1);
+
+    if (fetchErr) {
+      console.warn("Aviso ao buscar metas semanais no Supabase:", fetchErr.message);
+      return false;
+    }
+
+    let currentItems: any[] = [];
+    let existingRowId: string | null = null;
+
+    if (existingRows && existingRows.length > 0) {
+      existingRowId = existingRows[0].id;
+      if (Array.isArray(existingRows[0].items)) {
+        currentItems = existingRows[0].items;
+      }
+    }
+
+    // Remove registro anterior do mesmo ciclo e coloca o novo no topo (índice 0 = mais recente da empresa)
+    const filteredItems = currentItems.filter(
+      (item: any) => item && item.cycleId && item.cycleId !== targetCycleId
+    );
+    const updatedItems = [payloadItem, ...filteredItems].slice(0, 24);
+
+    if (existingRowId) {
+      const { error: updErr } = await supabase
+        .from("smoking_orders")
+        .update({ items: updatedItems })
+        .eq("id", existingRowId);
+      if (updErr) {
+        console.warn("Aviso ao atualizar metas semanais no Supabase:", updErr.message);
+        return false;
+      }
+    } else {
+      const { error: insErr } = await supabase
+        .from("smoking_orders")
+        .insert({
+          client_phone: SYSTEM_WEEKLY_GOALS_KEY,
+          client_name: "System Config Weekly Goals",
+          shipping_address: "CONFIG",
+          items: updatedItems,
+          total_amount: 0,
+          company_id: targetCompanyId,
+        });
+      if (insErr) {
+        console.warn("Aviso ao inserir metas semanais no Supabase:", insErr.message);
+        return false;
+      }
+    }
+
+    return true;
+  } catch (err) {
+    console.warn("Exceção ao persistir metas semanais no Supabase:", err);
+    return false;
   }
+}
+
+/**
+ * Extrai as metas semanais diretamente da lista de registros de smoking_orders do Supabase
+ * Se ainda não houver registro no banco para a empresa, inicializa no Supabase automaticamente.
+ */
+export function syncWeeklyGoalsFromOrders(
+  rawOrders: any[],
+  companyId?: string,
+  cycleId?: string
+): WeeklyGoalsConfig {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const targetCycleId = cycleId || "current";
+
+  if (Array.isArray(rawOrders)) {
+    const configRow = rawOrders.find(
+      (o) => o && o.client_phone === SYSTEM_WEEKLY_GOALS_KEY
+    );
+
+    if (configRow && Array.isArray(configRow.items) && configRow.items.length > 0) {
+      const exactCycleMatch = configRow.items.find(
+        (it: any) =>
+          it &&
+          it.cycleId === targetCycleId &&
+          typeof it.monthlyTarget === "number" &&
+          typeof it.week1 === "number"
+      );
+      const latestMatch = configRow.items.find(
+        (it: any) =>
+          it &&
+          typeof it.monthlyTarget === "number" &&
+          typeof it.week1 === "number"
+      );
+
+      const chosen = exactCycleMatch || latestMatch;
+      if (chosen) {
+        const synced: WeeklyGoalsConfig = {
+          monthlyTarget: Number(chosen.monthlyTarget),
+          week1: Number(chosen.week1),
+          week2: Number(chosen.week2),
+          week3: Number(chosen.week3),
+          week4: Number(chosen.week4),
+          cycleId: chosen.cycleId || targetCycleId,
+          updatedAt: chosen.updatedAt,
+        };
+        saveLocalWeeklyGoalsCache(synced, targetCompanyId, targetCycleId);
+        return synced;
+      }
+    }
+  }
+
+  // Caso ainda não exista no Supabase para esta empresa, usa a meta local/padrão (7000 / 1750) e grava no Supabase
+  const fallbackGoals = loadWeeklyGoals(targetCompanyId, targetCycleId);
+  saveLocalWeeklyGoalsCache(fallbackGoals, targetCompanyId, targetCycleId);
+  persistWeeklyGoalsToSupabase(fallbackGoals, targetCompanyId, targetCycleId).catch(() => {});
+  return fallbackGoals;
+}
+
+/**
+ * Salva a configuração de metas semanais (no cache local e no Supabase para todos os sócios) e dispara evento global
+ */
+export async function saveWeeklyGoals(
+  goals: WeeklyGoalsConfig,
+  companyId?: string,
+  cycleId?: string
+): Promise<void> {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const targetCycleId = cycleId || "current";
+
+  const toSave: WeeklyGoalsConfig = {
+    ...goals,
+    cycleId: targetCycleId,
+    updatedAt: new Date().toISOString(),
+  };
+
+  saveLocalWeeklyGoalsCache(toSave, targetCompanyId, targetCycleId);
+
+  // Notificar abas e componentes locais imediatamente
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("smk-weekly-goals-updated", { detail: toSave }));
+  }
+
+  // Persistir globalmente no Supabase para sincronizar no Vercel entre todos os sócios da empresa
+  await persistWeeklyGoalsToSupabase(toSave, targetCompanyId, targetCycleId);
 }
 
 /**
@@ -236,7 +431,7 @@ export function calculateWeeklyPerformances(
     }
 
     const weekProfit = Number(((weekRev - weekCmv) + weekNationalShippingMargin).toFixed(2));
-    const goalForWeek = goals[`week${w.weekNumber}`] || 2000;
+    const goalForWeek = goals[`week${w.weekNumber}`] || 1750;
     const percentage = goalForWeek > 0 ? Math.round((weekRev / goalForWeek) * 100) : 0;
 
     let status: WeekPerformance["status"] = "FUTURE";
