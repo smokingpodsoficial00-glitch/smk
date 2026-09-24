@@ -43,6 +43,7 @@ import {
   Zap,
   Scale,
   Globe,
+  Route,
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { supabase } from "@/lib/supabase";
@@ -1522,6 +1523,30 @@ export default function FinanceDashboard() {
     );
   }, [currentCycle, allValidOrders, weeklyGoalsConfig, persistedProductCosts]);
 
+  // Trajeto da Meta Mensal (Termômetro de Compensação Global do Ciclo)
+  const monthlyTrajectory = useMemo(() => {
+    const totalRealized = weeklyPerformances.reduce((acc, wp) => acc + wp.revenue, 0);
+    const target = weeklyGoalsConfig.monthlyTarget || 7000;
+    const remaining = Math.max(0, target - totalRealized);
+    const progressPerc = target > 0 ? (totalRealized / target) * 100 : 0;
+
+    const [endD, endM, endY] = currentCycle.endDateStr.split("/").map(Number);
+    const cycleEndDate = new Date(endY, endM - 1, endD, 23, 59, 59, 999);
+    const now = new Date();
+    const diffTime = cycleEndDate.getTime() - now.getTime();
+    const remainingDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    const dailyPaceNeeded = remainingDays > 0 ? remaining / remainingDays : 0;
+
+    return {
+      totalRealized,
+      target,
+      remaining,
+      progressPerc,
+      remainingDays,
+      dailyPaceNeeded,
+    };
+  }, [weeklyPerformances, weeklyGoalsConfig.monthlyTarget, currentCycle.endDateStr]);
+
   // Seletores Memoizados para a Área de Faturamento a Longo Prazo
   const selectedMonthlyMetric = useMemo(() => {
     return (
@@ -2564,6 +2589,143 @@ export default function FinanceDashboard() {
               </div>
             );
           })}
+        </div>
+
+        {/* ─── Trajeto da Meta Mensal & Termômetro de Compensação ─── */}
+        <div className="pt-4 border-t border-white/10 space-y-4">
+          {/* Header do Trajeto */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="size-8 rounded-xl bg-gradient-to-br from-emerald-500/20 to-amber-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                <Route className="size-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-white uppercase tracking-wider">
+                    Trajeto da Meta Mensal
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                    {monthlyTrajectory.progressPerc.toFixed(1)}% do mês percorrido
+                  </span>
+                </div>
+                <p className="text-[11px] text-white/50 mt-0.5">
+                  {monthlyTrajectory.totalRealized >= monthlyTrajectory.target ? (
+                    <span className="text-emerald-400 font-bold">🎉 Meta mensal batida com sucesso!</span>
+                  ) : (
+                    <span>
+                      Realizado: <strong className="text-white font-bold">{formatBRL(monthlyTrajectory.totalRealized)}</strong>. Faltam exatamente{" "}
+                      <strong className="text-emerald-300 font-extrabold">{formatBRL(monthlyTrajectory.remaining)}</strong> para a meta de{" "}
+                      <strong className="text-emerald-400 font-bold">{formatBRL(monthlyTrajectory.target)}</strong>.
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Pílulas de Apoio: Dias Restantes & Ritmo Necessário */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl text-xs">
+                <Clock className="size-3.5 text-amber-400 shrink-0" />
+                <span className="text-white/50 text-[11px]">Tempo restante:</span>
+                <span className="font-extrabold text-white text-[11px]">{monthlyTrajectory.remainingDays} dias</span>
+              </div>
+
+              <div className="flex items-center gap-1.5 bg-black/40 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs">
+                <Zap className="size-3.5 text-emerald-400 shrink-0" />
+                <span className="text-white/50 text-[11px]">Ritmo necessário:</span>
+                <span className="font-extrabold text-emerald-400 text-[11px]">
+                  {formatBRL(monthlyTrajectory.dailyPaceNeeded)}/dia
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* A Barra de Trajeto Contínua (Roadmap com os 4 Checkpoints Semanais) */}
+          <div className="space-y-3 bg-black/40 border border-white/10 p-4 rounded-2xl">
+            {/* Linha dos Checkpoints com Marcadores */}
+            <div className="relative pt-2 pb-1">
+              {/* Trilho de Fundo */}
+              <div className="h-3 w-full bg-white/10 rounded-full overflow-hidden relative">
+                {/* Preenchimento Dinâmico de Progresso */}
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-amber-300 rounded-full transition-all duration-700 shadow-[0_0_15px_rgba(52,211,153,0.5)]"
+                  style={{ width: `${Math.min(100, monthlyTrajectory.progressPerc)}%` }}
+                />
+              </div>
+
+              {/* Marcadores das 4 Semanas no Trilho */}
+              <div className="absolute top-1/2 -translate-y-1/2 w-full flex justify-between pointer-events-none px-0.5">
+                {/* Checkpoint S1 (25%) */}
+                <div className="relative left-[25%] -translate-x-1/2 flex flex-col items-center">
+                  <div
+                    className={`size-3 rounded-full border-2 ${
+                      monthlyTrajectory.progressPerc >= 25
+                        ? "bg-emerald-400 border-black ring-2 ring-emerald-500/50"
+                        : "bg-black border-white/30"
+                    }`}
+                  />
+                </div>
+                {/* Checkpoint S2 (50%) */}
+                <div className="relative left-[50%] -translate-x-1/2 flex flex-col items-center">
+                  <div
+                    className={`size-3 rounded-full border-2 ${
+                      monthlyTrajectory.progressPerc >= 50
+                        ? "bg-emerald-400 border-black ring-2 ring-emerald-500/50"
+                        : "bg-black border-white/30"
+                    }`}
+                  />
+                </div>
+                {/* Checkpoint S3 (75%) */}
+                <div className="relative left-[75%] -translate-x-1/2 flex flex-col items-center">
+                  <div
+                    className={`size-3 rounded-full border-2 ${
+                      monthlyTrajectory.progressPerc >= 75
+                        ? "bg-emerald-400 border-black ring-2 ring-emerald-500/50"
+                        : "bg-black border-white/30"
+                    }`}
+                  />
+                </div>
+                {/* Checkpoint Final S4 (100%) */}
+                <div className="relative left-[100%] -translate-x-full flex flex-col items-center">
+                  <div
+                    className={`size-3.5 rounded-full border-2 ${
+                      monthlyTrajectory.progressPerc >= 100
+                        ? "bg-emerald-300 border-black ring-2 ring-emerald-400"
+                        : "bg-black border-white/40"
+                    }`}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Labels das 4 Etapas do Trajeto */}
+            <div className="grid grid-cols-4 text-[10px] pt-1 border-t border-white/5 text-white/50">
+              <div className="text-left">
+                <span className="font-bold text-white/80 block">Semana 1</span>
+                <span>{formatBRL(weeklyGoalsConfig.week1)}</span>
+              </div>
+              <div className="text-center">
+                <span className="font-bold text-white/80 block">Semana 2</span>
+                <span>{formatBRL(weeklyGoalsConfig.week1 + weeklyGoalsConfig.week2)}</span>
+              </div>
+              <div className="text-center">
+                <span className="font-bold text-white/80 block">Semana 3</span>
+                <span>{formatBRL(weeklyGoalsConfig.week1 + weeklyGoalsConfig.week2 + weeklyGoalsConfig.week3)}</span>
+              </div>
+              <div className="text-right">
+                <span className="font-bold text-emerald-400 block">Meta Final</span>
+                <span className="font-extrabold text-white">{formatBRL(monthlyTrajectory.target)}</span>
+              </div>
+            </div>
+
+            {/* Nota de Inteligência e Compensação Automática */}
+            <div className="pt-2 border-t border-white/5 flex items-start gap-2 text-[11px] text-white/60 leading-relaxed">
+              <Sparkles className="size-3.5 text-amber-400 shrink-0 mt-0.5" />
+              <span>
+                <strong className="text-white">Compensação Automática de Metas:</strong> O progresso do mês é contínuo. Como a Semana 2 iniciou dia 21 e você já está em 45% da meta semanal em apenas 2 dias, qualquer excedente vendido nos próximos dias e no final de semana cobrirá automaticamente o déficit da Semana 1, avançando o trajeto rumo aos <strong className="text-emerald-300">{formatBRL(monthlyTrajectory.target)}</strong>!
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
