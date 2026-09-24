@@ -50,7 +50,13 @@ import { useAuth } from "../contexts/AuthContext";
 import { fetchProductCostsMap } from "../lib/productCosts";
 import { NationalSalesModal } from "./NationalSalesModal";
 import { ManualSaleModal } from "./ManualSaleModal";
+import { WeeklyGoalsModal } from "./WeeklyGoalsModal";
 import { isOrderNational } from "@/lib/nationalSales";
+import {
+  type WeeklyGoalsConfig,
+  loadWeeklyGoals,
+  calculateWeeklyPerformances,
+} from "@/lib/weeklyGoals";
 import {
   fetchStockRepurchases,
   createStockRepurchase,
@@ -1120,6 +1126,12 @@ export default function FinanceDashboard() {
   const [isNationalModalOpen, setIsNationalModalOpen] = useState(false);
   const [isNationalManualSaleOpen, setIsNationalManualSaleOpen] = useState(false);
 
+  // Metas Semanais (4 Semanas do Ciclo 14 -> 13)
+  const [weeklyGoalsConfig, setWeeklyGoalsConfig] = useState<WeeklyGoalsConfig>(() =>
+    loadWeeklyGoals(company?.id, currentCycle.id)
+  );
+  const [isWeeklyGoalsModalOpen, setIsWeeklyGoalsModalOpen] = useState(false);
+
   // Financial Metrics State (Correspondente ao Ciclo Vigente)
   const [grossRevenue, setGrossRevenue] = useState(0);
   const [cmv, setCmv] = useState(0);
@@ -1490,6 +1502,25 @@ export default function FinanceDashboard() {
   const totalStockPurchases = allTimeMetrics.stockPurchases;
   const totalFreightRepurchases = allTimeMetrics.freightRepurchases;
   const totalInvestedRepurchases = allTimeMetrics.totalInvestedRepurchases;
+
+  // Sincronizar configuração de Metas Semanais
+  useEffect(() => {
+    const handleGoalsUpdate = () => {
+      setWeeklyGoalsConfig(loadWeeklyGoals(company?.id, currentCycle.id));
+    };
+    window.addEventListener("smk-weekly-goals-updated", handleGoalsUpdate);
+    return () => window.removeEventListener("smk-weekly-goals-updated", handleGoalsUpdate);
+  }, [company?.id, currentCycle.id]);
+
+  // Desempenho Realizado das 4 Semanas do Ciclo Atual (Semana 1 a 4)
+  const weeklyPerformances = useMemo(() => {
+    return calculateWeeklyPerformances(
+      currentCycle,
+      allValidOrders,
+      weeklyGoalsConfig,
+      persistedProductCosts
+    );
+  }, [currentCycle, allValidOrders, weeklyGoalsConfig, persistedProductCosts]);
 
   // Seletores Memoizados para a Área de Faturamento a Longo Prazo
   const selectedMonthlyMetric = useMemo(() => {
@@ -2400,6 +2431,139 @@ export default function FinanceDashboard() {
               </p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ━━━ NOVO BLOCO: 🎯 METAS SEMANAIS DO CICLO (SEMANA 1 A 4) ━━━━━━━━━━━━━━ */}
+      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
+        {/* Cabeçalho da Seção de Metas */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div>
+            <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <Target className="size-5 text-emerald-400" />
+              <span>Metas Semanais do Ciclo</span>
+              <span className="text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-2.5 py-0.5 rounded-full">
+                Ciclo {currentCycle.startDateStr.slice(0, 5)} → {currentCycle.endDateStr.slice(0, 5)}
+              </span>
+            </h3>
+            <p className="text-xs text-white/50 mt-0.5">
+              Ritmo de faturamento dividido nas 4 semanas oficiais. Meta Mensal Vigente:{" "}
+              <strong className="text-emerald-400 font-extrabold">{formatBRL(weeklyGoalsConfig.monthlyTarget)}</strong>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setIsWeeklyGoalsModalOpen(true)}
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-black font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all active:scale-95 cursor-pointer"
+            >
+              <Target className="size-4 stroke-[2.5]" />
+              <span>⚙️ Ajustar Metas</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Os 4 Cards de Metas Semanais */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {weeklyPerformances.map((wp) => {
+            const isCurrent = wp.status === "CURRENT";
+            const isAchieved = wp.status === "ACHIEVED";
+            const isBelow = wp.status === "BELOW";
+
+            return (
+              <div
+                key={wp.week.weekNumber}
+                className={`border rounded-2xl p-5 space-y-3 relative overflow-hidden transition-all shadow-lg ${
+                  isCurrent
+                    ? "bg-gradient-to-b from-emerald-500/15 via-[#0e0e10] to-[#0e0e10] border-emerald-500/50 shadow-emerald-950/30"
+                    : isAchieved
+                    ? "bg-emerald-500/5 border-emerald-500/30"
+                    : isBelow
+                    ? "bg-amber-500/5 border-amber-500/30"
+                    : "bg-[#0e0e10] border-white/10 opacity-75"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-black text-white uppercase tracking-wider block">
+                      {wp.week.label}
+                    </span>
+                    <span className="text-[10px] text-white/50 font-medium">
+                      {wp.week.dateRangeFormatted}
+                    </span>
+                  </div>
+
+                  {isCurrent && (
+                    <span className="text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                      <span className="size-1.5 rounded-full bg-emerald-400" />
+                      Em Andamento
+                    </span>
+                  )}
+                  {isAchieved && (
+                    <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle2 className="size-3" />
+                      Meta Batida
+                    </span>
+                  )}
+                  {isBelow && (
+                    <span className="text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 px-2 py-0.5 rounded-full">
+                      Abaixo da Meta
+                    </span>
+                  )}
+                  {wp.status === "FUTURE" && (
+                    <span className="text-[10px] font-bold bg-white/5 text-white/40 border border-white/10 px-2 py-0.5 rounded-full">
+                      Próxima
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <div className="text-2xl font-black text-white">
+                    {formatBRL(wp.revenue)}
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-white/50 mt-1">
+                    <span>Meta: {formatBRL(wp.goal)}</span>
+                    <span
+                      className={`font-extrabold ${
+                        isAchieved || wp.percentage >= 100
+                          ? "text-emerald-400"
+                          : isCurrent
+                          ? "text-emerald-300"
+                          : "text-white/60"
+                      }`}
+                    >
+                      {wp.percentage}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Barra de Progresso */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-700 ${
+                        wp.percentage >= 100
+                          ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.6)]"
+                          : isCurrent
+                          ? "bg-gradient-to-r from-emerald-500 to-amber-400"
+                          : "bg-amber-400"
+                      }`}
+                      style={{ width: `${Math.min(100, wp.percentage)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-white/40 font-medium">
+                    <span>
+                      {wp.podsSold} {wp.podsSold === 1 ? "pod vendido" : "pods vendidos"}
+                    </span>
+                    <span>
+                      {wp.ordersCount} {wp.ordersCount === 1 ? "pedido" : "pedidos"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -4100,6 +4264,18 @@ export default function FinanceDashboard() {
         onSaleSuccess={() => {
           setIsNationalManualSaleOpen(false);
           fetchFinanceData();
+        }}
+      />
+
+      {/* Modal de Configuração e Ajuste de Metas Semanais */}
+      <WeeklyGoalsModal
+        isOpen={isWeeklyGoalsModalOpen}
+        onClose={() => setIsWeeklyGoalsModalOpen(false)}
+        currentGoals={weeklyGoalsConfig}
+        cycle={currentCycle}
+        companyId={company?.id}
+        onGoalsSaved={(newGoals) => {
+          setWeeklyGoalsConfig(newGoals);
         }}
       />
     </div>

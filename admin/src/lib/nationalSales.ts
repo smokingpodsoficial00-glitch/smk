@@ -10,6 +10,8 @@ export interface NationalSaleInfo {
 
 export interface NationalMetrics {
   totalRevenue: number;
+  totalProductsRevenue: number;
+  totalShippingMargin: number;
   totalProfit: number;
   totalCmv: number;
   totalOrders: number;
@@ -151,7 +153,7 @@ export function extractNationalInfo(order: any): NationalSaleInfo {
 }
 
 /**
- * Calcula métricas financeiras exclusivas de vendas nacionais
+ * Calcula métricas financeiras auditadas exclusivas de vendas nacionais
  */
 export function calculateNationalMetrics(
   orders: any[],
@@ -160,13 +162,16 @@ export function calculateNationalMetrics(
   const nationalOrders = (orders || []).filter((o) => isOrderNational(o));
 
   let totalRevenue = 0;
+  let totalProductsRevenue = 0;
+  let totalShippingMargin = 0;
   let totalCmv = 0;
   let totalPodsSold = 0;
   const stateCounts: Record<string, { count: number; revenue: number }> = {};
 
   for (const order of nationalOrders) {
     const items = Array.isArray(order.items) ? order.items : [];
-    let orderPodCount = 0;
+    let orderProductsRev = 0;
+    let orderCmv = 0;
 
     for (const item of items) {
       const qty = Number(item.quantity) || 1;
@@ -181,28 +186,40 @@ export function calculateNationalMetrics(
       }
       if (!itemCost) itemCost = 65;
 
-      totalRevenue += qty * itemPrice;
-      totalCmv += qty * itemCost;
+      orderProductsRev += qty * itemPrice;
+      orderCmv += qty * itemCost;
       totalPodsSold += qty;
-      orderPodCount += qty;
     }
 
     if (items.length === 0) {
-      totalRevenue += Number(order.total_amount) || 0;
-      totalCmv += (Number(order.total_amount) || 0) * 0.45;
+      orderProductsRev = Number(order.total_amount) || 0;
+      orderCmv = orderProductsRev * 0.45;
       totalPodsSold += 1;
     }
 
     const info = extractNationalInfo(order);
+    const shipCharged = info.shippingFeeCharged || Number(order.shipping_fee) || 0;
+    const shipCost = info.shippingCostReal || 0;
+    const shipMargin = shipCharged - shipCost;
+
+    totalProductsRevenue += orderProductsRev;
+    totalCmv += orderCmv;
+    totalShippingMargin += shipMargin;
+
+    // Faturamento Total Nacional (Valor total pago pelo cliente)
+    const orderTotal = Number(order.total_amount) || (orderProductsRev + shipCharged);
+    totalRevenue += orderTotal;
+
     const uf = info.state || "OUTROS";
     if (!stateCounts[uf]) {
       stateCounts[uf] = { count: 0, revenue: 0 };
     }
     stateCounts[uf].count += 1;
-    stateCounts[uf].revenue += Number(order.total_amount) || 0;
+    stateCounts[uf].revenue += orderTotal;
   }
 
-  const totalProfit = Number((totalRevenue - totalCmv).toFixed(2));
+  // Lucro Líquido Nacional Real = (Receita de Pods - Custo de Pods) + Margem no Frete
+  const totalProfit = Number(((totalProductsRevenue - totalCmv) + totalShippingMargin).toFixed(2));
   const profitMargin = totalRevenue > 0 ? parseFloat(((totalProfit / totalRevenue) * 100).toFixed(1)) : 0;
   const totalOrders = nationalOrders.length;
   const averageTicket = totalOrders > 0 ? Number((totalRevenue / totalOrders).toFixed(2)) : 0;
@@ -217,6 +234,8 @@ export function calculateNationalMetrics(
 
   return {
     totalRevenue: Number(totalRevenue.toFixed(2)),
+    totalProductsRevenue: Number(totalProductsRevenue.toFixed(2)),
+    totalShippingMargin: Number(totalShippingMargin.toFixed(2)),
     totalProfit,
     totalCmv: Number(totalCmv.toFixed(2)),
     totalOrders,

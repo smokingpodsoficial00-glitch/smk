@@ -289,17 +289,24 @@ export function NationalSalesModal({
                 const items = Array.isArray(order.items) ? order.items : [];
                 const isCopied = copiedTrackingId === order.id;
 
-                // Calcular custo e lucro específico desse pedido
+                // Calcular custo e lucro específico desse pedido (Pods + Margem de Frete)
                 let orderCmv = 0;
                 let podCount = 0;
+                let orderProductsRev = 0;
                 for (const it of items) {
                   const qty = Number(it.quantity) || 1;
                   const itemCost = Number(it.cost_price || it.costPrice) || persistedCosts[it.product_id] || 65;
+                  const itemPrice = Number(it.price || it.unit_price) || 0;
+                  orderProductsRev += qty * itemPrice;
                   orderCmv += qty * itemCost;
                   podCount += qty;
                 }
-                const orderRev = Number(order.total_amount) || 0;
-                const orderProfit = Number((orderRev - orderCmv).toFixed(2));
+                const shipCharged = info.shippingFeeCharged || Number(order.shipping_fee) || 0;
+                const shipCost = info.shippingCostReal || 0;
+                const shippingMargin = shipCharged - shipCost;
+                const productProfit = orderProductsRev - orderCmv;
+                const orderProfit = Number((productProfit + shippingMargin).toFixed(2));
+                const orderRev = Number(order.total_amount) || (orderProductsRev + shipCharged);
 
                 const formattedDate = order.created_at
                   ? new Date(order.created_at).toLocaleDateString("pt-BR", {
@@ -352,6 +359,11 @@ export function NationalSalesModal({
                           <div className="text-[10px] font-bold text-emerald-400">
                             +{formatBRL(orderProfit)} lucro
                           </div>
+                          {shippingMargin !== 0 && (
+                            <div className="text-[9px] text-white/40 font-medium">
+                              (Pods: +{formatBRL(productProfit)} · Frete: +{formatBRL(shippingMargin)})
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

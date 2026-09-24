@@ -5,7 +5,7 @@
  * Exemplo: 14/08/2026 -> 13/09/2026 (Ciclo de Agosto/2026).
  */
 
-import { isOrderNational } from "./nationalSales";
+import { isOrderNational, extractNationalInfo } from "./nationalSales";
 
 export interface CycleDefinition {
   id: string; // Ex: "2026-08"
@@ -247,12 +247,18 @@ export function calculateMetricsForCycle(
   let cmvSum = 0;
   let shippingSum = 0;
   let podsSoldSum = 0;
+  let nationalShippingProfitSum = 0;
 
   for (const order of cycleOrders) {
     const shippingFee = parseFloat(order.shipping_fee || 0);
     // Vendas Nacionais (Correios/fora de SP) não somam no frete de entregas locais (motoboy)
     if (!isOrderNational(order)) {
       shippingSum += shippingFee;
+    } else {
+      const info = extractNationalInfo(order);
+      const shipCharged = info.shippingFeeCharged || shippingFee;
+      const shipCost = info.shippingCostReal || 0;
+      nationalShippingProfitSum += (shipCharged - shipCost);
     }
 
     const items = Array.isArray(order.items) ? order.items : [];
@@ -278,7 +284,8 @@ export function calculateMetricsForCycle(
     }
   }
 
-  const netProfit = Number((revenueSum - cmvSum).toFixed(2));
+  // Lucro Líquido Real = Lucro dos Produtos + Lucro/Margem do Frete Nacional
+  const netProfit = Number((revenueSum - cmvSum + nationalShippingProfitSum).toFixed(2));
   const profitMargin = revenueSum > 0 ? parseFloat(((netProfit / revenueSum) * 100).toFixed(1)) : 0;
   const totalOrders = cycleOrders.length;
 
@@ -286,8 +293,8 @@ export function calculateMetricsForCycle(
   const freightRepurchases = Number(cycleRepurchases.reduce((sum, r) => sum + (Number(r.freight_amount) || 0), 0).toFixed(2));
   const totalInvestedRepurchases = Number((stockPurchases + freightRepurchases).toFixed(2));
 
-  // Caixa Real do ciclo: Faturamento do ciclo menos recompras do ciclo
-  const realCash = Number((revenueSum - stockPurchases).toFixed(2));
+  // Caixa Real do ciclo: Faturamento dos produtos + Lucro de frete nacional menos recompras do ciclo
+  const realCash = Number((revenueSum + nationalShippingProfitSum - stockPurchases).toFixed(2));
 
   const averageTicket = totalOrders > 0 ? Number((revenueSum / totalOrders).toFixed(2)) : 0;
   const averagePricePerPod = podsSoldSum > 0 ? Number((revenueSum / podsSoldSum).toFixed(2)) : 0;
@@ -631,10 +638,18 @@ export function calculateAllTimeMetrics(
   let cmvSum = 0;
   let shippingSum = 0;
   let podsSoldSum = 0;
+  let nationalShippingProfitSum = 0;
 
   for (const order of validOrders) {
     const shippingFee = parseFloat(order.shipping_fee || 0);
-    shippingSum += shippingFee;
+    if (!isOrderNational(order)) {
+      shippingSum += shippingFee;
+    } else {
+      const info = extractNationalInfo(order);
+      const shipCharged = info.shippingFeeCharged || shippingFee;
+      const shipCost = info.shippingCostReal || 0;
+      nationalShippingProfitSum += (shipCharged - shipCost);
+    }
 
     const items = Array.isArray(order.items) ? order.items : [];
     for (const item of items) {
@@ -659,7 +674,8 @@ export function calculateAllTimeMetrics(
     }
   }
 
-  const netProfit = Number((revenueSum - cmvSum).toFixed(2));
+  // Lucro Líquido Real Histórico = Lucro dos Produtos + Lucro/Margem do Frete Nacional
+  const netProfit = Number((revenueSum - cmvSum + nationalShippingProfitSum).toFixed(2));
   const profitMargin = revenueSum > 0 ? parseFloat(((netProfit / revenueSum) * 100).toFixed(1)) : 0;
   const totalOrders = validOrders.length;
 
@@ -691,8 +707,8 @@ export function calculateAllTimeMetrics(
     }
   }
 
-  // Caixa puramente operacional (Vendas - Compras de Reposição)
-  const operationalCash = revenueSum - stockPurchases;
+  // Caixa puramente operacional (Vendas + Lucro Frete Nacional - Compras de Reposição)
+  const operationalCash = (revenueSum + nationalShippingProfitSum) - stockPurchases;
 
   // Caixa Real (Operacional + Injeções em Caixa - Retiradas)
   const realCash = Number((operationalCash + capitalInflows - capitalOutflows).toFixed(2));
