@@ -386,7 +386,7 @@ export default function PartnersDashboard() {
         </div>
 
         {/* Ações Rápidas */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={async () => {
@@ -400,42 +400,42 @@ export default function PartnersDashboard() {
               }
             }}
             disabled={isValidating}
-            className="px-3 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/15 border border-white/20 text-white transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+            className="px-3 py-2.5 sm:py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/15 border border-white/20 text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
             title="Executar bateria controlada de 18 testes do Bloco 8"
           >
-            <ShieldCheck className="size-3.5 text-white" />
-            <span>{isValidating ? 'Validando...' : 'Validar Sociedade'}</span>
+            <ShieldCheck className="size-3.5 text-white shrink-0" />
+            <span className="truncate">{isValidating ? 'Validando...' : 'Validar Sociedade'}</span>
           </button>
 
           <button
             onClick={() => setShowDilutionModal(true)}
-            className="px-3 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/15 border border-white/20 text-white transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+            className="px-3 py-2.5 sm:py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/15 border border-white/20 text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
           >
-            <Calculator className="size-3.5 text-white/80" />
-            <span>Simulador de Aportes</span>
+            <Calculator className="size-3.5 text-white/80 shrink-0" />
+            <span className="truncate">Simulador Aportes</span>
           </button>
 
           <button
             onClick={() => setShowNewPartnerModal(true)}
-            className="px-3 py-2 rounded-xl text-xs font-bold bg-[#141416] hover:bg-[#1a1a1d] border border-white/10 text-white transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+            className="px-3 py-2.5 sm:py-2 rounded-xl text-xs font-bold bg-[#141416] hover:bg-[#1a1a1d] border border-white/10 text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
           >
-            <UserPlus className="size-3.5 text-white/80" />
-            <span>Cadastrar Sócio</span>
+            <UserPlus className="size-3.5 text-white/80 shrink-0" />
+            <span className="truncate">Cadastrar Sócio</span>
           </button>
 
           <button
             onClick={() => handleOpenTransactionModal('DESPESA_OPERACIONAL')}
-            className="px-3 py-2 rounded-xl text-xs font-bold bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-orange-300 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+            className="px-3 py-2.5 sm:py-2 rounded-xl text-xs font-bold bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-orange-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
           >
-            <Building2 className="size-3.5 text-orange-400" />
-            <span>Lançar Custo da Empresa</span>
+            <Building2 className="size-3.5 text-orange-400 shrink-0" />
+            <span className="truncate">Custo da Empresa</span>
           </button>
 
           <button
             onClick={() => handleOpenTransactionModal('APORTE')}
-            className="px-4 py-2 rounded-xl text-xs font-extrabold bg-white hover:bg-slate-100 text-black transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)]"
+            className="col-span-2 sm:col-span-1 px-4 py-2.5 sm:py-2 rounded-xl text-xs font-extrabold bg-white hover:bg-slate-100 text-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)]"
           >
-            <Plus className="size-3.5 stroke-[3]" />
+            <Plus className="size-3.5 stroke-[3] shrink-0" />
             <span>Novo Aporte / Retirada</span>
           </button>
         </div>

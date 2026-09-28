@@ -386,39 +386,60 @@ export default function KanbanBoard() {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#050505] relative">
-      <header className="h-16 px-6 flex items-center justify-between border-b border-white/5 shrink-0 bg-[#070707]">
-        <div>
-          <h2 className="text-sm font-bold tracking-tight text-white">Painel de Pedidos</h2>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider font-mono">tempo real ativo</span>
+      <header className="py-3 px-4 sm:px-6 sm:h-16 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-white/5 shrink-0 bg-[#070707]">
+        <div className="flex items-center justify-between sm:block">
+          <div>
+            <h2 className="text-sm font-bold tracking-tight text-white">Painel de Pedidos</h2>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[9px] text-white/40 uppercase font-semibold tracking-wider font-mono">tempo real ativo</span>
+            </div>
+          </div>
+
+          {/* Botões rápidos no mobile ao lado do título */}
+          <div className="flex sm:hidden items-center gap-2">
+            <button
+              onClick={() => setIsPushModalOpen(true)}
+              title="Ativar App e Notificações de Venda no Celular"
+              className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-[11px] font-extrabold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+            >
+              <Bell className="size-3.5" />
+              <span>Alertas</span>
+            </button>
+
+            <button
+              onClick={() => setIsManualSaleOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-black text-[11px] font-extrabold flex items-center gap-1 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-95 cursor-pointer"
+            >
+              <Plus className="size-3.5 stroke-[3]" />
+              <span>Nova Venda</span>
+            </button>
           </div>
         </div>
 
         {/* Ações e Abas Principais */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={() => setIsPushModalOpen(true)}
             title="Ativar App e Notificações de Venda no Celular"
-            className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-extrabold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+            className="hidden sm:flex px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-extrabold items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
           >
             <Bell className="size-3.5" />
-            <span className="hidden sm:inline">Notificações no Celular</span>
-            <span className="sm:hidden">Alertas</span>
+            <span>Notificações no Celular</span>
           </button>
 
           <button
             onClick={() => setIsManualSaleOpen(true)}
-            className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] active:scale-95 cursor-pointer"
+            className="hidden sm:flex px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-extrabold items-center gap-1.5 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] active:scale-95 cursor-pointer"
           >
             <Plus className="size-3.5 stroke-[3]" />
             <span>Registrar Venda</span>
           </button>
 
-          <div className="flex items-center gap-1 bg-[#121212]/50 p-1 rounded-xl border border-white/10">
+          <div className="grid grid-cols-2 sm:flex items-center gap-1 bg-[#121212]/50 p-1 rounded-xl border border-white/10 w-full sm:w-auto">
             <button
               onClick={() => setActiveTab('kanban')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-center justify-center cursor-pointer ${
                 activeTab === 'kanban' 
                   ? 'bg-white/10 text-white font-extrabold border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.15)]' 
                   : 'text-white/50 hover:text-white'
@@ -428,7 +449,7 @@ export default function KanbanBoard() {
             </button>
             <button
               onClick={() => setActiveTab('concluidos')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 activeTab === 'concluidos' 
                   ? 'bg-white/10 text-white font-extrabold border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.15)]' 
                   : 'text-white/50 hover:text-white'
@@ -464,12 +485,12 @@ export default function KanbanBoard() {
 
       {/* Conteúdo da Aba: KANBAN EM ANDAMENTO (3 ETAPAS LOGÍSTICAS REAIS) */}
       {activeTab === 'kanban' && (
-        <div className="flex-1 overflow-hidden p-6 flex flex-col gap-4 min-h-0 bg-[#070707]/30">
-          <div data-tour="kanban-pedidos" className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-5 xl:gap-7 min-h-0">
+        <div className="flex-1 overflow-y-auto md:overflow-hidden p-3 sm:p-6 flex flex-col gap-4 min-h-0 bg-[#070707]/30 custom-scrollbar">
+          <div data-tour="kanban-pedidos" className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 xl:gap-7 min-h-0">
             {columns.filter(c => c.status !== 'AGUARDANDO_PAGAMENTO').map(col => {
               const colOrders = orders.filter(o => o.status === col.status);
               return (
-                <div key={col.title} className="flex flex-col h-full max-h-full min-w-0 min-h-0 overflow-hidden bg-[#0a0a0a]/60 border border-white/5 rounded-2xl p-4">
+                <div key={col.title} className="flex flex-col md:h-full md:max-h-full min-w-0 md:min-h-0 md:overflow-hidden bg-[#0a0a0a]/60 border border-white/5 rounded-2xl p-4">
                   <div className="flex items-center justify-between px-1 shrink-0 pb-3 border-b border-white/5">
                     <div className="flex items-center gap-2">
                       <div className={`size-2.5 rounded-full ${col.color}`} />
