@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ensureBuyerInBroadcastList } from "@/lib/marketingLists";
 import { BRAZILIAN_STATES } from "@/lib/nationalSales";
+import { notifyMobileSale } from "@/lib/saleNotifications";
 import {
   ShoppingCart,
   User,
@@ -669,6 +670,18 @@ export function ManualSaleModal({
           console.warn("Aviso ao incluir cliente na lista de marketing:", mktErr);
         }
       }
+
+      // 6. Disparar Notificação Push no Celular dos Sócios (100% isolado e não-bloqueante)
+      void notifyMobileSale({
+        companyId,
+        clientName: clientName.trim(),
+        items: effectiveItems,
+        totalAmount: grandTotal,
+        estimatedProfit,
+        paymentMethod,
+        isNationalSale,
+        nationalState: isNationalSale ? nationalState : undefined,
+      });
 
       if (clientSaveWarning) {
         setSuccessMessage(`✅ Venda registrada com sucesso! (${clientSaveWarning})`);
