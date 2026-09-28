@@ -2992,9 +2992,9 @@ export default function FinanceDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
           {/* Card 1: Ticket Médio */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-5 space-y-1.5 sm:space-y-2 hover:border-white/30 transition-all">
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
             <span className="text-[10px] sm:text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
               <ReceiptText className="size-3.5 sm:size-4 text-white/70 shrink-0" />
               <span className="truncate">Ticket Médio</span>
@@ -3003,15 +3003,15 @@ export default function FinanceDashboard() {
               {formatBRL(averageTicket)}
             </div>
             <p className="text-[11px] sm:text-xs text-white/50">
-              Valor médio por compra.
+              Valor médio por compra
             </p>
-            <div className="pt-2 border-t border-white/10 text-[9.5px] sm:text-[10px] text-white/40 font-medium">
+            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
               Fat. ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalOrders} ped
             </div>
           </div>
 
           {/* Card 2: Margem Média Líquida (%) */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-5 space-y-1.5 sm:space-y-2 hover:border-white/30 transition-all">
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
             <span className="text-[10px] sm:text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
               <Percent className="size-3.5 sm:size-4 text-emerald-400 shrink-0" />
               <span className="truncate">Margem Média</span>
@@ -3020,15 +3020,15 @@ export default function FinanceDashboard() {
               {averageNetMarginPercent.toFixed(1)}%
             </div>
             <p className="text-[11px] sm:text-xs text-white/50">
-              Margem líquida média.
+              Margem líquida média
             </p>
-            <div className="pt-2 border-t border-white/10 text-[9.5px] sm:text-[10px] text-emerald-400/70 font-medium">
+            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
               Lucro Líquido ÷ Faturamento
             </div>
           </div>
 
           {/* Card 3: Margem por Pedido */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-5 space-y-1.5 sm:space-y-2 hover:border-white/30 transition-all">
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
             <span className="text-[10px] sm:text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
               <TrendingUp className="size-3.5 sm:size-4 text-emerald-400 shrink-0" />
               <span className="truncate">Lucro / Pedido</span>
@@ -3037,15 +3037,15 @@ export default function FinanceDashboard() {
               {formatBRL(averageNetProfitPerOrder)}
             </div>
             <p className="text-[11px] sm:text-xs text-white/50">
-              Ganho médio por pedido.
+              Ganho médio por pedido
             </p>
-            <div className="pt-2 border-t border-white/10 text-[9.5px] sm:text-[10px] text-emerald-400/70 font-medium">
+            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
               Lucro ({formatBRL(allTimeMetrics.netProfit)}) ÷ {allTimeMetrics.totalOrders} ped
             </div>
           </div>
 
           {/* Card 4: Preço Médio por Pod */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-5 space-y-1.5 sm:space-y-2 hover:border-white/30 transition-all">
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
             <span className="text-[10px] sm:text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
               <Box className="size-3.5 sm:size-4 text-white/70 shrink-0" />
               <span className="truncate">Preço / Pod</span>
@@ -3054,9 +3054,9 @@ export default function FinanceDashboard() {
               {formatBRL(averagePricePerPod)}
             </div>
             <p className="text-[11px] sm:text-xs text-white/50">
-              Preço médio por pod.
+              Preço médio por pod
             </p>
-            <div className="pt-2 border-t border-white/10 text-[9.5px] sm:text-[10px] text-white/40 font-medium">
+            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
               Fat. ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalPodsSold} pods
             </div>
           </div>
@@ -3335,66 +3335,66 @@ export default function FinanceDashboard() {
             {selectedMonthlyMetric ? (
               <div className="space-y-4">
                 {/* 4 Cards Principais do Ciclo Selecionado */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
                   {/* Card 1: Faturamento */}
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
-                      Faturamento Bruto Real
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
+                      Faturamento Bruto
                     </span>
-                    <div className="text-2xl font-extrabold text-white">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white">
                       {formatBRL(selectedMonthlyMetric.grossRevenue)}
                     </div>
                     <EvolutionBadge evolution={monthlyEvolution.grossRevenue} />
-                    <p className="text-[11px] text-white/50">
-                      {selectedMonthlyMetric.totalOrders} pedidos ({selectedMonthlyMetric.totalPodsSold} pods)
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      {selectedMonthlyMetric.totalOrders} ped ({selectedMonthlyMetric.totalPodsSold} pods)
                     </p>
                   </div>
 
                   {/* Card 2: CMV */}
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
                       Custo Reposição (CMV)
                     </span>
-                    <div className="text-2xl font-extrabold text-red-400">
+                    <div className="text-lg sm:text-2xl font-extrabold text-red-400">
                       {formatBRL(selectedMonthlyMetric.cmv)}
                     </div>
                     <EvolutionBadge evolution={monthlyEvolution.cmv} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Custo de mercadoria do ciclo
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Custo de mercadoria
                     </p>
                   </div>
 
                   {/* Card 3: Frete */}
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
-                      Frete Logística (Cobrado)
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
+                      Frete e Logística
                     </span>
-                    <div className="text-2xl font-extrabold text-white/80">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white/80">
                       {formatBRL(selectedMonthlyMetric.logisticsFee)}
                     </div>
                     <EvolutionBadge evolution={monthlyEvolution.logisticsFee} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Diluído nas entregas do ciclo
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Entregas do ciclo
                     </p>
                   </div>
 
                   {/* Card 4: Lucro Líquido */}
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block">
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block truncate">
                       Lucro Líquido Real
                     </span>
-                    <div className="text-2xl font-black text-emerald-300">
+                    <div className="text-lg sm:text-2xl font-black text-emerald-300">
                       {formatBRL(selectedMonthlyMetric.netProfit)}
                     </div>
                     <EvolutionBadge evolution={monthlyEvolution.netProfit} />
-                    <p className="text-[11px] font-bold text-emerald-400">
-                      Margem Líquida: {selectedMonthlyMetric.profitMargin}%
+                    <p className="text-[10px] sm:text-[11px] font-bold text-emerald-400">
+                      Margem: {selectedMonthlyMetric.profitMargin}%
                     </p>
                   </div>
                 </div>
 
-                {/* 4 Indicadores Secundários do Ciclo Selecionado */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-black/30 border border-white/10 rounded-2xl p-4 text-xs">
+                {/* 4 Indicadores Secundários do Ciclo Selecionado (Visível no PC) */}
+                <div className="hidden sm:grid grid-cols-2 sm:grid-cols-4 gap-3 bg-black/30 border border-white/10 rounded-2xl p-4 text-xs">
                   <div>
                     <span className="text-white/50 block text-[10px] uppercase font-semibold">Ticket Médio</span>
                     <span className="text-white font-extrabold text-sm">{formatBRL(selectedMonthlyMetric.averageTicket)}</span>
@@ -3524,56 +3524,56 @@ export default function FinanceDashboard() {
             {selectedQuarter ? (
               <div className="space-y-4">
                 {/* 4 KPIs Consolidados do Trimestre */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
                       Faturamento Trimestral
                     </span>
-                    <div className="text-2xl font-extrabold text-white">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white">
                       {formatBRL(selectedQuarter.grossRevenue)}
                     </div>
                     <EvolutionBadge evolution={quarterlyEvolution.grossRevenue} />
-                    <p className="text-[11px] text-white/50">
-                      {selectedQuarter.totalOrders} pedidos ({selectedQuarter.totalPodsSold} pods)
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      {selectedQuarter.totalOrders} ped ({selectedQuarter.totalPodsSold} pods)
                     </p>
                   </div>
 
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
                       CMV Trimestral
                     </span>
-                    <div className="text-2xl font-extrabold text-red-400">
+                    <div className="text-lg sm:text-2xl font-extrabold text-red-400">
                       {formatBRL(selectedQuarter.cmv)}
                     </div>
                     <EvolutionBadge evolution={quarterlyEvolution.cmv} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Custo total de reposição nos 3 ciclos
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Custo nos 3 ciclos
                     </p>
                   </div>
 
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
-                      Frete Logística Trimestral
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
+                      Frete Trimestral
                     </span>
-                    <div className="text-2xl font-extrabold text-white/80">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white/80">
                       {formatBRL(selectedQuarter.logisticsFee)}
                     </div>
                     <EvolutionBadge evolution={quarterlyEvolution.logisticsFee} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Fretes cobrados nos 3 ciclos
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Fretes nos 3 ciclos
                     </p>
                   </div>
 
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block">
-                      Lucro Líquido Trimestral
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block truncate">
+                      Lucro Líquido Trim.
                     </span>
-                    <div className="text-2xl font-black text-emerald-300">
+                    <div className="text-lg sm:text-2xl font-black text-emerald-300">
                       {formatBRL(selectedQuarter.netProfit)}
                     </div>
                     <EvolutionBadge evolution={quarterlyEvolution.netProfit} />
-                    <p className="text-[11px] font-bold text-emerald-400">
-                      Margem Média: {selectedQuarter.profitMargin}%
+                    <p className="text-[10px] sm:text-[11px] font-bold text-emerald-400">
+                      Margem: {selectedQuarter.profitMargin}%
                     </p>
                   </div>
                 </div>
@@ -3654,56 +3654,56 @@ export default function FinanceDashboard() {
             {selectedSemester ? (
               <div className="space-y-4">
                 {/* 4 KPIs Consolidados do Semestre */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
                       Faturamento Semestral
                     </span>
-                    <div className="text-2xl font-extrabold text-white">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white">
                       {formatBRL(selectedSemester.grossRevenue)}
                     </div>
                     <EvolutionBadge evolution={semiannualEvolution.grossRevenue} />
-                    <p className="text-[11px] text-white/50">
-                      {selectedSemester.totalOrders} pedidos ({selectedSemester.totalPodsSold} pods)
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      {selectedSemester.totalOrders} ped ({selectedSemester.totalPodsSold} pods)
                     </p>
                   </div>
 
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
                       CMV Semestral
                     </span>
-                    <div className="text-2xl font-extrabold text-red-400">
+                    <div className="text-lg sm:text-2xl font-extrabold text-red-400">
                       {formatBRL(selectedSemester.cmv)}
                     </div>
                     <EvolutionBadge evolution={semiannualEvolution.cmv} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Custo total de reposição nos 6 ciclos
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Custo nos 6 ciclos
                     </p>
                   </div>
 
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
-                      Frete Logística Semestral
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
+                      Frete Semestral
                     </span>
-                    <div className="text-2xl font-extrabold text-white/80">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white/80">
                       {formatBRL(selectedSemester.logisticsFee)}
                     </div>
                     <EvolutionBadge evolution={semiannualEvolution.logisticsFee} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Fretes cobrados nos 6 ciclos
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Fretes nos 6 ciclos
                     </p>
                   </div>
 
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block">
-                      Lucro Líquido Semestral
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block truncate">
+                      Lucro Líquido Sem.
                     </span>
-                    <div className="text-2xl font-black text-emerald-300">
+                    <div className="text-lg sm:text-2xl font-black text-emerald-300">
                       {formatBRL(selectedSemester.netProfit)}
                     </div>
                     <EvolutionBadge evolution={semiannualEvolution.netProfit} />
-                    <p className="text-[11px] font-bold text-emerald-400">
-                      Margem Média: {selectedSemester.profitMargin}%
+                    <p className="text-[10px] sm:text-[11px] font-bold text-emerald-400">
+                      Margem: {selectedSemester.profitMargin}%
                     </p>
                   </div>
                 </div>
@@ -3784,56 +3784,56 @@ export default function FinanceDashboard() {
             {selectedYear ? (
               <div className="space-y-4">
                 {/* 4 KPIs Consolidados do Ano */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
                       Faturamento Anual
                     </span>
-                    <div className="text-2xl font-extrabold text-white">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white">
                       {formatBRL(selectedYear.grossRevenue)}
                     </div>
                     <EvolutionBadge evolution={annualEvolution.grossRevenue} />
-                    <p className="text-[11px] text-white/50">
-                      {selectedYear.totalOrders} pedidos ({selectedYear.totalPodsSold} pods)
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      {selectedYear.totalOrders} ped ({selectedYear.totalPodsSold} pods)
                     </p>
                   </div>
 
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
                       CMV Anual
                     </span>
-                    <div className="text-2xl font-extrabold text-red-400">
+                    <div className="text-lg sm:text-2xl font-extrabold text-red-400">
                       {formatBRL(selectedYear.cmv)}
                     </div>
                     <EvolutionBadge evolution={annualEvolution.cmv} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Custo total de reposição no ano
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Custo no ano
                     </p>
                   </div>
 
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
-                      Frete Logística Anual
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
+                      Frete Anual
                     </span>
-                    <div className="text-2xl font-extrabold text-white/80">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white/80">
                       {formatBRL(selectedYear.logisticsFee)}
                     </div>
                     <EvolutionBadge evolution={annualEvolution.logisticsFee} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Fretes cobrados no ano
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Fretes no ano
                     </p>
                   </div>
 
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block">
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block truncate">
                       Lucro Líquido Anual
                     </span>
-                    <div className="text-2xl font-black text-emerald-300">
+                    <div className="text-lg sm:text-2xl font-black text-emerald-300">
                       {formatBRL(selectedYear.netProfit)}
                     </div>
                     <EvolutionBadge evolution={annualEvolution.netProfit} />
-                    <p className="text-[11px] font-bold text-emerald-400">
-                      Margem Média: {selectedYear.profitMargin}%
+                    <p className="text-[10px] sm:text-[11px] font-bold text-emerald-400">
+                      Margem: {selectedYear.profitMargin}%
                     </p>
                   </div>
                 </div>
@@ -3939,15 +3939,15 @@ export default function FinanceDashboard() {
         {longTermTab === "comparativo" && (
           <div className="space-y-4">
             {/* 1. Barra Superior de Seleção dos Dois Ciclos para Benchmark */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3 rounded-2xl">
-              <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3.5 rounded-2xl">
+              <div className="grid grid-cols-1 sm:flex sm:items-center gap-2.5 flex-wrap w-full sm:w-auto">
                 {/* Seletor Mês Base (Verde) */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-white/70">Mês Base:</span>
+                <div className="flex items-center justify-between sm:justify-start gap-2">
+                  <span className="text-[11px] font-bold text-white/70 shrink-0">Mês Base:</span>
                   <select
                     value={compBaseCycle?.cycle.id}
                     onChange={(e) => setCompBaseCycleId(e.target.value)}
-                    className="bg-black/90 border border-emerald-500/50 rounded-xl px-2.5 py-1 text-xs font-bold text-emerald-400 focus:outline-none focus:border-emerald-400 cursor-pointer"
+                    className="bg-black/90 border border-emerald-500/50 rounded-xl px-2.5 py-1.5 sm:py-1 text-xs font-bold text-emerald-400 focus:outline-none focus:border-emerald-400 cursor-pointer flex-1 sm:flex-initial"
                   >
                     {monthlyCycles.map((m) => (
                       <option key={`base-${m.cycle.id}`} value={m.cycle.id} className="bg-[#121214] text-white">
@@ -3957,15 +3957,15 @@ export default function FinanceDashboard() {
                   </select>
                 </div>
 
-                <span className="text-white/30 text-xs font-mono font-bold">vs</span>
+                <span className="hidden sm:inline text-white/30 text-xs font-mono font-bold">vs</span>
 
                 {/* Seletor Mês Comparado (Roxo) */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-white/70">Comparar com:</span>
+                <div className="flex items-center justify-between sm:justify-start gap-2">
+                  <span className="text-[11px] font-bold text-white/70 shrink-0">Comparar com:</span>
                   <select
                     value={compTargetCycle?.cycle.id}
                     onChange={(e) => setCompTargetCycleId(e.target.value)}
-                    className="bg-black/90 border border-purple-500/50 rounded-xl px-2.5 py-1 text-xs font-bold text-purple-300 focus:outline-none focus:border-purple-400 cursor-pointer"
+                    className="bg-black/90 border border-purple-500/50 rounded-xl px-2.5 py-1.5 sm:py-1 text-xs font-bold text-purple-300 focus:outline-none focus:border-purple-400 cursor-pointer flex-1 sm:flex-initial"
                   >
                     {monthlyCycles.map((m) => (
                       <option key={`comp-${m.cycle.id}`} value={m.cycle.id} className="bg-[#121214] text-white">
@@ -3983,10 +3983,10 @@ export default function FinanceDashboard() {
 
             {/* 2. Placar Executivo Head-to-Head (5 KPIs Compactos) */}
             {compMetrics && compBaseCycle && compTargetCycle && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-2.5">
                 {/* 1. Faturamento Bruto */}
-                <div className="bg-black/40 border border-white/10 rounded-2xl p-3 space-y-1">
-                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider block">
+                <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-3 space-y-1.5">
+                  <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider block">
                     Faturamento Bruto
                   </span>
                   <div className="text-base sm:text-lg font-black text-white">
@@ -4002,8 +4002,8 @@ export default function FinanceDashboard() {
                 </div>
 
                 {/* 2. Lucro Líquido Real */}
-                <div className="bg-black/40 border border-white/10 rounded-2xl p-3 space-y-1">
-                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider block">
+                <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-3 space-y-1.5">
+                  <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider block">
                     Lucro Líquido Real
                   </span>
                   <div className="text-base sm:text-lg font-black text-emerald-400">
@@ -4019,8 +4019,8 @@ export default function FinanceDashboard() {
                 </div>
 
                 {/* 3. Pods Vendidos */}
-                <div className="bg-black/40 border border-white/10 rounded-2xl p-3 space-y-1">
-                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider block">
+                <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-3 space-y-1.5">
+                  <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider block">
                     Pods Vendidos
                   </span>
                   <div className="text-base sm:text-lg font-black text-white">
@@ -4035,8 +4035,8 @@ export default function FinanceDashboard() {
                 </div>
 
                 {/* 4. Ticket Médio */}
-                <div className="bg-black/40 border border-white/10 rounded-2xl p-3 space-y-1">
-                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider block">
+                <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-3 space-y-1.5">
+                  <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider block">
                     Ticket Médio
                   </span>
                   <div className="text-base sm:text-lg font-black text-white">
@@ -4051,8 +4051,8 @@ export default function FinanceDashboard() {
                 </div>
 
                 {/* 5. Margem Líquida */}
-                <div className="bg-black/40 border border-white/10 rounded-2xl p-3 space-y-1 col-span-2 sm:col-span-1">
-                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider block">
+                <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-3 space-y-1.5 col-span-2 sm:col-span-1">
+                  <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider block">
                     Margem Líquida
                   </span>
                   <div className="text-base sm:text-lg font-black text-cyan-300">
