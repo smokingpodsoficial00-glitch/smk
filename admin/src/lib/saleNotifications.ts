@@ -88,7 +88,7 @@ export async function notifyMobileSale(payload: SaleMobileNotificationPayload): 
         topic,
         title: `💰 Nova Venda! R$ ${totalFormatted}`,
         message: lines.join("\n"),
-        priority: 4,
+        priority: 5,
         tags: ["moneybag", "white_check_mark"],
       }),
     });
