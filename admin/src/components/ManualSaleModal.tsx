@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ensureBuyerInBroadcastList } from "@/lib/marketingLists";
@@ -14,9 +14,37 @@ import {
   Trash2,
   Megaphone,
   Globe,
-  MapPin,
-  Truck,
+  Search,
+  ChevronDown,
+  Phone,
 } from "lucide-react";
+
+const normalizeText = (str: string) =>
+  (str || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const formatDisplayPhone = (rawPhone: string) => {
+  if (!rawPhone) return "Sem número";
+  if (
+    rawPhone.startsWith("INSTA_") ||
+    rawPhone.startsWith("SEM_WPP_") ||
+    rawPhone.toLowerCase().includes("instagram")
+  ) {
+    return "Instagram / Sem WhatsApp";
+  }
+  const digits = rawPhone.replace(/\D/g, "");
+  const local = digits.length >= 12 && digits.startsWith("55") ? digits.slice(2) : digits;
+  if (local.length === 11) {
+    return `(${local.slice(0, 2)}) ${local.slice(2, 7)}-${local.slice(7)}`;
+  }
+  if (local.length === 10) {
+    return `(${local.slice(0, 2)}) ${local.slice(2, 6)}-${local.slice(6)}`;
+  }
+  return rawPhone;
+};
 
 interface ManualSaleModalProps {
   isOpen: boolean;
@@ -42,6 +70,14 @@ export function ManualSaleModal({
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [productsList, setProductsList] = useState<any[]>([]);
   const [clientsList, setClientsList] = useState<any[]>([]);
+
+  // Estados da Busca Inteligente de Clientes Existentes
+  const [clientSearchQuery, setClientSearchQuery] = useState("");
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+  const [highlightedClientIdx, setHighlightedClientIdx] = useState(0);
+  const [selectedExistingClientPhone, setSelectedExistingClientPhone] = useState<string>("");
+  const clientPickerRef = useRef<HTMLDivElement>(null);
+  const clientSearchInputRef = useRef<HTMLInputElement>(null);
 
   // Dados do Cliente
   const [clientName, setClientName] = useState("");
@@ -85,6 +121,17 @@ export function ManualSaleModal({
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
+  // Fechar dropdown de clientes ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (clientPickerRef.current && !clientPickerRef.current.contains(event.target as Node)) {
+        setIsClientDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // Carregar produtos e clientes limpos do Supabase
   useEffect(() => {
     if (!isOpen) return;
@@ -109,72 +156,94 @@ export function ManualSaleModal({
           prodsQuery = prodsQuery.eq("company_id", companyId);
         }
 
-        const { data: prods, error: pErr } = await prodsQuery;
-
-        if (!pErr && prods) {
-          setProductsList(prods);
-        }
-
-        // 2. Buscar Clientes Oficiais de smoking_clients (com fallback seguro para smoking_orders)
+        // 2. Buscar Clientes Oficiais de smoking_clients E histórico de smoking_orders em paralelo
         let clientsQuery = supabase
           .from("smoking_clients")
           .select("name, phone, address")
           .order("name", { ascending: true });
 
+        let ordersQuery = supabase
+          .from("smoking_orders")
+          .select("client_name, client_phone, shipping_address")
+          .order("created_at", { ascending: false })
+          .limit(300);
+
         if (isOfficialStore) {
           clientsQuery = clientsQuery.or(`company_id.eq.${companyId},company_id.is.null`);
+          ordersQuery = ordersQuery.or(`company_id.eq.${companyId},company_id.is.null`);
         } else {
           clientsQuery = clientsQuery.eq("company_id", companyId);
+          ordersQuery = ordersQuery.eq("company_id", companyId);
         }
 
-        const { data: dbClients } = await clientsQuery;
+        const [{ data: prods, error: pErr }, { data: dbClients }, { data: orders }] = await Promise.all([
+          prodsQuery,
+          clientsQuery,
+          ordersQuery,
+        ]);
+
+        if (!pErr && prods) {
+          setProductsList(prods);
+        }
+
+        const mergedClients = new Map<string, { client_name: string; client_phone: string; shipping_address: string }>();
+
+        const getClientLookupKey = (rawPhone: string, rawName: string) => {
+          const p = (rawPhone || "").trim();
+          if (p.startsWith("INSTA_") || p.startsWith("SEM_WPP_") || p.toLowerCase().includes("instagram")) {
+            return p;
+          }
+          const digits = p.replace(/\D/g, "");
+          if (digits) {
+            return digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
+          }
+          return normalizeText(rawName);
+        };
 
         if (dbClients && dbClients.length > 0) {
-          const uniqueClients = dbClients.map((c) => ({
-            client_name: c.name || "",
-            client_phone: c.phone || "",
-            shipping_address: c.address || "",
-          }));
-          setClientsList(uniqueClients);
-        } else {
-          let ordersQuery = supabase
-            .from("smoking_orders")
-            .select("client_name, client_phone, shipping_address")
-            .order("created_at", { ascending: false })
-            .limit(100);
-
-          if (isOfficialStore) {
-            ordersQuery = ordersQuery.or(`company_id.eq.${companyId},company_id.is.null`);
-          } else {
-            ordersQuery = ordersQuery.eq("company_id", companyId);
-          }
-
-          const { data: orders } = await ordersQuery;
-
-          if (orders) {
-            const uniqueClients = new Map<string, any>();
-            orders.forEach((o) => {
-              const phone = (o.client_phone || "").trim();
-              const name = (o.client_name || "").trim();
-
-              if (
-                phone &&
-                !phone.startsWith("__SYSTEM_") &&
-                !name.toLowerCase().includes("system") &&
-                !name.toLowerCase().includes("config")
-              ) {
-                if (!uniqueClients.has(phone)) {
-                  uniqueClients.set(phone, {
-                    client_name: name,
-                    client_phone: phone,
-                    shipping_address: o.shipping_address || "",
-                  });
-                }
-              }
-            });
-            setClientsList(Array.from(uniqueClients.values()));
-          }
+          dbClients.forEach((c) => {
+            const name = (c.name || "").trim();
+            const phone = (c.phone || "").trim();
+            if (!name || phone.startsWith("__SYSTEM_") || name.toLowerCase().includes("system")) return;
+            const key = getClientLookupKey(phone, name);
+            if (key && !mergedClients.has(key)) {
+              mergedClients.set(key, {
+                client_name: name,
+                client_phone: phone,
+                shipping_address: c.address || "",
+              });
+            }
+          });
         }
+
+        if (orders && orders.length > 0) {
+          orders.forEach((o) => {
+            const phone = (o.client_phone || "").trim();
+            const name = (o.client_name || "").trim();
+            if (
+              !name ||
+              !phone ||
+              phone.startsWith("__SYSTEM_") ||
+              name.toLowerCase().includes("system") ||
+              name.toLowerCase().includes("config")
+            ) {
+              return;
+            }
+            const key = getClientLookupKey(phone, name);
+            if (key && !mergedClients.has(key)) {
+              mergedClients.set(key, {
+                client_name: name,
+                client_phone: phone,
+                shipping_address: o.shipping_address || "",
+              });
+            }
+          });
+        }
+
+        const sortedClients = Array.from(mergedClients.values()).sort((a, b) =>
+          a.client_name.localeCompare(b.client_name, "pt-BR", { sensitivity: "base" })
+        );
+        setClientsList(sortedClients);
       } catch (err) {
         console.error("Erro ao carregar catálogo para venda manual:", err);
       } finally {
@@ -303,12 +372,90 @@ export function ManualSaleModal({
   // Lucro Total Líquido
   const estimatedProfit = productProfit + shippingProfit;
 
+  // Busca inteligente de clientes por nome ou telefone (coloca o melhor match sempre no topo)
+  const filteredAndRankedClients = useMemo(() => {
+    const rawQuery = clientSearchQuery.trim();
+    if (!rawQuery) return clientsList;
+
+    const qText = normalizeText(rawQuery);
+    const qDigits = rawQuery.replace(/\D/g, "");
+
+    const scored: Array<{ client: any; score: number }> = [];
+
+    for (const c of clientsList) {
+      const cName = normalizeText(c.client_name || "");
+      const cPhoneRaw = (c.client_phone || "").toLowerCase();
+      const cDigits = (c.client_phone || "").replace(/\D/g, "");
+      const cLocalDigits = cDigits.length >= 12 && cDigits.startsWith("55") ? cDigits.slice(2) : cDigits;
+      const cNumberWithoutDdd = cLocalDigits.length >= 10 ? cLocalDigits.slice(2) : cLocalDigits;
+
+      let score = 0;
+
+      // 1. Match por Nome
+      if (qText) {
+        if (cName === qText) {
+          score = Math.max(score, 100);
+        } else if (cName.startsWith(qText)) {
+          score = Math.max(score, 85);
+        } else if (cName.split(/\s+/).some((word) => word.startsWith(qText))) {
+          score = Math.max(score, 70);
+        } else if (cName.includes(qText)) {
+          score = Math.max(score, 45);
+        }
+      }
+
+      // 2. Match por Telefone / Número
+      if (qDigits) {
+        if (cLocalDigits === qDigits || cDigits === qDigits || cNumberWithoutDdd === qDigits) {
+          score = Math.max(score, 100);
+        } else if (
+          cLocalDigits.startsWith(qDigits) ||
+          cNumberWithoutDdd.startsWith(qDigits) ||
+          cDigits.startsWith(qDigits)
+        ) {
+          score = Math.max(score, 80);
+        } else if (cDigits.includes(qDigits) || cLocalDigits.includes(qDigits)) {
+          score = Math.max(score, 55);
+        }
+      } else if (qText && cPhoneRaw.includes(qText)) {
+        score = Math.max(score, 35);
+      }
+
+      if (score > 0) {
+        scored.push({ client: c, score });
+      }
+    }
+
+    scored.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return (a.client.client_name || "").localeCompare(b.client.client_name || "", "pt-BR", {
+        sensitivity: "base",
+      });
+    });
+
+    return scored.map((item) => item.client);
+  }, [clientsList, clientSearchQuery]);
+
   // Preencher dados ao selecionar cliente recente
-  const handleSelectExistingClient = (phone: string) => {
-    const found = clientsList.find((c) => c.client_phone === phone);
+  const handleSelectExistingClient = (clientObjOrPhone: any) => {
+    const found =
+      typeof clientObjOrPhone === "string"
+        ? clientsList.find((c) => c.client_phone === clientObjOrPhone)
+        : clientObjOrPhone;
+
     if (found) {
+      setSelectedExistingClientPhone(found.client_phone || found.client_name);
+      setClientSearchQuery("");
+      setIsClientDropdownOpen(false);
+      setHighlightedClientIdx(0);
+
       setClientName(found.client_name || "");
-      if (found.client_phone && (found.client_phone.startsWith("INSTA_") || found.client_phone.startsWith("SEM_WPP_") || found.client_phone.includes("Instagram"))) {
+      if (
+        found.client_phone &&
+        (found.client_phone.startsWith("INSTA_") ||
+          found.client_phone.startsWith("SEM_WPP_") ||
+          found.client_phone.includes("Instagram"))
+      ) {
         setIsNoWhatsApp(true);
         setClientPhone("");
         setAutoAddToMarketingList(false);
@@ -323,13 +470,25 @@ export function ManualSaleModal({
         setIsNationalSale(true);
         if (match[1]) setNationalState(match[1].toUpperCase());
         if (match[2]) setNationalCity(match[2].trim());
-        const clean = rawAddr.replace(/\[(?:ENVIO )?NACIONAL:[^\]]+\]\s*/gi, "").replace(/\|\s*Rastreio:[^|]+$/gi, "").trim();
+        const clean = rawAddr
+          .replace(/\[(?:ENVIO )?NACIONAL:[^\]]+\]\s*/gi, "")
+          .replace(/\|\s*Rastreio:[^|]+$/gi, "")
+          .trim();
         setNationalStreetAddress(clean);
         setShippingAddress(clean);
       } else {
         setShippingAddress(rawAddr);
       }
     }
+  };
+
+  const handleClearSelectedClient = () => {
+    setSelectedExistingClientPhone("");
+    setClientSearchQuery("");
+    setClientName("");
+    setClientPhone("");
+    setIsNoWhatsApp(false);
+    setShippingAddress("");
   };
 
   // Finalizar e Registrar Venda
@@ -524,6 +683,9 @@ export function ManualSaleModal({
         setItems([]);
         setClientName("");
         setClientPhone("");
+        setSelectedExistingClientPhone("");
+        setClientSearchQuery("");
+        setIsClientDropdownOpen(false);
         setIsNoWhatsApp(false);
         setShippingAddress("");
         setSelectedModelKey("");
@@ -592,24 +754,229 @@ export function ManualSaleModal({
 
             {/* 1. DADOS DO CLIENTE */}
             <div className="space-y-3 bg-white/5 border border-white/10 rounded-2xl p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-xs uppercase font-bold text-amber-400 tracking-wider flex items-center gap-1.5">
                   <User className="size-3.5" /> 1. Dados do Cliente
                 </span>
                 {clientsList.length > 0 && (
-                  <select
-                    onChange={(e) => handleSelectExistingClient(e.target.value)}
-                    className="bg-black/60 border border-white/10 rounded-lg text-xs text-muted-foreground px-2.5 py-1 focus:outline-none focus:border-amber-400/50 cursor-pointer"
-                  >
-                    <option value="">-- Selecionar Cliente Existente --</option>
-                    {clientsList.map((c) => (
-                      <option key={c.client_phone} value={c.client_phone}>
-                        {c.client_name} ({c.client_phone})
-                      </option>
-                    ))}
-                  </select>
+                  <span className="text-[10px] font-bold text-white/50 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
+                    {clientsList.length} clientes salvos
+                  </span>
                 )}
               </div>
+
+              {/* CAMPO INTELIGENTE DE BUSCA E SELEÇÃO DE CLIENTE EXISTENTE */}
+              {clientsList.length > 0 && (
+                <div ref={clientPickerRef} className="relative">
+                  <div
+                    onClick={() => {
+                      setIsClientDropdownOpen(true);
+                      setTimeout(() => clientSearchInputRef.current?.focus(), 10);
+                    }}
+                    className={`flex items-center gap-2 w-full bg-black/60 border rounded-xl px-3 py-2.5 transition-all cursor-text ${
+                      isClientDropdownOpen
+                        ? "border-amber-400/70 ring-2 ring-amber-500/15 bg-black/80"
+                        : selectedExistingClientPhone
+                        ? "border-emerald-500/40 bg-emerald-500/5"
+                        : "border-white/15 hover:border-amber-400/40"
+                    }`}
+                  >
+                    <Search
+                      className={`size-4 shrink-0 ${
+                        isClientDropdownOpen
+                          ? "text-amber-400"
+                          : selectedExistingClientPhone
+                          ? "text-emerald-400"
+                          : "text-white/40"
+                      }`}
+                    />
+                    <input
+                      ref={clientSearchInputRef}
+                      type="text"
+                      value={clientSearchQuery}
+                      onFocus={() => setIsClientDropdownOpen(true)}
+                      onChange={(e) => {
+                        setClientSearchQuery(e.target.value);
+                        setIsClientDropdownOpen(true);
+                        setHighlightedClientIdx(0);
+                      }}
+                      onKeyDown={(e) => {
+                        if (!isClientDropdownOpen && (e.key === "ArrowDown" || e.key === "Enter")) {
+                          setIsClientDropdownOpen(true);
+                          return;
+                        }
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setHighlightedClientIdx((prev) =>
+                            Math.min(prev + 1, Math.max(0, filteredAndRankedClients.length - 1))
+                          );
+                        } else if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setHighlightedClientIdx((prev) => Math.max(0, prev - 1));
+                        } else if (e.key === "Enter" && isClientDropdownOpen) {
+                          e.preventDefault();
+                          const target =
+                            filteredAndRankedClients[highlightedClientIdx] || filteredAndRankedClients[0];
+                          if (target) {
+                            handleSelectExistingClient(target);
+                          }
+                        } else if (e.key === "Escape") {
+                          setIsClientDropdownOpen(false);
+                        }
+                      }}
+                      placeholder={
+                        selectedExistingClientPhone && clientName
+                          ? `✓ Selecionado: ${clientName} — Clique para buscar outro nome ou número...`
+                          : "Pesquisar cliente salvo por nome ou telefone (Ex: Samuel ou 96120)..."
+                      }
+                      className={`w-full bg-transparent text-xs focus:outline-none font-semibold ${
+                        selectedExistingClientPhone && !clientSearchQuery
+                          ? "placeholder:text-emerald-400 text-white"
+                          : "placeholder:text-white/45 text-white"
+                      }`}
+                    />
+
+                    {(clientSearchQuery || selectedExistingClientPhone) && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (clientSearchQuery) {
+                            setClientSearchQuery("");
+                            setHighlightedClientIdx(0);
+                            clientSearchInputRef.current?.focus();
+                          } else {
+                            handleClearSelectedClient();
+                          }
+                        }}
+                        title="Limpar pesquisa / seleção"
+                        className="p-1 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-colors cursor-pointer shrink-0"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsClientDropdownOpen((prev) => !prev);
+                        if (!isClientDropdownOpen) {
+                          setTimeout(() => clientSearchInputRef.current?.focus(), 10);
+                        }
+                      }}
+                      className="p-1 rounded-lg hover:bg-white/10 text-white/50 hover:text-amber-400 transition-colors cursor-pointer shrink-0"
+                      title="Abrir lista de clientes"
+                    >
+                      <ChevronDown
+                        className={`size-4 transition-transform duration-150 ${
+                          isClientDropdownOpen ? "rotate-180 text-amber-400" : ""
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* LISTA SUSPENSA INTELIGENTE DE CLIENTES */}
+                  {isClientDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-[#16161a] border border-amber-500/30 rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                      <div className="px-3 py-2 bg-black/50 border-b border-white/10 flex items-center justify-between text-[10px] text-white/50">
+                        <span>
+                          {clientSearchQuery.trim()
+                            ? `${filteredAndRankedClients.length} resultado(s) encontrado(s) — melhor resultado no topo`
+                            : `Todos os clientes salvos (${filteredAndRankedClients.length})`}
+                        </span>
+                        <span className="text-amber-400/80 font-semibold hidden sm:inline">
+                          Clique ou pressione Enter ↵
+                        </span>
+                      </div>
+
+                      {filteredAndRankedClients.length === 0 ? (
+                        <div className="p-5 text-center space-y-1.5">
+                          <p className="text-xs font-semibold text-white/70">
+                            Nenhum cliente encontrado para "{clientSearchQuery}"
+                          </p>
+                          <p className="text-[11px] text-white/40">
+                            Você pode preencher os campos abaixo para cadastrar este novo cliente na venda.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="max-h-60 overflow-y-auto divide-y divide-white/5 custom-scrollbar">
+                          {filteredAndRankedClients.map((c, idx) => {
+                            const isTopResult = idx === 0 && clientSearchQuery.trim().length > 0;
+                            const isHighlighted = idx === highlightedClientIdx;
+                            const displayPhone = formatDisplayPhone(c.client_phone);
+                            const initials = (c.client_name || "CL")
+                              .trim()
+                              .split(/\s+/)
+                              .slice(0, 2)
+                              .map((part: string) => part[0]?.toUpperCase() || "")
+                              .join("");
+
+                            return (
+                              <button
+                                key={`${c.client_phone}_${idx}`}
+                                type="button"
+                                onMouseEnter={() => setHighlightedClientIdx(idx)}
+                                onClick={() => handleSelectExistingClient(c)}
+                                className={`w-full px-3.5 py-2.5 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer ${
+                                  isHighlighted
+                                    ? "bg-amber-500/15 text-white"
+                                    : "hover:bg-white/5 text-white/85"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div
+                                    className={`size-8 rounded-xl flex items-center justify-center text-[11px] font-extrabold shrink-0 border ${
+                                      isTopResult
+                                        ? "bg-amber-500/25 text-amber-300 border-amber-500/40"
+                                        : "bg-white/5 text-white/70 border-white/10"
+                                    }`}
+                                  >
+                                    {initials || "CL"}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-bold text-white truncate">
+                                        {c.client_name}
+                                      </span>
+                                      {isTopResult && (
+                                        <span className="text-[9px] font-extrabold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-md shrink-0">
+                                          ★ Topo da Busca
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-[11px] text-white/50 font-mono truncate">
+                                      <Phone className="size-2.5 text-emerald-400 shrink-0" />
+                                      <span>{displayPhone}</span>
+                                      {!c.client_phone?.startsWith("INSTA_") &&
+                                        !c.client_phone?.startsWith("SEM_WPP_") &&
+                                        displayPhone !== c.client_phone && (
+                                          <span className="text-[10px] text-white/30">
+                                            ({c.client_phone})
+                                          </span>
+                                        )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-1 rounded-lg border shrink-0 transition-all ${
+                                    isHighlighted
+                                      ? "bg-amber-500 text-black border-amber-400"
+                                      : "bg-white/5 text-white/50 border-white/10"
+                                  }`}
+                                >
+                                  Selecionar
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
