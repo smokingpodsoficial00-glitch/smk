@@ -39,27 +39,17 @@ export interface PayrollOverview {
 }
 
 /**
- * Identifica se um cadastro de "sócio" é na verdade a conta/entidade da própria empresa (ex: "Smoking Pods")
+ * Mantido por compatibilidade de assinatura (nunca bloqueia nomes de sócios)
  */
-export function isCompanyEntityPartner(partnerName?: string | null): boolean {
-  if (!partnerName) return false;
-  const normalized = partnerName.trim().toLowerCase();
-  return (
-    normalized === "smoking pods" ||
-    normalized === "smolking pods" ||
-    normalized === "empresa" ||
-    normalized === "caixa da loja" ||
-    normalized === "loja"
-  );
+export function isCompanyEntityPartner(_partnerName?: string | null): boolean {
+  return false;
 }
 
 /**
- * Filtra apenas os sócios reais (pessoas físicas), ignorando eventual terceiro card criado para a empresa
+ * Retorna todos os sócios ativos cadastrados na empresa (suporta qualquer quantidade de sócios)
  */
 export function filterRealHumanPartners(partners: Partner[]): Partner[] {
-  return (partners || []).filter(
-    (p) => p.is_active !== false && !isCompanyEntityPartner(p.name)
-  );
+  return (partners || []).filter((p) => p.is_active !== false);
 }
 
 /**
@@ -67,23 +57,10 @@ export function filterRealHumanPartners(partners: Partner[]): Partner[] {
  */
 export function isCompanyExpenseTransaction(
   tx: PartnerTransaction | any,
-  partners: Partner[] = []
+  _partners: Partner[] = []
 ): boolean {
   if (!tx) return false;
   if (tx.type === "DESPESA_OPERACIONAL") return true;
-
-  // Se foi lançada anteriormente no perfil fictício "Smoking Pods" como saída
-  if (tx.type === "RETIRADA_CAPITAL") {
-    if (isCompanyEntityPartner(tx.partner_name)) return true;
-    if (tx.partner_id) {
-      const found = partners.find((p) => p.id === tx.partner_id);
-      if (found && isCompanyEntityPartner(found.name)) return true;
-    }
-    if (tx.description && tx.description.toLowerCase().includes("smoking pods")) {
-      return true;
-    }
-  }
-
   return false;
 }
 

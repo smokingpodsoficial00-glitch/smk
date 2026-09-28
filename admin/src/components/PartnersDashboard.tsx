@@ -15,7 +15,6 @@ import {
   fetchPartnerTransactions,
   deletePartnerTransaction,
   updatePartnerTransaction,
-  deletePartner,
   calculatePartnersFinancials,
   type Partner,
   type PartnerTransaction,
@@ -31,7 +30,6 @@ import {
   syncPayrollConfigFromOrders,
   savePayrollConfigToSupabase,
   calculatePayrollOverview,
-  isCompanyEntityPartner,
   isCompanyExpenseTransaction,
   type PayrollConfig
 } from '@/lib/partnerPayroll';
@@ -242,11 +240,6 @@ export default function PartnersDashboard() {
     });
   }, [partners, transactions, payrollConfig, currentCycleMetrics.netProfit, financials.netProfitRealized, currentCycleMetrics.cycle.id]);
 
-  // Verificar se ainda existe o card fictício "Smoking Pods" cadastrado como sócio
-  const companyEntityPartners = useMemo(() => {
-    return partners.filter(p => isCompanyEntityPartner(p.name));
-  }, [partners]);
-
   const handleSavePayrollConfig = async (newConfig: PayrollConfig) => {
     setPayrollConfig(newConfig);
     await savePayrollConfigToSupabase(newConfig, targetCompanyId);
@@ -260,24 +253,6 @@ export default function PartnersDashboard() {
     };
     setPayrollConfig(updated);
     await savePayrollConfigToSupabase(updated, targetCompanyId);
-  };
-
-  const handleRemoveCompanyEntityPartner = async (entityPartner: Partner) => {
-    // Reclassifica eventuais saídas desse perfil para DESPESA_OPERACIONAL sem perder o histórico
-    const entityTxs = transactions.filter(t => t.partner_id === entityPartner.id);
-    for (const tx of entityTxs) {
-      await updatePartnerTransaction(
-        tx.id,
-        {
-          partner_id: null,
-          type: 'DESPESA_OPERACIONAL',
-          description: tx.description || 'Custo operacional da empresa'
-        },
-        targetCompanyId
-      );
-    }
-    await deletePartner(entityPartner.id, targetCompanyId);
-    loadAllData();
   };
 
   // 3. Resolução e Filtragem de Transações
@@ -391,7 +366,7 @@ export default function PartnersDashboard() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
+    <div className="flex-1 h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
       {/* ━━━ CABEÇALHO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div>
@@ -465,31 +440,6 @@ export default function PartnersDashboard() {
           </button>
         </div>
       </header>
-
-      {/* Aviso Inteligente caso o 3º Sócio "Smoking Pods" ainda exista no banco */}
-      {companyEntityPartners.length > 0 && (
-        <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-xl bg-orange-500/20 text-orange-400 shrink-0">
-              <Building2 className="size-5" />
-            </div>
-            <div>
-              <h3 className="text-xs font-bold text-orange-300 uppercase tracking-wider">
-                Terceiro Sócio "{companyEntityPartners[0].name}" Detectado
-              </h3>
-              <p className="text-xs text-white/75 mt-0.5">
-                Você não precisa mais manter um 3º sócio para lançar os custos da loja! Ele já foi ocultado da divisão societária e seus gastos foram vinculados aos <strong>Custos da Empresa</strong>. Deseja remover o cadastro fictício mantendo os lançamentos intactos?
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => handleRemoveCompanyEntityPartner(companyEntityPartners[0])}
-            className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shrink-0 cursor-pointer transition-all shadow-md"
-          >
-            Remover 3º Sócio Fictício
-          </button>
-        </div>
-      )}
 
       {/* ━━━ BARRA DE COMPOSIÇÃO SOCIETÁRIA ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-4 sm:p-5 space-y-3 shadow-lg">
@@ -626,8 +576,8 @@ export default function PartnersDashboard() {
         </div>
       </div>
 
-      {/* ━━━ NOVO SETOR DE PAGAMENTOS, SALÁRIOS & REINVESTIMENTO ━━━━━━━━━━━━ */}
-      <div className="bg-[#0e0e10] border border-purple-500/25 rounded-2xl p-5 space-y-5 shadow-xl relative overflow-hidden">
+      {/* ━━━ SETOR DE PAGAMENTOS, SALÁRIOS & REINVESTIMENTO ━━━━━━━━━━━━━━━━ */}
+      <div className="bg-[#0e0e10] border border-purple-500/25 rounded-2xl p-5 space-y-5 shadow-xl relative">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/10 pb-4">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2.5">
