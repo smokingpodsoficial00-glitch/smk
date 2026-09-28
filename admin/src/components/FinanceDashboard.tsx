@@ -44,6 +44,7 @@ import {
   Scale,
   Globe,
   Route,
+  Building2,
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { supabase } from "@/lib/supabase";
@@ -52,6 +53,7 @@ import { fetchProductCostsMap } from "../lib/productCosts";
 import { NationalSalesModal } from "./NationalSalesModal";
 import { ManualSaleModal } from "./ManualSaleModal";
 import { WeeklyGoalsModal } from "./WeeklyGoalsModal";
+import { NewTransactionModal } from "./partners/NewTransactionModal";
 import { isOrderNational } from "@/lib/nationalSales";
 import {
   type WeeklyGoalsConfig,
@@ -1137,6 +1139,9 @@ export default function FinanceDashboard() {
   // Financial Metrics State (Correspondente ao Ciclo Vigente)
   const [grossRevenue, setGrossRevenue] = useState(0);
   const [cmv, setCmv] = useState(0);
+  const [companyExpenses, setCompanyExpenses] = useState(0);
+  const [partnersList, setPartnersList] = useState<any[]>([]);
+  const [isCompanyExpenseModalOpen, setIsCompanyExpenseModalOpen] = useState(false);
   const [logisticsFee, setLogisticsFee] = useState(0);
   const [netProfit, setNetProfit] = useState(0);
   const [profitMargin, setProfitMargin] = useState(0);
@@ -1200,7 +1205,7 @@ export default function FinanceDashboard() {
       setFinanceError(null);
 
       // Executa todas as consultas financeiras em paralelo para carregamento ultrarrápido
-      const [persistedCostsRes, ordersRes, productsRes, repurchasesRes, partnerTxRes] = await Promise.all([
+      const [persistedCostsRes, ordersRes, productsRes, repurchasesRes, partnerTxRes, partnersRes] = await Promise.all([
         fetchProductCostsMap(targetCompanyId).catch(() => ({})),
         supabase
           .from("smoking_orders")
@@ -1219,6 +1224,10 @@ export default function FinanceDashboard() {
           .order("purchase_date", { ascending: false }),
         supabase
           .from("smoking_partner_transactions")
+          .select("*")
+          .eq("company_id", targetCompanyId),
+        supabase
+          .from("smoking_partners")
           .select("*")
           .eq("company_id", targetCompanyId)
       ]);
@@ -1295,7 +1304,9 @@ export default function FinanceDashboard() {
       setPersistedProductCosts(persistedCosts);
       
       const loadedPartnerTxs = partnerTxRes?.data || [];
+      const loadedPartners = partnersRes?.data || [];
       setPartnerTransactions(loadedPartnerTxs);
+      setPartnersList(loadedPartners);
 
       // 1. Estoque Físico na Prateleira
       let totalStockCostSum = 0;
@@ -1343,9 +1354,17 @@ export default function FinanceDashboard() {
       const syncedGoals = syncWeeklyGoalsFromOrders(rawOrders, targetCompanyId, curCycle.id);
       setWeeklyGoalsConfig(syncedGoals);
 
-      const curCycleMetrics = calculateMetricsForCycle(curCycle, validOrders, loadedRepurchases, persistedCosts);
+      const curCycleMetrics = calculateMetricsForCycle(
+        curCycle,
+        validOrders,
+        loadedRepurchases,
+        persistedCosts,
+        loadedPartnerTxs,
+        loadedPartners
+      );
       setGrossRevenue(curCycleMetrics.grossRevenue);
       setCmv(curCycleMetrics.cmv);
+      setCompanyExpenses(curCycleMetrics.companyExpenses || 0);
       setLogisticsFee(curCycleMetrics.logisticsFee);
       setNetProfit(curCycleMetrics.netProfit);
       setProfitMargin(curCycleMetrics.profitMargin);
@@ -1375,7 +1394,13 @@ export default function FinanceDashboard() {
       setBrandSales(brandList);
 
       // 4. Gerar Histórico de Longo Prazo (Mensal, Trimestral, Semestral e Anual)
-      const historicalMonths = generateHistoricalMonthlyCycles(validOrders, loadedRepurchases, persistedCosts);
+      const historicalMonths = generateHistoricalMonthlyCycles(
+        validOrders,
+        loadedRepurchases,
+        persistedCosts,
+        loadedPartnerTxs,
+        loadedPartners
+      );
       setMonthlyCycles(historicalMonths);
 
       // Selecionar o ciclo mensal fechado mais recente (ex: Agosto/2026) por padrão para consulta imediata
@@ -1490,17 +1515,25 @@ export default function FinanceDashboard() {
       })
       .subscribe();
 
+    const subPartnerTx = supabase
+      .channel("finance_partner_tx_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partner_transactions" }, () => {
+        fetchFinanceData();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(subOrders);
       supabase.removeChannel(subProducts);
       supabase.removeChannel(subRepurchases);
+      supabase.removeChannel(subPartnerTx);
     };
   }, [user, company?.id, companyUser, authLoading]);
 
   // ── All-Time Metrics (Histórico Completo para Eficiência Comercial & Caixa Real Atual) ──
   const allTimeMetrics = useMemo(() => {
-    return calculateAllTimeMetrics(allValidOrders, repurchases, persistedProductCosts, partnerTransactions);
-  }, [allValidOrders, repurchases, persistedProductCosts, partnerTransactions]);
+    return calculateAllTimeMetrics(allValidOrders, repurchases, persistedProductCosts, partnerTransactions, partnersList);
+  }, [allValidOrders, repurchases, persistedProductCosts, partnerTransactions, partnersList]);
 
   // CAIXA REAL ATUAL: Posição patrimonial viva da empresa (NÃO reinicia no dia 14)
   // Conforme regra fundamental: Faturamento total acumulado - total pago em recompras
@@ -2400,24 +2433,40 @@ export default function FinanceDashboard() {
             )}
           </div>
 
-          {/* 2. Custo de Reposição (CMV) */}
-          <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
-                Custo de Reposição (CMV)
-              </span>
-              <div className="size-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
-                <TrendingDown className="size-4" />
+          {/* 2. Custos da Empresa (Substitui antigo Custo de Reposição CMV) */}
+          <div className="bg-[#0e0e10] border border-orange-500/25 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-orange-500/40 transition-all flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-orange-300/90 uppercase tracking-wider">
+                  Custos da Empresa
+                </span>
+                <div className="size-8 rounded-xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-center text-orange-400">
+                  <Building2 className="size-4" />
+                </div>
+              </div>
+
+              <div>
+                <div className="text-2xl sm:text-3xl font-extrabold text-orange-400">
+                  {formatBRL(companyExpenses)}
+                </div>
+                <p className="text-xs font-medium text-white/50 mt-1">
+                  Despesas operacionais do ciclo · Acumulado: {formatBRL(allTimeMetrics.companyExpenses || 0)}
+                </p>
               </div>
             </div>
 
-            <div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-red-400">
-                {formatBRL(cmv)}
-              </div>
-              <p className="text-xs font-medium text-white/50 mt-1">
-                Custo dos pods vendidos
-              </p>
+            <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+              <span className="text-[10px] text-white/40 font-medium">
+                Abatido do Caixa e Lucro
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsCompanyExpenseModalOpen(true)}
+                className="text-[10px] font-bold text-orange-300 hover:text-white bg-orange-500/15 hover:bg-orange-500/30 border border-orange-500/30 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="size-3" />
+                <span>Lançar Custo</span>
+              </button>
             </div>
           </div>
 
@@ -4446,6 +4495,20 @@ export default function FinanceDashboard() {
           setWeeklyGoalsConfig(newGoals);
         }}
       />
+
+      {/* Modal de Lançamento Rápido de Custo da Empresa direto pelo Financeiro */}
+      {isCompanyExpenseModalOpen && (
+        <NewTransactionModal
+          isOpen={isCompanyExpenseModalOpen}
+          onClose={() => setIsCompanyExpenseModalOpen(false)}
+          onTransactionCreated={() => {
+            fetchFinanceData();
+          }}
+          partners={partnersList}
+          companyId={company?.id}
+          defaultType="DESPESA_OPERACIONAL"
+        />
+      )}
     </div>
   );
 }

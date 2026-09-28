@@ -6,6 +6,7 @@
  */
 
 import { isOrderNational, extractNationalInfo } from "./nationalSales";
+import { isCompanyExpenseTransaction } from "./partnerPayroll";
 
 export interface CycleDefinition {
   id: string; // Ex: "2026-08"
@@ -24,6 +25,7 @@ export interface CycleFinancialMetrics {
   cycle: CycleDefinition;
   grossRevenue: number;
   cmv: number;
+  companyExpenses: number;
   logisticsFee: number;
   netProfit: number;
   profitMargin: number;
@@ -48,6 +50,7 @@ export interface ConsolidatedPeriod {
   includedCycles: CycleFinancialMetrics[];
   grossRevenue: number;
   cmv: number;
+  companyExpenses: number;
   logisticsFee: number;
   netProfit: number;
   profitMargin: number;
@@ -224,7 +227,9 @@ export function calculateMetricsForCycle(
   cycle: CycleDefinition,
   orders: any[],
   repurchases: any[],
-  persistedCosts: Record<string, number> = {}
+  persistedCosts: Record<string, number> = {},
+  partnerTransactions: any[] = [],
+  partners: any[] = []
 ): CycleFinancialMetrics {
   const validOrders = filterValidOrders(orders);
 
@@ -242,6 +247,32 @@ export function calculateMetricsForCycle(
     const c = getCycleForDate(repDate);
     return c.id === cycle.id;
   });
+
+  // Filtrar transações societárias / custos operacionais que pertencem a este ciclo
+  const cyclePartnerTransactions = (partnerTransactions || []).filter((tx) => {
+    const txDate = tx.date || tx.created_at;
+    if (!txDate) return false;
+    const c = getCycleForDate(txDate);
+    return c.id === cycle.id;
+  });
+
+  let companyExpensesSum = 0;
+  let cycleCapitalInflows = 0;
+  let cycleCapitalOutflows = 0;
+
+  for (const tx of cyclePartnerTransactions) {
+    const amt = Number(tx.amount) || 0;
+    if (isCompanyExpenseTransaction(tx, partners)) {
+      companyExpensesSum += amt;
+    }
+    if (tx.type === "APORTE" && (tx.destination_category === "CAIXA" || tx.destination_category === "CAIXA_GERAL")) {
+      cycleCapitalInflows += amt;
+    }
+    if (["RETIRADA_CAPITAL", "DISTRIBUICAO_LUCRO", "PRO_LABORE", "DESPESA_OPERACIONAL", "COMPRA_ESTOQUE"].includes(tx.type)) {
+      cycleCapitalOutflows += amt;
+    }
+  }
+  const companyExpenses = Number(companyExpensesSum.toFixed(2));
 
   let revenueSum = 0;
   let cmvSum = 0;
@@ -284,8 +315,8 @@ export function calculateMetricsForCycle(
     }
   }
 
-  // Lucro Líquido Real = Lucro dos Produtos + Lucro/Margem do Frete Nacional
-  const netProfit = Number((revenueSum - cmvSum + nationalShippingProfitSum).toFixed(2));
+  // Lucro Líquido Real = Lucro dos Produtos + Lucro/Margem do Frete Nacional - Custos Operacionais da Empresa
+  const netProfit = Number((revenueSum - cmvSum + nationalShippingProfitSum - companyExpenses).toFixed(2));
   const profitMargin = revenueSum > 0 ? parseFloat(((netProfit / revenueSum) * 100).toFixed(1)) : 0;
   const totalOrders = cycleOrders.length;
 
@@ -293,8 +324,8 @@ export function calculateMetricsForCycle(
   const freightRepurchases = Number(cycleRepurchases.reduce((sum, r) => sum + (Number(r.freight_amount) || 0), 0).toFixed(2));
   const totalInvestedRepurchases = Number((stockPurchases + freightRepurchases).toFixed(2));
 
-  // Caixa Real do ciclo: Faturamento dos produtos + Lucro de frete nacional menos recompras do ciclo
-  const realCash = Number((revenueSum + nationalShippingProfitSum - stockPurchases).toFixed(2));
+  // Caixa Real do ciclo: Faturamento dos produtos + Lucro de frete nacional - recompras do ciclo + entradas caixa - saídas caixa
+  const realCash = Number((revenueSum + nationalShippingProfitSum - stockPurchases + cycleCapitalInflows - cycleCapitalOutflows).toFixed(2));
 
   const averageTicket = totalOrders > 0 ? Number((revenueSum / totalOrders).toFixed(2)) : 0;
   const averagePricePerPod = podsSoldSum > 0 ? Number((revenueSum / podsSoldSum).toFixed(2)) : 0;
@@ -304,6 +335,7 @@ export function calculateMetricsForCycle(
     cycle,
     grossRevenue: Number(revenueSum.toFixed(2)),
     cmv: Number(cmvSum.toFixed(2)),
+    companyExpenses,
     logisticsFee: Number(shippingSum.toFixed(2)),
     netProfit,
     profitMargin,
@@ -328,7 +360,9 @@ export function calculateMetricsForCycle(
 export function generateHistoricalMonthlyCycles(
   orders: any[],
   repurchases: any[],
-  persistedCosts: Record<string, number> = {}
+  persistedCosts: Record<string, number> = {},
+  partnerTransactions: any[] = [],
+  partners: any[] = []
 ): CycleFinancialMetrics[] {
   const currentCycle = getCurrentCycle();
 
@@ -366,10 +400,22 @@ export function generateHistoricalMonthlyCycles(
     }
   }
 
+  for (const tx of partnerTransactions || []) {
+    const d = tx.date || tx.created_at;
+    if (d) {
+      const def = getCycleForDate(d);
+      if (!cycleMap.has(def.id)) {
+        cycleMap.set(def.id, def);
+      }
+    }
+  }
+
   // Ordenar decrescente (mais recente primeiro)
   const sortedCycles = Array.from(cycleMap.values()).sort((a, b) => b.id.localeCompare(a.id));
 
-  return sortedCycles.map((cycle) => calculateMetricsForCycle(cycle, orders, repurchases, persistedCosts));
+  return sortedCycles.map((cycle) =>
+    calculateMetricsForCycle(cycle, orders, repurchases, persistedCosts, partnerTransactions, partners)
+  );
 }
 
 /**
@@ -383,26 +429,32 @@ export function aggregateCycles(
 ): ConsolidatedPeriod {
   let grossRevenue = 0;
   let cmv = 0;
+  let companyExpenses = 0;
   let logisticsFee = 0;
+  let netProfitSum = 0;
   let totalOrders = 0;
   let totalPodsSold = 0;
   let stockPurchases = 0;
   let freightRepurchases = 0;
+  let realCashSum = 0;
 
   for (const c of cycles) {
     grossRevenue += c.grossRevenue;
     cmv += c.cmv;
+    companyExpenses += c.companyExpenses || 0;
     logisticsFee += c.logisticsFee;
+    netProfitSum += c.netProfit;
     totalOrders += c.totalOrders;
     totalPodsSold += c.totalPodsSold;
     stockPurchases += c.stockPurchases;
     freightRepurchases += c.freightRepurchases;
+    realCashSum += c.realCash;
   }
 
-  const netProfit = Number((grossRevenue - cmv).toFixed(2));
+  const netProfit = Number(netProfitSum.toFixed(2));
   const profitMargin = grossRevenue > 0 ? parseFloat(((netProfit / grossRevenue) * 100).toFixed(1)) : 0;
   const totalInvestedRepurchases = Number((stockPurchases + freightRepurchases).toFixed(2));
-  const realCash = Number((grossRevenue - stockPurchases).toFixed(2));
+  const realCash = Number(realCashSum.toFixed(2));
   const averageTicket = totalOrders > 0 ? Number((grossRevenue / totalOrders).toFixed(2)) : 0;
   const averagePricePerPod = totalPodsSold > 0 ? Number((grossRevenue / totalPodsSold).toFixed(2)) : 0;
 
@@ -420,6 +472,7 @@ export function aggregateCycles(
     includedCycles: cycles,
     grossRevenue: Number(grossRevenue.toFixed(2)),
     cmv: Number(cmv.toFixed(2)),
+    companyExpenses: Number(companyExpenses.toFixed(2)),
     logisticsFee: Number(logisticsFee.toFixed(2)),
     netProfit,
     profitMargin,
@@ -451,6 +504,7 @@ function getOrCreateCycleMetric(
     cycle,
     grossRevenue: 0,
     cmv: 0,
+    companyExpenses: 0,
     logisticsFee: 0,
     netProfit: 0,
     profitMargin: 0,
@@ -608,6 +662,7 @@ export function generateHistoricalYears(
 export interface AllTimeFinancialMetrics {
   grossRevenue: number;
   cmv: number;
+  companyExpenses: number;
   logisticsFee: number;
   netProfit: number;
   profitMargin: number;
@@ -630,7 +685,8 @@ export function calculateAllTimeMetrics(
   orders: any[],
   repurchases: any[] = [],
   persistedCosts: Record<string, number> = {},
-  partnerTransactions: any[] = []
+  partnerTransactions: any[] = [],
+  partners: any[] = []
 ): AllTimeFinancialMetrics {
   const validOrders = filterValidOrders(orders);
 
@@ -674,8 +730,27 @@ export function calculateAllTimeMetrics(
     }
   }
 
-  // Lucro Líquido Real Histórico = Lucro dos Produtos + Lucro/Margem do Frete Nacional
-  const netProfit = Number((revenueSum - cmvSum + nationalShippingProfitSum).toFixed(2));
+  let capitalInflows = 0;
+  let capitalOutflows = 0;
+  let companyExpensesSum = 0;
+
+  for (const tx of partnerTransactions) {
+    const amt = Number(tx.amount) || 0;
+    if (isCompanyExpenseTransaction(tx, partners)) {
+      companyExpensesSum += amt;
+    }
+    if (tx.type === 'APORTE' && (tx.destination_category === 'CAIXA' || tx.destination_category === 'CAIXA_GERAL')) {
+      capitalInflows += amt;
+    }
+    if (['RETIRADA_CAPITAL', 'DISTRIBUICAO_LUCRO', 'PRO_LABORE', 'DESPESA_OPERACIONAL', 'COMPRA_ESTOQUE'].includes(tx.type)) {
+      capitalOutflows += amt;
+    }
+  }
+
+  const companyExpenses = Number(companyExpensesSum.toFixed(2));
+
+  // Lucro Líquido Real Histórico = Lucro dos Produtos + Lucro/Margem do Frete Nacional - Custos da Empresa
+  const netProfit = Number((revenueSum - cmvSum + nationalShippingProfitSum - companyExpenses).toFixed(2));
   const profitMargin = revenueSum > 0 ? parseFloat(((netProfit / revenueSum) * 100).toFixed(1)) : 0;
   const totalOrders = validOrders.length;
 
@@ -693,21 +768,7 @@ export function calculateAllTimeMetrics(
   //    Portanto, "Aportes" com destination_category === 'ESTOQUE' (que é o caso do aporte inicial)
   //    não entram aqui para não duplicar patrimônio artificialmente.
   //    Apenas aportes direcionados explicitamente para 'CAIXA_GERAL' somam dinheiro na conta.
-  // 2. Retiradas de Capital, Distribuição de Lucro, Pró-Labore subtraem do caixa imediatamente.
-  let capitalInflows = 0;
-  let capitalOutflows = 0;
-
-  for (const tx of partnerTransactions) {
-    const amt = Number(tx.amount) || 0;
-    if (tx.type === 'APORTE' && (tx.destination_category === 'CAIXA' || tx.destination_category === 'CAIXA_GERAL')) {
-      capitalInflows += amt;
-    }
-    if (['RETIRADA_CAPITAL', 'DISTRIBUICAO_LUCRO', 'PRO_LABORE', 'DESPESA_OPERACIONAL', 'COMPRA_ESTOQUE'].includes(tx.type)) {
-      capitalOutflows += amt;
-    }
-  }
-
-  // Caixa puramente operacional (Vendas + Lucro Frete Nacional - Compras de Reposição)
+  // 2. Retiradas de Capital, Distribuição de Lucro, Pró-Labore e Custos Operacionais subtraem do caixa imediatamente.
   const operationalCash = (revenueSum + nationalShippingProfitSum) - stockPurchases;
 
   // Caixa Real (Operacional + Injeções em Caixa - Retiradas)
@@ -720,6 +781,7 @@ export function calculateAllTimeMetrics(
   return {
     grossRevenue: Number(revenueSum.toFixed(2)),
     cmv: Number(cmvSum.toFixed(2)),
+    companyExpenses,
     logisticsFee: Number(shippingSum.toFixed(2)),
     netProfit,
     profitMargin,
@@ -831,21 +893,23 @@ export function calculateMetricEvolution(
 export interface GroupedPeriodEvolution {
   grossRevenue: PeriodEvolution;
   cmv: PeriodEvolution;
+  companyExpenses: PeriodEvolution;
   logisticsFee: PeriodEvolution;
   netProfit: PeriodEvolution;
 }
 
 /**
- * Calcula a evolução de todos os 4 indicadores principais de um período
+ * Calcula a evolução de todos os indicadores principais de um período
  */
 export function calculatePeriodEvolutions(
-  current: { grossRevenue: number; cmv: number; logisticsFee: number; netProfit: number } | null | undefined,
-  previous: { grossRevenue: number; cmv: number; logisticsFee: number; netProfit: number } | null | undefined,
+  current: { grossRevenue: number; cmv: number; companyExpenses?: number; logisticsFee: number; netProfit: number } | null | undefined,
+  previous: { grossRevenue: number; cmv: number; companyExpenses?: number; logisticsFee: number; netProfit: number } | null | undefined,
   periodLabel: string = "período anterior"
 ): GroupedPeriodEvolution {
   return {
     grossRevenue: calculateMetricEvolution(current?.grossRevenue ?? 0, previous?.grossRevenue, periodLabel),
     cmv: calculateMetricEvolution(current?.cmv ?? 0, previous?.cmv, periodLabel),
+    companyExpenses: calculateMetricEvolution(current?.companyExpenses ?? 0, previous?.companyExpenses, periodLabel),
     logisticsFee: calculateMetricEvolution(current?.logisticsFee ?? 0, previous?.logisticsFee, periodLabel),
     netProfit: calculateMetricEvolution(current?.netProfit ?? 0, previous?.netProfit, periodLabel),
   };
