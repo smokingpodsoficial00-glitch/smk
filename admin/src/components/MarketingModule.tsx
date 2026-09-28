@@ -1045,7 +1045,7 @@ export default function MarketingModule() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto md:overflow-hidden bg-background custom-scrollbar">
+    <div className="flex-1 flex flex-col h-full overflow-y-auto overflow-x-hidden md:overflow-hidden bg-background custom-scrollbar">
       {/* Header Principal do Marketing */}
       <header className="px-4 py-4 sm:px-6 sm:py-5 border-b border-white/10 shrink-0 bg-[#0a0a0a]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">

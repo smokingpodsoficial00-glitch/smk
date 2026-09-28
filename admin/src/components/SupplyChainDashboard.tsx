@@ -1299,7 +1299,7 @@ export default function SupplyChainDashboard() {
   //  RENDER — Nova Hierarquia ERP Profissional
   // ═══════════════════════════════════════════════════════
   return (
-    <div className="flex-1 overflow-y-auto bg-background custom-scrollbar relative">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden bg-background custom-scrollbar relative">
 
       {/* ━━━ STICKY HEADER COM AÇÕES PRINCIPAIS HIERARQUIZADAS ━━━━━━━━━━━━━━ */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-white/10">
@@ -1748,10 +1748,10 @@ export default function SupplyChainDashboard() {
                   className={`bg-card border border-border rounded-2xl shadow-lg transition-all relative ${isGroupMenuActive ? 'z-40' : 'z-10'}`}
                 >
                   {/* ── CARD HEADER MINIMALISTA E UNIFORME (SEM EXPANSÃO INLINE) ────────── */}
-                  <div className="p-5 space-y-4">
+                  <div className="p-4 sm:p-5 space-y-3 sm:space-y-4">
                     {/* Linha Superior: Foto, Nome, Puffs e Ações */}
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                         {/* Foto do Modelo */}
                         <div 
                           className="relative size-14 rounded-xl border border-white/10 bg-black/40 overflow-hidden shrink-0 group/img cursor-pointer"
@@ -1782,10 +1782,10 @@ export default function SupplyChainDashboard() {
                           />
                         </div>
 
-                        <div>
-                          <div className="flex items-center gap-2.5">
-                            <h3 className="font-bold text-base text-white tracking-tight">{displayName}</h3>
-                            <span className="text-[10px] bg-white/5 border border-white/10 text-muted-foreground px-2 py-0.5 rounded-md font-medium">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-bold text-sm sm:text-base text-white tracking-tight truncate">{displayName}</h3>
+                            <span className="text-[10px] bg-white/5 border border-white/10 text-muted-foreground px-2 py-0.5 rounded-md font-medium shrink-0">
                               {group.puffs} puffs
                             </span>
                           </div>
@@ -1796,7 +1796,7 @@ export default function SupplyChainDashboard() {
                       </div>
 
                       {/* Ações do Grupo (Status, Ver Sabores, Olho, 3 Pontos) */}
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:shrink-0 pt-2 sm:pt-0 border-t border-white/5 sm:border-t-0">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${stockBadgeClass}`}>
                           <div className={`size-1.5 rounded-full ${stockBarColor}`} />
                           {stockLabel}
@@ -1806,7 +1806,7 @@ export default function SupplyChainDashboard() {
                           type="button"
                           data-tour="btn-ver-sabores"
                           onClick={() => setViewingFlavorsGroup(group)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95 ml-auto sm:ml-0"
                         >
                           <Eye className="size-3.5" />
                           Ver Sabores ({realFlavors.length})
@@ -2063,19 +2063,19 @@ export default function SupplyChainDashboard() {
             <div className="bg-[#121212] border border-border rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
               
               {/* Modal Header */}
-              <div className="p-5 border-b border-border flex items-center justify-between bg-black/40">
-                <div className="flex items-center gap-3.5">
+              <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40">
+                <div className="flex items-center gap-3 min-w-0">
                   {currentGroup.image_url ? (
-                    <img src={currentGroup.image_url} alt={displayName} className="size-12 object-cover rounded-xl border border-white/10" />
+                    <img src={currentGroup.image_url} alt={displayName} className="size-11 sm:size-12 object-cover rounded-xl border border-white/10 shrink-0" />
                   ) : (
-                    <div className="size-12 rounded-xl bg-elevated border border-border flex items-center justify-center">
+                    <div className="size-11 sm:size-12 rounded-xl bg-elevated border border-border flex items-center justify-center shrink-0">
                       <Box className="size-6 text-muted-foreground" />
                     </div>
                   )}
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      {displayName}
-                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-base sm:text-lg font-bold text-white flex flex-wrap items-center gap-2">
+                      <span className="truncate">{displayName}</span>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 shrink-0">
                         {currentGroup.totalStock} un em estoque
                       </span>
                     </h3>
@@ -2085,21 +2085,21 @@ export default function SupplyChainDashboard() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between sm:justify-end gap-2">
                   <button
                     onClick={() => {
                       setAddingFlavorGroup(currentGroup);
                       setNewFlavorName("");
                       setNewFlavorStock("");
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95"
                   >
                     <Plus className="size-4" />
                     Adicionar Sabor
                   </button>
                   <button
                     onClick={handleCloseViewingFlavors}
-                    className="p-2 text-muted-foreground hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                    className="p-2 text-muted-foreground hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer shrink-0"
                   >
                     <X className="size-5" />
                   </button>
@@ -2107,7 +2107,7 @@ export default function SupplyChainDashboard() {
               </div>
 
               {/* Modal Body - Lista Limpa de Sabores */}
-              <div className="p-5 overflow-y-auto space-y-3 custom-scrollbar flex-1">
+              <div className="p-4 sm:p-5 overflow-y-auto space-y-3 custom-scrollbar flex-1">
                 {realFlavors.map((f: any) => {
                   let stockBadgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
                   let stockLabel = "Em estoque";
@@ -2120,16 +2120,16 @@ export default function SupplyChainDashboard() {
                   }
 
                   return (
-                    <div key={f.id} className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 ${
+                    <div key={f.id} className={`p-3.5 sm:p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 ${
                       f.is_active === false 
                         ? "border-red-500/20 bg-red-950/10 opacity-75" 
                         : "border-white/10 bg-black/30 hover:border-white/20"
                     }`}>
                       <div className="flex items-center gap-3 min-w-0">
                         <div className={`size-2.5 rounded-full shrink-0 ${f.is_active === false ? "bg-red-400" : "bg-emerald-400"}`} />
-                        <div>
-                          <div className="text-sm font-bold text-white truncate flex items-center gap-2">
-                            {f.flavor || 'Padrão'}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-bold text-white truncate flex flex-wrap items-center gap-2">
+                            <span className="truncate">{f.flavor || 'Padrão'}</span>
                             {f.is_active === false && (
                               <span className="text-[10px] px-2 py-0.2 rounded-md bg-red-500/20 text-red-400 font-normal">
                                 Oculto do cardápio
@@ -2145,7 +2145,7 @@ export default function SupplyChainDashboard() {
                       </div>
 
                       {/* Ações e Controles de Estoque */}
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center justify-end gap-2 shrink-0 pt-2 sm:pt-0 border-t border-white/5 sm:border-t-0">
                         {/* Botão Ocultar/Exibir Sabor no Cardápio */}
                         <button
                           type="button"

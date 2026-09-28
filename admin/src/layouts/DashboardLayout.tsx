@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, Users, Settings, CircleDollarSign, 
-  Store, ChevronRight, Bot, LogOut, Shield, User as UserIcon, Megaphone, Scale, CheckSquare, Compass, Crown, Sun, Moon, Menu, X
+  Store, ChevronRight, LogOut, Megaphone, Scale, CheckSquare, Compass, Crown, Sun, Moon, Menu, X, Smartphone, Bell
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -10,21 +10,37 @@ import { usePermissions } from '../hooks/usePermissions';
 import { useStoreConfig } from '../lib/useStoreConfig';
 import { SystemTourGuide } from '../components/tour/SystemTourGuide';
 import { FloatingSupportButton } from '../components/FloatingSupportButton';
+import { MobilePushSetupModal } from '../components/MobilePushSetupModal';
 
 export function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobilePushModalOpen, setMobilePushModalOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { config } = useStoreConfig();
-  const { company, companyUser, signOut, isSuperAdmin } = useAuth();
+  const { company, companyUser, signOut } = useAuth();
   const { canAccess } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
 
   // Fecha a gaveta mobile automaticamente ao trocar de rota
+  // E no celular (< 768px), redireciona abas exclusivas de PC (/pedidos, /clientes, /marketing, /tarefas, /gestao-saas) para /financeiro
   useEffect(() => {
     setMobileMenuOpen(false);
-  }, [location.pathname]);
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      const p = location.pathname;
+      const isDesktopOnlyRoute =
+        p === '/' ||
+        p.startsWith('/pedidos') ||
+        p.startsWith('/clientes') ||
+        p.startsWith('/marketing') ||
+        p.startsWith('/tarefas') ||
+        p.startsWith('/gestao-saas');
+      if (isDesktopOnlyRoute) {
+        navigate('/financeiro', { replace: true });
+      }
+    }
+  }, [location.pathname, navigate]);
 
   const isOfficial = !company?.id || company?.id === 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
   const displayName = isOfficial 
@@ -53,10 +69,10 @@ export function DashboardLayout() {
         {/* Navegação Principal */}
         <nav className={`flex-1 py-3 flex flex-col gap-1 w-full overflow-y-auto custom-scrollbar ${collapsed ? 'items-center px-1' : ''}`}>
           
-          {canAccess('pedidos') && (
+          {/* Pedidos: Somente no Computador */}
+          {!isMobileDrawer && canAccess('pedidos') && (
             <NavLink 
               to="/pedidos"
-              onClick={() => isMobileDrawer && setMobileMenuOpen(false)}
               title={collapsed ? "Pedidos" : undefined}
               className={({ isActive }) =>
                 `flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
@@ -73,6 +89,7 @@ export function DashboardLayout() {
             </NavLink>
           )}
 
+          {/* Financeiro: Computador e Celular */}
           {canAccess('financeiro') && (
             <NavLink 
               to="/financeiro"
@@ -93,6 +110,7 @@ export function DashboardLayout() {
             </NavLink>
           )}
 
+          {/* Estoque: Computador e Celular */}
           {canAccess('estoque') && (
             <NavLink 
               to="/estoque"
@@ -113,10 +131,10 @@ export function DashboardLayout() {
             </NavLink>
           )}
 
-          {canAccess('clientes') && (
+          {/* CRM: Somente no Computador */}
+          {!isMobileDrawer && canAccess('clientes') && (
             <NavLink 
               to="/clientes"
-              onClick={() => isMobileDrawer && setMobileMenuOpen(false)}
               title={collapsed ? "CRM" : undefined}
               className={({ isActive }) =>
                 `flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
@@ -135,11 +153,10 @@ export function DashboardLayout() {
 
           <div className="h-px bg-white/5 my-2 w-[85%] mx-auto" />
 
-          {/* Aba Exclusiva de Marketing (Smoking Pods) */}
-          {canAccess('marketing') && (
+          {/* Marketing: Somente no Computador */}
+          {!isMobileDrawer && canAccess('marketing') && (
             <NavLink 
               to="/marketing"
-              onClick={() => isMobileDrawer && setMobileMenuOpen(false)}
               title={collapsed ? "Marketing & Disparos" : undefined}
               className={({ isActive }) =>
                 `flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
@@ -163,7 +180,7 @@ export function DashboardLayout() {
             </NavLink>
           )}
 
-          {/* Aba de Sócios & Gestão de Equity */}
+          {/* Sócios & Equity: Computador e Celular */}
           {canAccess('socios') && (
             <NavLink 
               to="/socios"
@@ -191,11 +208,10 @@ export function DashboardLayout() {
             </NavLink>
           )}
 
-          {/* Aba de Tarefas & Produtividade dos Sócios */}
-          {canAccess('tarefas') && (
+          {/* Tarefas: Somente no Computador */}
+          {!isMobileDrawer && canAccess('tarefas') && (
             <NavLink 
               to="/tarefas"
-              onClick={() => isMobileDrawer && setMobileMenuOpen(false)}
               title={collapsed ? "Tarefas dos Sócios" : undefined}
               className={({ isActive }) =>
                 `flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
@@ -219,11 +235,10 @@ export function DashboardLayout() {
             </NavLink>
           )}
 
-          {/* Aba Exclusiva de Gestão & Vendas do SaaS (Smoking Pods Master) */}
-          {canAccess('gestao-saas') && (
+          {/* Vendas do SaaS: Somente no Computador */}
+          {!isMobileDrawer && canAccess('gestao-saas') && (
             <NavLink 
               to="/gestao-saas"
-              onClick={() => isMobileDrawer && setMobileMenuOpen(false)}
               title={collapsed ? "Vendas do SaaS" : undefined}
               className={({ isActive }) =>
                 `flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
@@ -270,9 +285,26 @@ export function DashboardLayout() {
           </div>
         )}
 
-        {/* Rodapé / Configurações, Tour & Logout */}
-        <div className={`p-3 border-t border-white/5 w-full flex flex-col gap-1 ${collapsed ? 'items-center' : ''}`}>
+        {/* Rodapé / Conectar no Celular, Modo Claro, Tour, Configurações & Sair */}
+        <div className={`p-3 border-t border-white/5 w-full flex flex-col gap-1.5 ${collapsed ? 'items-center' : ''}`}>
           
+          {/* Botão Conectar Sistema no Celular (Visível no PC e no Celular) */}
+          <button
+            type="button"
+            data-tour="sidebar-conectar-celular"
+            onClick={() => {
+              if (isMobileDrawer) setMobileMenuOpen(false);
+              setMobilePushModalOpen(true);
+            }}
+            title={collapsed ? "Conectar Sistema no Celular" : undefined}
+            className={`flex items-center gap-2.5 py-2 transition-all cursor-pointer w-full text-xs font-extrabold rounded-xl text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-400/50 shadow-sm ${
+              collapsed ? 'justify-center px-3' : 'px-3'
+            }`}
+          >
+            <Smartphone className="size-4 shrink-0 text-emerald-400" />
+            {!collapsed && <span className="truncate">Conectar no Celular</span>}
+          </button>
+
           {/* Botão Alternador Modo Claro / Modo Escuro */}
           <button
             type="button"
@@ -295,21 +327,22 @@ export function DashboardLayout() {
             )}
           </button>
 
-          {/* Botão de Tour do Sistema */}
-          <button
-            type="button"
-            onClick={() => {
-              if (isMobileDrawer) setMobileMenuOpen(false);
-              window.dispatchEvent(new CustomEvent('open-system-tour'));
-            }}
-            title={collapsed ? "Tour do Sistema" : undefined}
-            className={`flex items-center gap-3 py-2 transition-all cursor-pointer w-full text-xs font-semibold rounded-xl text-amber-300 hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 ${
-              collapsed ? 'justify-center px-3' : 'px-3'
-            }`}
-          >
-            <Compass className="size-4 shrink-0 text-amber-400 animate-spin-slow" />
-            {!collapsed && <span className="truncate">Tour do Sistema</span>}
-          </button>
+          {/* Botão de Tour do Sistema (Somente Computador) */}
+          {!isMobileDrawer && (
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('open-system-tour'));
+              }}
+              title={collapsed ? "Tour do Sistema" : undefined}
+              className={`flex items-center gap-3 py-2 transition-all cursor-pointer w-full text-xs font-semibold rounded-xl text-amber-300 hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 ${
+                collapsed ? 'justify-center px-3' : 'px-3'
+              }`}
+            >
+              <Compass className="size-4 shrink-0 text-amber-400 animate-spin-slow" />
+              {!collapsed && <span className="truncate">Tour do Sistema</span>}
+            </button>
+          )}
 
           {canAccess('configuracoes') && (
             <NavLink 
@@ -350,7 +383,7 @@ export function DashboardLayout() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-[100dvh] bg-[#050505] text-white overflow-hidden font-sans">
+    <div className="flex flex-col md:flex-row h-[100dvh] w-full max-w-[100vw] bg-[#050505] text-white overflow-hidden font-sans">
       {/* ━━━ TOP BAR MOBILE (Visível apenas em telas < 768px) ━━━━━━━━━━━━━━ */}
       <header className="md:hidden h-14 px-4 flex items-center justify-between border-b border-white/10 bg-[#0a0a0a] shrink-0 z-30">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -386,6 +419,17 @@ export function DashboardLayout() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Botão rápido de Alertas / Notificações no Topo do Celular */}
+          <button
+            type="button"
+            onClick={() => setMobilePushModalOpen(true)}
+            className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+            title="Configurar ou Testar Notificações"
+          >
+            <Bell className="size-3.5 text-emerald-400" />
+            <span>Alertas</span>
+          </button>
+
           <button
             type="button"
             onClick={toggleTheme}
@@ -488,27 +532,13 @@ export function DashboardLayout() {
         <Outlet />
       </main>
 
-      {/* ━━━ BARRA DE NAVEGAÇÃO INFERIOR ESTILO APP (Somente Mobile) ━━━━━━━ */}
-      <nav className="md:hidden h-16 px-1 bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-white/10 flex items-center justify-around shrink-0 z-30 select-none">
-        {canAccess('pedidos') && (
-          <NavLink
-            to="/pedidos"
-            className={({ isActive }) =>
-              `flex flex-col items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl text-[10px] font-bold transition-all ${
-                isActive ? 'text-emerald-400 bg-emerald-500/10' : 'text-white/50 hover:text-white'
-              }`
-            }
-          >
-            <LayoutDashboard className="size-4" />
-            <span>Pedidos</span>
-          </NavLink>
-        )}
-
+      {/* ━━━ BARRA DE NAVEGAÇÃO INFERIOR ESTILO APP (Somente Mobile: Financeiro, Estoque, Sócios, Menu) ━━━━━━━ */}
+      <nav className="md:hidden h-16 px-2 bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-white/10 flex items-center justify-around shrink-0 z-30 select-none">
         {canAccess('financeiro') && (
           <NavLink
             to="/financeiro"
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl text-[10px] font-bold transition-all ${
+              `flex flex-col items-center justify-center gap-1 py-1.5 px-3.5 rounded-xl text-[10px] font-bold transition-all ${
                 isActive ? 'text-emerald-400 bg-emerald-500/10' : 'text-white/50 hover:text-white'
               }`
             }
@@ -522,7 +552,7 @@ export function DashboardLayout() {
           <NavLink
             to="/estoque"
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl text-[10px] font-bold transition-all ${
+              `flex flex-col items-center justify-center gap-1 py-1.5 px-3.5 rounded-xl text-[10px] font-bold transition-all ${
                 isActive ? 'text-emerald-400 bg-emerald-500/10' : 'text-white/50 hover:text-white'
               }`
             }
@@ -536,7 +566,7 @@ export function DashboardLayout() {
           <NavLink
             to="/socios"
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl text-[10px] font-bold transition-all ${
+              `flex flex-col items-center justify-center gap-1 py-1.5 px-3.5 rounded-xl text-[10px] font-bold transition-all ${
                 isActive ? 'text-emerald-400 bg-emerald-500/10' : 'text-white/50 hover:text-white'
               }`
             }
@@ -549,12 +579,20 @@ export function DashboardLayout() {
         <button
           type="button"
           onClick={() => setMobileMenuOpen(true)}
-          className="flex flex-col items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl text-[10px] font-bold text-white/60 hover:text-white transition-all cursor-pointer"
+          className="flex flex-col items-center justify-center gap-1 py-1.5 px-3.5 rounded-xl text-[10px] font-bold text-white/60 hover:text-white transition-all cursor-pointer"
         >
           <Menu className="size-4" />
-          <span>Mais</span>
+          <span>Menu</span>
         </button>
       </nav>
+
+      {/* Modal Global de Conexão e Notificações no Celular */}
+      <MobilePushSetupModal
+        isOpen={mobilePushModalOpen}
+        onClose={() => setMobilePushModalOpen(false)}
+        companyId={company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5'}
+        storeName={displayName}
+      />
 
       {/* Botão Flutuante Global de Suporte no WhatsApp (Oculto no Mobile para não cobrir botões) */}
       <div className="hidden md:block">

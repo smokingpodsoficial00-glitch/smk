@@ -397,7 +397,7 @@ function RevenueEvolutionChart({
       <div className="relative w-full overflow-visible">
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-auto min-w-[480px] cursor-crosshair overflow-visible"
+          className="w-full h-auto cursor-crosshair overflow-visible"
           onPointerMove={handlePointerMove}
           onPointerLeave={handlePointerLeave}
         >
@@ -826,7 +826,7 @@ function MonthComparisonChart({
       <div className="relative w-full overflow-visible">
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-auto min-w-[480px] cursor-crosshair overflow-visible"
+          className="w-full h-auto cursor-crosshair overflow-visible"
           onPointerMove={handlePointerMove}
           onPointerLeave={handlePointerLeave}
         >
@@ -2342,7 +2342,7 @@ export default function FinanceDashboard() {
 
   // Estado B (com dados) e Estado C (dados legítimos vazios)
   return (
-    <div className="flex-1 h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
+    <div className="flex-1 h-full overflow-y-auto overflow-x-hidden bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
       {/* Cabeçalho */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div>
@@ -2387,17 +2387,17 @@ export default function FinanceDashboard() {
       )}
 
       {/* ━━━ BLOCO 1: CICLO ATUAL (14 → 13) ━━━━━━━━━━━━━━ */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-white/60 uppercase tracking-wider">
+      <div className="bg-[#0e0e10] sm:bg-transparent border border-white/15 sm:border-0 rounded-3xl p-4 sm:p-0 space-y-4 sm:space-y-3 shadow-xl sm:shadow-none">
+        <div className="flex items-center justify-between border-b border-white/10 sm:border-0 pb-3 sm:pb-0">
+          <span className="text-xs font-bold text-white/80 sm:text-white/60 uppercase tracking-wider">
             Ciclo Atual ({currentCycle.startDateStr.slice(0, 5)} → {currentCycle.endDateStr.slice(0, 5)})
           </span>
-          <span className="text-xs text-white/40">
+          <span className="text-xs font-semibold text-emerald-400 sm:text-white/40 bg-emerald-500/10 sm:bg-transparent px-2.5 py-0.5 sm:p-0 rounded-full border border-emerald-500/20 sm:border-0">
             {totalOrders} {totalOrders === 1 ? "pedido" : "pedidos"} · {totalPodsSold} pods
           </span>
         </div>
 
-        <div data-tour="financeiro-kpis" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div data-tour="financeiro-kpis" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
           {/* 1. Faturamento Bruto Real (Sem o Frete) */}
           <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all">
             <div className="flex items-center justify-between">
@@ -2514,8 +2514,8 @@ export default function FinanceDashboard() {
         </div>
       </div>
 
-      {/* ━━━ NOVO BLOCO: 🎯 METAS SEMANAIS DO CICLO (SEMANA 1 A 4) ━━━━━━━━━━━━━━ */}
-      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
+      {/* ━━━ NOVO BLOCO: 🎯 METAS SEMANAIS DO CICLO (SEMANA 1 A 4) — Visível apenas no Computador ━━━━━━━━━━━━━━ */}
+      <div className="hidden md:block bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
         {/* Cabeçalho da Seção de Metas */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
           <div>
@@ -2784,8 +2784,8 @@ export default function FinanceDashboard() {
         </div>
       </div>
 
-      {/* ━━━ NOVO BLOCO: 📦 RECOMPRA DE ESTOQUE & CAIXA REAL (MÓDULO INDEPENDENTE) ━━━━━━━━━━━━━━ */}
-      <div data-tour="financeiro-recompra-caixa" className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
+      {/* ━━━ NOVO BLOCO: 📦 RECOMPRA DE ESTOQUE & CAIXA REAL (MÓDULO INDEPENDENTE — Visível apenas no Computador) ━━━━━━━━━━━━━━ */}
+      <div data-tour="financeiro-recompra-caixa" className="hidden md:block bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
         {/* Cabeçalho da Seção */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
           <div>
@@ -2974,93 +2974,97 @@ export default function FinanceDashboard() {
       </div>
 
       {/* ━━━ BLOCO DEDICADO: 🎯 EFICIÊNCIA COMERCIAL (HISTÓRICO COMPLETO) ━━━━━━━━━━━━━━ */}
-      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-xl hover:border-white/25 transition-all">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-white/10 pb-3.5 sm:pb-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Target className="size-5 text-white" />
+              <Target className="size-5 text-white shrink-0" />
               <span>Eficiência Comercial</span>
             </h3>
             <p className="text-xs text-white/50 mt-0.5">
               Médias acumuladas de venda e rentabilidade no histórico completo ({allTimeMetrics.totalOrders} pedidos).
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-white/70 bg-white/5 px-3 py-1 rounded-xl border border-white/10">
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="text-[11px] sm:text-xs font-semibold text-white/70 bg-white/5 px-3 py-1 rounded-xl border border-white/10">
               Histórico Completo
             </span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {/* Card 1: Ticket Médio */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <ReceiptText className="size-4 text-white/70" /> Ticket Médio
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-5 space-y-1.5 sm:space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[10px] sm:text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <ReceiptText className="size-3.5 sm:size-4 text-white/70 shrink-0" />
+              <span className="truncate">Ticket Médio</span>
             </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-white">
+            <div className="text-xl sm:text-3xl font-extrabold text-white">
               {formatBRL(averageTicket)}
             </div>
-            <p className="text-xs text-white/50">
-              Valor médio por compra no histórico.
+            <p className="text-[11px] sm:text-xs text-white/50">
+              Valor médio por compra.
             </p>
-            <div className="pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
-              Fat. total ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalOrders} pedidos
+            <div className="pt-2 border-t border-white/10 text-[9.5px] sm:text-[10px] text-white/40 font-medium">
+              Fat. ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalOrders} ped
             </div>
           </div>
 
           {/* Card 2: Margem Média Líquida (%) */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <Percent className="size-4 text-emerald-400" /> Margem Média
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-5 space-y-1.5 sm:space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[10px] sm:text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <Percent className="size-3.5 sm:size-4 text-emerald-400 shrink-0" />
+              <span className="truncate">Margem Média</span>
             </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-emerald-400">
+            <div className="text-xl sm:text-3xl font-extrabold text-emerald-400">
               {averageNetMarginPercent.toFixed(1)}%
             </div>
-            <p className="text-xs text-white/50">
-              Margem líquida média da operação.
+            <p className="text-[11px] sm:text-xs text-white/50">
+              Margem líquida média.
             </p>
-            <div className="pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
-              Lucro Líquido total ÷ Faturamento total
+            <div className="pt-2 border-t border-white/10 text-[9.5px] sm:text-[10px] text-emerald-400/70 font-medium">
+              Lucro Líquido ÷ Faturamento
             </div>
           </div>
 
           {/* Card 3: Margem por Pedido */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <TrendingUp className="size-4 text-emerald-400" /> Margem por Pedido
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-5 space-y-1.5 sm:space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[10px] sm:text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="size-3.5 sm:size-4 text-emerald-400 shrink-0" />
+              <span className="truncate">Lucro / Pedido</span>
             </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-emerald-300">
+            <div className="text-xl sm:text-3xl font-extrabold text-emerald-300">
               {formatBRL(averageNetProfitPerOrder)}
             </div>
-            <p className="text-xs text-white/50">
-              Ganho líquido médio por pedido entregue.
+            <p className="text-[11px] sm:text-xs text-white/50">
+              Ganho médio por pedido.
             </p>
-            <div className="pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
-              Lucro Líquido ({formatBRL(allTimeMetrics.netProfit)}) ÷ {allTimeMetrics.totalOrders} pedidos
+            <div className="pt-2 border-t border-white/10 text-[9.5px] sm:text-[10px] text-emerald-400/70 font-medium">
+              Lucro ({formatBRL(allTimeMetrics.netProfit)}) ÷ {allTimeMetrics.totalOrders} ped
             </div>
           </div>
 
           {/* Card 4: Preço Médio por Pod */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <Box className="size-4 text-white/70" /> Preço Médio por Pod
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-5 space-y-1.5 sm:space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[10px] sm:text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <Box className="size-3.5 sm:size-4 text-white/70 shrink-0" />
+              <span className="truncate">Preço / Pod</span>
             </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-white">
+            <div className="text-xl sm:text-3xl font-extrabold text-white">
               {formatBRL(averagePricePerPod)}
             </div>
-            <p className="text-xs text-white/50">
-              Preço médio por unidade vendida.
+            <p className="text-[11px] sm:text-xs text-white/50">
+              Preço médio por pod.
             </p>
-            <div className="pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
-              Faturamento ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalPodsSold} pods
+            <div className="pt-2 border-t border-white/10 text-[9.5px] sm:text-[10px] text-white/40 font-medium">
+              Fat. ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalPodsSold} pods
             </div>
           </div>
         </div>
       </div>
 
-      {/* ━━━ BLOCO 2: PATRIMÔNIO & ESTOQUE NA PRATELEIRA ━━━━━━━━━━━━━━ */}
-      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
+      {/* ━━━ BLOCO 2: PATRIMÔNIO & ESTOQUE NA PRATELEIRA (Visível apenas no Computador) ━━━━━━━━━━━━━━ */}
+      <div className="hidden md:block bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -3172,12 +3176,12 @@ export default function FinanceDashboard() {
       </div>
 
       {/* ━━━ NOVO BLOCO: 📈 FATURAMENTO A LONGO PRAZO (2 ABAS: HISTÓRICO & EVOLUÇÃO) ━━━━━━━━━━━━━━ */}
-      <div data-tour="financeiro-longo-prazo" className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
-        {/* Cabeçalho do Bloco: Duas Abas Principais [ Histórico ] [ Evolução ] */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+      <div data-tour="financeiro-longo-prazo" className="bg-[#0e0e10] border border-white/15 rounded-3xl p-4 sm:p-6 space-y-5 sm:space-y-6 shadow-xl hover:border-white/25 transition-all">
+        {/* Cabeçalho do Bloco: Abas Principais [ Histórico ] [ Evolução ] [ Mês a Mês ] */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 border-b border-white/10 pb-4">
           <div>
             <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-              <TrendingUp className="size-5 text-emerald-400" />
+              <TrendingUp className="size-5 text-emerald-400 shrink-0" />
               <span>Faturamento a Longo Prazo</span>
             </h3>
             <p className="text-xs text-white/50 mt-0.5">
@@ -3185,43 +3189,44 @@ export default function FinanceDashboard() {
             </p>
           </div>
 
-          {/* Abas Principais: [ Histórico ] [ Evolução ] [ Comparar Mês a Mês ] */}
-          <div className="inline-flex p-1 rounded-2xl bg-black/60 border border-white/15 self-start sm:self-auto flex-wrap gap-1">
+          {/* Abas Principais: Grid de 3 colunas alinhadas no celular e inline-flex no PC */}
+          <div className="grid grid-cols-3 sm:inline-flex w-full sm:w-auto p-1 rounded-2xl bg-black/60 border border-white/15 gap-1">
             <button
               type="button"
               onClick={() => setLongTermTab("historico")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-2 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 ${
                 longTermTab === "historico"
                   ? "bg-white text-black shadow-md font-extrabold"
                   : "text-white/70 hover:text-white hover:bg-white/5"
               }`}
             >
-              <History className="size-4" />
-              <span>Histórico</span>
+              <History className="size-3.5 sm:size-4 shrink-0" />
+              <span className="truncate">Histórico</span>
             </button>
             <button
               type="button"
               onClick={() => setLongTermTab("evolucao")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-2 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 ${
                 longTermTab === "evolucao"
                   ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 font-extrabold"
                   : "text-white/70 hover:text-white hover:bg-white/5"
               }`}
             >
-              <TrendingUp className="size-4" />
-              <span>Evolução</span>
+              <TrendingUp className="size-3.5 sm:size-4 shrink-0" />
+              <span className="truncate">Evolução</span>
             </button>
             <button
               type="button"
               onClick={() => setLongTermTab("comparativo")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-2 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 ${
                 longTermTab === "comparativo"
                   ? "bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-lg shadow-purple-500/25 font-extrabold"
                   : "text-white/70 hover:text-white hover:bg-white/5"
               }`}
             >
-              <GitCompare className="size-4" />
-              <span>Comparar Mês a Mês</span>
+              <GitCompare className="size-3.5 sm:size-4 shrink-0" />
+              <span className="sm:hidden truncate">Mês a Mês</span>
+              <span className="hidden sm:inline">Comparar Mês a Mês</span>
             </button>
           </div>
         </div>
@@ -3232,55 +3237,55 @@ export default function FinanceDashboard() {
         {longTermTab === "historico" && (
           <div className="space-y-6">
             {/* Seletor de Modalidade: Mensal / Trimestral / Semestral / Anual */}
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="inline-flex p-1 rounded-2xl bg-black/60 border border-white/15">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="grid grid-cols-2 sm:inline-flex w-full sm:w-auto p-1 rounded-2xl bg-black/60 border border-white/15 gap-1">
                 <button
                   type="button"
                   onClick={() => setHistoryTab("mensal")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     historyTab === "mensal"
                       ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                       : "text-white/70 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Calendar className="size-3.5" />
-                  <span>Mensal (14 → 13)</span>
+                  <Calendar className="size-3.5 shrink-0" />
+                  <span className="truncate">Mensal (14 → 13)</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setHistoryTab("trimestral")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     historyTab === "trimestral"
                       ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                       : "text-white/70 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <BarChart3 className="size-3.5" />
-                  <span>Trimestral</span>
+                  <BarChart3 className="size-3.5 shrink-0" />
+                  <span className="truncate">Trimestral</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setHistoryTab("semestral")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     historyTab === "semestral"
                       ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                       : "text-white/70 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Layers className="size-3.5" />
-                  <span>Semestral</span>
+                  <Layers className="size-3.5 shrink-0" />
+                  <span className="truncate">Semestral</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setHistoryTab("anual")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     historyTab === "anual"
                       ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                       : "text-white/70 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Award className="size-3.5" />
-                  <span>Anual</span>
+                  <Award className="size-3.5 shrink-0" />
+                  <span className="truncate">Anual</span>
                 </button>
               </div>
 
@@ -4168,8 +4173,8 @@ export default function FinanceDashboard() {
         )}
       </div>
 
-      {/* ━━━ BLOCO 4: DEMONSTRATIVO DE RESULTADO (DRE EXECUTIVO EM TABELA LIMPA) ━━━━━━━━━━━━━━ */}
-      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
+      {/* ━━━ BLOCO 4: DEMONSTRATIVO DE RESULTADO (DRE EXECUTIVO — Visível apenas no Computador) ━━━━━━━━━━━━━━ */}
+      <div className="hidden md:block bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">

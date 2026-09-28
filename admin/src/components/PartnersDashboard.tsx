@@ -366,16 +366,16 @@ export default function PartnersDashboard() {
   };
 
   return (
-    <div className="flex-1 h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
+    <div className="flex-1 h-full overflow-y-auto overflow-x-hidden bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
       {/* ━━━ CABEÇALHO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Scale className="size-6 text-white" />
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-lg sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+              <Scale className="size-5 sm:size-6 text-white shrink-0" />
               <span>Sócios, Salários & Gestão de Equity</span>
             </h1>
-            <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+            <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 shrink-0">
               <Zap className="size-3" />
               Margem Ativa: {financials.officialProfitMarginPct.toFixed(1)}%
             </span>

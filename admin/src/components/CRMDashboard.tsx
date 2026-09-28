@@ -70,7 +70,7 @@ export default function CRMDashboard() {
 
   return (
     <CRMErrorBoundary>
-      <div className="flex-1 h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
+      <div className="flex-1 h-full overflow-y-auto overflow-x-hidden bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
         {/* ━━━ CABEÇALHO EXECUTIVO PADRONIZADO (DESIGN SYSTEM) ━━━━━━━━━━━ */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
           <div className="space-y-1">
