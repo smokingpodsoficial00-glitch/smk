@@ -3,12 +3,13 @@ import { formatBRL } from "@/lib/cart";
 import { 
   Clock, MapPin, ReceiptText, CheckCircle2, Truck, Bike, X, Loader2, 
   Search, Filter, MoreVertical, ChevronDown, ChevronUp, Copy, Printer, 
-  Trash2, RotateCcw, Package, DollarSign, Eye, EyeOff, Plus
+  Trash2, RotateCcw, Package, DollarSign, Eye, EyeOff, Plus, Bell
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { getBackendUrl } from "@/lib/backend";
 import { ManualSaleModal } from "./ManualSaleModal";
+import { MobilePushSetupModal } from "./MobilePushSetupModal";
 import { deleteOrderWithStockRestoration } from "@/lib/orders";
 // stockSync: centralizada em deleteOrderWithStockRestoration
 
@@ -53,6 +54,7 @@ export default function KanbanBoard() {
   const [notifyCustomerOnDispatch, setNotifyCustomerOnDispatch] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
   const [isManualSaleOpen, setIsManualSaleOpen] = useState(false);
+  const [isPushModalOpen, setIsPushModalOpen] = useState(false);
 
   // Estados para o histórico ERP de Concluídos
   const [searchQuery, setSearchQuery] = useState("");
@@ -394,7 +396,17 @@ export default function KanbanBoard() {
         </div>
 
         {/* Ações e Abas Principais */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={() => setIsPushModalOpen(true)}
+            title="Ativar App e Notificações de Venda no Celular"
+            className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-extrabold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+          >
+            <Bell className="size-3.5" />
+            <span className="hidden sm:inline">Notificações no Celular</span>
+            <span className="sm:hidden">Alertas</span>
+          </button>
+
           <button
             onClick={() => setIsManualSaleOpen(true)}
             className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] active:scale-95 cursor-pointer"
@@ -428,6 +440,13 @@ export default function KanbanBoard() {
           </div>
         </div>
       </header>
+
+      {/* Modal de Ativação de Push Nativo no Celular */}
+      <MobilePushSetupModal
+        isOpen={isPushModalOpen}
+        onClose={() => setIsPushModalOpen(false)}
+        companyId={company?.id}
+      />
 
       {/* Modal de Venda Manual Integrado */}
       <ManualSaleModal 

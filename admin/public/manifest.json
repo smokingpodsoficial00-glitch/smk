@@ -1,0 +1,19 @@
+{
+  "name": "Smoking Pods Admin",
+  "short_name": "SMK Admin",
+  "description": "Sistema de Gestão, Vendas e Alertas em Tempo Real",
+  "start_url": "/pedidos",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
