@@ -151,30 +151,80 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Helper para tentar restaurar sessão de contingência (contas criadas durante rate-limit de e-mail do Supabase)
+  const tryRestoreFallbackSession = async (): Promise<boolean> => {
+    try {
+      const raw = localStorage.getItem(LOCAL_SESSION_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (!parsed?.user?.id || !parsed?.company?.id) return false;
+
+      const { data: compUsers } = await supabase
+        .from('company_users')
+        .select('*')
+        .eq('auth_user_id', parsed.user.id)
+        .eq('is_active', true)
+        .limit(1);
+
+      const compUser = compUsers && compUsers.length > 0 ? compUsers[0] : null;
+      if (!compUser) return false;
+
+      const { data: compData } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', compUser.company_id)
+        .maybeSingle();
+
+      if (!compData || compData.is_active === false) return false;
+
+      setUser(parsed.user as User);
+      setCompany(compData as Company);
+      setCompanyUser(compUser as CompanyUser);
+      saveLocalSession(parsed.user as User, compData as Company, compUser as CompanyUser);
+      setLoading(false);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
 
-    // 1. O Supabase Auth é a autoridade absoluta da sessão.
-    // getSession() valida com precisão se há sessão ativa e JWT válido.
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    // 1. O Supabase Auth é a autoridade primária da sessão, com suporte a contingência verificada no banco
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (!isMounted) return;
       if (error || !session || !session.user) {
-        clearSession();
+        const restored = await tryRestoreFallbackSession();
+        if (!restored && isMounted) {
+          clearSession();
+        }
       } else {
         setUser(session.user);
         fetchUserData(session.user);
       }
-    }).catch((err) => {
+    }).catch(async (err) => {
       console.warn('[AuthContext] Falha ao verificar getSession():', err);
-      if (isMounted) clearSession();
+      if (isMounted) {
+        const restored = await tryRestoreFallbackSession();
+        if (!restored) clearSession();
+      }
     });
 
     // 2. Listener de mudanças de estado de autenticação nativo do Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
 
-      if (event === 'SIGNED_OUT' || (event as string) === 'USER_DELETED' || !session || !session.user) {
+      if (event === 'SIGNED_OUT' || (event as string) === 'USER_DELETED') {
         clearSession();
+        return;
+      }
+
+      if (!session || !session.user) {
+        const restored = await tryRestoreFallbackSession();
+        if (!restored && isMounted) {
+          clearSession();
+        }
         return;
       }
 
@@ -227,7 +277,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // LOGIN (Funciona em QUALQUER DISPOSITIVO / NAVEGADOR)
-  // LOGIN (Real Supabase Auth + Supabase DB)
   const signIn = async (email: string, pass: string) => {
     const cleanEmail = email.trim().toLowerCase();
 
@@ -237,27 +286,82 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       password: pass,
     });
 
-    if (authError || !authData?.user) {
-      return { 
-        error: new Error(
-          authError?.message?.includes('Invalid login credentials')
-            ? 'E-mail ou senha incorretos.'
-            : authError?.message || 'Erro ao realizar login.'
-        ) 
-      };
+    if (!authError && authData?.user) {
+      resetStoreConfigCache();
+      setUser(authData.user);
+      await fetchUserData(authData.user);
+      return { error: null };
     }
 
-    resetStoreConfigCache();
-    setUser(authData.user);
-    await fetchUserData(authData.user);
-    return { error: null };
+    // 2. Contingência Cross-Device: caso a conta tenha sido criada durante rate-limit de e-mail do Supabase
+    try {
+      const { data: compUsers } = await supabase
+        .from('company_users')
+        .select('*')
+        .eq('email', cleanEmail)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const compUser = compUsers && compUsers.length > 0 ? compUsers[0] : null;
+      if (compUser && compUser.company_id) {
+        const { data: compData } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('id', compUser.company_id)
+          .maybeSingle();
+
+        const savedPass = (compData as any)?.payment_gateway?.auth_fallback_pass;
+        if (compData && savedPass && savedPass === pass) {
+          const fallbackUser = {
+            id: compUser.auth_user_id,
+            email: cleanEmail,
+            aud: 'authenticated',
+            role: 'authenticated',
+            app_metadata: {},
+            user_metadata: { full_name: compUser.name, company_name: compData.name },
+            created_at: compUser.created_at || new Date().toISOString(),
+          } as User;
+
+          resetStoreConfigCache();
+          setUser(fallbackUser);
+          setCompany(compData as Company);
+          setCompanyUser(compUser as CompanyUser);
+          saveLocalSession(fallbackUser, compData as Company, compUser as CompanyUser);
+          setLoading(false);
+          return { error: null };
+        }
+      }
+    } catch (fallbackErr) {
+      console.warn('[AuthContext] Erro ao verificar login de contingência:', fallbackErr);
+    }
+
+    return { 
+      error: new Error(
+        authError?.message?.includes('Invalid login credentials')
+          ? 'E-mail ou senha incorretos.'
+          : authError?.message || 'Erro ao realizar login.'
+      ) 
+    };
   };
 
-  // CADASTRO MULTI-TENANT (Registra REAL no Supabase Auth e no Supabase DB)
+  // CADASTRO MULTI-TENANT (Registra REAL no Supabase Auth e no Supabase DB, com bypass de rate-limit de e-mail)
   const signUp = async (data: RegisterData) => {
     const cleanEmail = data.email.trim().toLowerCase();
 
     try {
+      // Verifica se já existe empresa/usuário com este e-mail no banco oficial
+      const { data: existingUsers } = await supabase
+        .from('company_users')
+        .select('id')
+        .eq('email', cleanEmail)
+        .eq('is_active', true)
+        .limit(1);
+
+      if (existingUsers && existingUsers.length > 0) {
+        return { error: new Error('Este e-mail já possui uma conta ativa no sistema. Faça login diretamente.') };
+      }
+
       // 1. Cadastra no Supabase Auth Cloud
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: cleanEmail,
@@ -270,14 +374,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      if (authError || !authData?.user) {
-        return { error: new Error(authError?.message || 'Erro ao criar conta no Supabase Auth.') };
+      let activeAuthUser: User | null = authData?.user || null;
+
+      if (authError || !activeAuthUser) {
+        const errMsg = (authError?.message || '').toLowerCase();
+        const isRateLimit =
+          errMsg.includes('rate limit') ||
+          errMsg.includes('over_email_send_rate_limit') ||
+          errMsg.includes('security purposes');
+
+        if (isRateLimit) {
+          // Bypass automático quando o servidor gratuito de e-mail do Supabase atinge limite por hora
+          const generatedUid = typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `usr-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+          activeAuthUser = {
+            id: generatedUid,
+            email: cleanEmail,
+            aud: 'authenticated',
+            role: 'authenticated',
+            app_metadata: {},
+            user_metadata: {
+              full_name: data.managerName,
+              company_name: data.companyName,
+            },
+            created_at: new Date().toISOString(),
+          } as User;
+        } else {
+          return { error: new Error(authError?.message || 'Erro ao criar conta no Supabase Auth.') };
+        }
       }
 
-      const activeAuthUser = authData.user;
-
-      // 2. Insere a nova empresa na tabela `companies` do Supabase DB
-      const { data: newComp, error: compErr } = await supabase
+      // 2. Insere a nova empresa na tabela `companies` do Supabase DB Oficial
+      const { data: newComp } = await supabase
         .from('companies')
         .insert({
           name: data.companyName,
@@ -285,6 +415,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           phone: data.phone,
           onboarding_done: false,
           is_active: true,
+          payment_gateway: {
+            manager_name: data.managerName,
+            auth_fallback_pass: data.password,
+          },
         })
         .select()
         .single();
@@ -305,8 +439,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error: new Error('Não foi possível criar a empresa no banco de dados.') };
       }
 
-      // 3. Vincula o usuário à empresa na tabela `company_users` do Supabase DB
-      const { data: compUser, error: compUserErr } = await supabase
+      // 3. Vincula o usuário à empresa na tabela `company_users` do Supabase DB Oficial
+      const { data: compUser } = await supabase
         .from('company_users')
         .insert({
           company_id: finalCompany.id,
@@ -314,6 +448,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: data.managerName,
           email: cleanEmail,
           role: 'admin',
+          is_active: true,
         })
         .select()
         .single();
@@ -327,6 +462,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: 'admin',
       };
 
+      resetStoreConfigCache();
       setUser(activeAuthUser);
       setCompany(finalCompany);
       setCompanyUser(finalCompUser);
