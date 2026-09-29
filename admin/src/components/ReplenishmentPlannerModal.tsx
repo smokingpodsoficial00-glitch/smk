@@ -33,6 +33,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { updateProductCost, fetchProductCostsMap } from "../lib/productCosts";
 import { executeStockEntryRpc } from "../lib/stockRepurchases";
+import { getCurrentCycle } from "../lib/financialCycles";
+import { syncWeeklyGoalsFromOrders, saveWeeklyGoals } from "../lib/weeklyGoals";
 
 export interface OrderItem {
   id: string;
@@ -58,7 +60,7 @@ export interface StockModelSuggestion {
 export interface FinancialGoals {
   reorderCashGoal: number; // ex: 1000, 2000, 5000
   paraguayScaleGoal: number; // ex: 5000, 10000, 25000
-  monthlyRevenueGoal: number; // ex: 8000
+  monthlyRevenueGoal: number; // ex: 7000
   quarterlyRevenueGoal: number; // ex: 25000
   annualRevenueGoal: number; // ex: 100000
 }
@@ -66,7 +68,7 @@ export interface FinancialGoals {
 export const DEFAULT_GOALS: FinancialGoals = {
   reorderCashGoal: 1000,
   paraguayScaleGoal: 5000,
-  monthlyRevenueGoal: 8000,
+  monthlyRevenueGoal: 7000,
   quarterlyRevenueGoal: 25000,
   annualRevenueGoal: 100000,
 };
@@ -270,13 +272,21 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
       try {
         const { data: rawOrders, error } = await supabase
           .from("smoking_orders")
-          .select("id, total_amount, delivery_status, client_phone, client_name")
+          .select("id, total_amount, delivery_status, client_phone, client_name, items")
           .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
           .neq("delivery_status", "CANCELADO");
 
         if (error) {
           console.error("Erro ao buscar vendas para Metas em tempo real:", error);
           return;
+        }
+
+        // Sincronizar Meta Mensal oficial da empresa salva no Supabase
+        const curCycle = getCurrentCycle();
+        const syncedWeekly = syncWeeklyGoalsFromOrders(rawOrders || [], targetCompanyId, curCycle.id);
+        if (syncedWeekly && syncedWeekly.monthlyTarget > 0) {
+          setGoals((prev) => ({ ...prev, monthlyRevenueGoal: syncedWeekly.monthlyTarget }));
+          setTempGoals((prev) => ({ ...prev, monthlyRevenueGoal: syncedWeekly.monthlyTarget }));
         }
 
         const validOrders = (rawOrders || []).filter(
@@ -466,7 +476,7 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
     saveOrderItemsToStorage(DEFAULT_ORDER_ITEMS);
   };
 
-  // Salvar Metas
+  // Salvar Metas (e sincronizar globalmente no Supabase para todos os sócios)
   const handleSaveGoals = () => {
     setGoals(tempGoals);
     setIsEditingGoals(false);
@@ -476,6 +486,22 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
     try {
       localStorage.setItem(LOCAL_STORAGE_GOALS_KEY, JSON.stringify(tempGoals));
     } catch (e) {}
+
+    const targetCompanyId = companyId || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+    const curCycle = getCurrentCycle();
+    const mTarget = Number(tempGoals.monthlyRevenueGoal) || 7000;
+    const qTarget = Number((mTarget / 4).toFixed(2));
+    saveWeeklyGoals(
+      {
+        monthlyTarget: mTarget,
+        week1: qTarget,
+        week2: qTarget,
+        week3: qTarget,
+        week4: qTarget,
+      },
+      targetCompanyId,
+      curCycle.id
+    ).catch(() => {});
 
     if (onGoalsUpdated) {
       onGoalsUpdated(tempGoals);
@@ -489,6 +515,20 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
     try {
       localStorage.removeItem(LOCAL_STORAGE_GOALS_KEY);
     } catch (e) {}
+
+    const targetCompanyId = companyId || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+    const curCycle = getCurrentCycle();
+    saveWeeklyGoals(
+      {
+        monthlyTarget: DEFAULT_GOALS.monthlyRevenueGoal,
+        week1: 1750,
+        week2: 1750,
+        week3: 1750,
+        week4: 1750,
+      },
+      targetCompanyId,
+      curCycle.id
+    ).catch(() => {});
 
     if (onGoalsUpdated) {
       onGoalsUpdated(DEFAULT_GOALS);

@@ -37,11 +37,30 @@ import {
   History,
   FileText,
   CheckCircle2,
+  GitCompare,
+  ChevronDown,
+  ChevronUp,
+  Zap,
+  Scale,
+  Globe,
+  Route,
+  Building2,
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchProductCostsMap } from "../lib/productCosts";
+import { NationalSalesModal } from "./NationalSalesModal";
+import { ManualSaleModal } from "./ManualSaleModal";
+import { WeeklyGoalsModal } from "./WeeklyGoalsModal";
+import { NewTransactionModal } from "./partners/NewTransactionModal";
+import { isOrderNational } from "@/lib/nationalSales";
+import {
+  type WeeklyGoalsConfig,
+  loadWeeklyGoals,
+  syncWeeklyGoalsFromOrders,
+  calculateWeeklyPerformances,
+} from "@/lib/weeklyGoals";
 import {
   fetchStockRepurchases,
   createStockRepurchase,
@@ -378,7 +397,7 @@ function RevenueEvolutionChart({
       <div className="relative w-full overflow-visible">
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-auto min-w-[480px] cursor-crosshair overflow-visible"
+          className="w-full h-auto cursor-crosshair overflow-visible"
           onPointerMove={handlePointerMove}
           onPointerLeave={handlePointerLeave}
         >
@@ -630,6 +649,441 @@ function RevenueEvolutionChart({
   );
 }
 
+interface ComparisonDayRecord {
+  dayIndex: number;
+  relativeLabel: string;
+  baseDateFormatted: string;
+  baseFullDate: string;
+  baseRevenue: number;
+  baseProfit: number;
+  baseOrders: number;
+  basePods: number;
+  baseAccumRevenue: number;
+  isBaseFuture: boolean;
+  isBaseToday: boolean;
+
+  compDateFormatted: string;
+  compFullDate: string;
+  compRevenue: number;
+  compProfit: number;
+  compOrders: number;
+  compPods: number;
+  compAccumRevenue: number;
+
+  diffRevenue: number;
+  diffPercentRevenue: number;
+  diffAccumRevenue: number;
+  diffAccumPercentRevenue: number;
+}
+
+/**
+ * Componente Gráfico Comparativo Mês a Mês (MoM Benchmark)
+ * Estilo Day Trade / Terminal Financeiro Ultracompacto (180px de altura)
+ * Cruza o Mês Atual (Verde Esmeralda) com o Mês Passado (Roxo/Violeta Neon)
+ */
+function MonthComparisonChart({
+  records,
+  baseCycleName,
+  compCycleName,
+  mode,
+  onModeChange,
+}: {
+  records: ComparisonDayRecord[];
+  baseCycleName: string;
+  compCycleName: string;
+  mode: "diario" | "acumulado";
+  onModeChange: (m: "diario" | "acumulado") => void;
+}) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  if (!records || records.length === 0) {
+    return (
+      <div className="p-6 text-center text-white/40 text-xs italic bg-[#0f1115] border border-white/10 rounded-xl">
+        Selecione dois ciclos para visualizar o comparativo mês a mês.
+      </div>
+    );
+  }
+
+  // Dimensões compactas exatas (180px de altura) — evita gráficos enormes
+  const width = 740;
+  const height = 180;
+  const padLeft = 52;
+  const padRight = 20;
+  const padTop = 14;
+  const padBottom = 26;
+  const chartW = width - padLeft - padRight;
+  const chartH = height - padTop - padBottom;
+
+  const isAcum = mode === "acumulado";
+
+  // Identificar valor máximo para escala Y
+  const maxVal = Math.max(
+    ...records.map((r) => {
+      const bVal = isAcum ? r.baseAccumRevenue : (r.isBaseFuture ? 0 : r.baseRevenue);
+      const cVal = isAcum ? r.compAccumRevenue : r.compRevenue;
+      return Math.max(bVal, cVal);
+    }),
+    50
+  );
+  const yMax = Math.ceil(maxVal * 1.12);
+
+  // Mapear pontos do Mês Atual (apenas dias já decorridos)
+  const validBaseRecords = records.filter((r) => !r.isBaseFuture);
+  const basePoints = validBaseRecords.map((r) => {
+    const x = records.length <= 1
+      ? padLeft + chartW / 2
+      : padLeft + ((r.dayIndex - 1) / (records.length - 1)) * chartW;
+    const val = isAcum ? r.baseAccumRevenue : r.baseRevenue;
+    const y = padTop + chartH - (Math.max(0, val) / yMax) * chartH;
+    return { ...r, x, y, val };
+  });
+
+  // Mapear pontos do Mês Anterior (todos os dias do ciclo histórico)
+  const compPoints = records.map((r) => {
+    const x = records.length <= 1
+      ? padLeft + chartW / 2
+      : padLeft + ((r.dayIndex - 1) / (records.length - 1)) * chartW;
+    const val = isAcum ? r.compAccumRevenue : r.compRevenue;
+    const y = padTop + chartH - (Math.max(0, val) / yMax) * chartH;
+    return { ...r, x, y, val };
+  });
+
+  const baseLinePath = generateSmoothPath(basePoints);
+  const baseAreaPath = generateSmoothArea(basePoints, padTop + chartH);
+  const compLinePath = generateSmoothPath(compPoints);
+
+  const gridLevels = [0, 0.33, 0.66, 1];
+  const xLabelStep = Math.max(1, Math.ceil(records.length / 8));
+
+  const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (!rect.width) return;
+    const svgX = ((e.clientX - rect.left) / rect.width) * width;
+    const clampedX = Math.max(padLeft, Math.min(width - padRight, svgX));
+    let best = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < records.length; i++) {
+      const px = padLeft + (i / (records.length - 1)) * chartW;
+      const d = Math.abs(px - clampedX);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    setHoveredIdx(best);
+  };
+
+  const handlePointerLeave = () => setHoveredIdx(null);
+
+  const activeRecord = hoveredIdx !== null ? records[hoveredIdx] : null;
+
+  return (
+    <div className="bg-[#0f1115] border border-white/10 rounded-xl p-3 sm:p-3.5 shadow-xl relative select-none">
+      {/* Header Compacto com Legenda e Alternador */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2 pb-2 border-b border-white/5">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-[#10b981] shadow-sm shadow-emerald-500/40" />
+            <span className="text-white/90 font-bold text-[11px]">{baseCycleName}</span>
+            <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-extrabold uppercase">Atual</span>
+          </div>
+          <span className="text-white/30 text-xs font-mono">vs</span>
+          <div className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-[#a855f7] shadow-sm shadow-purple-500/40" />
+            <span className="text-white/80 font-medium text-[11px]">{compCycleName}</span>
+            <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-bold uppercase">Anterior</span>
+          </div>
+        </div>
+
+        {/* Alternador de Modo do Gráfico */}
+        <div className="inline-flex p-0.5 rounded-lg bg-black/60 border border-white/15 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => onModeChange("diario")}
+            className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+              mode === "diario"
+                ? "bg-white text-black shadow-sm font-extrabold"
+                : "text-white/60 hover:text-white"
+            }`}
+          >
+            📊 Vendas Diárias
+          </button>
+          <button
+            type="button"
+            onClick={() => onModeChange("acumulado")}
+            className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+              mode === "acumulado"
+                ? "bg-gradient-to-r from-emerald-500 to-teal-400 text-black shadow-sm font-extrabold"
+                : "text-white/60 hover:text-white"
+            }`}
+          >
+            📈 Faturamento Acumulado (Ritmo)
+          </button>
+        </div>
+      </div>
+
+      {/* SVG Chart Compacto (180px) */}
+      <div className="relative w-full overflow-visible">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="w-full h-auto cursor-crosshair overflow-visible"
+          onPointerMove={handlePointerMove}
+          onPointerLeave={handlePointerLeave}
+        >
+          <defs>
+            <linearGradient id="compBaseGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.18" />
+              <stop offset="60%" stopColor="#10b981" stopOpacity="0.04" />
+              <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+            </linearGradient>
+            <linearGradient id="compTargetGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#a855f7" stopOpacity="0.10" />
+              <stop offset="100%" stopColor="#a855f7" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+
+          {/* Rótulo lateral Y */}
+          <text
+            transform="rotate(-90)"
+            x={-(padTop + chartH / 2)}
+            y="12"
+            textAnchor="middle"
+            fill="rgba(255,255,255,0.3)"
+            fontSize="7.5"
+            fontWeight="500"
+          >
+            {isAcum ? "Acumulado (R$)" : "Receita Diária (R$)"}
+          </text>
+
+          {/* Grade Horizontal + Labels Y */}
+          {gridLevels.map((lvl) => {
+            const yVal = padTop + chartH - lvl * chartH;
+            const val = lvl * yMax;
+            return (
+              <g key={`cg-${lvl}`}>
+                <line x1={padLeft} y1={yVal} x2={width - padRight} y2={yVal} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+                <text x={padLeft - 5} y={yVal + 3} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize="8.5" fontFamily="monospace">
+                  {lvl === 0 ? "0" : formatBRL(val).replace(",00", "")}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Grade Vertical */}
+          {records.map((r, i) => {
+            if (i % xLabelStep !== 0 && i !== records.length - 1) return null;
+            const x = padLeft + (i / (records.length - 1)) * chartW;
+            return (
+              <line key={`cvg-${i}`} x1={x} y1={padTop} x2={x} y2={padTop + chartH} stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+            );
+          })}
+
+          {/* Área sob a curva do mês atual */}
+          {baseAreaPath && <path d={baseAreaPath} fill="url(#compBaseGrad)" />}
+
+          {/* Linha Mês Anterior (Violeta Neon tracejada elegante) */}
+          {compLinePath && (
+            <path
+              d={compLinePath}
+              fill="none"
+              stroke="#a855f7"
+              strokeWidth="2"
+              strokeDasharray={isAcum ? "none" : "5 2.5"}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.85"
+            />
+          )}
+
+          {/* Linha Mês Atual (Verde Esmeralda sólida destacada) */}
+          {baseLinePath && (
+            <path
+              d={baseLinePath}
+              fill="none"
+              stroke="#10b981"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
+
+          {/* Crosshair vertical no hover */}
+          {hoveredIdx !== null && (
+            <>
+              {(() => {
+                const hovX = padLeft + (hoveredIdx / (records.length - 1)) * chartW;
+                return (
+                  <line
+                    x1={hovX}
+                    y1={padTop}
+                    x2={hovX}
+                    y2={padTop + chartH}
+                    stroke="rgba(255,255,255,0.35)"
+                    strokeWidth="1"
+                    strokeDasharray="3 3"
+                  />
+                );
+              })()}
+            </>
+          )}
+
+          {/* Dots Mês Anterior */}
+          {compPoints.map((p, i) => {
+            const isHov = hoveredIdx === i;
+            const show = p.val > 0 || isHov;
+            if (!show && records.length > 15) return null;
+            return (
+              <circle
+                key={`cpd-${i}`}
+                cx={p.x}
+                cy={p.y}
+                r={isHov ? 4.5 : 2}
+                fill={isHov ? "#ffffff" : "#a855f7"}
+                stroke={isHov ? "#a855f7" : "none"}
+                strokeWidth={isHov ? 2 : 0}
+              />
+            );
+          })}
+
+          {/* Dots Mês Atual */}
+          {basePoints.map((p, i) => {
+            const isHov = hoveredIdx === (p.dayIndex - 1);
+            const show = p.val > 0 || isHov;
+            if (!show && records.length > 15) return null;
+            return (
+              <circle
+                key={`bpd-${i}`}
+                cx={p.x}
+                cy={p.y}
+                r={isHov ? 5 : 2.5}
+                fill={isHov ? "#ffffff" : "#10b981"}
+                stroke={isHov ? "#10b981" : "#0f1115"}
+                strokeWidth={isHov ? 2 : 1}
+              />
+            );
+          })}
+
+          {/* Labels do Eixo X */}
+          {records.map((r, i) => {
+            const isHov = hoveredIdx === i;
+            if (!isHov && i % xLabelStep !== 0 && i !== records.length - 1) return null;
+            const x = padLeft + (i / (records.length - 1)) * chartW;
+            return (
+              <text
+                key={`cxl-${i}`}
+                x={x}
+                y={padTop + chartH + 13}
+                textAnchor="middle"
+                fill={isHov ? "#ffffff" : "rgba(255,255,255,0.45)"}
+                fontSize={isHov ? "8.5" : "7.5"}
+                fontWeight={isHov ? "bold" : "normal"}
+                fontFamily="monospace"
+              >
+                {r.baseDateFormatted !== "—" ? r.baseDateFormatted : r.compDateFormatted}
+              </text>
+            );
+          })}
+
+          {/* Legenda do Eixo X */}
+          <text
+            x={padLeft + chartW / 2}
+            y={height - 2}
+            textAnchor="middle"
+            fill="rgba(255,255,255,0.25)"
+            fontSize="8"
+            fontWeight="500"
+          >
+            Dias do Ciclo (14 → 13) · Datas de Vendas nos Dois Meses
+          </text>
+        </svg>
+
+        {/* HUD / Tooltip Flutuante Duplo */}
+        {hoveredIdx !== null && activeRecord && (() => {
+          const hovX = padLeft + (hoveredIdx / (records.length - 1)) * chartW;
+          const isNearRight = hovX > width * 0.70;
+          const isNearLeft = hovX < width * 0.30;
+          const xTranslate = isNearRight ? "-95%" : isNearLeft ? "-5%" : "-50%";
+
+          const baseVal = isAcum ? activeRecord.baseAccumRevenue : activeRecord.baseRevenue;
+          const compVal = isAcum ? activeRecord.compAccumRevenue : activeRecord.compRevenue;
+          const diff = baseVal - compVal;
+          const diffPerc = compVal > 0 ? (diff / compVal) * 100 : 0;
+
+          return (
+            <div
+              className="pointer-events-none absolute z-30 transition-transform duration-75 ease-out"
+              style={{
+                left: `${(hovX / width) * 100}%`,
+                top: "10px",
+                transform: `translateX(${xTranslate})`,
+              }}
+            >
+              <div className="bg-[#12141a]/95 border border-white/20 rounded-xl p-3 shadow-2xl backdrop-blur-md min-w-[210px] text-[11px] space-y-1.5">
+                <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1">
+                  <span className="font-extrabold text-white text-[11px]">
+                    Dia {activeRecord.dayIndex} do Ciclo
+                  </span>
+                  <span className="text-[9px] text-white/50 font-mono">
+                    {activeRecord.baseDateFormatted} vs {activeRecord.compDateFormatted}
+                  </span>
+                </div>
+
+                {/* Mês Atual */}
+                <div className="space-y-0.5">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-white/60 flex items-center gap-1 font-medium">
+                      <span className="size-1.5 rounded-full bg-[#10b981]" />
+                      {baseCycleName}:
+                    </span>
+                    <span className="font-black text-emerald-400">
+                      {activeRecord.isBaseFuture ? "Ainda não decorrido" : formatBRL(baseVal)}
+                    </span>
+                  </div>
+                  {!activeRecord.isBaseFuture && (
+                    <div className="text-[9px] text-white/40 pl-2.5">
+                      {activeRecord.basePods} pods em {activeRecord.baseOrders} ped
+                    </div>
+                  )}
+                </div>
+
+                {/* Mês Anterior */}
+                <div className="space-y-0.5">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-white/60 flex items-center gap-1 font-medium">
+                      <span className="size-1.5 rounded-full bg-[#a855f7]" />
+                      {compCycleName}:
+                    </span>
+                    <span className="font-bold text-purple-300">
+                      {formatBRL(compVal)}
+                    </span>
+                  </div>
+                  <div className="text-[9px] text-white/40 pl-2.5">
+                    {activeRecord.compPods} pods em {activeRecord.compOrders} ped
+                  </div>
+                </div>
+
+                {/* Diferença */}
+                {!activeRecord.isBaseFuture && (
+                  <div className="pt-1 border-t border-white/10 flex items-center justify-between text-[10px]">
+                    <span className="text-white/60 font-semibold">Variação:</span>
+                    <span
+                      className={`font-black flex items-center gap-0.5 ${
+                        diff >= 0 ? "text-emerald-400" : "text-red-400"
+                      }`}
+                    >
+                      {diff >= 0 ? "+" : ""}{formatBRL(diff)} ({diff >= 0 ? "+" : ""}{diffPerc.toFixed(1)}%)
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
 export default function FinanceDashboard() {
   const { user, company, companyUser, loading: authLoading, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -656,8 +1110,8 @@ export default function FinanceDashboard() {
   const [allValidOrders, setAllValidOrders] = useState<any[]>([]);
   const [persistedProductCosts, setPersistedProductCosts] = useState<Record<string, number>>({});
 
-  // Seletores da Área: Faturamento a Longo Prazo (2 Abas: Histórico e Evolução)
-  const [longTermTab, setLongTermTab] = useState<"historico" | "evolucao">("historico");
+  // Seletores da Área: Faturamento a Longo Prazo (3 Abas: Histórico, Evolução e Comparativo)
+  const [longTermTab, setLongTermTab] = useState<"historico" | "evolucao" | "comparativo">("historico");
   const [historyTab, setHistoryTab] = useState<"mensal" | "trimestral" | "semestral" | "anual">("mensal");
   const [evolutionTab, setEvolutionTab] = useState<"mensal" | "anual">("mensal");
   const [selectedEvolutionCycleId, setSelectedEvolutionCycleId] = useState<string>("");
@@ -666,9 +1120,28 @@ export default function FinanceDashboard() {
   const [selectedSemesterId, setSelectedSemesterId] = useState<string>("");
   const [selectedYearId, setSelectedYearId] = useState<string>("");
 
+  // Seletores da Área de Comparação Mês a Mês
+  const [compBaseCycleId, setCompBaseCycleId] = useState<string>("");
+  const [compTargetCycleId, setCompTargetCycleId] = useState<string>("");
+  const [compChartMode, setCompChartMode] = useState<"diario" | "acumulado">("diario");
+  const [showCompDailyTable, setShowCompDailyTable] = useState<boolean>(false);
+
+  // Vendas Nacionais (Fora de SP / Correios)
+  const [isNationalModalOpen, setIsNationalModalOpen] = useState(false);
+  const [isNationalManualSaleOpen, setIsNationalManualSaleOpen] = useState(false);
+
+  // Metas Semanais (4 Semanas do Ciclo 14 -> 13)
+  const [weeklyGoalsConfig, setWeeklyGoalsConfig] = useState<WeeklyGoalsConfig>(() =>
+    loadWeeklyGoals(company?.id, currentCycle.id)
+  );
+  const [isWeeklyGoalsModalOpen, setIsWeeklyGoalsModalOpen] = useState(false);
+
   // Financial Metrics State (Correspondente ao Ciclo Vigente)
   const [grossRevenue, setGrossRevenue] = useState(0);
   const [cmv, setCmv] = useState(0);
+  const [companyExpenses, setCompanyExpenses] = useState(0);
+  const [partnersList, setPartnersList] = useState<any[]>([]);
+  const [isCompanyExpenseModalOpen, setIsCompanyExpenseModalOpen] = useState(false);
   const [logisticsFee, setLogisticsFee] = useState(0);
   const [netProfit, setNetProfit] = useState(0);
   const [profitMargin, setProfitMargin] = useState(0);
@@ -732,7 +1205,7 @@ export default function FinanceDashboard() {
       setFinanceError(null);
 
       // Executa todas as consultas financeiras em paralelo para carregamento ultrarrápido
-      const [persistedCostsRes, ordersRes, productsRes, repurchasesRes, partnerTxRes] = await Promise.all([
+      const [persistedCostsRes, ordersRes, productsRes, repurchasesRes, partnerTxRes, partnersRes] = await Promise.all([
         fetchProductCostsMap(targetCompanyId).catch(() => ({})),
         supabase
           .from("smoking_orders")
@@ -751,6 +1224,10 @@ export default function FinanceDashboard() {
           .order("purchase_date", { ascending: false }),
         supabase
           .from("smoking_partner_transactions")
+          .select("*")
+          .eq("company_id", targetCompanyId),
+        supabase
+          .from("smoking_partners")
           .select("*")
           .eq("company_id", targetCompanyId)
       ]);
@@ -827,7 +1304,9 @@ export default function FinanceDashboard() {
       setPersistedProductCosts(persistedCosts);
       
       const loadedPartnerTxs = partnerTxRes?.data || [];
+      const loadedPartners = partnersRes?.data || [];
       setPartnerTransactions(loadedPartnerTxs);
+      setPartnersList(loadedPartners);
 
       // 1. Estoque Físico na Prateleira
       let totalStockCostSum = 0;
@@ -871,9 +1350,21 @@ export default function FinanceDashboard() {
       const curCycle = getCurrentCycle();
       setCurrentCycle(curCycle);
 
-      const curCycleMetrics = calculateMetricsForCycle(curCycle, validOrders, loadedRepurchases, persistedCosts);
+      // Sincronizar Metas Semanais/Mensais da empresa diretamente do Supabase (compartilhado entre todos os sócios)
+      const syncedGoals = syncWeeklyGoalsFromOrders(rawOrders, targetCompanyId, curCycle.id);
+      setWeeklyGoalsConfig(syncedGoals);
+
+      const curCycleMetrics = calculateMetricsForCycle(
+        curCycle,
+        validOrders,
+        loadedRepurchases,
+        persistedCosts,
+        loadedPartnerTxs,
+        loadedPartners
+      );
       setGrossRevenue(curCycleMetrics.grossRevenue);
       setCmv(curCycleMetrics.cmv);
+      setCompanyExpenses(curCycleMetrics.companyExpenses || 0);
       setLogisticsFee(curCycleMetrics.logisticsFee);
       setNetProfit(curCycleMetrics.netProfit);
       setProfitMargin(curCycleMetrics.profitMargin);
@@ -903,7 +1394,13 @@ export default function FinanceDashboard() {
       setBrandSales(brandList);
 
       // 4. Gerar Histórico de Longo Prazo (Mensal, Trimestral, Semestral e Anual)
-      const historicalMonths = generateHistoricalMonthlyCycles(validOrders, loadedRepurchases, persistedCosts);
+      const historicalMonths = generateHistoricalMonthlyCycles(
+        validOrders,
+        loadedRepurchases,
+        persistedCosts,
+        loadedPartnerTxs,
+        loadedPartners
+      );
       setMonthlyCycles(historicalMonths);
 
       // Selecionar o ciclo mensal fechado mais recente (ex: Agosto/2026) por padrão para consulta imediata
@@ -1018,17 +1515,25 @@ export default function FinanceDashboard() {
       })
       .subscribe();
 
+    const subPartnerTx = supabase
+      .channel("finance_partner_tx_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partner_transactions" }, () => {
+        fetchFinanceData();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(subOrders);
       supabase.removeChannel(subProducts);
       supabase.removeChannel(subRepurchases);
+      supabase.removeChannel(subPartnerTx);
     };
   }, [user, company?.id, companyUser, authLoading]);
 
   // ── All-Time Metrics (Histórico Completo para Eficiência Comercial & Caixa Real Atual) ──
   const allTimeMetrics = useMemo(() => {
-    return calculateAllTimeMetrics(allValidOrders, repurchases, persistedProductCosts, partnerTransactions);
-  }, [allValidOrders, repurchases, persistedProductCosts, partnerTransactions]);
+    return calculateAllTimeMetrics(allValidOrders, repurchases, persistedProductCosts, partnerTransactions, partnersList);
+  }, [allValidOrders, repurchases, persistedProductCosts, partnerTransactions, partnersList]);
 
   // CAIXA REAL ATUAL: Posição patrimonial viva da empresa (NÃO reinicia no dia 14)
   // Conforme regra fundamental: Faturamento total acumulado - total pago em recompras
@@ -1036,6 +1541,50 @@ export default function FinanceDashboard() {
   const totalStockPurchases = allTimeMetrics.stockPurchases;
   const totalFreightRepurchases = allTimeMetrics.freightRepurchases;
   const totalInvestedRepurchases = allTimeMetrics.totalInvestedRepurchases;
+
+  // Sincronizar configuração de Metas Semanais
+  useEffect(() => {
+    setWeeklyGoalsConfig(loadWeeklyGoals(company?.id, currentCycle.id));
+    const handleGoalsUpdate = () => {
+      setWeeklyGoalsConfig(loadWeeklyGoals(company?.id, currentCycle.id));
+    };
+    window.addEventListener("smk-weekly-goals-updated", handleGoalsUpdate);
+    return () => window.removeEventListener("smk-weekly-goals-updated", handleGoalsUpdate);
+  }, [company?.id, currentCycle.id]);
+
+  // Desempenho Realizado das 4 Semanas do Ciclo Atual (Semana 1 a 4)
+  const weeklyPerformances = useMemo(() => {
+    return calculateWeeklyPerformances(
+      currentCycle,
+      allValidOrders,
+      weeklyGoalsConfig,
+      persistedProductCosts
+    );
+  }, [currentCycle, allValidOrders, weeklyGoalsConfig, persistedProductCosts]);
+
+  // Trajeto da Meta Mensal (Termômetro de Compensação Global do Ciclo)
+  const monthlyTrajectory = useMemo(() => {
+    const totalRealized = weeklyPerformances.reduce((acc, wp) => acc + wp.revenue, 0);
+    const target = weeklyGoalsConfig.monthlyTarget || 7000;
+    const remaining = Math.max(0, target - totalRealized);
+    const progressPerc = target > 0 ? (totalRealized / target) * 100 : 0;
+
+    const [endD, endM, endY] = currentCycle.endDateStr.split("/").map(Number);
+    const cycleEndDate = new Date(endY, endM - 1, endD, 23, 59, 59, 999);
+    const now = new Date();
+    const diffTime = cycleEndDate.getTime() - now.getTime();
+    const remainingDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    const dailyPaceNeeded = remainingDays > 0 ? remaining / remainingDays : 0;
+
+    return {
+      totalRealized,
+      target,
+      remaining,
+      progressPerc,
+      remainingDays,
+      dailyPaceNeeded,
+    };
+  }, [weeklyPerformances, weeklyGoalsConfig.monthlyTarget, currentCycle.endDateStr]);
 
   // Seletores Memoizados para a Área de Faturamento a Longo Prazo
   const selectedMonthlyMetric = useMemo(() => {
@@ -1362,6 +1911,271 @@ export default function FinanceDashboard() {
     persistedProductCosts,
   ]);
 
+  // ─── Lógica Especializada de Comparação Mês a Mês (MoM Benchmark) ────────
+  const getCycleDailyRecords = (
+    cycleMetric: CycleFinancialMetrics,
+    orders: any[],
+    costsMap: Record<string, number>
+  ) => {
+    const cycleDef = cycleMetric.cycle;
+    const [startD, startM, startY] = cycleDef.startDateStr.split("/").map(Number);
+    const [endD, endM, endY] = cycleDef.endDateStr.split("/").map(Number);
+
+    const startDate = new Date(startY, startM - 1, startD, 12, 0, 0);
+    const endDate = new Date(endY, endM - 1, endD, 12, 0, 0);
+
+    const nowSP = getSaoPauloDateParts(new Date());
+    const todayStr = `${nowSP.year}-${String(nowSP.month).padStart(2, "0")}-${String(nowSP.day).padStart(2, "0")}`;
+
+    const ordersByDay = new Map<string, any[]>();
+    for (const order of orders || []) {
+      if (!order.created_at) continue;
+      const p = getSaoPauloDateParts(order.created_at);
+      const key = `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+      if (!ordersByDay.has(key)) ordersByDay.set(key, []);
+      ordersByDay.get(key)!.push(order);
+    }
+
+    const days: {
+      dayIndex: number;
+      dateKey: string;
+      dateFormatted: string;
+      fullDate: string;
+      revenue: number;
+      profit: number;
+      orders: number;
+      pods: number;
+      accumRevenue: number;
+      accumProfit: number;
+      accumPods: number;
+      isFuture: boolean;
+      isToday: boolean;
+    }[] = [];
+
+    let cur = new Date(startDate);
+    let dayIdx = 1;
+    let accumRev = 0;
+    let accumProf = 0;
+    let accumP = 0;
+
+    while (cur <= endDate) {
+      const parts = getSaoPauloDateParts(cur);
+      const dateKey = `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+      const dayOrders = ordersByDay.get(dateKey) || [];
+
+      const isToday = dateKey === todayStr;
+      const isFuture = cycleDef.isCurrent && dateKey > todayStr;
+
+      let dayRev = 0;
+      let dayCmv = 0;
+      let dayPods = 0;
+
+      if (!isFuture) {
+        for (const o of dayOrders) {
+          const items = Array.isArray(o.items) ? o.items : [];
+          if (items.length > 0) {
+            for (const item of items) {
+              const qty = Number(item.quantity) || 1;
+              const brand = (item.brand || "OUTROS").toUpperCase();
+              const modelName = (item.name || "POD").toUpperCase();
+              const itemPrice = Number(item.price || item.unit_price) || 0;
+              const modelKey = (item.modelKey || `${brand}__${modelName}`).toLowerCase();
+
+              let itemCost = Number(item.cost_price || item.costPrice) || 0;
+              if (!itemCost && item.product_id && costsMap[item.product_id]) {
+                itemCost = costsMap[item.product_id];
+              }
+              if (!itemCost && modelKey && DEFAULT_MODEL_COSTS[modelKey]) {
+                itemCost = DEFAULT_MODEL_COSTS[modelKey];
+              }
+              if (!itemCost) itemCost = 65;
+
+              dayRev += qty * itemPrice;
+              dayCmv += qty * itemCost;
+              dayPods += qty;
+            }
+          } else {
+            dayRev += Number(o.total_amount) || 0;
+            dayCmv += (Number(o.total_amount) || 0) * 0.45;
+            dayPods += 1;
+          }
+        }
+        accumRev += dayRev;
+        accumProf += (dayRev - dayCmv);
+        accumP += dayPods;
+      }
+
+      const dayFormatted = `${String(parts.day).padStart(2, "0")}/${String(parts.month).padStart(2, "0")}`;
+
+      days.push({
+        dayIndex: dayIdx,
+        dateKey,
+        dateFormatted: dayFormatted,
+        fullDate: `${parts.day} de ${MONTH_NAMES[parts.month]} de ${parts.year}`,
+        revenue: Number(dayRev.toFixed(2)),
+        profit: Number((dayRev - dayCmv).toFixed(2)),
+        orders: isFuture ? 0 : dayOrders.length,
+        pods: isFuture ? 0 : dayPods,
+        accumRevenue: Number(accumRev.toFixed(2)),
+        accumProfit: Number(accumProf.toFixed(2)),
+        accumPods: accumP,
+        isFuture,
+        isToday,
+      });
+
+      cur.setDate(cur.getDate() + 1);
+      dayIdx++;
+      if (dayIdx > 35) break;
+    }
+
+    return days;
+  };
+
+  // Ciclo Base Selecionado (Padrão: Ciclo Vigente ou o 1º da lista)
+  const compBaseCycle = useMemo(() => {
+    if (compBaseCycleId) {
+      const found = monthlyCycles.find((m) => m.cycle.id === compBaseCycleId);
+      if (found) return found;
+    }
+    return monthlyCycles.find((m) => m.cycle.isCurrent) || monthlyCycles[0] || null;
+  }, [monthlyCycles, compBaseCycleId]);
+
+  // Ciclo de Comparação Selecionado (Padrão: Ciclo Anterior ao Base)
+  const compTargetCycle = useMemo(() => {
+    if (compTargetCycleId) {
+      const found = monthlyCycles.find((m) => m.cycle.id === compTargetCycleId);
+      if (found) return found;
+    }
+    if (compBaseCycle) {
+      const { year, month } = compBaseCycle.cycle;
+      const prevYear = month === 1 ? year - 1 : year;
+      const prevMonth = month === 1 ? 12 : month - 1;
+      const prevId = `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
+      const found = monthlyCycles.find((m) => m.cycle.id === prevId);
+      if (found) return found;
+    }
+    return monthlyCycles.find((m) => m.cycle.id !== compBaseCycle?.cycle.id) || null;
+  }, [monthlyCycles, compTargetCycleId, compBaseCycle]);
+
+  // Registros Diários Comparativos Pareados
+  const comparisonRecords = useMemo<ComparisonDayRecord[]>(() => {
+    if (!compBaseCycle || !compTargetCycle) return [];
+
+    const baseDays = getCycleDailyRecords(compBaseCycle, allValidOrders, persistedProductCosts);
+    const compDays = getCycleDailyRecords(compTargetCycle, allValidOrders, persistedProductCosts);
+
+    const totalDays = Math.max(baseDays.length, compDays.length);
+    const records: ComparisonDayRecord[] = [];
+
+    for (let i = 0; i < totalDays; i++) {
+      const b = baseDays[i] || {
+        dayIndex: i + 1,
+        dateFormatted: "—",
+        fullDate: "—",
+        revenue: 0,
+        profit: 0,
+        orders: 0,
+        pods: 0,
+        accumRevenue: baseDays[baseDays.length - 1]?.accumRevenue || 0,
+        isFuture: true,
+        isToday: false,
+      };
+
+      const c = compDays[i] || {
+        dayIndex: i + 1,
+        dateFormatted: "—",
+        fullDate: "—",
+        revenue: 0,
+        profit: 0,
+        orders: 0,
+        pods: 0,
+        accumRevenue: compDays[compDays.length - 1]?.accumRevenue || 0,
+      };
+
+      const diffRev = b.revenue - c.revenue;
+      const diffPercRev = c.revenue > 0 ? (diffRev / c.revenue) * 100 : 0;
+      const diffAccum = b.accumRevenue - c.accumRevenue;
+      const diffPercAccum = c.accumRevenue > 0 ? (diffAccum / c.accumRevenue) * 100 : 0;
+
+      records.push({
+        dayIndex: i + 1,
+        relativeLabel: `Dia ${i + 1}`,
+        baseDateFormatted: b.dateFormatted,
+        baseFullDate: b.fullDate,
+        baseRevenue: b.revenue,
+        baseProfit: b.profit,
+        baseOrders: b.orders,
+        basePods: b.pods,
+        baseAccumRevenue: b.accumRevenue,
+        isBaseFuture: b.isFuture,
+        isBaseToday: b.isToday,
+
+        compDateFormatted: c.dateFormatted,
+        compFullDate: c.fullDate,
+        compRevenue: c.revenue,
+        compProfit: c.profit,
+        compOrders: c.orders,
+        compPods: c.pods,
+        compAccumRevenue: c.accumRevenue,
+
+        diffRevenue: diffRev,
+        diffPercentRevenue: diffPercRev,
+        diffAccumRevenue: diffAccum,
+        diffAccumPercentRevenue: diffPercAccum,
+      });
+    }
+
+    return records;
+  }, [compBaseCycle, compTargetCycle, allValidOrders, persistedProductCosts]);
+
+  // Cálculos de Resumo Head-to-Head
+  const compMetrics = useMemo(() => {
+    if (!compBaseCycle || !compTargetCycle) return null;
+
+    const revDiff = compBaseCycle.grossRevenue - compTargetCycle.grossRevenue;
+    const revDiffPerc = compTargetCycle.grossRevenue > 0 ? (revDiff / compTargetCycle.grossRevenue) * 100 : 0;
+
+    const profitDiff = compBaseCycle.netProfit - compTargetCycle.netProfit;
+    const profitDiffPerc = compTargetCycle.netProfit > 0 ? (profitDiff / compTargetCycle.netProfit) * 100 : 0;
+
+    const podsDiff = compBaseCycle.totalPodsSold - compTargetCycle.totalPodsSold;
+    const podsDiffPerc = compTargetCycle.totalPodsSold > 0 ? (podsDiff / compTargetCycle.totalPodsSold) * 100 : 0;
+
+    const ticketDiff = compBaseCycle.averageTicket - compTargetCycle.averageTicket;
+    const ticketDiffPerc = compTargetCycle.averageTicket > 0 ? (ticketDiff / compTargetCycle.averageTicket) * 100 : 0;
+
+    const marginDiff = compBaseCycle.profitMargin - compTargetCycle.profitMargin;
+
+    // Cálculo de Ritmo / Pacing
+    const elapsedDays = comparisonRecords.filter((r) => !r.isBaseFuture).length || 1;
+    const dailyPace = compBaseCycle.grossRevenue / elapsedDays;
+    const projectedTotal = dailyPace * comparisonRecords.length;
+    const projectedDiff = projectedTotal - compTargetCycle.grossRevenue;
+    const projectedDiffPerc = compTargetCycle.grossRevenue > 0 ? (projectedDiff / compTargetCycle.grossRevenue) * 100 : 0;
+
+    return {
+      revDiff,
+      revDiffPerc,
+      profitDiff,
+      profitDiffPerc,
+      podsDiff,
+      podsDiffPerc,
+      ticketDiff,
+      ticketDiffPerc,
+      marginDiff,
+      elapsedDays,
+      dailyPace,
+      projectedTotal,
+      projectedDiff,
+      projectedDiffPerc,
+    };
+  }, [compBaseCycle, compTargetCycle, comparisonRecords]);
+
+  // Contagem de Vendas Nacionais no histórico
+  const nationalOrdersCount = useMemo(() => {
+    return allValidOrders.filter((o) => isOrderNational(o)).length;
+  }, [allValidOrders]);
+
   // Modal Handlers de Recompra
   const handleOpenRepurchaseModal = () => {
     setStockAmountInput("");
@@ -1528,7 +2342,7 @@ export default function FinanceDashboard() {
 
   // Estado B (com dados) e Estado C (dados legítimos vazios)
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
+    <div className="flex-1 h-full overflow-y-auto overflow-x-hidden bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
       {/* Cabeçalho */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div>
@@ -1540,7 +2354,23 @@ export default function FinanceDashboard() {
             Visão consolidada do ciclo atual, caixa disponível e inteligência comercial.
           </p>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+          {/* Botão Vendas Nacionais (Fora de SP) */}
+          <button
+            type="button"
+            onClick={() => setIsNationalModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-all cursor-pointer shadow-sm hover:scale-[1.02] active:scale-95"
+            title="Abrir Painel Financeiro de Vendas Nacionais (Fora de SP)"
+          >
+            <Globe className="size-3.5 text-amber-400" />
+            <span>Envios Nacionais</span>
+            {nationalOrdersCount > 0 && (
+              <span className="bg-amber-400 text-black text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                {nationalOrdersCount}
+              </span>
+            )}
+          </button>
+
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/5 text-white/90 border border-white/10">
             <Calendar className="size-3.5 text-white/70" />
             <span>Ciclo atual: {currentCycle.startDateStr.slice(0, 5)} → {currentCycle.endDateStr.slice(0, 5)}</span>
@@ -1557,17 +2387,17 @@ export default function FinanceDashboard() {
       )}
 
       {/* ━━━ BLOCO 1: CICLO ATUAL (14 → 13) ━━━━━━━━━━━━━━ */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-white/60 uppercase tracking-wider">
+      <div className="bg-[#0e0e10] sm:bg-transparent border border-white/15 sm:border-0 rounded-3xl p-4 sm:p-0 space-y-4 sm:space-y-3 shadow-xl sm:shadow-none">
+        <div className="flex items-center justify-between border-b border-white/10 sm:border-0 pb-3 sm:pb-0">
+          <span className="text-xs font-bold text-white/80 sm:text-white/60 uppercase tracking-wider">
             Ciclo Atual ({currentCycle.startDateStr.slice(0, 5)} → {currentCycle.endDateStr.slice(0, 5)})
           </span>
-          <span className="text-xs text-white/40">
+          <span className="text-xs font-semibold text-emerald-400 sm:text-white/40 bg-emerald-500/10 sm:bg-transparent px-2.5 py-0.5 sm:p-0 rounded-full border border-emerald-500/20 sm:border-0">
             {totalOrders} {totalOrders === 1 ? "pedido" : "pedidos"} · {totalPodsSold} pods
           </span>
         </div>
 
-        <div data-tour="financeiro-kpis" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div data-tour="financeiro-kpis" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
           {/* 1. Faturamento Bruto Real (Sem o Frete) */}
           <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all">
             <div className="flex items-center justify-between">
@@ -1603,24 +2433,40 @@ export default function FinanceDashboard() {
             )}
           </div>
 
-          {/* 2. Custo de Reposição (CMV) */}
-          <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
-                Custo de Reposição (CMV)
-              </span>
-              <div className="size-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
-                <TrendingDown className="size-4" />
+          {/* 2. Custos da Empresa (Substitui antigo Custo de Reposição CMV) */}
+          <div className="bg-[#0e0e10] border border-orange-500/25 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-orange-500/40 transition-all flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-orange-300/90 uppercase tracking-wider">
+                  Custos da Empresa
+                </span>
+                <div className="size-8 rounded-xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-center text-orange-400">
+                  <Building2 className="size-4" />
+                </div>
+              </div>
+
+              <div>
+                <div className="text-2xl sm:text-3xl font-extrabold text-orange-400">
+                  {formatBRL(companyExpenses)}
+                </div>
+                <p className="text-xs font-medium text-white/50 mt-1">
+                  Despesas operacionais do ciclo · Acumulado: {formatBRL(allTimeMetrics.companyExpenses || 0)}
+                </p>
               </div>
             </div>
 
-            <div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-red-400">
-                {formatBRL(cmv)}
-              </div>
-              <p className="text-xs font-medium text-white/50 mt-1">
-                Custo dos pods vendidos
-              </p>
+            <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+              <span className="text-[10px] text-white/40 font-medium">
+                Abatido do Caixa e Lucro
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsCompanyExpenseModalOpen(true)}
+                className="text-[10px] font-bold text-orange-300 hover:text-white bg-orange-500/15 hover:bg-orange-500/30 border border-orange-500/30 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="size-3" />
+                <span>Lançar Custo</span>
+              </button>
             </div>
           </div>
 
@@ -1640,7 +2486,7 @@ export default function FinanceDashboard() {
                 {formatBRL(logisticsFee)}
               </div>
               <p className="text-xs font-medium text-white/50 mt-1">
-                Fretes das entregas
+                Entregas locais (motoboy/Uber)
               </p>
             </div>
           </div>
@@ -1668,8 +2514,278 @@ export default function FinanceDashboard() {
         </div>
       </div>
 
-      {/* ━━━ NOVO BLOCO: 📦 RECOMPRA DE ESTOQUE & CAIXA REAL (MÓDULO INDEPENDENTE) ━━━━━━━━━━━━━━ */}
-      <div data-tour="financeiro-recompra-caixa" className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
+      {/* ━━━ NOVO BLOCO: 🎯 METAS SEMANAIS DO CICLO (SEMANA 1 A 4) — Visível apenas no Computador ━━━━━━━━━━━━━━ */}
+      <div className="hidden md:block bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
+        {/* Cabeçalho da Seção de Metas */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div>
+            <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <Target className="size-5 text-emerald-400" />
+              <span>Metas Semanais do Ciclo</span>
+              <span className="text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-2.5 py-0.5 rounded-full">
+                Ciclo {currentCycle.startDateStr.slice(0, 5)} → {currentCycle.endDateStr.slice(0, 5)}
+              </span>
+            </h3>
+            <p className="text-xs text-white/50 mt-0.5">
+              Ritmo de faturamento dividido nas 4 semanas oficiais. Meta Mensal Vigente:{" "}
+              <strong className="text-emerald-400 font-extrabold">{formatBRL(weeklyGoalsConfig.monthlyTarget)}</strong>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setIsWeeklyGoalsModalOpen(true)}
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-black font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all active:scale-95 cursor-pointer"
+            >
+              <Target className="size-4 stroke-[2.5]" />
+              <span>⚙️ Ajustar Metas</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Os 4 Cards de Metas Semanais */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {weeklyPerformances.map((wp) => {
+            const isCurrent = wp.status === "CURRENT";
+            const isAchieved = wp.status === "ACHIEVED";
+            const isBelow = wp.status === "BELOW";
+
+            return (
+              <div
+                key={wp.week.weekNumber}
+                className={`border rounded-2xl p-5 space-y-3 relative overflow-hidden transition-all shadow-lg ${
+                  isCurrent
+                    ? "bg-gradient-to-b from-emerald-500/15 via-[#0e0e10] to-[#0e0e10] border-emerald-500/50 shadow-emerald-950/30"
+                    : isAchieved
+                    ? "bg-emerald-500/5 border-emerald-500/30"
+                    : isBelow
+                    ? "bg-amber-500/5 border-amber-500/30"
+                    : "bg-[#0e0e10] border-white/10 opacity-75"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-black text-white uppercase tracking-wider block">
+                      {wp.week.label}
+                    </span>
+                    <span className="text-[10px] text-white/50 font-medium">
+                      {wp.week.dateRangeFormatted}
+                    </span>
+                  </div>
+
+                  {isCurrent && (
+                    <span className="text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                      <span className="size-1.5 rounded-full bg-emerald-400" />
+                      Em Andamento
+                    </span>
+                  )}
+                  {isAchieved && (
+                    <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle2 className="size-3" />
+                      Meta Batida
+                    </span>
+                  )}
+                  {isBelow && (
+                    <span className="text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 px-2 py-0.5 rounded-full">
+                      Abaixo da Meta
+                    </span>
+                  )}
+                  {wp.status === "FUTURE" && (
+                    <span className="text-[10px] font-bold bg-white/5 text-white/40 border border-white/10 px-2 py-0.5 rounded-full">
+                      Próxima
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <div className="text-2xl font-black text-white">
+                    {formatBRL(wp.revenue)}
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-white/50 mt-1">
+                    <span>Meta: {formatBRL(wp.goal)}</span>
+                    <span
+                      className={`font-extrabold ${
+                        isAchieved || wp.percentage >= 100
+                          ? "text-emerald-400"
+                          : isCurrent
+                          ? "text-emerald-300"
+                          : "text-white/60"
+                      }`}
+                    >
+                      {wp.percentage}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Barra de Progresso */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-700 ${
+                        wp.percentage >= 100
+                          ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.6)]"
+                          : isCurrent
+                          ? "bg-gradient-to-r from-emerald-500 to-amber-400"
+                          : "bg-amber-400"
+                      }`}
+                      style={{ width: `${Math.min(100, wp.percentage)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-white/40 font-medium">
+                    <span>
+                      {wp.podsSold} {wp.podsSold === 1 ? "pod vendido" : "pods vendidos"}
+                    </span>
+                    <span>
+                      {wp.ordersCount} {wp.ordersCount === 1 ? "pedido" : "pedidos"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ─── Trajeto da Meta Mensal & Termômetro de Compensação ─── */}
+        <div className="pt-4 border-t border-white/10 space-y-4">
+          {/* Header do Trajeto */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="size-8 rounded-xl bg-gradient-to-br from-emerald-500/20 to-amber-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                <Route className="size-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-white uppercase tracking-wider">
+                    Trajeto da Meta Mensal
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                    {monthlyTrajectory.progressPerc.toFixed(1)}% do mês percorrido
+                  </span>
+                </div>
+                <p className="text-[11px] text-white/50 mt-0.5">
+                  {monthlyTrajectory.totalRealized >= monthlyTrajectory.target ? (
+                    <span className="text-emerald-400 font-bold">🎉 Meta mensal batida com sucesso!</span>
+                  ) : (
+                    <span>
+                      Realizado: <strong className="text-white font-bold">{formatBRL(monthlyTrajectory.totalRealized)}</strong>. Faltam exatamente{" "}
+                      <strong className="text-emerald-300 font-extrabold">{formatBRL(monthlyTrajectory.remaining)}</strong> para a meta de{" "}
+                      <strong className="text-emerald-400 font-bold">{formatBRL(monthlyTrajectory.target)}</strong>.
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Pílulas de Apoio: Dias Restantes & Ritmo Necessário */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl text-xs">
+                <Clock className="size-3.5 text-amber-400 shrink-0" />
+                <span className="text-white/50 text-[11px]">Tempo restante:</span>
+                <span className="font-extrabold text-white text-[11px]">{monthlyTrajectory.remainingDays} dias</span>
+              </div>
+
+              <div className="flex items-center gap-1.5 bg-black/40 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs">
+                <Zap className="size-3.5 text-emerald-400 shrink-0" />
+                <span className="text-white/50 text-[11px]">Ritmo necessário:</span>
+                <span className="font-extrabold text-emerald-400 text-[11px]">
+                  {formatBRL(monthlyTrajectory.dailyPaceNeeded)}/dia
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* A Barra de Trajeto Contínua (Roadmap com os 4 Checkpoints Semanais) */}
+          <div className="space-y-3 bg-black/40 border border-white/10 p-4 rounded-2xl">
+            {/* Linha dos Checkpoints com Marcadores */}
+            <div className="relative pt-2 pb-1">
+              {/* Trilho de Fundo */}
+              <div className="h-3 w-full bg-white/10 rounded-full overflow-hidden relative">
+                {/* Preenchimento Dinâmico de Progresso */}
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-amber-300 rounded-full transition-all duration-700 shadow-[0_0_15px_rgba(52,211,153,0.5)]"
+                  style={{ width: `${Math.min(100, monthlyTrajectory.progressPerc)}%` }}
+                />
+              </div>
+
+              {/* Marcadores das 4 Semanas no Trilho */}
+              <div className="absolute top-1/2 -translate-y-1/2 w-full flex justify-between pointer-events-none px-0.5">
+                {/* Checkpoint S1 (25%) */}
+                <div className="relative left-[25%] -translate-x-1/2 flex flex-col items-center">
+                  <div
+                    className={`size-3 rounded-full border-2 ${
+                      monthlyTrajectory.progressPerc >= 25
+                        ? "bg-emerald-400 border-black ring-2 ring-emerald-500/50"
+                        : "bg-black border-white/30"
+                    }`}
+                  />
+                </div>
+                {/* Checkpoint S2 (50%) */}
+                <div className="relative left-[50%] -translate-x-1/2 flex flex-col items-center">
+                  <div
+                    className={`size-3 rounded-full border-2 ${
+                      monthlyTrajectory.progressPerc >= 50
+                        ? "bg-emerald-400 border-black ring-2 ring-emerald-500/50"
+                        : "bg-black border-white/30"
+                    }`}
+                  />
+                </div>
+                {/* Checkpoint S3 (75%) */}
+                <div className="relative left-[75%] -translate-x-1/2 flex flex-col items-center">
+                  <div
+                    className={`size-3 rounded-full border-2 ${
+                      monthlyTrajectory.progressPerc >= 75
+                        ? "bg-emerald-400 border-black ring-2 ring-emerald-500/50"
+                        : "bg-black border-white/30"
+                    }`}
+                  />
+                </div>
+                {/* Checkpoint Final S4 (100%) */}
+                <div className="relative left-[100%] -translate-x-full flex flex-col items-center">
+                  <div
+                    className={`size-3.5 rounded-full border-2 ${
+                      monthlyTrajectory.progressPerc >= 100
+                        ? "bg-emerald-300 border-black ring-2 ring-emerald-400"
+                        : "bg-black border-white/40"
+                    }`}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Labels das 4 Etapas do Trajeto */}
+            <div className="grid grid-cols-4 text-[10px] pt-1 border-t border-white/5 text-white/50">
+              <div className="text-left">
+                <span className="font-bold text-white/80 block">Semana 1</span>
+                <span>{formatBRL(weeklyGoalsConfig.week1)}</span>
+              </div>
+              <div className="text-center">
+                <span className="font-bold text-white/80 block">Semana 2</span>
+                <span>{formatBRL(weeklyGoalsConfig.week1 + weeklyGoalsConfig.week2)}</span>
+              </div>
+              <div className="text-center">
+                <span className="font-bold text-white/80 block">Semana 3</span>
+                <span>{formatBRL(weeklyGoalsConfig.week1 + weeklyGoalsConfig.week2 + weeklyGoalsConfig.week3)}</span>
+              </div>
+              <div className="text-right">
+                <span className="font-bold text-emerald-400 block">Meta Final</span>
+                <span className="font-extrabold text-white">{formatBRL(monthlyTrajectory.target)}</span>
+              </div>
+            </div>
+
+            {/* Nota de Inteligência e Compensação Automática */}
+            <div className="pt-2 border-t border-white/5 flex items-start gap-2 text-[11px] text-white/60 leading-relaxed">
+              <Sparkles className="size-3.5 text-amber-400 shrink-0 mt-0.5" />
+              <span>
+                <strong className="text-white">Compensação Automática de Metas:</strong> O progresso do mês é contínuo. Como a Semana 2 iniciou dia 21 e você já está em 45% da meta semanal em apenas 2 dias, qualquer excedente vendido nos próximos dias e no final de semana cobrirá automaticamente o déficit da Semana 1, avançando o trajeto rumo aos <strong className="text-emerald-300">{formatBRL(monthlyTrajectory.target)}</strong>!
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ━━━ NOVO BLOCO: 📦 RECOMPRA DE ESTOQUE & CAIXA REAL (MÓDULO INDEPENDENTE — Visível apenas no Computador) ━━━━━━━━━━━━━━ */}
+      <div data-tour="financeiro-recompra-caixa" className="hidden md:block bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
         {/* Cabeçalho da Seção */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
           <div>
@@ -1858,93 +2974,97 @@ export default function FinanceDashboard() {
       </div>
 
       {/* ━━━ BLOCO DEDICADO: 🎯 EFICIÊNCIA COMERCIAL (HISTÓRICO COMPLETO) ━━━━━━━━━━━━━━ */}
-      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-xl hover:border-white/25 transition-all">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-white/10 pb-3.5 sm:pb-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Target className="size-5 text-white" />
+              <Target className="size-5 text-white shrink-0" />
               <span>Eficiência Comercial</span>
             </h3>
             <p className="text-xs text-white/50 mt-0.5">
               Médias acumuladas de venda e rentabilidade no histórico completo ({allTimeMetrics.totalOrders} pedidos).
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-white/70 bg-white/5 px-3 py-1 rounded-xl border border-white/10">
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="text-[11px] sm:text-xs font-semibold text-white/70 bg-white/5 px-3 py-1 rounded-xl border border-white/10">
               Histórico Completo
             </span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
           {/* Card 1: Ticket Médio */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <ReceiptText className="size-4 text-white/70" /> Ticket Médio
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[10px] sm:text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <ReceiptText className="size-3.5 sm:size-4 text-white/70 shrink-0" />
+              <span className="truncate">Ticket Médio</span>
             </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-white">
+            <div className="text-xl sm:text-3xl font-extrabold text-white">
               {formatBRL(averageTicket)}
             </div>
-            <p className="text-xs text-white/50">
-              Valor médio por compra no histórico.
+            <p className="text-[11px] sm:text-xs text-white/50">
+              Valor médio por compra
             </p>
-            <div className="pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
-              Fat. total ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalOrders} pedidos
+            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
+              Fat. ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalOrders} ped
             </div>
           </div>
 
           {/* Card 2: Margem Média Líquida (%) */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <Percent className="size-4 text-emerald-400" /> Margem Média
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[10px] sm:text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <Percent className="size-3.5 sm:size-4 text-emerald-400 shrink-0" />
+              <span className="truncate">Margem Média</span>
             </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-emerald-400">
+            <div className="text-xl sm:text-3xl font-extrabold text-emerald-400">
               {averageNetMarginPercent.toFixed(1)}%
             </div>
-            <p className="text-xs text-white/50">
-              Margem líquida média da operação.
+            <p className="text-[11px] sm:text-xs text-white/50">
+              Margem líquida média
             </p>
-            <div className="pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
-              Lucro Líquido total ÷ Faturamento total
+            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
+              Lucro Líquido ÷ Faturamento
             </div>
           </div>
 
           {/* Card 3: Margem por Pedido */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <TrendingUp className="size-4 text-emerald-400" /> Margem por Pedido
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[10px] sm:text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="size-3.5 sm:size-4 text-emerald-400 shrink-0" />
+              <span className="truncate">Lucro / Pedido</span>
             </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-emerald-300">
+            <div className="text-xl sm:text-3xl font-extrabold text-emerald-300">
               {formatBRL(averageNetProfitPerOrder)}
             </div>
-            <p className="text-xs text-white/50">
-              Ganho líquido médio por pedido entregue.
+            <p className="text-[11px] sm:text-xs text-white/50">
+              Ganho médio por pedido
             </p>
-            <div className="pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
-              Lucro Líquido ({formatBRL(allTimeMetrics.netProfit)}) ÷ {allTimeMetrics.totalOrders} pedidos
+            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
+              Lucro ({formatBRL(allTimeMetrics.netProfit)}) ÷ {allTimeMetrics.totalOrders} ped
             </div>
           </div>
 
           {/* Card 4: Preço Médio por Pod */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <Box className="size-4 text-white/70" /> Preço Médio por Pod
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[10px] sm:text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <Box className="size-3.5 sm:size-4 text-white/70 shrink-0" />
+              <span className="truncate">Preço / Pod</span>
             </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-white">
+            <div className="text-xl sm:text-3xl font-extrabold text-white">
               {formatBRL(averagePricePerPod)}
             </div>
-            <p className="text-xs text-white/50">
-              Preço médio por unidade vendida.
+            <p className="text-[11px] sm:text-xs text-white/50">
+              Preço médio por pod
             </p>
-            <div className="pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
-              Faturamento ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalPodsSold} pods
+            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
+              Fat. ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalPodsSold} pods
             </div>
           </div>
         </div>
       </div>
 
-      {/* ━━━ BLOCO 2: PATRIMÔNIO & ESTOQUE NA PRATELEIRA ━━━━━━━━━━━━━━ */}
-      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
+      {/* ━━━ BLOCO 2: PATRIMÔNIO & ESTOQUE NA PRATELEIRA (Visível apenas no Computador) ━━━━━━━━━━━━━━ */}
+      <div className="hidden md:block bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -2056,12 +3176,12 @@ export default function FinanceDashboard() {
       </div>
 
       {/* ━━━ NOVO BLOCO: 📈 FATURAMENTO A LONGO PRAZO (2 ABAS: HISTÓRICO & EVOLUÇÃO) ━━━━━━━━━━━━━━ */}
-      <div data-tour="financeiro-longo-prazo" className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
-        {/* Cabeçalho do Bloco: Duas Abas Principais [ Histórico ] [ Evolução ] */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+      <div data-tour="financeiro-longo-prazo" className="bg-[#0e0e10] border border-white/15 rounded-3xl p-4 sm:p-6 space-y-5 sm:space-y-6 shadow-xl hover:border-white/25 transition-all">
+        {/* Cabeçalho do Bloco: Abas Principais [ Histórico ] [ Evolução ] [ Mês a Mês ] */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 border-b border-white/10 pb-4">
           <div>
             <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-              <TrendingUp className="size-5 text-emerald-400" />
+              <TrendingUp className="size-5 text-emerald-400 shrink-0" />
               <span>Faturamento a Longo Prazo</span>
             </h3>
             <p className="text-xs text-white/50 mt-0.5">
@@ -2069,31 +3189,44 @@ export default function FinanceDashboard() {
             </p>
           </div>
 
-          {/* Abas Principais: [ Histórico ] [ Evolução ] */}
-          <div className="inline-flex p-1 rounded-2xl bg-black/60 border border-white/15 self-start sm:self-auto">
+          {/* Abas Principais: Grid de 3 colunas alinhadas no celular e inline-flex no PC */}
+          <div className="grid grid-cols-3 sm:inline-flex w-full sm:w-auto p-1 rounded-2xl bg-black/60 border border-white/15 gap-1">
             <button
               type="button"
               onClick={() => setLongTermTab("historico")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              className={`px-2 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 ${
                 longTermTab === "historico"
                   ? "bg-white text-black shadow-md font-extrabold"
                   : "text-white/70 hover:text-white hover:bg-white/5"
               }`}
             >
-              <History className="size-4" />
-              <span>Histórico</span>
+              <History className="size-3.5 sm:size-4 shrink-0" />
+              <span className="truncate">Histórico</span>
             </button>
             <button
               type="button"
               onClick={() => setLongTermTab("evolucao")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              className={`px-2 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 ${
                 longTermTab === "evolucao"
                   ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 font-extrabold"
                   : "text-white/70 hover:text-white hover:bg-white/5"
               }`}
             >
-              <TrendingUp className="size-4" />
-              <span>Evolução</span>
+              <TrendingUp className="size-3.5 sm:size-4 shrink-0" />
+              <span className="truncate">Evolução</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setLongTermTab("comparativo")}
+              className={`px-2 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 ${
+                longTermTab === "comparativo"
+                  ? "bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-lg shadow-purple-500/25 font-extrabold"
+                  : "text-white/70 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <GitCompare className="size-3.5 sm:size-4 shrink-0" />
+              <span className="sm:hidden truncate">Mês a Mês</span>
+              <span className="hidden sm:inline">Comparar Mês a Mês</span>
             </button>
           </div>
         </div>
@@ -2104,55 +3237,55 @@ export default function FinanceDashboard() {
         {longTermTab === "historico" && (
           <div className="space-y-6">
             {/* Seletor de Modalidade: Mensal / Trimestral / Semestral / Anual */}
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="inline-flex p-1 rounded-2xl bg-black/60 border border-white/15">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="grid grid-cols-2 sm:inline-flex w-full sm:w-auto p-1 rounded-2xl bg-black/60 border border-white/15 gap-1">
                 <button
                   type="button"
                   onClick={() => setHistoryTab("mensal")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     historyTab === "mensal"
                       ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                       : "text-white/70 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Calendar className="size-3.5" />
-                  <span>Mensal (14 → 13)</span>
+                  <Calendar className="size-3.5 shrink-0" />
+                  <span className="truncate">Mensal (14 → 13)</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setHistoryTab("trimestral")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     historyTab === "trimestral"
                       ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                       : "text-white/70 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <BarChart3 className="size-3.5" />
-                  <span>Trimestral</span>
+                  <BarChart3 className="size-3.5 shrink-0" />
+                  <span className="truncate">Trimestral</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setHistoryTab("semestral")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     historyTab === "semestral"
                       ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                       : "text-white/70 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Layers className="size-3.5" />
-                  <span>Semestral</span>
+                  <Layers className="size-3.5 shrink-0" />
+                  <span className="truncate">Semestral</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setHistoryTab("anual")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     historyTab === "anual"
                       ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                       : "text-white/70 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Award className="size-3.5" />
-                  <span>Anual</span>
+                  <Award className="size-3.5 shrink-0" />
+                  <span className="truncate">Anual</span>
                 </button>
               </div>
 
@@ -2202,66 +3335,66 @@ export default function FinanceDashboard() {
             {selectedMonthlyMetric ? (
               <div className="space-y-4">
                 {/* 4 Cards Principais do Ciclo Selecionado */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
                   {/* Card 1: Faturamento */}
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
-                      Faturamento Bruto Real
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
+                      Faturamento Bruto
                     </span>
-                    <div className="text-2xl font-extrabold text-white">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white">
                       {formatBRL(selectedMonthlyMetric.grossRevenue)}
                     </div>
                     <EvolutionBadge evolution={monthlyEvolution.grossRevenue} />
-                    <p className="text-[11px] text-white/50">
-                      {selectedMonthlyMetric.totalOrders} pedidos ({selectedMonthlyMetric.totalPodsSold} pods)
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      {selectedMonthlyMetric.totalOrders} ped ({selectedMonthlyMetric.totalPodsSold} pods)
                     </p>
                   </div>
 
                   {/* Card 2: CMV */}
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
                       Custo Reposição (CMV)
                     </span>
-                    <div className="text-2xl font-extrabold text-red-400">
+                    <div className="text-lg sm:text-2xl font-extrabold text-red-400">
                       {formatBRL(selectedMonthlyMetric.cmv)}
                     </div>
                     <EvolutionBadge evolution={monthlyEvolution.cmv} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Custo de mercadoria do ciclo
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Custo de mercadoria
                     </p>
                   </div>
 
                   {/* Card 3: Frete */}
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
-                      Frete Logística (Cobrado)
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
+                      Frete e Logística
                     </span>
-                    <div className="text-2xl font-extrabold text-white/80">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white/80">
                       {formatBRL(selectedMonthlyMetric.logisticsFee)}
                     </div>
                     <EvolutionBadge evolution={monthlyEvolution.logisticsFee} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Diluído nas entregas do ciclo
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Entregas do ciclo
                     </p>
                   </div>
 
                   {/* Card 4: Lucro Líquido */}
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block">
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block truncate">
                       Lucro Líquido Real
                     </span>
-                    <div className="text-2xl font-black text-emerald-300">
+                    <div className="text-lg sm:text-2xl font-black text-emerald-300">
                       {formatBRL(selectedMonthlyMetric.netProfit)}
                     </div>
                     <EvolutionBadge evolution={monthlyEvolution.netProfit} />
-                    <p className="text-[11px] font-bold text-emerald-400">
-                      Margem Líquida: {selectedMonthlyMetric.profitMargin}%
+                    <p className="text-[10px] sm:text-[11px] font-bold text-emerald-400">
+                      Margem: {selectedMonthlyMetric.profitMargin}%
                     </p>
                   </div>
                 </div>
 
-                {/* 4 Indicadores Secundários do Ciclo Selecionado */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-black/30 border border-white/10 rounded-2xl p-4 text-xs">
+                {/* 4 Indicadores Secundários do Ciclo Selecionado (Visível no PC) */}
+                <div className="hidden sm:grid grid-cols-2 sm:grid-cols-4 gap-3 bg-black/30 border border-white/10 rounded-2xl p-4 text-xs">
                   <div>
                     <span className="text-white/50 block text-[10px] uppercase font-semibold">Ticket Médio</span>
                     <span className="text-white font-extrabold text-sm">{formatBRL(selectedMonthlyMetric.averageTicket)}</span>
@@ -2391,56 +3524,56 @@ export default function FinanceDashboard() {
             {selectedQuarter ? (
               <div className="space-y-4">
                 {/* 4 KPIs Consolidados do Trimestre */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
                       Faturamento Trimestral
                     </span>
-                    <div className="text-2xl font-extrabold text-white">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white">
                       {formatBRL(selectedQuarter.grossRevenue)}
                     </div>
                     <EvolutionBadge evolution={quarterlyEvolution.grossRevenue} />
-                    <p className="text-[11px] text-white/50">
-                      {selectedQuarter.totalOrders} pedidos ({selectedQuarter.totalPodsSold} pods)
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      {selectedQuarter.totalOrders} ped ({selectedQuarter.totalPodsSold} pods)
                     </p>
                   </div>
 
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
                       CMV Trimestral
                     </span>
-                    <div className="text-2xl font-extrabold text-red-400">
+                    <div className="text-lg sm:text-2xl font-extrabold text-red-400">
                       {formatBRL(selectedQuarter.cmv)}
                     </div>
                     <EvolutionBadge evolution={quarterlyEvolution.cmv} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Custo total de reposição nos 3 ciclos
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Custo nos 3 ciclos
                     </p>
                   </div>
 
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
-                      Frete Logística Trimestral
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
+                      Frete Trimestral
                     </span>
-                    <div className="text-2xl font-extrabold text-white/80">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white/80">
                       {formatBRL(selectedQuarter.logisticsFee)}
                     </div>
                     <EvolutionBadge evolution={quarterlyEvolution.logisticsFee} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Fretes cobrados nos 3 ciclos
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Fretes nos 3 ciclos
                     </p>
                   </div>
 
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block">
-                      Lucro Líquido Trimestral
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block truncate">
+                      Lucro Líquido Trim.
                     </span>
-                    <div className="text-2xl font-black text-emerald-300">
+                    <div className="text-lg sm:text-2xl font-black text-emerald-300">
                       {formatBRL(selectedQuarter.netProfit)}
                     </div>
                     <EvolutionBadge evolution={quarterlyEvolution.netProfit} />
-                    <p className="text-[11px] font-bold text-emerald-400">
-                      Margem Média: {selectedQuarter.profitMargin}%
+                    <p className="text-[10px] sm:text-[11px] font-bold text-emerald-400">
+                      Margem: {selectedQuarter.profitMargin}%
                     </p>
                   </div>
                 </div>
@@ -2521,56 +3654,56 @@ export default function FinanceDashboard() {
             {selectedSemester ? (
               <div className="space-y-4">
                 {/* 4 KPIs Consolidados do Semestre */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
                       Faturamento Semestral
                     </span>
-                    <div className="text-2xl font-extrabold text-white">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white">
                       {formatBRL(selectedSemester.grossRevenue)}
                     </div>
                     <EvolutionBadge evolution={semiannualEvolution.grossRevenue} />
-                    <p className="text-[11px] text-white/50">
-                      {selectedSemester.totalOrders} pedidos ({selectedSemester.totalPodsSold} pods)
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      {selectedSemester.totalOrders} ped ({selectedSemester.totalPodsSold} pods)
                     </p>
                   </div>
 
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
                       CMV Semestral
                     </span>
-                    <div className="text-2xl font-extrabold text-red-400">
+                    <div className="text-lg sm:text-2xl font-extrabold text-red-400">
                       {formatBRL(selectedSemester.cmv)}
                     </div>
                     <EvolutionBadge evolution={semiannualEvolution.cmv} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Custo total de reposição nos 6 ciclos
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Custo nos 6 ciclos
                     </p>
                   </div>
 
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
-                      Frete Logística Semestral
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
+                      Frete Semestral
                     </span>
-                    <div className="text-2xl font-extrabold text-white/80">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white/80">
                       {formatBRL(selectedSemester.logisticsFee)}
                     </div>
                     <EvolutionBadge evolution={semiannualEvolution.logisticsFee} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Fretes cobrados nos 6 ciclos
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Fretes nos 6 ciclos
                     </p>
                   </div>
 
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block">
-                      Lucro Líquido Semestral
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block truncate">
+                      Lucro Líquido Sem.
                     </span>
-                    <div className="text-2xl font-black text-emerald-300">
+                    <div className="text-lg sm:text-2xl font-black text-emerald-300">
                       {formatBRL(selectedSemester.netProfit)}
                     </div>
                     <EvolutionBadge evolution={semiannualEvolution.netProfit} />
-                    <p className="text-[11px] font-bold text-emerald-400">
-                      Margem Média: {selectedSemester.profitMargin}%
+                    <p className="text-[10px] sm:text-[11px] font-bold text-emerald-400">
+                      Margem: {selectedSemester.profitMargin}%
                     </p>
                   </div>
                 </div>
@@ -2651,56 +3784,56 @@ export default function FinanceDashboard() {
             {selectedYear ? (
               <div className="space-y-4">
                 {/* 4 KPIs Consolidados do Ano */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
                       Faturamento Anual
                     </span>
-                    <div className="text-2xl font-extrabold text-white">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white">
                       {formatBRL(selectedYear.grossRevenue)}
                     </div>
                     <EvolutionBadge evolution={annualEvolution.grossRevenue} />
-                    <p className="text-[11px] text-white/50">
-                      {selectedYear.totalOrders} pedidos ({selectedYear.totalPodsSold} pods)
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      {selectedYear.totalOrders} ped ({selectedYear.totalPodsSold} pods)
                     </p>
                   </div>
 
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
                       CMV Anual
                     </span>
-                    <div className="text-2xl font-extrabold text-red-400">
+                    <div className="text-lg sm:text-2xl font-extrabold text-red-400">
                       {formatBRL(selectedYear.cmv)}
                     </div>
                     <EvolutionBadge evolution={annualEvolution.cmv} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Custo total de reposição no ano
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Custo no ano
                     </p>
                   </div>
 
-                  <div className="bg-black/40 border border-white/15 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider block">
-                      Frete Logística Anual
+                  <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider block truncate">
+                      Frete Anual
                     </span>
-                    <div className="text-2xl font-extrabold text-white/80">
+                    <div className="text-lg sm:text-2xl font-extrabold text-white/80">
                       {formatBRL(selectedYear.logisticsFee)}
                     </div>
                     <EvolutionBadge evolution={annualEvolution.logisticsFee} invertColors={true} />
-                    <p className="text-[11px] text-white/50">
-                      Fretes cobrados no ano
+                    <p className="text-[10px] sm:text-[11px] text-white/50">
+                      Fretes no ano
                     </p>
                   </div>
 
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
-                    <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block">
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3.5 sm:p-4 space-y-1.5 sm:space-y-2">
+                    <span className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block truncate">
                       Lucro Líquido Anual
                     </span>
-                    <div className="text-2xl font-black text-emerald-300">
+                    <div className="text-lg sm:text-2xl font-black text-emerald-300">
                       {formatBRL(selectedYear.netProfit)}
                     </div>
                     <EvolutionBadge evolution={annualEvolution.netProfit} />
-                    <p className="text-[11px] font-bold text-emerald-400">
-                      Margem Média: {selectedYear.profitMargin}%
+                    <p className="text-[10px] sm:text-[11px] font-bold text-emerald-400">
+                      Margem: {selectedYear.profitMargin}%
                     </p>
                   </div>
                 </div>
@@ -2799,10 +3932,249 @@ export default function FinanceDashboard() {
             />
           </div>
         )}
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* ABA 3 — COMPARAR COM MÊS ANTERIOR (MoM BENCHMARK)                */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {longTermTab === "comparativo" && (
+          <div className="space-y-4">
+            {/* 1. Barra Superior de Seleção dos Dois Ciclos para Benchmark */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3.5 rounded-2xl">
+              <div className="grid grid-cols-1 sm:flex sm:items-center gap-2.5 flex-wrap w-full sm:w-auto">
+                {/* Seletor Mês Base (Verde) */}
+                <div className="flex items-center justify-between sm:justify-start gap-2">
+                  <span className="text-[11px] font-bold text-white/70 shrink-0">Mês Base:</span>
+                  <select
+                    value={compBaseCycle?.cycle.id}
+                    onChange={(e) => setCompBaseCycleId(e.target.value)}
+                    className="bg-black/90 border border-emerald-500/50 rounded-xl px-2.5 py-1.5 sm:py-1 text-xs font-bold text-emerald-400 focus:outline-none focus:border-emerald-400 cursor-pointer flex-1 sm:flex-initial"
+                  >
+                    {monthlyCycles.map((m) => (
+                      <option key={`base-${m.cycle.id}`} value={m.cycle.id} className="bg-[#121214] text-white">
+                        {m.cycle.name} {m.cycle.isCurrent ? "(Vigente)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <span className="hidden sm:inline text-white/30 text-xs font-mono font-bold">vs</span>
+
+                {/* Seletor Mês Comparado (Roxo) */}
+                <div className="flex items-center justify-between sm:justify-start gap-2">
+                  <span className="text-[11px] font-bold text-white/70 shrink-0">Comparar com:</span>
+                  <select
+                    value={compTargetCycle?.cycle.id}
+                    onChange={(e) => setCompTargetCycleId(e.target.value)}
+                    className="bg-black/90 border border-purple-500/50 rounded-xl px-2.5 py-1.5 sm:py-1 text-xs font-bold text-purple-300 focus:outline-none focus:border-purple-400 cursor-pointer flex-1 sm:flex-initial"
+                  >
+                    {monthlyCycles.map((m) => (
+                      <option key={`comp-${m.cycle.id}`} value={m.cycle.id} className="bg-[#121214] text-white">
+                        {m.cycle.name} {m.cycle.isCurrent ? "(Vigente)" : "(Fechado)"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <span className="text-[11px] text-white/40 hidden md:inline-block">
+                Comparativo normalizado dia a dia do ciclo oficial (14 → 13)
+              </span>
+            </div>
+
+            {/* 2. Placar Executivo Head-to-Head (5 KPIs Compactos) */}
+            {compMetrics && compBaseCycle && compTargetCycle && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-2.5">
+                {/* 1. Faturamento Bruto */}
+                <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-3 space-y-1.5">
+                  <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider block">
+                    Faturamento Bruto
+                  </span>
+                  <div className="text-base sm:text-lg font-black text-white">
+                    {formatBRL(compBaseCycle.grossRevenue)}
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] pt-0.5">
+                    <span className="text-white/40">Ant: {formatBRL(compTargetCycle.grossRevenue).replace(",00", "")}</span>
+                    <span className={`font-extrabold flex items-center gap-0.5 ${compMetrics.revDiff >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {compMetrics.revDiff >= 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                      {compMetrics.revDiff >= 0 ? "+" : ""}{compMetrics.revDiffPerc.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Lucro Líquido Real */}
+                <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-3 space-y-1.5">
+                  <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider block">
+                    Lucro Líquido Real
+                  </span>
+                  <div className="text-base sm:text-lg font-black text-emerald-400">
+                    {formatBRL(compBaseCycle.netProfit)}
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] pt-0.5">
+                    <span className="text-white/40">Ant: {formatBRL(compTargetCycle.netProfit).replace(",00", "")}</span>
+                    <span className={`font-extrabold flex items-center gap-0.5 ${compMetrics.profitDiff >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {compMetrics.profitDiff >= 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                      {compMetrics.profitDiff >= 0 ? "+" : ""}{compMetrics.profitDiffPerc.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Pods Vendidos */}
+                <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-3 space-y-1.5">
+                  <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider block">
+                    Pods Vendidos
+                  </span>
+                  <div className="text-base sm:text-lg font-black text-white">
+                    {compBaseCycle.totalPodsSold} pods
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] pt-0.5">
+                    <span className="text-white/40">Ant: {compTargetCycle.totalPodsSold}</span>
+                    <span className={`font-extrabold flex items-center gap-0.5 ${compMetrics.podsDiff >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {compMetrics.podsDiff >= 0 ? "+" : ""}{compMetrics.podsDiff} ({compMetrics.podsDiff >= 0 ? "+" : ""}{compMetrics.podsDiffPerc.toFixed(1)}%)
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4. Ticket Médio */}
+                <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-3 space-y-1.5">
+                  <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider block">
+                    Ticket Médio
+                  </span>
+                  <div className="text-base sm:text-lg font-black text-white">
+                    {formatBRL(compBaseCycle.averageTicket)}
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] pt-0.5">
+                    <span className="text-white/40">Ant: {formatBRL(compTargetCycle.averageTicket)}</span>
+                    <span className={`font-extrabold flex items-center gap-0.5 ${compMetrics.ticketDiff >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {compMetrics.ticketDiff >= 0 ? "+" : ""}{compMetrics.ticketDiffPerc.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* 5. Margem Líquida */}
+                <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-3 space-y-1.5 col-span-2 sm:col-span-1">
+                  <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider block">
+                    Margem Líquida
+                  </span>
+                  <div className="text-base sm:text-lg font-black text-cyan-300">
+                    {compBaseCycle.profitMargin}%
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] pt-0.5">
+                    <span className="text-white/40">Ant: {compTargetCycle.profitMargin}%</span>
+                    <span className={`font-extrabold ${compMetrics.marginDiff >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {compMetrics.marginDiff >= 0 ? "+" : ""}{compMetrics.marginDiff.toFixed(1)} p.p.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 3. Pílula de Ritmo & Velocidade (Sleek Compact Bar) */}
+            {compMetrics && compBaseCycle && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-gradient-to-r from-emerald-500/10 via-purple-500/10 to-transparent border border-white/10 px-3.5 py-2 rounded-xl text-xs">
+                <div className="flex items-center gap-3.5 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <Zap className="size-3.5 text-amber-400 shrink-0" />
+                    <span className="text-white/60">Ritmo de Venda:</span>
+                    <span className="font-extrabold text-white">{formatBRL(compMetrics.dailyPace)}/dia</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="size-3.5 text-emerald-400 shrink-0" />
+                    <span className="text-white/60">Ciclo:</span>
+                    <span className="font-bold text-white/90">{compMetrics.elapsedDays} de {comparisonRecords.length} dias</span>
+                  </div>
+                </div>
+                {compBaseCycle.cycle.isCurrent && (
+                  <div className="flex items-center gap-1.5 text-[11px]">
+                    <span className="text-white/60">Projeção de Fechamento:</span>
+                    <span className="font-black text-emerald-300">{formatBRL(compMetrics.projectedTotal)}</span>
+                    <span className={`font-extrabold px-1.5 py-0.5 rounded text-[10px] ${compMetrics.projectedDiff >= 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"}`}>
+                      {compMetrics.projectedDiff >= 0 ? "+" : ""}{compMetrics.projectedDiffPerc.toFixed(1)}% vs anterior
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 4. O Gráfico Compacto (180px de Altura - Proporcional e Leve) */}
+            <MonthComparisonChart
+              records={comparisonRecords}
+              baseCycleName={compBaseCycle ? compBaseCycle.cycle.name : "Mês Atual"}
+              compCycleName={compTargetCycle ? compTargetCycle.cycle.name : "Mês Anterior"}
+              mode={compChartMode}
+              onModeChange={setCompChartMode}
+            />
+
+            {/* 5. Acordeão da Tabela Detalhada Dia a Dia */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowCompDailyTable(!showCompDailyTable)}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-black/40 hover:bg-white/5 border border-white/10 transition-colors text-xs font-bold text-white/80 cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <FileSpreadsheet className="size-3.5 text-purple-400" />
+                  <span>Ver Detalhamento e Auditoria Dia a Dia ({comparisonRecords.length} dias)</span>
+                </span>
+                {showCompDailyTable ? <ChevronUp className="size-4 text-white/50" /> : <ChevronDown className="size-4 text-white/50" />}
+              </button>
+
+              {showCompDailyTable && (
+                <div className="mt-2.5 overflow-x-auto rounded-2xl border border-white/10 bg-black/40">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-white/5 text-white/60 font-bold uppercase text-[10px]">
+                        <th className="py-2 px-3">Dia</th>
+                        <th className="py-2 px-3">Data Atual</th>
+                        <th className="py-2 px-3 text-right">Venda Atual (R$)</th>
+                        <th className="py-2 px-3 text-center">Pods</th>
+                        <th className="py-2 px-3">Data Anterior</th>
+                        <th className="py-2 px-3 text-right">Venda Anterior (R$)</th>
+                        <th className="py-2 px-3 text-center">Pods</th>
+                        <th className="py-2 px-3 text-right">Variação (R$)</th>
+                        <th className="py-2 px-3 text-right">Acumulado Atual</th>
+                        <th className="py-2 px-3 text-right">Acumulado Anterior</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 font-medium text-[11px]">
+                      {comparisonRecords.map((r) => (
+                        <tr key={`comp-row-${r.dayIndex}`} className="hover:bg-white/5 transition-colors">
+                          <td className="py-2 px-3 font-bold text-white/70">{r.dayIndex}º</td>
+                          <td className="py-2 px-3 font-mono text-emerald-400 font-bold">{r.baseDateFormatted}</td>
+                          <td className="py-2 px-3 text-right font-bold text-white">
+                            {r.isBaseFuture ? <span className="text-white/30 italic text-[10px]">Pendente</span> : formatBRL(r.baseRevenue)}
+                          </td>
+                          <td className="py-2 px-3 text-center text-white/80">{r.isBaseFuture ? "—" : r.basePods}</td>
+                          <td className="py-2 px-3 font-mono text-purple-300">{r.compDateFormatted}</td>
+                          <td className="py-2 px-3 text-right text-white/80">{formatBRL(r.compRevenue)}</td>
+                          <td className="py-2 px-3 text-center text-white/70">{r.compPods}</td>
+                          <td className="py-2 px-3 text-right font-bold">
+                            {r.isBaseFuture ? (
+                              <span className="text-white/30">—</span>
+                            ) : (
+                              <span className={r.diffRevenue >= 0 ? "text-emerald-400" : "text-red-400"}>
+                                {r.diffRevenue >= 0 ? "+" : ""}{formatBRL(r.diffRevenue)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-right font-extrabold text-emerald-300">
+                            {r.isBaseFuture ? "—" : formatBRL(r.baseAccumRevenue)}
+                          </td>
+                          <td className="py-2 px-3 text-right text-purple-300">
+                            {formatBRL(r.compAccumRevenue)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ━━━ BLOCO 4: DEMONSTRATIVO DE RESULTADO (DRE EXECUTIVO EM TABELA LIMPA) ━━━━━━━━━━━━━━ */}
-      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
+      {/* ━━━ BLOCO 4: DEMONSTRATIVO DE RESULTADO (DRE EXECUTIVO — Visível apenas no Computador) ━━━━━━━━━━━━━━ */}
+      <div className="hidden md:block bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -3093,6 +4465,54 @@ export default function FinanceDashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Especializado de Inteligência em Vendas Nacionais */}
+      <NationalSalesModal
+        isOpen={isNationalModalOpen}
+        onClose={() => setIsNationalModalOpen(false)}
+        orders={allValidOrders}
+        persistedCosts={persistedProductCosts}
+        onOpenNewSale={() => {
+          setIsNationalManualSaleOpen(true);
+        }}
+      />
+
+      {/* Modal de Registro de Venda Manual com Suporte a Envio Nacional */}
+      <ManualSaleModal
+        isOpen={isNationalManualSaleOpen}
+        onClose={() => setIsNationalManualSaleOpen(false)}
+        defaultIsNational={true}
+        onSaleSuccess={() => {
+          setIsNationalManualSaleOpen(false);
+          fetchFinanceData();
+        }}
+      />
+
+      {/* Modal de Configuração e Ajuste de Metas Semanais */}
+      <WeeklyGoalsModal
+        isOpen={isWeeklyGoalsModalOpen}
+        onClose={() => setIsWeeklyGoalsModalOpen(false)}
+        currentGoals={weeklyGoalsConfig}
+        cycle={currentCycle}
+        companyId={company?.id}
+        onGoalsSaved={(newGoals) => {
+          setWeeklyGoalsConfig(newGoals);
+        }}
+      />
+
+      {/* Modal de Lançamento Rápido de Custo da Empresa direto pelo Financeiro */}
+      {isCompanyExpenseModalOpen && (
+        <NewTransactionModal
+          isOpen={isCompanyExpenseModalOpen}
+          onClose={() => setIsCompanyExpenseModalOpen(false)}
+          onTransactionCreated={() => {
+            fetchFinanceData();
+          }}
+          partners={partnersList}
+          companyId={company?.id}
+          defaultType="DESPESA_OPERACIONAL"
+        />
       )}
     </div>
   );

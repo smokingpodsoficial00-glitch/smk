@@ -1372,16 +1372,59 @@ async function processMessage(msg, senderNumber, chatId, messageText, accumulate
 
 // =============================================
 // CODE-005: WEBHOOK — Fixed dispatch message per script P41/P42
+// 🛡️ BLINDAGEM DE SEGURANÇA: Cache de deduplicação e cooldown anti-spam (30 min)
 // =============================================
+const dispatchCooldownMap = new Map();
+const DISPATCH_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutos de proteção
+
+function checkDispatchCooldown(identifier) {
+    if (!identifier) return false;
+    const lastTimestamp = dispatchCooldownMap.get(identifier);
+    if (lastTimestamp && (Date.now() - lastTimestamp < DISPATCH_COOLDOWN_MS)) {
+        return true;
+    }
+    return false;
+}
+
+function registerDispatchCooldown(phoneDigits, orderId) {
+    const now = Date.now();
+    if (phoneDigits) dispatchCooldownMap.set(phoneDigits, now);
+    if (orderId) dispatchCooldownMap.set(orderId, now);
+}
+
 app.post('/api/webhook/dispatch', async (req, res) => {
     try {
-        const { orderId, clientPhone, deliveryType, trackingLink } = req.body;
+        const { orderId, clientPhone, deliveryType, trackingLink, isNational } = req.body;
         
         if (!clientPhone) {
             return res.status(400).json({ error: 'Telefone do cliente é obrigatório.' });
         }
 
-        const formattedNumber = `${clientPhone.replace(/\D/g, '')}@c.us`;
+        // 🛡️ TRAVA 1: Envio Nacional (Sedex / Correios / PAC) não deve disparar mensagem de motoboy local
+        if (isNational || deliveryType === 'correios' || deliveryType === 'sedex' || deliveryType === 'pac') {
+            console.log(`🛡️ [Webhook Dispatch] Ignorado: Pedido #${orderId || 'N/A'} é envio nacional/correios.`);
+            return res.json({ 
+                success: true, 
+                skipped: true, 
+                reason: 'Envio nacional/correios não dispara notificação de motoboy local.' 
+            });
+        }
+
+        const phoneDigits = clientPhone.replace(/\D/g, '');
+        const formattedNumber = `${phoneDigits}@c.us`;
+
+        // 🛡️ TRAVA 2: Deduplicação e Cooldown (impede cliques duplos/triplos ou spam no mesmo número/pedido)
+        if (checkDispatchCooldown(phoneDigits) || (orderId && checkDispatchCooldown(orderId))) {
+            console.warn(`⚠️ [Webhook Dispatch Bloqueado] Disparo recusado para ${phoneDigits} (cooldown de 30m ativo).`);
+            return res.json({ 
+                success: true, 
+                skipped: true, 
+                reason: 'Notificação de despacho já foi enviada recentemente para este cliente/pedido.' 
+            });
+        }
+
+        // Registra o disparo imediatamente no cache para barrar requisições concorrentes
+        registerDispatchCooldown(phoneDigits, orderId);
         
         // Script P41/P42: exact messages from the script
         const msg1 = 'seu pedido já saiu para entrega!';
@@ -1392,7 +1435,7 @@ app.post('/api/webhook/dispatch', async (req, res) => {
         await new Promise(resolve => setTimeout(resolve, 4000));
         await sendBaileysMessage(formattedNumber, msg2);
 
-        console.log(`🚀 [Webhook] Mensagem de despacho enviada para ${formattedNumber}`);
+        console.log(`🚀 [Webhook] Mensagem de despacho enviada para ${formattedNumber} (Pedido: ${orderId || 'avulso'})`);
         res.json({ success: true, message: 'Mensagem de despacho enviada pelo WhatsApp.' });
     } catch (error) {
         console.error('❌ Erro no webhook de despacho:', error);

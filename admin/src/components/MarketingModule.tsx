@@ -1045,15 +1045,15 @@ export default function MarketingModule() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-background">
+    <div className="flex-1 flex flex-col h-full overflow-y-auto overflow-x-hidden md:overflow-hidden bg-background custom-scrollbar">
       {/* Header Principal do Marketing */}
-      <header className="px-6 py-5 border-b border-white/10 shrink-0 bg-[#0a0a0a]">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <header className="px-4 py-4 sm:px-6 sm:py-5 border-b border-white/10 shrink-0 bg-[#0a0a0a]">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Megaphone className="size-6 text-white" />
-                Módulo de Marketing & Disparos
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg sm:text-2xl font-bold text-white flex items-center gap-2">
+                <Megaphone className="size-5 sm:size-6 text-white shrink-0" />
+                <span>Módulo de Marketing & Disparos</span>
               </h2>
               <span className="text-[10px] font-mono uppercase bg-white/10 text-white border border-white/20 px-2.5 py-0.5 rounded-full font-bold shadow-sm">
                 Exclusivo Smoking Pods

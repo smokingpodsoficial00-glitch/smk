@@ -40,10 +40,14 @@ export function EditPartnerModal({
     setErrorMsg(null);
 
     try {
-      await updatePartner(partner.id, {
-        name: name.trim(),
-        is_active: isActive
-      });
+      await updatePartner(
+        partner.id,
+        {
+          name: name.trim(),
+          is_active: isActive
+        },
+        partner.company_id || undefined
+      );
 
       onPartnerUpdated();
       onClose();
@@ -58,7 +62,7 @@ export function EditPartnerModal({
   const handleDelete = async () => {
     setSubmitting(true);
     try {
-      await deletePartner(partner.id);
+      await deletePartner(partner.id, partner.company_id || undefined);
       onPartnerUpdated();
       onClose();
     } catch (err) {

@@ -152,7 +152,7 @@ export default function TasksDashboard() {
   const activeCountEduardo = tasks.filter(t => t.assigned_partner_id === eduardoPartner?.id && t.status !== 'CONCLUIDA').length;
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto bg-[#08080a] p-4 sm:p-6 lg:p-8 space-y-7 text-white custom-scrollbar">
+    <div className="flex-1 h-full overflow-y-auto overflow-x-hidden bg-[#08080a] p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
       
       {/* ━━━ CABEÇALHO MODERNO & RESPIRO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-white/10">

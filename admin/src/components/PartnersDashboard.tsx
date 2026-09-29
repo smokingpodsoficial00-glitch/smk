@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Users, UserPlus, DollarSign, ArrowUpDown, PieChart, ShieldCheck,
   TrendingUp, Box, Plus, Trash2, Edit3, Sparkles,
   AlertTriangle, CheckCircle2, Calculator, Landmark,
   Wallet, Scale, Info, Search, ArrowDownRight, ArrowUpRight,
-  AlertCircle, X, Percent, Zap
+  AlertCircle, X, Percent, Zap, Settings2, Building2, Banknote
 } from 'lucide-react';
 import { formatBRL } from '@/lib/cart';
 import { supabase } from '@/lib/supabase';
@@ -14,17 +14,32 @@ import {
   fetchPartners,
   fetchPartnerTransactions,
   deletePartnerTransaction,
+  updatePartnerTransaction,
   calculatePartnersFinancials,
   type Partner,
   type PartnerTransaction,
+  type PartnerTransactionType,
   type CompanyFinancialOverview
 } from '@/lib/partners';
+import {
+  getCurrentCycle,
+  calculateMetricsForCycle
+} from '@/lib/financialCycles';
+import {
+  loadLocalPayrollConfig,
+  syncPayrollConfigFromOrders,
+  savePayrollConfigToSupabase,
+  calculatePayrollOverview,
+  isCompanyExpenseTransaction,
+  type PayrollConfig
+} from '@/lib/partnerPayroll';
 import { runPartnersValidationSuite, type PartnersTestSuiteReport } from '@/lib/partnersTester';
 
 import { NewPartnerModal } from './partners/NewPartnerModal';
 import { NewTransactionModal } from './partners/NewTransactionModal';
 import { EditPartnerModal } from './partners/EditPartnerModal';
 import { DilutionSimulatorModal } from './partners/DilutionSimulatorModal';
+import { PayrollConfigModal } from './partners/PayrollConfigModal';
 
 export default function PartnersDashboard() {
   const { company } = useAuth();
@@ -42,24 +57,43 @@ export default function PartnersDashboard() {
   const [repurchases, setRepurchases] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
+  // Payroll Config state
+  const [payrollConfig, setPayrollConfig] = useState<PayrollConfig>(() =>
+    loadLocalPayrollConfig(targetCompanyId, [])
+  );
+  const [showPayrollConfigModal, setShowPayrollConfigModal] = useState<boolean>(false);
+
   // Modals
   const [showNewPartnerModal, setShowNewPartnerModal] = useState<boolean>(false);
   const [showNewTxModal, setShowNewTxModal] = useState<boolean>(false);
-  const [newTxDefaultType, setNewTxDefaultType] = useState<'APORTE' | 'RETIRADA_CAPITAL'>('APORTE');
+  const [newTxDefaultType, setNewTxDefaultType] = useState<PartnerTransactionType>('APORTE');
   const [newTxDefaultPartnerId, setNewTxDefaultPartnerId] = useState<string | undefined>(undefined);
+  const [newTxDefaultAmount, setNewTxDefaultAmount] = useState<number | undefined>(undefined);
   const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
   const [showDilutionModal, setShowDilutionModal] = useState<boolean>(false);
   const [txToDelete, setTxToDelete] = useState<PartnerTransaction | null>(null);
   const [isDeletingTx, setIsDeletingTx] = useState<boolean>(false);
+  const [updatingTxId, setUpdatingTxId] = useState<string | null>(null);
 
   // Table filter states
   const [txFilterType, setTxFilterType] = useState<string>('TODOS');
   const [txSearchQuery, setTxSearchQuery] = useState<string>('');
 
-  // 1. Carregar todos os dados reais integrados da empresa (Apenas Leitura)
-  const loadAllData = async () => {
+  // Performance & Debounce refs
+  const realtimeDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isFetchingRef = useRef(false);
+  const hasPendingFetchRef = useRef(false);
+
+  // 1. Carregar todos os dados reais integrados da empresa
+  const loadAllData = async (silent = false) => {
+    if (isFetchingRef.current) {
+      hasPendingFetchRef.current = true;
+      return;
+    }
+    isFetchingRef.current = true;
+
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
 
       const [
         costs,
@@ -79,7 +113,7 @@ export default function PartnersDashboard() {
           .neq("delivery_status", "CANCELADO"),
         supabase
           .from("smoking_products")
-          .select("*")
+          .select("id, name, brand, stock, price, cost_price, flavor, is_active")
           .or("company_id.eq." + targetCompanyId + ",company_id.is.null")
           .eq("is_active", true),
         supabase
@@ -93,51 +127,73 @@ export default function PartnersDashboard() {
         setOperationalExpenses(mkt);
       } catch (e) {}
 
-      // Apply all states synchronously to prevent UI flashing
+      const syncedPayrollCfg = syncPayrollConfigFromOrders(
+        rawOrders || [],
+        targetCompanyId,
+        partnersData
+      );
+
       setPersistedCosts(costs as Record<string, number>);
       setPartners(partnersData);
       setTransactions(txData);
       setOrders(rawOrders || []);
       setProducts(rawProducts || []);
       setRepurchases(rawRepurchases || []);
+      setPayrollConfig(syncedPayrollCfg);
 
     } catch (err) {
       console.error("Erro ao carregar dados do módulo de sócios:", err);
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
+      if (hasPendingFetchRef.current) {
+        hasPendingFetchRef.current = false;
+        loadAllData(true);
+      }
     }
   };
 
   useEffect(() => {
-    loadAllData();
+    loadAllData(false);
 
-    // Supabase Realtime Channels para sincronização instantânea
+    const debouncedReload = () => {
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
+      realtimeDebounceTimerRef.current = setTimeout(() => {
+        loadAllData(true);
+      }, 500);
+    };
+
     const subOrders = supabase
       .channel(`partners_orders_${targetCompanyId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, () => loadAllData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, () => debouncedReload())
       .subscribe();
 
     const subProducts = supabase
       .channel(`partners_products_${targetCompanyId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => loadAllData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => debouncedReload())
       .subscribe();
 
     const subPartners = supabase
       .channel(`partners_partners_${targetCompanyId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partners" }, () => loadAllData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partners" }, () => debouncedReload())
       .subscribe();
 
     const subTx = supabase
       .channel(`partners_tx_${targetCompanyId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partner_transactions" }, () => loadAllData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partner_transactions" }, () => debouncedReload())
       .subscribe();
 
     const subRepurchases = supabase
       .channel(`partners_repurchases_${targetCompanyId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_stock_repurchases" }, () => loadAllData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_stock_repurchases" }, () => debouncedReload())
       .subscribe();
 
     return () => {
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
       supabase.removeChannel(subOrders);
       supabase.removeChannel(subProducts);
       supabase.removeChannel(subPartners);
@@ -159,8 +215,51 @@ export default function PartnersDashboard() {
     });
   }, [partners, transactions, orders, products, persistedCosts, operationalExpenses, repurchases]);
 
+  // 2.1 Métricas do Ciclo Mensal Atual (14->13) para base de salários
+  const currentCycleMetrics = useMemo(() => {
+    const cycle = getCurrentCycle();
+    return calculateMetricsForCycle(
+      cycle,
+      orders,
+      repurchases,
+      persistedCosts,
+      transactions,
+      partners
+    );
+  }, [orders, repurchases, persistedCosts, transactions, partners]);
+
+  // 2.2 Visão Consolidada de Salários & Reinvestimento
+  const payrollOverview = useMemo(() => {
+    return calculatePayrollOverview({
+      partners,
+      transactions,
+      config: payrollConfig,
+      cycleNetProfit: currentCycleMetrics.netProfit,
+      allTimeNetProfit: financials.netProfitRealized,
+      currentCycleId: currentCycleMetrics.cycle.id
+    });
+  }, [partners, transactions, payrollConfig, currentCycleMetrics.netProfit, financials.netProfitRealized, currentCycleMetrics.cycle.id]);
+
+  const handleSavePayrollConfig = async (newConfig: PayrollConfig) => {
+    setPayrollConfig(newConfig);
+    await savePayrollConfigToSupabase(newConfig, targetCompanyId);
+  };
+
+  const handleTogglePeriodMode = async (mode: "CYCLE" | "ALL_TIME") => {
+    const updated: PayrollConfig = {
+      ...payrollConfig,
+      periodMode: mode,
+      updatedAt: new Date().toISOString()
+    };
+    setPayrollConfig(updated);
+    await savePayrollConfigToSupabase(updated, targetCompanyId);
+  };
+
   // 3. Resolução e Filtragem de Transações
   const getPartnerName = (tx: PartnerTransaction) => {
+    if (isCompanyExpenseTransaction(tx, partners)) {
+      return 'Empresa (Smoking Pods)';
+    }
     if (tx.partner_name && tx.partner_name !== 'Sócio') return tx.partner_name;
     if (tx.partner_id) {
       const found = partners.find(p => p.id === tx.partner_id);
@@ -172,7 +271,9 @@ export default function PartnersDashboard() {
       const parts = tx.description.split(' - ');
       if (parts[1]) {
         const n = parts[1].trim();
-        if (n.toLowerCase().includes('smolking') || n.toLowerCase().includes('smoking')) return 'Smoking Pods';
+        if (n.toLowerCase().includes('smolking') || n.toLowerCase().includes('smoking')) {
+          return 'Empresa (Smoking Pods)';
+        }
         return n;
       }
     }
@@ -181,8 +282,19 @@ export default function PartnersDashboard() {
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
+      const isCompExpense = isCompanyExpenseTransaction(tx, partners);
+      const isSalary = tx.type === 'PRO_LABORE' || tx.type === 'DISTRIBUICAO_LUCRO';
+
       if (txFilterType === 'APORTE' && tx.type !== 'APORTE') return false;
-      if (txFilterType === 'RETIRADA_CAPITAL' && tx.type !== 'RETIRADA_CAPITAL') return false;
+      if (txFilterType === 'PRO_LABORE' && !isSalary) return false;
+      if (txFilterType === 'DESPESA_OPERACIONAL' && !isCompExpense) return false;
+      if (
+        txFilterType === 'RETIRADA_CAPITAL' &&
+        (tx.type !== 'RETIRADA_CAPITAL' || isCompExpense)
+      ) {
+        return false;
+      }
+
       if (txSearchQuery.trim()) {
         const q = txSearchQuery.toLowerCase();
         const descMatch = (tx.description || '').toLowerCase().includes(q);
@@ -193,17 +305,56 @@ export default function PartnersDashboard() {
     });
   }, [transactions, txFilterType, txSearchQuery, partners]);
 
-  const handleOpenAporte = (partnerId?: string) => {
-    setNewTxDefaultType('APORTE');
+  const handleOpenTransactionModal = (
+    type: PartnerTransactionType = 'APORTE',
+    partnerId?: string,
+    amount?: number
+  ) => {
+    setNewTxDefaultType(type);
     setNewTxDefaultPartnerId(partnerId);
+    setNewTxDefaultAmount(amount);
     setShowNewTxModal(true);
+  };
+
+  const handleReclassifyTransaction = async (
+    tx: PartnerTransaction,
+    newType: PartnerTransactionType
+  ) => {
+    setUpdatingTxId(tx.id);
+    try {
+      const partnerName = getPartnerName(tx);
+      let newDesc = tx.description;
+      if (newType === 'PRO_LABORE') {
+        newDesc = `Retirada de Salário / Lucro - ${partnerName}`;
+      } else if (newType === 'DESPESA_OPERACIONAL') {
+        newDesc = tx.description?.includes('Retirada de capital')
+          ? 'Custo operacional da empresa'
+          : tx.description;
+      } else if (newType === 'RETIRADA_CAPITAL') {
+        newDesc = `Retirada de capital - ${partnerName}`;
+      }
+
+      await updatePartnerTransaction(
+        tx.id,
+        {
+          type: newType,
+          description: newDesc
+        },
+        targetCompanyId
+      );
+      await loadAllData(true);
+    } catch (err) {
+      console.error('Erro ao reclassificar movimentação:', err);
+    } finally {
+      setUpdatingTxId(null);
+    }
   };
 
   const handleConfirmDeleteTransaction = async () => {
     if (!txToDelete) return;
     setIsDeletingTx(true);
     try {
-      const updatedTx = await deletePartnerTransaction(txToDelete.id);
+      const updatedTx = await deletePartnerTransaction(txToDelete.id, targetCompanyId);
       setTransactions(updatedTx);
       setTxToDelete(null);
     } catch (err) {
@@ -215,27 +366,27 @@ export default function PartnersDashboard() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
+    <div className="flex-1 h-full overflow-y-auto overflow-x-hidden bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
       {/* ━━━ CABEÇALHO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Scale className="size-6 text-white" />
-              <span>Sócios & Gestão de Equity</span>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-lg sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+              <Scale className="size-5 sm:size-6 text-white shrink-0" />
+              <span>Sócios, Salários & Gestão de Equity</span>
             </h1>
-            <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+            <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 shrink-0">
               <Zap className="size-3" />
               Margem Ativa: {financials.officialProfitMarginPct.toFixed(1)}%
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Projeção automática de lucro sobre aportes de capital baseada na margem oficial do financeiro.
+            Gestão integrada de capital societário, divisão de salários sobre o lucro e reinvestimento automático da loja.
           </p>
         </div>
 
         {/* Ações Rápidas */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={async () => {
@@ -249,34 +400,42 @@ export default function PartnersDashboard() {
               }
             }}
             disabled={isValidating}
-            className="px-3 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/15 border border-white/20 text-white transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+            className="px-3 py-2.5 sm:py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/15 border border-white/20 text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
             title="Executar bateria controlada de 18 testes do Bloco 8"
           >
-            <ShieldCheck className="size-3.5 text-white" />
-            <span>{isValidating ? 'Validando 18 testes...' : 'Validar Sociedade'}</span>
+            <ShieldCheck className="size-3.5 text-white shrink-0" />
+            <span className="truncate">{isValidating ? 'Validando...' : 'Validar Sociedade'}</span>
           </button>
 
           <button
             onClick={() => setShowDilutionModal(true)}
-            className="px-3 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/15 border border-white/20 text-white transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+            className="px-3 py-2.5 sm:py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/15 border border-white/20 text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
           >
-            <Calculator className="size-3.5 text-white/80" />
-            <span>Simulador de Aportes</span>
+            <Calculator className="size-3.5 text-white/80 shrink-0" />
+            <span className="truncate">Simulador Aportes</span>
           </button>
 
           <button
             onClick={() => setShowNewPartnerModal(true)}
-            className="px-3 py-2 rounded-xl text-xs font-bold bg-[#141416] hover:bg-[#1a1a1d] border border-white/10 text-white transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+            className="px-3 py-2.5 sm:py-2 rounded-xl text-xs font-bold bg-[#141416] hover:bg-[#1a1a1d] border border-white/10 text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
           >
-            <UserPlus className="size-3.5 text-white/80" />
-            <span>Cadastrar Sócio</span>
+            <UserPlus className="size-3.5 text-white/80 shrink-0" />
+            <span className="truncate">Cadastrar Sócio</span>
           </button>
 
           <button
-            onClick={() => handleOpenAporte()}
-            className="px-4 py-2 rounded-xl text-xs font-extrabold bg-white hover:bg-slate-100 text-black transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)]"
+            onClick={() => handleOpenTransactionModal('DESPESA_OPERACIONAL')}
+            className="px-3 py-2.5 sm:py-2 rounded-xl text-xs font-bold bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-orange-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
           >
-            <Plus className="size-3.5 stroke-[3]" />
+            <Building2 className="size-3.5 text-orange-400 shrink-0" />
+            <span className="truncate">Custo da Empresa</span>
+          </button>
+
+          <button
+            onClick={() => handleOpenTransactionModal('APORTE')}
+            className="col-span-2 sm:col-span-1 px-4 py-2.5 sm:py-2 rounded-xl text-xs font-extrabold bg-white hover:bg-slate-100 text-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)]"
+          >
+            <Plus className="size-3.5 stroke-[3] shrink-0" />
             <span>Novo Aporte / Retirada</span>
           </button>
         </div>
@@ -417,15 +576,234 @@ export default function PartnersDashboard() {
         </div>
       </div>
 
+      {/* ━━━ SETOR DE PAGAMENTOS, SALÁRIOS & REINVESTIMENTO ━━━━━━━━━━━━━━━━ */}
+      <div className="bg-[#0e0e10] border border-purple-500/25 rounded-2xl p-5 space-y-5 shadow-xl relative">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400">
+                <Banknote className="size-5" />
+              </div>
+              <h2 className="text-sm sm:text-base font-extrabold text-white uppercase tracking-wider">
+                Setor de Pagamentos, Salários & Reinvestimento
+              </h2>
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/25">
+                {payrollOverview.reinvestmentPct}% Loja · {payrollOverview.totalPartnersPct}% Sócios
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Divisão automática do Lucro Líquido Real ({formatBRL(payrollOverview.baseNetProfit)}) entre reinvestimento da loja e salário (pró-labore) de cada sócio.
+            </p>
+          </div>
+
+          {/* Controles de Período e Configuração */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-xl bg-[#161618] p-1 border border-white/10">
+              <button
+                type="button"
+                onClick={() => handleTogglePeriodMode("CYCLE")}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                  payrollOverview.periodMode === "CYCLE"
+                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/40"
+                    : "text-white/50 hover:text-white"
+                }`}
+              >
+                Ciclo Atual ({currentCycleMetrics.cycle.monthName})
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTogglePeriodMode("ALL_TIME")}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                  payrollOverview.periodMode === "ALL_TIME"
+                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/40"
+                    : "text-white/50 hover:text-white"
+                }`}
+              >
+                Acumulado Geral
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowPayrollConfigModal(true)}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Settings2 className="size-3.5" />
+              <span>Configurar % (Salários & Reinvestimento)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Barra Visual da Regra de Divisão do Lucro */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-[11px] text-white/70">
+            <span className="font-semibold">
+              Base de Lucro Líquido ({payrollOverview.periodMode === "CYCLE" ? `Ciclo ${currentCycleMetrics.cycle.label}` : "Histórico Completo"}):{" "}
+              <strong className="text-emerald-400 font-mono">{formatBRL(payrollOverview.baseNetProfit)}</strong>
+            </span>
+            <span className="font-mono text-white/50">100% Distribuído</span>
+          </div>
+
+          <div className="h-3 w-full bg-[#161618] rounded-full overflow-hidden flex p-0.5 border border-white/5 gap-0.5">
+            {/* Fatia da Loja */}
+            <div
+              className="h-full rounded-l-full bg-cyan-500 transition-all"
+              style={{ width: `${Math.max(2, payrollOverview.reinvestmentPct)}%` }}
+              title={`Reinvestimento da Loja: ${payrollOverview.reinvestmentPct}% (${formatBRL(payrollOverview.reinvestmentAmount)})`}
+            />
+            {/* Fatias de Salário dos Sócios */}
+            {payrollOverview.partnerItems.map((item) => (
+              <div
+                key={item.partner.id}
+                className="h-full transition-all last:rounded-r-full"
+                style={{
+                  width: `${Math.max(2, item.salaryPct)}%`,
+                  backgroundColor: item.partner.avatar_color || "#a855f7"
+                }}
+                title={`Salário ${item.partner.name}: ${item.salaryPct}% (${formatBRL(item.grossSalaryGenerated)})`}
+              />
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 text-[11px] pt-0.5">
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-cyan-400" />
+              <span className="text-white/80 font-semibold">Reinvestimento da Loja:</span>
+              <span className="font-mono font-bold text-cyan-400">{payrollOverview.reinvestmentPct}%</span>
+              <span className="font-mono text-white/40">({formatBRL(payrollOverview.reinvestmentAmount)})</span>
+            </div>
+            {payrollOverview.partnerItems.map((item) => (
+              <div key={item.partner.id} className="flex items-center gap-1.5">
+                <span
+                  className="size-2 rounded-full"
+                  style={{ backgroundColor: item.partner.avatar_color || "#a855f7" }}
+                />
+                <span className="text-white/80 font-semibold">Salário {item.partner.name}:</span>
+                <span className="font-mono font-bold text-purple-300">{item.salaryPct}%</span>
+                <span className="font-mono text-white/40">({formatBRL(item.grossSalaryGenerated)})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Grid: Card de Reinvestimento + Cards de Salário de cada Sócio */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card 1: Reinvestimento Obrigatório da Loja */}
+          <div className="bg-[#141416] border border-cyan-500/25 rounded-2xl p-4 flex flex-col justify-between space-y-3">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                  Fatia da Empresa · {payrollOverview.reinvestmentPct}%
+                </span>
+                <TrendingUp className="size-4 text-cyan-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Fundo de Reinvestimento</h3>
+                <p className="text-[11px] text-white/50">
+                  Lucro retido no caixa para reposição de estoque e expansão
+                </p>
+              </div>
+              <div className="text-2xl font-extrabold text-cyan-400 font-mono pt-1">
+                {formatBRL(payrollOverview.reinvestmentAmount)}
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-white/50">
+              <span>Status do Reinvestimento:</span>
+              <span className="text-cyan-400 font-bold flex items-center gap-1">
+                <CheckCircle2 className="size-3" /> Retido no Caixa Real
+              </span>
+            </div>
+          </div>
+
+          {/* Cards de Salário Individual de Cada Sócio */}
+          {payrollOverview.partnerItems.map((item) => (
+            <div
+              key={item.partner.id}
+              className="bg-[#141416] border border-white/10 hover:border-purple-500/30 rounded-2xl p-4 flex flex-col justify-between space-y-3 transition-all"
+            >
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="size-7 rounded-lg flex items-center justify-center text-xs font-extrabold text-white"
+                      style={{ backgroundColor: item.partner.avatar_color || "#10b981" }}
+                    >
+                      {item.partner.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white leading-tight">
+                        Salário · {item.partner.name}
+                      </h3>
+                      <span className="text-[10px] text-white/50">
+                        Fatia de Pró-Labore: <strong className="text-purple-300">{item.salaryPct}% do lucro</strong>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Valores: Gerado, Já Recebido e Disponível */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+                    <span className="text-[9px] uppercase font-bold text-white/40 block">
+                      Salário Gerado ({item.salaryPct}%)
+                    </span>
+                    <span className="text-xs font-mono font-bold text-white">
+                      {formatBRL(item.grossSalaryGenerated)}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+                    <span className="text-[9px] uppercase font-bold text-white/40 block">
+                      Já Recebido
+                    </span>
+                    <span className="text-xs font-mono font-bold text-purple-300">
+                      {formatBRL(item.salaryPaidInPeriod)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Saldo Disponível para Sacar */}
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                  <div>
+                    <span className="text-[9px] uppercase font-extrabold text-emerald-300/80 block">
+                      Disponível para Receber Agora
+                    </span>
+                    <span className="text-lg font-extrabold text-emerald-400 font-mono">
+                      {formatBRL(item.availableToReceive)}
+                    </span>
+                  </div>
+                  <Wallet className="size-5 text-emerald-400/70" />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  handleOpenTransactionModal(
+                    'PRO_LABORE',
+                    item.partner.id,
+                    item.availableToReceive > 0 ? item.availableToReceive : undefined
+                  )
+                }
+                className="w-full py-2 rounded-xl text-xs font-bold bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Banknote className="size-3.5 text-purple-300" />
+                <span>Receber / Sacar Salário</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* ━━━ CARDS INDIVIDUAIS DOS SÓCIOS (COM PROJEÇÃO DE LUCRO AUTOMÁTICA) ━ */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
             <Users className="size-4 text-emerald-400" />
-            <span>Fatia Individual dos Sócios</span>
+            <span>Fatia Individual dos Sócios (Patrimônio & Capital)</span>
           </h2>
           <span className="text-xs text-muted-foreground">
-            {financials.partnerMetrics.length} sócios cadastrados | Projeção via margem oficial de {financials.officialProfitMarginPct.toFixed(1)}%
+            {financials.partnerMetrics.length} sócios ativos | Projeção via margem oficial de {financials.officialProfitMarginPct.toFixed(1)}%
           </span>
         </div>
 
@@ -475,7 +853,7 @@ export default function PartnersDashboard() {
                     <button
                       onClick={() => setEditingPartner(pm.partner)}
                       className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-all cursor-pointer"
-                      title="Editar Nome do Sócio"
+                      title="Editar Sócio"
                     >
                       <Edit3 className="size-3.5" />
                     </button>
@@ -523,14 +901,14 @@ export default function PartnersDashboard() {
                     </span>
                   </div>
 
-                  {/* Margem Atual Utilizada */}
+                  {/* Salários Recebidos */}
                   <div className="bg-[#141416] p-3 rounded-xl border border-white/5 space-y-0.5">
-                    <span className="text-[10px] text-white/40 uppercase font-bold block">Margem Atual</span>
-                    <span className="font-mono font-bold text-emerald-400 text-sm">
-                      {financials.officialProfitMarginPct.toFixed(1)}%
+                    <span className="text-[10px] text-white/40 uppercase font-bold block">Salários Sacados</span>
+                    <span className="font-mono font-bold text-purple-300 text-sm">
+                      {formatBRL(pm.proLaboreReceived + pm.dividendsReceived)}
                     </span>
                     <span className="text-[9px] text-white/40 block">
-                      Financeiro Oficial
+                      Pró-Labore Acumulado
                     </span>
                   </div>
 
@@ -553,22 +931,21 @@ export default function PartnersDashboard() {
                   </div>
                 </div>
 
-                {/* Linha Informativa de Resultado Real das Vendas (se houver) */}
-                <div className="px-3 py-2 bg-white/5 rounded-xl border border-white/5 flex items-center justify-between text-[11px] text-white/60">
-                  <span>Fatia no Lucro Realizado:</span>
-                  <span className="font-mono font-bold text-white/90">
-                    {formatBRL(pm.economicProfitShare)}
-                  </span>
-                </div>
-
-                {/* Botão de Ação Rápida de Aporte no Card */}
-                <div className="pt-1">
+                {/* Botões de Ação Rápida no Card */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
                   <button
-                    onClick={() => handleOpenAporte(pm.partner.id)}
-                    className="w-full py-2 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                    onClick={() => handleOpenTransactionModal('APORTE', pm.partner.id)}
+                    className="py-2 px-2.5 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                   >
                     <Plus className="size-3 text-emerald-400" />
-                    <span>Lançar Aporte / Retirada</span>
+                    <span>Novo Aporte</span>
+                  </button>
+                  <button
+                    onClick={() => handleOpenTransactionModal('PRO_LABORE', pm.partner.id)}
+                    className="py-2 px-2.5 rounded-xl text-xs font-bold bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 text-purple-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    <Banknote className="size-3 text-purple-300" />
+                    <span>Sacar Salário</span>
                   </button>
                 </div>
               </div>
@@ -583,23 +960,23 @@ export default function PartnersDashboard() {
           <div>
             <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <ArrowUpDown className="size-4 text-emerald-400" />
-              <span>Extrato de Movimentações Societárias</span>
+              <span>Extrato de Movimentações (Aportes, Salários & Custos)</span>
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Histórico de entradas e retiradas de capital dos sócios.
+              Histórico completo integrado. Você também pode alterar a categoria de qualquer saída diretamente na tabela.
             </p>
           </div>
 
           {/* Filtros */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <Search className="size-3.5 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={txSearchQuery}
                 onChange={(e) => setTxSearchQuery(e.target.value)}
-                placeholder="Buscar sócio..."
-                className="bg-[#161618] border border-white/10 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-emerald-500/50 transition-all w-36 sm:w-44"
+                placeholder="Buscar sócio ou custo..."
+                className="bg-[#161618] border border-white/10 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-emerald-500/50 transition-all w-40 sm:w-48"
               />
             </div>
 
@@ -609,8 +986,10 @@ export default function PartnersDashboard() {
               className="bg-[#161618] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-all cursor-pointer"
             >
               <option value="TODOS">Todas as Movimentações</option>
-              <option value="APORTE">Apenas Entradas (Aportes)</option>
-              <option value="RETIRADA_CAPITAL">Apenas Saídas (Retiradas)</option>
+              <option value="APORTE">🟢 Entradas (Aportes)</option>
+              <option value="PRO_LABORE">💸 Salários / Pró-Labore</option>
+              <option value="DESPESA_OPERACIONAL">🏢 Custos da Empresa</option>
+              <option value="RETIRADA_CAPITAL">📉 Retiradas de Capital</option>
             </select>
           </div>
         </div>
@@ -627,8 +1006,9 @@ export default function PartnersDashboard() {
                 <thead>
                   <tr className="border-b border-white/10 text-white/50 text-[10px] uppercase font-bold bg-[#18181b]">
                     <th className="py-3 px-4">Data</th>
-                    <th className="py-3 px-4">Tipo</th>
-                    <th className="py-3 px-4">Sócio</th>
+                    <th className="py-3 px-4">Categoria / Tipo</th>
+                    <th className="py-3 px-4">Sócio / Origem</th>
+                    <th className="py-3 px-4">Descrição</th>
                     <th className="py-3 px-4 text-right">Valor (R$)</th>
                     <th className="py-3 px-4 text-center">Ações</th>
                   </tr>
@@ -636,6 +1016,16 @@ export default function PartnersDashboard() {
                 <tbody className="divide-y divide-white/5">
                   {filteredTransactions.map((tx) => {
                     const isEntry = tx.type === 'APORTE';
+                    const isCompExpense = isCompanyExpenseTransaction(tx, partners);
+                    const isSalary = tx.type === 'PRO_LABORE' || tx.type === 'DISTRIBUICAO_LUCRO';
+
+                    const currentSelectValue: PartnerTransactionType = isEntry
+                      ? 'APORTE'
+                      : isCompExpense
+                      ? 'DESPESA_OPERACIONAL'
+                      : isSalary
+                      ? 'PRO_LABORE'
+                      : 'RETIRADA_CAPITAL';
 
                     return (
                       <tr key={tx.id} className="hover:bg-white/5 transition-all">
@@ -643,23 +1033,64 @@ export default function PartnersDashboard() {
                           {tx.date.split('-').reverse().join('/')}
                         </td>
                         <td className="py-3 px-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${
-                            isEntry 
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                              : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                          }`}>
-                            {isEntry ? <ArrowDownRight className="size-3" /> : <ArrowUpRight className="size-3" />}
-                            {isEntry ? 'Entrada (Aporte)' : 'Saída (Retirada)'}
-                          </span>
+                          {isEntry ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                              <ArrowDownRight className="size-3" />
+                              Entrada (Aporte)
+                            </span>
+                          ) : (
+                            <select
+                              disabled={updatingTxId === tx.id}
+                              value={currentSelectValue}
+                              onChange={(e) =>
+                                handleReclassifyTransaction(tx, e.target.value as PartnerTransactionType)
+                              }
+                              title="Clique para alterar a classificação desta saída"
+                              className={`text-[10px] font-bold px-2.5 py-1 rounded-md border cursor-pointer focus:outline-none transition-all ${
+                                currentSelectValue === 'PRO_LABORE'
+                                  ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                                  : currentSelectValue === 'DESPESA_OPERACIONAL'
+                                  ? 'bg-orange-500/15 text-orange-300 border-orange-500/30'
+                                  : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                              }`}
+                            >
+                              <option value="PRO_LABORE" className="bg-[#141416] text-purple-300">
+                                💸 Salário / Lucro
+                              </option>
+                              <option value="DESPESA_OPERACIONAL" className="bg-[#141416] text-orange-300">
+                                🏢 Custo da Empresa
+                              </option>
+                              <option value="RETIRADA_CAPITAL" className="bg-[#141416] text-rose-300">
+                                📉 Retirada de Capital
+                              </option>
+                            </select>
+                          )}
                         </td>
                         <td className="py-3 px-4 font-semibold text-white whitespace-nowrap">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-white font-medium">
-                            <span className="size-1.5 rounded-full bg-emerald-400" />
+                            <span
+                              className={`size-1.5 rounded-full ${
+                                isCompExpense ? 'bg-orange-400' : isSalary ? 'bg-purple-400' : 'bg-emerald-400'
+                              }`}
+                            />
                             {getPartnerName(tx)}
                           </span>
                         </td>
+                        <td className="py-3 px-4 text-white/60 max-w-[220px] truncate" title={tx.description}>
+                          {tx.description || '-'}
+                        </td>
                         <td className="py-3 px-4 text-right font-mono font-bold whitespace-nowrap">
-                          <span className={isEntry ? 'text-emerald-400' : 'text-rose-400'}>
+                          <span
+                            className={
+                              isEntry
+                                ? 'text-emerald-400'
+                                : isCompExpense
+                                ? 'text-orange-400'
+                                : isSalary
+                                ? 'text-purple-300'
+                                : 'text-rose-400'
+                            }
+                          >
                             {isEntry ? '+' : '-'}{formatBRL(tx.amount)}
                           </span>
                         </td>
@@ -707,14 +1138,8 @@ export default function PartnersDashboard() {
             {/* Detalhes do Lançamento */}
             <div className="bg-[#141416] p-4 rounded-xl border border-white/5 space-y-2 text-xs">
               <div className="flex justify-between">
-                <span className="text-white/50">Sócio:</span>
-                <span className="font-bold text-white">{txToDelete.partner_name || 'Sócio Geral'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-white/50">Tipo:</span>
-                <span className={`font-bold ${txToDelete.type === 'APORTE' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {txToDelete.type === 'APORTE' ? 'Entrada (Aporte)' : 'Saída (Retirada)'}
-                </span>
+                <span className="text-white/50">Sócio / Origem:</span>
+                <span className="font-bold text-white">{getPartnerName(txToDelete)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-white/50">Valor:</span>
@@ -727,7 +1152,7 @@ export default function PartnersDashboard() {
             </div>
 
             <p className="text-[11px] text-amber-300/80 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl">
-              ⚠️ Esta ação recalculará automaticamente a participação societária e todas as projeções de lucro.
+              ⚠️ Esta ação atualizará imediatamente os saldos de salários, Caixa Real e Patrimônio.
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">
@@ -752,6 +1177,18 @@ export default function PartnersDashboard() {
       )}
 
       {/* ━━━ MODAIS FLUTUANTES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {showPayrollConfigModal && (
+        <PayrollConfigModal
+          isOpen={showPayrollConfigModal}
+          onClose={() => setShowPayrollConfigModal(false)}
+          partners={partners}
+          currentConfig={payrollConfig}
+          cycleNetProfit={currentCycleMetrics.netProfit}
+          allTimeNetProfit={financials.netProfitRealized}
+          onSave={handleSavePayrollConfig}
+        />
+      )}
+
       {showNewPartnerModal && (
         <NewPartnerModal
           isOpen={showNewPartnerModal}
@@ -771,6 +1208,8 @@ export default function PartnersDashboard() {
           companyId={targetCompanyId}
           defaultType={newTxDefaultType}
           defaultPartnerId={newTxDefaultPartnerId}
+          defaultAmount={newTxDefaultAmount}
+          payrollItems={payrollOverview.partnerItems}
         />
       )}
 
@@ -823,7 +1262,6 @@ export default function PartnersDashboard() {
             </div>
 
             <div className="p-5 space-y-4 overflow-y-auto custom-scrollbar flex-1 text-xs">
-              {/* Cap Table Summary */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-white/5 p-3 rounded-xl border border-white/5">
                   <span className="text-[10px] text-muted-foreground uppercase font-bold">Capital Total</span>
@@ -843,7 +1281,6 @@ export default function PartnersDashboard() {
                 </div>
               </div>
 
-              {/* Lista dos 18 Testes */}
               <div className="space-y-2">
                 <h3 className="text-xs font-bold text-white uppercase tracking-wider">Itens da Bateria Controlada</h3>
                 <div className="space-y-1.5">

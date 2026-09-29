@@ -244,15 +244,37 @@ export default function SupplyChainDashboard() {
     if (file && file.type.startsWith("image/")) processSelectedFile(file);
   };
 
+  // ─── Otimização de Performance, Cache de Imagens e Debounce ─────────────
+  const productImageCacheRef = useRef<Record<string, string>>({});
+  const isFetchingRef = useRef(false);
+  const hasPendingFetchRef = useRef(false);
+  const realtimeDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // ─── Data Fetching ──────────────────────────────────────
-  const fetchData = async () => {
+  const fetchData = async (forceRefreshImages = false) => {
+    // Evita chamadas concorrentes duplicadas que sobrecarregam o pool do Supabase
+    if (isFetchingRef.current) {
+      hasPendingFetchRef.current = true;
+      return;
+    }
+    isFetchingRef.current = true;
+
     const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
     try {
+      // Se não temos nenhuma imagem em cache ou forçado, busca com imagem.
+      // Se já temos o cache, busca apenas colunas leves (reduzindo de 3.5MB para ~12KB por requisição)
+      const hasCachedImages = Object.keys(productImageCacheRef.current).length > 0;
+      const shouldFetchImages = forceRefreshImages || !hasCachedImages;
+
+      const productsSelectCols = shouldFetchImages
+        ? "*"
+        : "id, name, brand, flavor, price, cost_price, stock, puffs, is_active, created_at, company_id";
+
       // Executa todas as consultas ao Supabase em paralelo para carregamento ultrarrápido
       const [prodRes, ordersRes, costsMap, cats, catMapRes] = await Promise.all([
         supabase
           .from("smoking_products")
-          .select("*")
+          .select(productsSelectCols)
           .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
           .neq("brand", "__STORE_CONFIG__")
           .order("created_at", { ascending: false })
@@ -306,6 +328,15 @@ export default function SupplyChainDashboard() {
       }
 
       if (prodData) {
+        // Popula cache de imagens se vieram dados completos
+        if (shouldFetchImages) {
+          prodData.forEach((p: any) => {
+            if (p.image_url) {
+              productImageCacheRef.current[p.id] = p.image_url;
+            }
+          });
+        }
+
         const mergedProducts = prodData.map((p: any) => {
           const brandName = (p.brand || "Genérico").trim();
           const modelName = (p.name || "Pod").trim();
@@ -324,8 +355,11 @@ export default function SupplyChainDashboard() {
           }
 
           const stagedStock = pendingStockChangesRef.current[p.id];
+          const finalImageUrl = p.image_url || productImageCacheRef.current[p.id] || "";
+
           return {
             ...p,
+            image_url: finalImageUrl,
             cost_price: costVal,
             stock: stagedStock !== undefined ? stagedStock : p.stock
           };
@@ -340,25 +374,43 @@ export default function SupplyChainDashboard() {
       console.error("Erro ao carregar dados do Supabase:", err);
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
+      // Se houve requisição enfileirada durante a execução, executa uma última vez de forma limpa
+      if (hasPendingFetchRef.current) {
+        hasPendingFetchRef.current = false;
+        fetchData(false);
+      }
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(true); // Carga inicial completa com imagens
 
-    // Inscrição Realtime no Supabase para atualização instantânea sem sobrecarga de rede
+    const debouncedRealtimeFetch = () => {
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
+      realtimeDebounceTimerRef.current = setTimeout(() => {
+        fetchData(false); // Refetch leve sem rebaixar os 3.5MB de imagens
+      }, 500);
+    };
+
+    // Inscrição Realtime no Supabase para atualização com Debounce protetor
     const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
     const channel = supabase
       .channel(`supply_chain_realtime_${targetCompanyId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => {
-        fetchData();
+        debouncedRealtimeFetch();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, () => {
-        fetchData();
+        debouncedRealtimeFetch();
       })
       .subscribe();
 
     return () => {
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
       supabase.removeChannel(channel);
     };
   }, [company?.id]);
@@ -506,11 +558,14 @@ export default function SupplyChainDashboard() {
     try {
       const newImageUrl = await uploadProductImage(file);
       const ids = group.flavors.map((f: any) => f.id);
+      ids.forEach((id: string) => {
+        productImageCacheRef.current[id] = newImageUrl;
+      });
       setProducts(prev => prev.map(p => ids.includes(p.id) ? { ...p, image_url: newImageUrl } : p));
       await supabase.from("smoking_products").update({ image_url: newImageUrl }).in("id", ids).eq("company_id", targetCompanyId);
     } catch (err) {
       console.error("Erro ao atualizar imagem do modelo:", err);
-      fetchData();
+      fetchData(false);
     } finally {
       setUploadingGroupKey(null);
     }
@@ -727,16 +782,16 @@ export default function SupplyChainDashboard() {
       if (error) {
         console.error("Erro do Supabase ao atualizar preços:", error);
         alert("Não foi possível atualizar o preço. Tente novamente.");
-        await fetchData();
+        await fetchData(false);
       } else {
         alert("Preço atualizado com sucesso.");
-        await fetchData();
+        await fetchData(false);
         setEditingGroup(null);
       }
     } catch (err: any) {
       console.error("Erro técnico inesperado ao salvar preço:", err);
       alert("Não foi possível atualizar o preço. Tente novamente.");
-      await fetchData();
+      await fetchData(false);
     } finally {
       setIsSavingBatchPrice(false);
     }
@@ -827,6 +882,10 @@ export default function SupplyChainDashboard() {
         updatePayload.cost_price = parsedCost;
       }
 
+      ids.forEach((id: string) => {
+        productImageCacheRef.current[id] = finalImageUrl;
+      });
+
       let query = supabase.from("smoking_products").update(updatePayload).in("id", ids);
       if (company?.id) query = query.eq("company_id", company.id);
       let { error } = await query;
@@ -843,16 +902,16 @@ export default function SupplyChainDashboard() {
       if (error) {
         console.error("Erro do Supabase ao atualizar produto completo:", error);
         alert("Não foi possível salvar as alterações no banco de dados. Tente novamente.");
-        await fetchData();
+        await fetchData(false);
       } else {
         alert("Produto atualizado com sucesso.");
-        await fetchData();
+        await fetchData(false);
         setEditingFullProduct(null);
       }
     } catch (err: any) {
       console.error("Erro técnico inesperado ao editar produto:", err);
       alert("Não foi possível salvar as alterações do produto. Tente novamente.");
-      await fetchData();
+      await fetchData(false);
     } finally {
       setIsSavingFullProduct(false);
     }
@@ -1240,17 +1299,17 @@ export default function SupplyChainDashboard() {
   //  RENDER — Nova Hierarquia ERP Profissional
   // ═══════════════════════════════════════════════════════
   return (
-    <div className="flex-1 overflow-y-auto bg-background custom-scrollbar relative">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden bg-background custom-scrollbar relative">
 
-      {/* ━━━ STICKY HEADER COM AÇÕES PRINCIPAIS HIERARQUIZADAS ━━━━━━━━━━━━━━ */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-white/10">
-        <div className="px-4 md:px-6 lg:px-8 py-3.5">
+      {/* ━━━ HEADER COM AÇÕES PRINCIPAIS HIERARQUIZADAS (Sticky apenas no PC) ━━━━━━━━━━━━━━ */}
+      <div className="md:sticky md:top-0 z-30 bg-background/95 backdrop-blur-md border-b border-white/10">
+        <div className="px-4 md:px-6 lg:px-8 py-3 sm:py-3.5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 flex-wrap">
               <div>
                 <h2 className="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                  <PackageSearch className="size-5 text-white" />
-                  Central de Gestão de Estoque
+                  <PackageSearch className="size-5 text-white shrink-0" />
+                  <span>Central de Gestão de Estoque</span>
                 </h2>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
                   Controle unificado de produtos, estoque e reposição
@@ -1258,11 +1317,11 @@ export default function SupplyChainDashboard() {
               </div>
 
               {/* Seletor de Visão Principal: Visão Geral Estoque x Produtos Parados */}
-              <div className="flex items-center bg-black/60 border border-white/15 rounded-xl p-1 gap-1">
+              <div className="grid grid-cols-2 sm:flex items-center bg-black/60 border border-white/15 rounded-xl p-1 gap-1 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setActiveMainView("ESTOQUE")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
                     activeMainView === "ESTOQUE"
                       ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.2)]"
                       : "text-muted-foreground hover:text-white"
@@ -1274,14 +1333,14 @@ export default function SupplyChainDashboard() {
                   type="button"
                   data-tour="tab-produtos-parados"
                   onClick={() => setActiveMainView("PARADOS")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     activeMainView === "PARADOS"
                       ? "bg-amber-500 text-black shadow-md shadow-amber-500/20"
                       : "text-muted-foreground hover:text-white"
                   }`}
                 >
-                  <Flame className="size-3.5" />
-                  <span>Produtos Parados</span>
+                  <Flame className="size-3.5 shrink-0" />
+                  <span className="truncate">Produtos Parados</span>
                 </button>
               </div>
             </div>
@@ -1292,10 +1351,11 @@ export default function SupplyChainDashboard() {
               <button
                 type="button"
                 onClick={() => setShowReplenishmentModal(true)}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#1c1c1c] hover:bg-white/10 text-white text-xs font-semibold border border-white/20 transition-all cursor-pointer active:scale-[0.97]"
+                className="inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl bg-[#1c1c1c] hover:bg-white/10 text-white text-[11px] sm:text-xs font-semibold border border-white/20 transition-all cursor-pointer active:scale-[0.97] flex-1 sm:flex-initial"
               >
-                <Boxes className="size-3.5 text-white" />
-                <span>Planejador de Recompra</span>
+                <Boxes className="size-3.5 text-white shrink-0" />
+                <span className="truncate">Planejador</span>
+                <span className="hidden sm:inline">de Recompra</span>
               </button>
 
               {/* Botão Ação Principal de Venda */}
@@ -1307,20 +1367,20 @@ export default function SupplyChainDashboard() {
                   setPreSelectedGroupForSale(null);
                   setIsManualSaleModalOpen(true);
                 }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] cursor-pointer active:scale-[0.97]"
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-[11px] sm:text-xs font-bold transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] cursor-pointer active:scale-[0.97] flex-1 sm:flex-initial"
               >
-                <ShoppingCart className="size-3.5 text-black" />
-                <span>Registrar Venda</span>
+                <ShoppingCart className="size-3.5 text-black shrink-0" />
+                <span className="truncate">Registrar Venda</span>
               </button>
 
               {/* Botão Secundário Mais Discreto */}
               <button
                 data-tour="btn-novo-produto"
                 onClick={() => setShowNewProductModal(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-medium border border-white/15 transition-all cursor-pointer active:scale-[0.97]"
+                className="inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-[11px] sm:text-xs font-medium border border-white/15 transition-all cursor-pointer active:scale-[0.97] flex-1 sm:flex-initial"
               >
-                <Plus className="size-3.5" />
-                <span>Novo Produto</span>
+                <Plus className="size-3.5 shrink-0" />
+                <span className="truncate">Novo Produto</span>
               </button>
             </div>
           </div>
@@ -1340,85 +1400,85 @@ export default function SupplyChainDashboard() {
       ) : null}
 
       {activeMainView === "ESTOQUE" && (
-      <div className="px-4 md:px-6 lg:px-8 py-5 space-y-5">
-        {/* ── KPIs GRUPO PRINCIPAL (4 CARDS MINIMALISTAS) ─────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="px-4 md:px-6 lg:px-8 py-4 sm:py-5 space-y-4 sm:space-y-5">
+        {/* ── KPIs GRUPO PRINCIPAL (4 CARDS COMPACTOS E ENQUADRADOS NO CELULAR) ─────── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
           {/* 1. Produtos (Neutro) */}
-          <div className="bg-[#141414] border border-white/10 rounded-xl p-4 flex flex-col justify-between space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Produtos Cadastrados</span>
-              <div className="size-7 rounded bg-white/5 border border-white/10 grid place-items-center">
-                <Box className="size-3.5 text-muted-foreground" />
+          <div className="bg-[#141414] border border-white/10 rounded-xl p-3 sm:p-4 flex flex-col justify-between space-y-1.5 sm:space-y-2">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider truncate">Produtos Ativos</span>
+              <div className="size-6 sm:size-7 rounded bg-white/5 border border-white/10 grid place-items-center shrink-0">
+                <Box className="size-3 sm:size-3.5 text-muted-foreground" />
               </div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-white">{totalProducts}</div>
-              <span className="text-[10px] text-muted-foreground block mt-0.5">modelos ativos no sistema</span>
+              <div className="text-lg sm:text-2xl font-bold text-white leading-tight">{totalProducts}</div>
+              <span className="text-[10px] text-muted-foreground block mt-0.5 truncate">modelos no sistema</span>
             </div>
           </div>
 
           {/* 2. Valor de Venda do Estoque (Neutro) */}
-          <div className="bg-[#141414] border border-white/10 rounded-xl p-4 flex flex-col justify-between space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Valor de Venda do Estoque</span>
-              <div className="size-7 rounded bg-white/5 border border-white/10 grid place-items-center">
-                <DollarSign className="size-3.5 text-muted-foreground" />
+          <div className="bg-[#141414] border border-white/10 rounded-xl p-3 sm:p-4 flex flex-col justify-between space-y-1.5 sm:space-y-2">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider truncate">Valor de Venda</span>
+              <div className="size-6 sm:size-7 rounded bg-white/5 border border-white/10 grid place-items-center shrink-0">
+                <DollarSign className="size-3 sm:size-3.5 text-muted-foreground" />
               </div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-white">{formatBRL(totalStockValue)}</div>
-              <span className="text-[10px] text-muted-foreground block mt-0.5">valor bruto dos {totalStockUnits} pods</span>
+              <div className="text-lg sm:text-2xl font-bold text-white leading-tight">{formatBRL(totalStockValue)}</div>
+              <span className="text-[10px] text-muted-foreground block mt-0.5 truncate">bruto ({totalStockUnits} pods)</span>
             </div>
           </div>
 
           {/* 3. Custo dos Pods em Estoque (Neutro) */}
-          <div className="bg-[#141414] border border-white/10 rounded-xl p-4 flex flex-col justify-between space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Custo dos Pods em Estoque</span>
-              <div className="size-7 rounded bg-white/5 border border-white/10 grid place-items-center">
-                <Tag className="size-3.5 text-muted-foreground" />
+          <div className="bg-[#141414] border border-white/10 rounded-xl p-3 sm:p-4 flex flex-col justify-between space-y-1.5 sm:space-y-2">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider truncate">Custo do Estoque</span>
+              <div className="size-6 sm:size-7 rounded bg-white/5 border border-white/10 grid place-items-center shrink-0">
+                <Tag className="size-3 sm:size-3.5 text-muted-foreground" />
               </div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-white">{formatBRL(totalStockCost)}</div>
-              <span className="text-[10px] text-muted-foreground block mt-0.5">custo pago nos {totalStockUnits} pods</span>
+              <div className="text-lg sm:text-2xl font-bold text-white leading-tight">{formatBRL(totalStockCost)}</div>
+              <span className="text-[10px] text-muted-foreground block mt-0.5 truncate">pago ({totalStockUnits} pods)</span>
             </div>
           </div>
 
           {/* 4. Lucro Potencial do Estoque (ÚNICO COM DESTAQUE VERDE) */}
-          <div className="bg-[#141414] border border-emerald-500/30 rounded-xl p-4 flex flex-col justify-between space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Lucro Potencial do Estoque</span>
-              <div className="size-7 rounded bg-emerald-500/10 border border-emerald-500/20 grid place-items-center">
-                <TrendingUp className="size-3.5 text-emerald-400" />
+          <div className="bg-[#141414] border border-emerald-500/30 rounded-xl p-3 sm:p-4 flex flex-col justify-between space-y-1.5 sm:space-y-2">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider truncate">Lucro Potencial</span>
+              <div className="size-6 sm:size-7 rounded bg-emerald-500/10 border border-emerald-500/20 grid place-items-center shrink-0">
+                <TrendingUp className="size-3 sm:size-3.5 text-emerald-400" />
               </div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-emerald-400">{formatBRL(estimatedProfit)}</div>
-              <span className="text-[10px] text-emerald-400/80 block mt-0.5">
-                {profitMarginPct}% de margem sobre os {totalStockUnits} pods
+              <div className="text-lg sm:text-2xl font-bold text-emerald-400 leading-tight">{formatBRL(estimatedProfit)}</div>
+              <span className="text-[10px] text-emerald-400/80 block mt-0.5 truncate">
+                {profitMarginPct}% margem ({totalStockUnits} pods)
               </span>
             </div>
           </div>
         </div>
 
-        {/* ── LINHA DE INDICADORES SECUNDÁRIOS DISCRETOS ──── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div className="bg-[#101010] border border-white/10 rounded-lg px-3.5 py-2 flex items-center justify-between">
-            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Unidades</span>
-            <span className="font-bold text-white">{totalStockUnits} un</span>
+        {/* ── LINHA DE INDICADORES SECUNDÁRIOS DISCRETOS (1 linha compacta de 4 colunas no celular) ──── */}
+        <div className="grid grid-cols-4 gap-2 sm:gap-3 text-xs">
+          <div className="bg-[#101010] border border-white/10 rounded-lg px-2 sm:px-3.5 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-0.5">
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-wider truncate">Unidades</span>
+            <span className="font-bold text-white text-[11px] sm:text-xs">{totalStockUnits} un</span>
           </div>
-          <div className="bg-[#101010] border border-amber-500/20 rounded-lg px-3.5 py-2 flex items-center justify-between">
-            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Estoque Baixo</span>
-            <span className="font-bold text-amber-400">{lowStockCount}</span>
+          <div className="bg-[#101010] border border-amber-500/20 rounded-lg px-2 sm:px-3.5 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-0.5">
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-wider truncate">Est. Baixo</span>
+            <span className="font-bold text-amber-400 text-[11px] sm:text-xs">{lowStockCount}</span>
           </div>
-          <div className="bg-[#101010] border border-red-500/20 rounded-lg px-3.5 py-2 flex items-center justify-between">
-            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Sem Estoque</span>
-            <span className="font-bold text-red-400">{outOfStockCount}</span>
+          <div className="bg-[#101010] border border-red-500/20 rounded-lg px-2 sm:px-3.5 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-0.5">
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-wider truncate">Esgotados</span>
+            <span className="font-bold text-red-400 text-[11px] sm:text-xs">{outOfStockCount}</span>
           </div>
-          <div className="bg-[#101010] border border-white/10 rounded-lg px-3.5 py-2 flex items-center justify-between">
-            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Última Entrada</span>
-            <span className="font-medium text-muted-foreground">{lastEntryTime}</span>
+          <div className="bg-[#101010] border border-white/10 rounded-lg px-2 sm:px-3.5 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-0.5">
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-wider truncate">Últ. Entrada</span>
+            <span className="font-medium text-muted-foreground text-[10px] sm:text-xs truncate">{lastEntryTime}</span>
           </div>
         </div>
 
@@ -1689,10 +1749,10 @@ export default function SupplyChainDashboard() {
                   className={`bg-card border border-border rounded-2xl shadow-lg transition-all relative ${isGroupMenuActive ? 'z-40' : 'z-10'}`}
                 >
                   {/* ── CARD HEADER MINIMALISTA E UNIFORME (SEM EXPANSÃO INLINE) ────────── */}
-                  <div className="p-5 space-y-4">
+                  <div className="p-4 sm:p-5 space-y-3 sm:space-y-4">
                     {/* Linha Superior: Foto, Nome, Puffs e Ações */}
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                         {/* Foto do Modelo */}
                         <div 
                           className="relative size-14 rounded-xl border border-white/10 bg-black/40 overflow-hidden shrink-0 group/img cursor-pointer"
@@ -1723,10 +1783,10 @@ export default function SupplyChainDashboard() {
                           />
                         </div>
 
-                        <div>
-                          <div className="flex items-center gap-2.5">
-                            <h3 className="font-bold text-base text-white tracking-tight">{displayName}</h3>
-                            <span className="text-[10px] bg-white/5 border border-white/10 text-muted-foreground px-2 py-0.5 rounded-md font-medium">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-bold text-sm sm:text-base text-white tracking-tight truncate">{displayName}</h3>
+                            <span className="text-[10px] bg-white/5 border border-white/10 text-muted-foreground px-2 py-0.5 rounded-md font-medium shrink-0">
                               {group.puffs} puffs
                             </span>
                           </div>
@@ -1737,7 +1797,7 @@ export default function SupplyChainDashboard() {
                       </div>
 
                       {/* Ações do Grupo (Status, Ver Sabores, Olho, 3 Pontos) */}
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:shrink-0 pt-2 sm:pt-0 border-t border-white/5 sm:border-t-0">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${stockBadgeClass}`}>
                           <div className={`size-1.5 rounded-full ${stockBarColor}`} />
                           {stockLabel}
@@ -1747,7 +1807,7 @@ export default function SupplyChainDashboard() {
                           type="button"
                           data-tour="btn-ver-sabores"
                           onClick={() => setViewingFlavorsGroup(group)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95 ml-auto sm:ml-0"
                         >
                           <Eye className="size-3.5" />
                           Ver Sabores ({realFlavors.length})
@@ -2004,19 +2064,19 @@ export default function SupplyChainDashboard() {
             <div className="bg-[#121212] border border-border rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
               
               {/* Modal Header */}
-              <div className="p-5 border-b border-border flex items-center justify-between bg-black/40">
-                <div className="flex items-center gap-3.5">
+              <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40">
+                <div className="flex items-center gap-3 min-w-0">
                   {currentGroup.image_url ? (
-                    <img src={currentGroup.image_url} alt={displayName} className="size-12 object-cover rounded-xl border border-white/10" />
+                    <img src={currentGroup.image_url} alt={displayName} className="size-11 sm:size-12 object-cover rounded-xl border border-white/10 shrink-0" />
                   ) : (
-                    <div className="size-12 rounded-xl bg-elevated border border-border flex items-center justify-center">
+                    <div className="size-11 sm:size-12 rounded-xl bg-elevated border border-border flex items-center justify-center shrink-0">
                       <Box className="size-6 text-muted-foreground" />
                     </div>
                   )}
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      {displayName}
-                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-base sm:text-lg font-bold text-white flex flex-wrap items-center gap-2">
+                      <span className="truncate">{displayName}</span>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 shrink-0">
                         {currentGroup.totalStock} un em estoque
                       </span>
                     </h3>
@@ -2026,21 +2086,21 @@ export default function SupplyChainDashboard() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between sm:justify-end gap-2">
                   <button
                     onClick={() => {
                       setAddingFlavorGroup(currentGroup);
                       setNewFlavorName("");
                       setNewFlavorStock("");
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95"
                   >
                     <Plus className="size-4" />
                     Adicionar Sabor
                   </button>
                   <button
                     onClick={handleCloseViewingFlavors}
-                    className="p-2 text-muted-foreground hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                    className="p-2 text-muted-foreground hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer shrink-0"
                   >
                     <X className="size-5" />
                   </button>
@@ -2048,7 +2108,7 @@ export default function SupplyChainDashboard() {
               </div>
 
               {/* Modal Body - Lista Limpa de Sabores */}
-              <div className="p-5 overflow-y-auto space-y-3 custom-scrollbar flex-1">
+              <div className="p-4 sm:p-5 overflow-y-auto space-y-3 custom-scrollbar flex-1">
                 {realFlavors.map((f: any) => {
                   let stockBadgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
                   let stockLabel = "Em estoque";
@@ -2061,16 +2121,16 @@ export default function SupplyChainDashboard() {
                   }
 
                   return (
-                    <div key={f.id} className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 ${
+                    <div key={f.id} className={`p-3.5 sm:p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 ${
                       f.is_active === false 
                         ? "border-red-500/20 bg-red-950/10 opacity-75" 
                         : "border-white/10 bg-black/30 hover:border-white/20"
                     }`}>
                       <div className="flex items-center gap-3 min-w-0">
                         <div className={`size-2.5 rounded-full shrink-0 ${f.is_active === false ? "bg-red-400" : "bg-emerald-400"}`} />
-                        <div>
-                          <div className="text-sm font-bold text-white truncate flex items-center gap-2">
-                            {f.flavor || 'Padrão'}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-bold text-white truncate flex flex-wrap items-center gap-2">
+                            <span className="truncate">{f.flavor || 'Padrão'}</span>
                             {f.is_active === false && (
                               <span className="text-[10px] px-2 py-0.2 rounded-md bg-red-500/20 text-red-400 font-normal">
                                 Oculto do cardápio
@@ -2086,7 +2146,7 @@ export default function SupplyChainDashboard() {
                       </div>
 
                       {/* Ações e Controles de Estoque */}
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center justify-end gap-2 shrink-0 pt-2 sm:pt-0 border-t border-white/5 sm:border-t-0">
                         {/* Botão Ocultar/Exibir Sabor no Cardápio */}
                         <button
                           type="button"

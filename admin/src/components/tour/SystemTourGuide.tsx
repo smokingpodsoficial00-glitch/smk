@@ -4,7 +4,7 @@ import {
   Sparkles, ChevronRight, ChevronLeft, X, Check, Compass, 
   PackageSearch, CircleDollarSign, RefreshCw, BarChart3, 
   PlusCircle, Layers, Flame, Users, Megaphone, Rocket,
-  FastForward, Minimize2, Maximize2, ShieldAlert
+  FastForward, Minimize2, Maximize2, ShieldAlert, Smartphone
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -24,7 +24,7 @@ export interface TourStep {
 const TOUR_STEPS: TourStep[] = [
   {
     id: "pedidos",
-    badge: "Etapa 1 de 11 • Operação Diária",
+    badge: "Etapa 1 de 12 • Operação Diária",
     route: "/pedidos",
     title: "📦 Pedidos: Kanban & Expedição em Tempo Real",
     targetSelector: '[data-tour="kanban-pedidos"]',
@@ -35,7 +35,7 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "financeiro_caixa",
-    badge: "Etapa 2 de 11 • Saúde Financeira & Caixa",
+    badge: "Etapa 2 de 12 • Saúde Financeira & Caixa",
     route: "/financeiro",
     title: "💰 Caixa Real & Recompras de Estoque",
     targetSelector: '[data-tour="financeiro-recompra-caixa"]',
@@ -46,7 +46,7 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "financeiro_recompra",
-    badge: "Etapa 3 de 11 • Gestão de Compras",
+    badge: "Etapa 3 de 12 • Gestão de Compras",
     route: "/financeiro",
     title: "🔄 Registrar Recompra de Estoque",
     targetSelector: '[data-tour="btn-registrar-recompra"]',
@@ -57,7 +57,7 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "financeiro_longo_prazo",
-    badge: "Etapa 4 de 11 • Inteligência de Escala",
+    badge: "Etapa 4 de 12 • Inteligência de Escala",
     route: "/financeiro",
     title: "📈 Faturamento a Longo Prazo & Gráficos",
     targetSelector: '[data-tour="financeiro-longo-prazo"]',
@@ -68,9 +68,9 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "estoque_ranking",
-    badge: "Etapa 5 de 11 • Inteligência de Estoque",
+    badge: "Etapa 5 de 12 • Inteligência de Estoque",
     route: "/estoque",
-    title: "📊 Reposição: Ranking dos Campeões de Venda",
+    title: "📊 Estoque: Ranking dos Campeões de Venda",
     targetSelector: '[data-tour="ranking-vendas"]',
     pointerText: "👇 RANKING DOS MAIS VENDIDOS 👇",
     description: "Por que esse ranking é vital? Porque ele te mostra matematicamente quais marcas e modelos mais vendem. Você descobre exatamente o que deve recomprar em maior escala para nunca faltar estoque, e o que deve cortar ou queimar para não empatar seu capital de giro!",
@@ -79,7 +79,7 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "estoque_novo_produto",
-    badge: "Etapa 6 de 11 • Catálogo & Produtos",
+    badge: "Etapa 6 de 12 • Catálogo & Produtos",
     route: "/estoque",
     title: "➕ Cadastrar Novo Produto na Prateleira",
     targetSelector: '[data-tour="btn-novo-produto"]',
@@ -90,7 +90,7 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "estoque_sabores",
-    badge: "Etapa 7 de 11 • Variações & Sabores",
+    badge: "Etapa 7 de 12 • Variações & Sabores",
     route: "/estoque",
     title: "🏷️ Prateleira & Gestão Rápida de Sabores",
     targetSelector: '[data-tour="btn-ver-sabores"]',
@@ -101,7 +101,7 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "estoque_parados",
-    badge: "Etapa 8 de 11 • Queima de Estoque",
+    badge: "Etapa 8 de 12 • Queima de Estoque",
     route: "/estoque",
     title: "🔥 Radar de Produtos Parados & Modo Demonstração",
     targetSelector: '[data-tour="tab-produtos-parados"]',
@@ -112,9 +112,9 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "crm_clientes",
-    badge: "Etapa 9 de 11 • LTV & Retenção",
+    badge: "Etapa 9 de 12 • LTV & Retenção",
     route: "/clientes",
-    title: "👥 Clientes & CRM Preditivo por Puffs",
+    title: "👥 CRM & Gestão de Clientes por Puffs",
     targetSelector: '[data-tour="crm-tabs"]',
     pointerText: "👇 NAVEGUE PELAS ABAS DO CRM 👇",
     description: "O cérebro de retenção da sua loja! Na aba 'Ranking & Fidelidade', você monitora quem compra a cada 15 dias e quem está sumindo (Risco de Churn). Na aba 'Aviso de Fim de Pod & Recompra', o sistema calcula os puffs consumidos e te avisa a data exata de chamar o cliente no WhatsApp antes do pod acabar!",
@@ -123,7 +123,7 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "marketing_disparos",
-    badge: "Etapa 10 de 11 • Escala de Vendas",
+    badge: "Etapa 10 de 12 • Escala de Vendas",
     route: "/marketing",
     title: "📢 Marketing & Disparos com Cadência Segura",
     targetSelector: '[data-tour="btn-nova-campanha"]',
@@ -138,8 +138,23 @@ const TOUR_STEPS: TourStep[] = [
     icon: <Megaphone className="size-6 text-pink-400" />
   },
   {
+    id: "conectar_celular",
+    badge: "Etapa 11 de 12 • App no Celular & Alertas",
+    route: "/financeiro",
+    title: "📱 Conectar Sistema no Seu Celular (App & Notificações)",
+    targetSelector: '[data-tour="sidebar-conectar-celular"]',
+    pointerText: "👉 CLIQUE AQUI: CONECTAR NO CELULAR 👈",
+    description: "Tenha o painel da sua loja na palma da mão! Clicando em 'Conectar no Celular' na barra lateral esquerda, você abre o QR Code e o passo a passo guiado para instalar o aplicativo no seu iPhone ou Android em 30 segundos. Você acompanha Financeiro, Estoque e Sócios de onde estiver e recebe notificações em tempo real na tela bloqueada a cada venda concluída na sua conta!",
+    tips: [
+      "Escaneie o QR Code com a câmera do seu celular",
+      "Adicione à Tela de Início (Safari no iPhone / Chrome no Android)",
+      "Ative os alertas para receber notificações exclusivas da sua loja"
+    ],
+    icon: <Smartphone className="size-6 text-amber-400" />
+  },
+  {
     id: "conclusao",
-    badge: "Etapa 11 de 11 • Pronto para Operar",
+    badge: "Etapa 12 de 12 • Pronto para Operar",
     route: "/configuracoes",
     title: "🚀 Tudo Pronto! Sua Operação Vai Decolar",
     targetSelector: '[data-tour="settings-store-name"]',

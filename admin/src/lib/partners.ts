@@ -1,12 +1,14 @@
 import { supabase } from "@/lib/supabase";
+import { isOrderNational, extractNationalInfo } from "./nationalSales";
+import { isCompanyEntityPartner, isCompanyExpenseTransaction } from "./partnerPayroll";
 
 export type PartnerTransactionType = 
   | 'APORTE'              // Entrada de capital novo do sócio na empresa (Altera Capital e % de Equity)
   | 'RETIRADA_CAPITAL'    // Retirada de capital investido pelo sócio (Reduz Capital e % de Equity)
   | 'DISTRIBUICAO_LUCRO'  // Dividendos pagos ao sócio (Saída de caixa)
-  | 'PRO_LABORE'          // Remuneração operacional (Despesa de caixa)
+  | 'PRO_LABORE'          // Remuneração / Salário dos sócios (Saída de caixa / distribuição de lucro)
   | 'COMPRA_ESTOQUE'      // Compra de pods com caixa
-  | 'DESPESA_OPERACIONAL' // Despesa operacional
+  | 'DESPESA_OPERACIONAL' // Custo / Despesa operacional da empresa
   | 'REINVESTIMENTO_LUCRO';
 
 export interface Partner {
@@ -141,14 +143,14 @@ export const TRANSACTION_TYPE_CONFIG: Record<PartnerTransactionType, {
     descriptionPlaceholder: 'Ex: Pagamento de dividendos'
   },
   PRO_LABORE: {
-    label: 'Pró-Labore',
+    label: 'Salário / Pró-Labore',
     badgeBg: 'bg-purple-500/10',
     badgeText: 'text-purple-400',
     badgeBorder: 'border-purple-500/20',
     isPartnerSpecific: true,
     cashFlowImpact: 'SAIDA',
     altersCapital: false,
-    descriptionPlaceholder: 'Ex: Remuneração operacional'
+    descriptionPlaceholder: 'Ex: Pagamento de salário do sócio'
   },
   COMPRA_ESTOQUE: {
     label: 'Compra de Estoque (Lote)',
@@ -161,14 +163,14 @@ export const TRANSACTION_TYPE_CONFIG: Record<PartnerTransactionType, {
     descriptionPlaceholder: 'Ex: Pagamento de lote'
   },
   DESPESA_OPERACIONAL: {
-    label: 'Despesa Operacional',
+    label: 'Custo da Empresa',
     badgeBg: 'bg-orange-500/10',
     badgeText: 'text-orange-400',
     badgeBorder: 'border-orange-500/20',
     isPartnerSpecific: false,
     cashFlowImpact: 'SAIDA',
     altersCapital: false,
-    descriptionPlaceholder: 'Ex: Tráfego pago'
+    descriptionPlaceholder: 'Ex: Embalagens, taxas, tráfego pago'
   },
   REINVESTIMENTO_LUCRO: {
     label: 'Reinvestimento de Lucro',
@@ -385,8 +387,8 @@ export async function createPartner(payload: {
   }
 
   // Atualiza cache local após tentativa remota
-  const current = getLocalPartners().filter(p => p.id !== savedPartner.id);
-  saveLocalPartners([...current, savedPartner]);
+  const current = getLocalPartners(targetCompanyId).filter(p => p.id !== savedPartner.id);
+  saveLocalPartners([...current, savedPartner], targetCompanyId);
 
   // Se houver investimento inicial, gera a transação de aporte correspondente
   if (payload.initialInvestment && Number(payload.initialInvestment) > 0) {
@@ -407,8 +409,10 @@ export async function createPartner(payload: {
 
 export async function updatePartner(
   partnerId: string,
-  payload: Partial<Partner>
+  payload: Partial<Partner>,
+  companyId?: string
 ): Promise<boolean> {
+  const targetCompanyId = companyId || payload.company_id || DEFAULT_COMPANY_ID;
   const updateData: any = {
     updated_at: new Date().toISOString()
   };
@@ -425,7 +429,7 @@ export async function updatePartner(
       .from("smoking_partners")
       .update(updateData)
       .eq("id", partnerId)
-      .eq("company_id", DEFAULT_COMPANY_ID);
+      .eq("company_id", targetCompanyId);
 
     if (error) {
       console.warn("[Partners] Erro ao atualizar parceiro no Supabase:", error.message);
@@ -435,20 +439,21 @@ export async function updatePartner(
   }
 
   // Sincroniza cache local
-  const current = getLocalPartners();
+  const current = getLocalPartners(targetCompanyId);
   const updated = current.map(p => p.id === partnerId ? { ...p, ...payload, updated_at: updateData.updated_at } : p);
-  saveLocalPartners(updated);
+  saveLocalPartners(updated, targetCompanyId);
 
   return true;
 }
 
-export async function deletePartner(partnerId: string): Promise<boolean> {
+export async function deletePartner(partnerId: string, companyId?: string): Promise<boolean> {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
   try {
     const { error } = await supabase
       .from("smoking_partners")
       .delete()
       .eq("id", partnerId)
-      .eq("company_id", DEFAULT_COMPANY_ID);
+      .eq("company_id", targetCompanyId);
 
     if (error) {
       console.warn("[Partners] Erro ao excluir parceiro no Supabase:", error.message);
@@ -458,9 +463,9 @@ export async function deletePartner(partnerId: string): Promise<boolean> {
   }
 
   // Sincroniza cache local
-  const current = getLocalPartners();
+  const current = getLocalPartners(targetCompanyId);
   const updated = current.filter(p => p.id !== partnerId);
-  saveLocalPartners(updated);
+  saveLocalPartners(updated, targetCompanyId);
 
   return true;
 }
@@ -634,6 +639,7 @@ export function calculatePartnersFinancials(params: {
   let cmvSum = 0;
   let shippingSum = 0;
   let podsSoldSum = 0;
+  let nationalShippingProfitSum = 0;
 
   const validOrders = (orders || []).filter(
     (o) =>
@@ -648,7 +654,14 @@ export function calculatePartnersFinancials(params: {
 
   for (const order of validOrders) {
     const shippingFee = parseFloat(order.shipping_fee || 0);
-    shippingSum += shippingFee;
+    if (!isOrderNational(order)) {
+      shippingSum += shippingFee;
+    } else {
+      const info = extractNationalInfo(order);
+      const shipCharged = info.shippingFeeCharged || shippingFee;
+      const shipCost = info.shippingCostReal || 0;
+      nationalShippingProfitSum += (shipCharged - shipCost);
+    }
 
     const items = Array.isArray(order.items) ? order.items : [];
     for (const item of items) {
@@ -674,9 +687,19 @@ export function calculatePartnersFinancials(params: {
     }
   }
 
-  // Lucro Líquido Real das Vendas = Faturamento dos Pods (Sem Frete) - CMV
-  const netProfit = revenueSum - cmvSum;
-  const realNetProfitPostMarketing = netProfit - operationalExpenses;
+  // Custos operacionais da empresa lançados via Movimentações (ex: DESPESA_OPERACIONAL ou Smoking Pods)
+  let txCompanyExpenses = 0;
+  for (const tx of transactions || []) {
+    if (isCompanyExpenseTransaction(tx, partners)) {
+      txCompanyExpenses += Number(tx.amount) || 0;
+    }
+  }
+
+  const totalOperationalExpenses = Number((operationalExpenses + txCompanyExpenses).toFixed(2));
+
+  // Lucro Líquido Real das Vendas = Faturamento dos Pods + Margem Frete Nacional - CMV - Custos Operacionais
+  const netProfit = revenueSum - cmvSum + nationalShippingProfitSum;
+  const realNetProfitPostMarketing = Number((netProfit - totalOperationalExpenses).toFixed(2));
   const netProfitMarginPct = revenueSum > 0 ? (realNetProfitPostMarketing / revenueSum) * 100 : 0;
 
   // 2. ESTOQUE OFICIAL: Unidades, Custo na Prateleira e Valor de Venda (Idêntico ao FinanceDashboard.tsx)
@@ -710,8 +733,6 @@ export function calculatePartnersFinancials(params: {
   const stockAssetProfit = Math.max(0, totalStockRetailSum - totalStockCostSum);
 
   // 3. DETERMINAÇÃO DA MARGEM OFICIAL ATIVA DO NEGÓCIO (NUNCA FIXA / HARDCODED)
-  // Se houver vendas realizadas, consome a Margem Líquida Real oficial do DRE.
-  // Se não houver vendas ainda, consome a margem de catálogo do estoque ativo.
   let officialProfitMarginPct = 0;
   if (revenueSum > 0) {
     officialProfitMarginPct = (realNetProfitPostMarketing / revenueSum) * 100;
@@ -722,10 +743,11 @@ export function calculatePartnersFinancials(params: {
   }
 
   // 4. TESOURARIA & CAIXA OFICIAL
-  const netCashAvailable = Math.max(0, revenueSum - shippingSum - operationalExpenses);
+  const netCashAvailable = Math.max(0, revenueSum - shippingSum - totalOperationalExpenses);
 
-  // 4.1 APURAÇÃO DOS SÓCIOS: Capital Líquido (Aportes - Retiradas)
-  const activePartners = (partners || []).filter(p => p.is_active !== false);
+  // 4.1 APURAÇÃO DOS SÓCIOS: Capital Líquido (Aportes - Retiradas de Capital)
+  // Filtra apenas sócios pessoas físicas (ignora perfil fictício "Smoking Pods" caso ainda exista)
+  const activePartners = (partners || []).filter(p => p.is_active !== false && !isCompanyEntityPartner(p.name));
   const partnerCapitalMap: Record<string, {
     grossContributed: number;
     withdrawn: number;
@@ -751,12 +773,6 @@ export function calculatePartnersFinancials(params: {
       if (tx.type === 'PRO_LABORE') pro += amt;
     }
 
-    // Capital líquido do sócio (aportes - retiradas)
-    // Se retirou mais do que aportou, o netInvested pode ficar negativo? O original limitava a 0 com Math.max
-    // Se um sócio retirar parte do lucro, não deveria ser RETIRADA_CAPITAL, mas DISTRIBUICAO_LUCRO.
-    // Retirada de capital reduz a cota. Vamos permitir ficar negativo temporariamente se esvaziar, mas o original usava Math.max(0, gross - withdr).
-    // Vou manter a regra original do sistema de Math.max(0, ...) para o capital do sócio, 
-    // mas o impacto no CAIXA DA EMPRESA deve somar TODOS os aportes e subtrair TODAS as retiradas de capital.
     const net = Math.max(0, gross - withdr);
     partnerCapitalMap[partner.id] = {
       grossContributed: gross,
@@ -787,8 +803,8 @@ export function calculatePartnersFinancials(params: {
     }
   }
   
-  // Caixa Operacional / Real
-  const operationalCash = revenueSum - stockPurchases;
+  // Caixa Operacional / Real (Incluindo margem de frete nacional para paridade 100% com Financeiro)
+  const operationalCash = (revenueSum + nationalShippingProfitSum) - stockPurchases;
   const realCash = Number((operationalCash + capitalInflows - capitalOutflows).toFixed(2));
 
   // 5. PATRIMÔNIO REAL TOTAL DA LOJA
@@ -819,7 +835,6 @@ export function calculatePartnersFinancials(params: {
     totalEquitySum += equityPct;
 
     // CÁLCULO AUTOMÁTICO DE LUCRO PROJETADO SOBRE O APORTE / CAPITAL INVESTIDO
-    // Lucro Projetado = Capital Investido * (Margem Oficial / 100)
     const projectedProfit = cap.netInvested * (officialProfitMarginPct / 100);
     const projectedEconomicEquity = cap.netInvested + projectedProfit;
     const projectedROI = cap.netInvested > 0 ? (projectedProfit / cap.netInvested) * 100 : officialProfitMarginPct;
@@ -833,8 +848,8 @@ export function calculatePartnersFinancials(params: {
     // Parcela Econômica do Lucro Realizado pelas Vendas
     const economicProfitShare = realNetProfitPostMarketing * (equityPct / 100);
 
-    // Ganho Econômico Real (Total Return = Patrimônio Atual + Dividendos Recebidos - Aporte Líquido Atual)
-    const economicGain = partnerEconomicEquity + cap.dividends - cap.netInvested;
+    // Ganho Econômico Real (Total Return = Patrimônio Atual + Dividendos + Pró-Labore Recebido - Aporte Líquido Atual)
+    const economicGain = partnerEconomicEquity + cap.dividends + cap.proLabore - cap.netInvested;
     const simplifiedROI = cap.netInvested > 0 ? (economicGain / cap.netInvested) * 100 : 0;
 
     // Fatias de Estoque
@@ -872,7 +887,7 @@ export function calculatePartnersFinancials(params: {
     stockPurchases,
     cmv: cmvSum,
     logisticsFee: shippingSum,
-    operationalExpenses,
+    operationalExpenses: totalOperationalExpenses,
     netProfitRealized: realNetProfitPostMarketing,
     netProfitMarginPct,
     officialProfitMarginPct,
@@ -937,7 +952,7 @@ export function simulatePartnerAporte(params: {
   const { targetPartnerId, newPartnerName = 'Novo Sócio', aporteAmount, currentOverview, existingPartners } = params;
 
   const validAporte = Math.max(0, aporteAmount);
-  const activeExisting = existingPartners.filter(p => p.is_active !== false);
+  const activeExisting = existingPartners.filter(p => p.is_active !== false && !isCompanyEntityPartner(p.name));
 
   const margin = currentOverview.officialProfitMarginPct || 21.0;
   const projectedProfitOnNewAporte = validAporte * (margin / 100);
