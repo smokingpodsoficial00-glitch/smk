@@ -359,12 +359,12 @@ function RevenueEvolutionChart({
 
         {/* Seletor de Ciclo (modo Mensal) */}
         {isMonthlyDaily && availableCycles && availableCycles.length > 0 && onCycleChange && (
-          <div className="flex items-center gap-1.5 self-start sm:self-auto">
-            <span className="text-[10px] text-white/40">Ciclo:</span>
+          <div className="flex items-center gap-1.5 w-full sm:w-auto min-w-0 self-start sm:self-auto">
+            <span className="text-[10px] text-white/40 shrink-0">Ciclo:</span>
             <select
               value={selectedCycleId || availableCycles[0]?.cycle.id}
               onChange={(e) => onCycleChange(e.target.value)}
-              className="bg-black/80 border border-white/15 rounded-lg px-2.5 py-0.5 text-[11px] font-semibold text-emerald-400 focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+              className="w-full sm:w-auto max-w-full min-w-0 truncate bg-black/80 border border-white/15 rounded-lg px-2.5 py-1 sm:py-0.5 text-[11px] font-semibold text-emerald-400 focus:outline-none focus:border-emerald-500/50 cursor-pointer"
             >
               {availableCycles.map((c) => (
                 <option key={c.cycle.id} value={c.cycle.id} className="bg-[#121316] text-white">
@@ -3298,16 +3298,16 @@ export default function FinanceDashboard() {
         {historyTab === "mensal" && (
           <div className="space-y-5">
             {/* Barra de Seleção do Ciclo Mensal */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3.5 rounded-2xl">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="text-xs font-bold text-white/70 flex items-center gap-1.5">
-                  <CalendarDays className="size-4 text-emerald-400" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3.5 rounded-2xl overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto min-w-0">
+                <span className="text-xs font-bold text-white/70 flex items-center gap-1.5 shrink-0">
+                  <CalendarDays className="size-4 text-emerald-400 shrink-0" />
                   <span>Selecionar Ciclo Mensal:</span>
                 </span>
                 <select
                   value={selectedMonthCycleId}
                   onChange={(e) => setSelectedMonthCycleId(e.target.value)}
-                  className="bg-black/80 border border-white/20 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+                  className="w-full sm:w-auto max-w-full min-w-0 truncate bg-black/80 border border-white/20 rounded-xl px-3 py-2 sm:py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
                 >
                   {monthlyCycles.map((m) => (
                     <option key={m.cycle.id} value={m.cycle.id} className="bg-[#121214] text-white">
@@ -3318,7 +3318,7 @@ export default function FinanceDashboard() {
               </div>
 
               {selectedMonthlyMetric && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
                   <span
                     className={`text-[10px] font-extrabold px-3 py-1 rounded-full border ${
                       selectedMonthlyMetric.cycle.isCurrent
@@ -3417,8 +3417,8 @@ export default function FinanceDashboard() {
               <p className="text-xs text-white/40 italic text-center py-4">Nenhum ciclo selecionado.</p>
             )}
 
-            {/* Tabela Comparativa de Todos os Ciclos Mensais */}
-            <div className="space-y-2.5 pt-2">
+            {/* Tabela Comparativa de Todos os Ciclos Mensais (Oculta no Mobile, Visível no Desktop) */}
+            <div className="hidden md:block space-y-2.5 pt-2">
               <h4 className="text-xs font-bold text-white/80 uppercase tracking-wider flex items-center gap-2">
                 <History className="size-4 text-white/60" />
                 <span>Histórico Completo de Ciclos Mensais (14 → 13)</span>
@@ -3495,16 +3495,16 @@ export default function FinanceDashboard() {
         {historyTab === "trimestral" && (
           <div className="space-y-5">
             {/* Seletor de Trimestre */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3.5 rounded-2xl">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="text-xs font-bold text-white/70 flex items-center gap-1.5">
-                  <BarChart3 className="size-4 text-emerald-400" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3.5 rounded-2xl overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto min-w-0">
+                <span className="text-xs font-bold text-white/70 flex items-center gap-1.5 shrink-0">
+                  <BarChart3 className="size-4 text-emerald-400 shrink-0" />
                   <span>Selecionar Trimestre (3 Ciclos Consolidados):</span>
                 </span>
                 <select
                   value={selectedQuarterId}
                   onChange={(e) => setSelectedQuarterId(e.target.value)}
-                  className="bg-black/80 border border-white/20 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+                  className="w-full sm:w-auto max-w-full min-w-0 truncate bg-black/80 border border-white/20 rounded-xl px-3 py-2 sm:py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
                 >
                   {quarterlyPeriods.map((q) => (
                     <option key={q.id} value={q.id} className="bg-[#121214] text-white">
@@ -3515,7 +3515,7 @@ export default function FinanceDashboard() {
               </div>
 
               {selectedQuarter && (
-                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-white/5 text-white/80 border border-white/10">
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-white/5 text-white/80 border border-white/10 self-start sm:self-auto shrink-0">
                   {selectedQuarter.includedCycles.length} ciclos mensais consolidados
                 </span>
               )}
@@ -3578,8 +3578,8 @@ export default function FinanceDashboard() {
                   </div>
                 </div>
 
-                {/* Tabela dos 3 Ciclos Componentes */}
-                <div className="space-y-2 pt-2">
+                {/* Tabela dos 3 Ciclos Componentes (Oculta no Mobile, Visível no Desktop) */}
+                <div className="hidden md:block space-y-2 pt-2">
                   <h5 className="text-xs font-bold text-white/70 uppercase tracking-wider">
                     Ciclos que Compõem este Trimestre
                   </h5>
@@ -3625,16 +3625,16 @@ export default function FinanceDashboard() {
         {historyTab === "semestral" && (
           <div className="space-y-5">
             {/* Seletor de Semestre */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3.5 rounded-2xl">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="text-xs font-bold text-white/70 flex items-center gap-1.5">
-                  <Layers className="size-4 text-emerald-400" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3.5 rounded-2xl overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto min-w-0">
+                <span className="text-xs font-bold text-white/70 flex items-center gap-1.5 shrink-0">
+                  <Layers className="size-4 text-emerald-400 shrink-0" />
                   <span>Selecionar Semestre (6 Ciclos Consolidados):</span>
                 </span>
                 <select
                   value={selectedSemesterId}
                   onChange={(e) => setSelectedSemesterId(e.target.value)}
-                  className="bg-black/80 border border-white/20 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+                  className="w-full sm:w-auto max-w-full min-w-0 truncate bg-black/80 border border-white/20 rounded-xl px-3 py-2 sm:py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
                 >
                   {semiannualPeriods.map((s) => (
                     <option key={s.id} value={s.id} className="bg-[#121214] text-white">
@@ -3645,7 +3645,7 @@ export default function FinanceDashboard() {
               </div>
 
               {selectedSemester && (
-                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-white/5 text-white/80 border border-white/10">
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-white/5 text-white/80 border border-white/10 self-start sm:self-auto shrink-0">
                   {selectedSemester.includedCycles.length} ciclos mensais consolidados
                 </span>
               )}
@@ -3708,8 +3708,8 @@ export default function FinanceDashboard() {
                   </div>
                 </div>
 
-                {/* Tabela dos 6 Ciclos Componentes */}
-                <div className="space-y-2 pt-2">
+                {/* Tabela dos 6 Ciclos Componentes (Oculta no Mobile, Visível no Desktop) */}
+                <div className="hidden md:block space-y-2 pt-2">
                   <h5 className="text-xs font-bold text-white/70 uppercase tracking-wider">
                     Ciclos que Compõem este Semestre
                   </h5>
@@ -3755,16 +3755,16 @@ export default function FinanceDashboard() {
         {historyTab === "anual" && (
           <div className="space-y-5">
             {/* Seletor de Ano */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3.5 rounded-2xl">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="text-xs font-bold text-white/70 flex items-center gap-1.5">
-                  <Award className="size-4 text-emerald-400" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border border-white/10 p-3.5 rounded-2xl overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto min-w-0">
+                <span className="text-xs font-bold text-white/70 flex items-center gap-1.5 shrink-0">
+                  <Award className="size-4 text-emerald-400 shrink-0" />
                   <span>Selecionar Ano Financeiro (12 Ciclos Consolidados):</span>
                 </span>
                 <select
                   value={selectedYearId}
                   onChange={(e) => setSelectedYearId(e.target.value)}
-                  className="bg-black/80 border border-white/20 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+                  className="w-full sm:w-auto max-w-full min-w-0 truncate bg-black/80 border border-white/20 rounded-xl px-3 py-2 sm:py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
                 >
                   {annualPeriods.map((y) => (
                     <option key={y.id} value={y.id} className="bg-[#121214] text-white">
@@ -3775,7 +3775,7 @@ export default function FinanceDashboard() {
               </div>
 
               {selectedYear && (
-                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-white/5 text-white/80 border border-white/10">
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-white/5 text-white/80 border border-white/10 self-start sm:self-auto shrink-0">
                   {selectedYear.includedCycles.length} ciclos mensais no ano
                 </span>
               )}
@@ -3838,8 +3838,8 @@ export default function FinanceDashboard() {
                   </div>
                 </div>
 
-                {/* Tabela de Todos os Ciclos do Ano */}
-                <div className="space-y-2 pt-2">
+                {/* Tabela de Todos os Ciclos do Ano (Oculta no Mobile, Visível no Desktop) */}
+                <div className="hidden md:block space-y-2 pt-2">
                   <h5 className="text-xs font-bold text-white/70 uppercase tracking-wider">
                     Evolução Mensal do Ano Financeiro
                   </h5>

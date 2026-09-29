@@ -318,31 +318,31 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
         </div>
 
         {/* Indicadores Resumidos */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="px-3.5 py-2 rounded-xl bg-black/50 border border-white/10 text-center min-w-[110px]">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-              Produtos na Fila
+        <div className="grid grid-cols-3 sm:flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          <div className="px-2.5 sm:px-3.5 py-2 rounded-xl bg-black/50 border border-white/10 text-center sm:min-w-[110px]">
+            <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-wider block truncate">
+              Na Fila
             </span>
-            <span className="text-lg font-extrabold text-amber-400">
-              {totalStagnantProducts} <span className="text-xs font-normal text-muted-foreground">sabores</span>
-            </span>
-          </div>
-
-          <div className="px-3.5 py-2 rounded-xl bg-black/50 border border-white/10 text-center min-w-[110px]">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-              Itens em Estoque
-            </span>
-            <span className="text-lg font-extrabold text-white">
-              {totalStagnantUnits} <span className="text-xs font-normal text-muted-foreground">un.</span>
+            <span className="text-sm sm:text-lg font-extrabold text-amber-400">
+              {totalStagnantProducts} <span className="text-[10px] sm:text-xs font-normal text-muted-foreground">sab.</span>
             </span>
           </div>
 
-          <div className="px-3.5 py-2 rounded-xl bg-black/50 border border-white/10 text-center min-w-[110px]">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-              Capital Parado
+          <div className="px-2.5 sm:px-3.5 py-2 rounded-xl bg-black/50 border border-white/10 text-center sm:min-w-[110px]">
+            <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-wider block truncate">
+              Em Estoque
             </span>
-            <span className="text-lg font-extrabold text-emerald-400">
-              R$ {totalStagnantCapital.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            <span className="text-sm sm:text-lg font-extrabold text-white">
+              {totalStagnantUnits} <span className="text-[10px] sm:text-xs font-normal text-muted-foreground">un.</span>
+            </span>
+          </div>
+
+          <div className="px-2.5 sm:px-3.5 py-2 rounded-xl bg-black/50 border border-white/10 text-center sm:min-w-[110px]">
+            <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-wider block truncate">
+              Cap. Parado
+            </span>
+            <span className="text-sm sm:text-lg font-extrabold text-emerald-400 truncate block">
+              R$ {totalStagnantCapital.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
           </div>
         </div>
@@ -380,24 +380,176 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
       )}
 
       {/* ━━━ BARRA DE PESQUISA ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div className="flex items-center justify-between gap-3 bg-[#141414] border border-white/10 rounded-2xl p-3.5">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-[#141414] border border-white/10 rounded-2xl p-3.5">
+        <div className="relative flex-1 w-full">
           <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar por marca, modelo ou sabor na fila de parados..."
+            placeholder="Buscar por marca, modelo ou sabor..."
             className="w-full bg-black/50 border border-white/10 rounded-xl pl-10 pr-3 py-2 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-amber-400 transition-all"
           />
         </div>
-        <div className="text-xs font-medium text-muted-foreground shrink-0 pr-2">
+        <div className="text-[11px] sm:text-xs font-medium text-muted-foreground shrink-0 sm:pr-2 text-right sm:text-left">
           Mostrando <strong className="text-white">{filteredQueue.length}</strong> de {totalStagnantProducts} produtos
         </div>
       </div>
 
-      {/* ━━━ TABELA PRINCIPAL DE PRODUTOS PARADOS (ORDEM DECRESCENTE) ━━━ */}
-      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#141414] custom-scrollbar">
+      {/* ━━━ VISÃO MOBILE (CARDS COMPACTOS E ENQUADRADOS — < 768px) ━━━━━━ */}
+      <div className="md:hidden space-y-2.5">
+        {filteredQueue.map((item, idx) => (
+          <div
+            key={`mob-stag-${item.id}`}
+            className="bg-[#141414] border border-white/10 rounded-2xl p-3.5 space-y-3 shadow-lg"
+          >
+            {/* Linha 1: Posição + Imagem + Nome do Modelo + Badge Dias Parado */}
+            <div className="flex items-start justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <span className="text-[11px] font-bold text-muted-foreground shrink-0">
+                  #{idx + 1}
+                </span>
+                {item.image_url ? (
+                  <img
+                    src={item.image_url}
+                    alt={item.name}
+                    className="size-10 rounded-xl object-contain bg-black/60 p-0.5 border border-white/10 shrink-0"
+                  />
+                ) : (
+                  <div className="size-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-muted-foreground font-bold text-[10px]">
+                    {item.brand?.substring(0, 2) || "POD"}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white truncate">
+                    {item.brand} {item.name}
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                    <span className="text-[10px] text-muted-foreground">
+                      {item.puffs ? `${item.puffs} puffs` : "Pod"}
+                    </span>
+                    <span className="text-[10px] text-white/25">•</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      Entrada: {item.formattedEntryDate}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Badge Dias Parado em linha única sem quebrar */}
+              <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[11px] whitespace-nowrap shrink-0">
+                {item.diasParado} {item.diasParado === 1 ? "dia" : "dias"} parado
+              </span>
+            </div>
+
+            {/* Badges extras (Promoção / Demo) se houver */}
+            {(item.isPromotional || item.isDemo) && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {item.isDemo && (
+                  <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    DEMO
+                  </span>
+                )}
+                {item.isPromotional && (
+                  <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 border border-red-500/40">
+                    EM PROMOÇÃO {item.promoData?.discountPct ? `(-${item.promoData.discountPct}%)` : ""}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Linha 2: Sabor + Estoque + Preço/Custo bem enquadrados */}
+            <div className="grid grid-cols-12 gap-2 bg-black/40 border border-white/5 rounded-xl p-2.5 items-center text-xs">
+              <div className="col-span-6 min-w-0 pr-1">
+                <span className="text-[9px] uppercase font-bold text-muted-foreground block">
+                  Sabor
+                </span>
+                <span className="font-semibold text-white text-xs truncate block mt-0.5">
+                  {item.flavor}
+                </span>
+              </div>
+
+              <div className="col-span-3 text-center border-x border-white/10 px-1">
+                <span className="text-[9px] uppercase font-bold text-muted-foreground block">
+                  Estoque
+                </span>
+                <span className="font-bold text-white text-xs block mt-0.5">
+                  {item.stock} un.
+                </span>
+              </div>
+
+              <div className="col-span-3 text-right pl-1">
+                <span className="text-[9px] uppercase font-bold text-muted-foreground block">
+                  Venda
+                </span>
+                {item.isPromotional && item.promoData?.promoPrice && item.promoData.promoPrice < item.sellPrice ? (
+                  <span className="text-emerald-400 font-bold text-xs block mt-0.5">
+                    R$ {item.promoData.promoPrice.toFixed(2)}
+                  </span>
+                ) : (
+                  <span className="text-white font-bold text-xs block mt-0.5">
+                    R$ {item.sellPrice.toFixed(2)}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Linha 3: Botões de Ação Rápida no Celular */}
+            <div className="flex items-center gap-2 pt-0.5">
+              <button
+                type="button"
+                onClick={() => setSelectedOfferProduct(item)}
+                className="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/10"
+              >
+                <Tag className="size-3.5 text-black shrink-0" />
+                <span>{item.isPromotional ? "Editar Oferta" : "Criar Oferta"}</span>
+              </button>
+
+              {item.isPromotional && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedVipProduct(item)}
+                  className="py-2 px-3 rounded-xl font-bold text-xs bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                >
+                  <Crown className="size-3.5 text-amber-400" />
+                  <span>VIP</span>
+                </button>
+              )}
+
+              {item.isPromotional ? (
+                <button
+                  type="button"
+                  onClick={() => handleTogglePromotion(item)}
+                  className="py-2 px-3 rounded-xl font-semibold text-xs border bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30 transition-colors cursor-pointer shrink-0"
+                >
+                  Encerrar
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleTogglePromotion(item)}
+                  className="py-2 px-3 rounded-xl font-semibold text-xs border bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white border-white/10 transition-colors cursor-pointer shrink-0"
+                >
+                  + Promo
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {filteredQueue.length === 0 && (
+          <div className="p-8 text-center text-muted-foreground space-y-2 bg-[#141414] border border-white/10 rounded-2xl">
+            <PackageSearch className="size-8 mx-auto text-muted-foreground/30" />
+            <p className="text-sm font-semibold text-white">Nenhum produto parado há 7 dias ou mais.</p>
+            <p className="text-xs text-muted-foreground">
+              Todos os produtos em estoque estão com giro ativo ou entraram recentemente no catálogo.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ━━━ TABELA PRINCIPAL DE PRODUTOS PARADOS (DESKTOP >= 768px) ━━━ */}
+      <div className="hidden md:block overflow-x-auto rounded-2xl border border-white/10 bg-[#141414] custom-scrollbar">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="bg-[#181818] border-b border-white/10 text-muted-foreground font-semibold uppercase tracking-wider text-[10px]">
@@ -453,7 +605,7 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
 
                 {/* Sabor */}
                 <td className="p-3.5">
-                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white font-medium text-xs">
+                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white font-medium text-xs inline-block">
                     {item.flavor}
                   </span>
                 </td>
@@ -465,14 +617,14 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
 
                 {/* Dias Parado (Destaque Principal) */}
                 <td className="p-3.5 text-center">
-                  <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-xs">
+                  <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-xs whitespace-nowrap inline-block">
                     {item.diasParado} {item.diasParado === 1 ? "dia" : "dias"} parado
                   </span>
                 </td>
 
                 {/* Estoque Atual */}
                 <td className="p-3.5 text-center">
-                  <span className="font-bold text-white bg-black/50 border border-white/10 px-2 py-0.5 rounded">
+                  <span className="font-bold text-white bg-black/50 border border-white/10 px-2 py-0.5 rounded whitespace-nowrap inline-block">
                     {item.stock} un.
                   </span>
                 </td>
