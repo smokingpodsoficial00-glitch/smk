@@ -113,7 +113,7 @@ export default function PartnersDashboard() {
           .neq("delivery_status", "CANCELADO"),
         supabase
           .from("smoking_products")
-          .select("id, name, brand, stock, price, cost_price, flavor, is_active")
+          .select("*")
           .or("company_id.eq." + targetCompanyId + ",company_id.is.null")
           .eq("is_active", true),
         supabase

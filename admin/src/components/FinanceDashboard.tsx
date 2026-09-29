@@ -1214,7 +1214,7 @@ export default function FinanceDashboard() {
           .neq("delivery_status", "CANCELADO"),
         supabase
           .from("smoking_products")
-          .select("id, name, brand, stock, price, cost_price, flavor")
+          .select("*")
           .eq("company_id", targetCompanyId)
           .eq("is_active", true),
         supabase

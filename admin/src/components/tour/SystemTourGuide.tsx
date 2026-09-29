@@ -232,7 +232,28 @@ export function SystemTourGuide() {
     return () => window.removeEventListener("open-system-tour", handleOpen);
   }, []);
 
-  const activeStep = TOUR_STEPS[currentStep] || TOUR_STEPS[0];
+  const [isMobileView, setIsMobileView] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const onResize = () => setIsMobileView(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // No celular (< 768px), exibe apenas as etapas de telas disponíveis no mobile
+  const activeStepsList = useMemo(() => {
+    if (!isMobileView) return TOUR_STEPS;
+    const desktopOnlyIds = new Set(["pedidos", "marketing_disparos", "conectar_celular"]);
+    const filtered = TOUR_STEPS.filter((s) => !desktopOnlyIds.has(s.id));
+    return filtered.map((s, idx) => ({
+      ...s,
+      badge: `Etapa ${idx + 1} de ${filtered.length} • ${s.badge.split("•")[1]?.trim() || "Painel Mobile"}`,
+    }));
+  }, [isMobileView]);
+
+  const activeStep = activeStepsList[currentStep] || activeStepsList[0];
 
   // Sincronizar rota e iniciar typewriter ao mudar de etapa
   useEffect(() => {
@@ -342,7 +363,11 @@ export function SystemTourGuide() {
         updateRect();
         const el = document.querySelector(activeStep.targetSelector || "");
         if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+          el.scrollIntoView({
+            behavior: "smooth",
+            block: window.innerWidth < 768 ? "start" : "center",
+            inline: "center",
+          });
         }
       }, 400),
       setTimeout(updateRect, 800),
@@ -403,7 +428,7 @@ export function SystemTourGuide() {
 
   // Avançar card / etapa
   const handleNextStep = () => {
-    if (currentStep < TOUR_STEPS.length - 1) {
+    if (currentStep < activeStepsList.length - 1) {
       setCurrentStep((prev) => prev + 1);
     } else {
       handleSkipEntireTour();
@@ -427,29 +452,29 @@ export function SystemTourGuide() {
       targetRect.top < (typeof window !== "undefined" ? window.innerHeight - 20 : 1080);
     if (!isTargetVisible) return null;
 
-    const badgeWidth = 340;
     const screenWidth = typeof window !== "undefined" ? window.innerWidth : 1920;
+    const badgeWidth = Math.min(320, screenWidth - 24);
     
     // Centraliza horizontalmente sobre o elemento com limites de tela
-    const left = Math.max(16, Math.min(screenWidth - badgeWidth - 16, targetRect.left + (targetRect.width / 2) - (badgeWidth / 2)));
+    const left = Math.max(12, Math.min(screenWidth - badgeWidth - 12, targetRect.left + (targetRect.width / 2) - (badgeWidth / 2)));
     
     // Se o elemento estiver com folga acima, posiciona a seta acima dele
     if (targetRect.top > 75) {
       return {
-        top: targetRect.top - 54,
+        top: targetRect.top - 48,
         left,
         arrow: "👇",
       };
     }
     // Caso contrário, posiciona a seta logo abaixo
     return {
-      top: targetRect.bottom + 14,
+      top: targetRect.bottom + 12,
       left,
       arrow: "👆",
     };
   }, [targetRect]);
 
-  const progressPercentage = Math.round(((currentStep + 1) / TOUR_STEPS.length) * 100);
+  const progressPercentage = Math.round(((currentStep + 1) / activeStepsList.length) * 100);
 
   return (
     <>
@@ -460,10 +485,10 @@ export function SystemTourGuide() {
           <div 
             className="fixed pointer-events-none z-[99990] transition-[opacity,box-shadow,border-color,width,height] duration-150 ease-out rounded-2xl"
             style={{
-              top: targetRect.top - 8,
-              left: targetRect.left - 8,
-              width: targetRect.width + 16,
-              height: targetRect.height + 16,
+              top: targetRect.top - 6,
+              left: targetRect.left - 6,
+              width: targetRect.width + 12,
+              height: targetRect.height + 12,
               boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.55), 0 0 45px 10px rgba(245, 158, 11, 0.9), inset 0 0 20px rgba(245, 158, 11, 0.3)",
               border: "3px solid #f59e0b",
             }}
@@ -472,14 +497,14 @@ export function SystemTourGuide() {
           {/* Seta Animada Apontando Diretamente para o Botão / Card */}
           {badgePositionData && (
             <div
-              className="fixed pointer-events-none z-[99995] transition-opacity duration-200 flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-black text-xs sm:text-sm tracking-wide bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-black shadow-[0_0_35px_rgba(245,158,11,1)] animate-bounce select-none w-max"
+              className="fixed pointer-events-none z-[99995] transition-opacity duration-200 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-full font-black text-[10px] sm:text-sm tracking-wide bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-black shadow-[0_0_35px_rgba(245,158,11,1)] animate-bounce select-none max-w-[calc(100vw-24px)] truncate"
               style={{
                 top: badgePositionData.top,
                 left: badgePositionData.left,
               }}
             >
-              <span className="text-base sm:text-lg">{badgePositionData.arrow}</span>
-              <span className="uppercase tracking-wider font-black">
+              <span className="text-sm sm:text-lg shrink-0">{badgePositionData.arrow}</span>
+              <span className="uppercase tracking-wider font-black truncate">
                 {activeStep.pointerText || "OLHE AQUI"}
               </span>
             </div>
@@ -489,61 +514,61 @@ export function SystemTourGuide() {
 
       {/* ━━━ MODAL DE BOAS-VINDAS INICIAL (APENAS 1º ACESSO REAL) ━━━━━ */}
       {isWelcomeOpen && (
-        <div className="fixed inset-0 z-[999999] bg-black/85 backdrop-blur-lg flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-[#121215] border-2 border-white/20 rounded-3xl max-w-xl w-full p-7 sm:p-9 text-white shadow-[0_30px_90px_rgba(0,0,0,0.95)] space-y-7 relative">
+        <div className="fixed inset-0 z-[999999] bg-black/85 backdrop-blur-lg flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-300">
+          <div className="bg-[#121215] border-2 border-white/20 rounded-2xl sm:rounded-3xl max-w-xl w-full p-4 sm:p-9 text-white shadow-[0_30px_90px_rgba(0,0,0,0.95)] space-y-4 sm:space-y-7 relative max-h-[90dvh] overflow-y-auto my-auto">
             <button
               type="button"
               onClick={handleSkipEntireTour}
-              className="absolute top-6 right-6 size-9 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              className="absolute top-3.5 right-3.5 sm:top-6 sm:right-6 size-8 sm:size-9 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white flex items-center justify-center transition-colors cursor-pointer"
               title="Pular tour completo"
             >
-              <X className="size-5" />
+              <X className="size-4 sm:size-5" />
             </button>
 
-            <div className="flex items-center gap-4">
-              <div className="size-14 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 flex items-center justify-center text-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.25)] shrink-0">
-                <Compass className="size-7 animate-spin-slow" />
+            <div className="flex items-center gap-3 sm:gap-4 pr-8">
+              <div className="size-11 sm:size-14 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 flex items-center justify-center text-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.25)] shrink-0">
+                <Compass className="size-5 sm:size-7 animate-spin-slow" />
               </div>
-              <div>
-                <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              <div className="min-w-0">
+                <span className="inline-block px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
                   Boas-vindas ao Sistema
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1.5">
+                <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight mt-1">
                   Conheça o seu Painel
                 </h2>
               </div>
             </div>
 
-            <p className="text-sm sm:text-base text-white/80 leading-relaxed font-medium">
-              Preparamos um <strong className="text-amber-300 font-bold">tour guiado interativo</strong> passando pelas áreas fundamentais da sua loja: pedidos em tempo real, controle de lucro, reposição de estoque, CRM de retenção e marketing no WhatsApp.
+            <p className="text-xs sm:text-base text-white/80 leading-relaxed font-medium">
+              Preparamos um <strong className="text-amber-300 font-bold">tour guiado interativo</strong> passando pelas áreas fundamentais da sua loja: controle de lucro, reposição de estoque, CRM de retenção e configurações da operação.
             </p>
 
-            <div className="space-y-3 bg-black/50 border border-white/10 rounded-2xl p-5 text-sm">
-              <div className="flex items-center gap-3 text-white/95 font-medium">
-                <div className="size-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                  <Check className="size-3.5 stroke-[3]" />
+            <div className="space-y-2.5 sm:space-y-3 bg-black/50 border border-white/10 rounded-2xl p-3.5 sm:p-5 text-xs sm:text-sm">
+              <div className="flex items-center gap-2.5 sm:gap-3 text-white/95 font-medium">
+                <div className="size-5 sm:size-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                  <Check className="size-3 sm:size-3.5 stroke-[3]" />
                 </div>
                 <span>Sinalização com <strong>setas luminosas</strong> indicando cada botão e card</span>
               </div>
-              <div className="flex items-center gap-3 text-white/95 font-medium">
-                <div className="size-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                  <Check className="size-3.5 stroke-[3]" />
+              <div className="flex items-center gap-2.5 sm:gap-3 text-white/95 font-medium">
+                <div className="size-5 sm:size-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                  <Check className="size-3 sm:size-3.5 stroke-[3]" />
                 </div>
                 <span>Liberdade total: você pode <strong>pular card por card</strong> a qualquer momento</span>
               </div>
-              <div className="flex items-center gap-3 text-white/95 font-medium">
-                <div className="size-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                  <Check className="size-3.5 stroke-[3]" />
+              <div className="flex items-center gap-2.5 sm:gap-3 text-white/95 font-medium">
+                <div className="size-5 sm:size-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                  <Check className="size-3 sm:size-3.5 stroke-[3]" />
                 </div>
-                <span>Duração de apenas ~3 minutos para dominar 100% da ferramenta</span>
+                <span>Duração de apenas ~2 minutos para dominar 100% da ferramenta</span>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row items-center gap-2.5 sm:gap-3 pt-1">
               <button
                 type="button"
                 onClick={handleSkipEntireTour}
-                className="w-full sm:w-1/2 py-3.5 px-5 rounded-2xl text-sm font-semibold text-muted-foreground hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer text-center"
+                className="w-full sm:w-1/2 py-3 sm:py-3.5 px-4 sm:px-5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold text-muted-foreground hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer text-center"
               >
                 Pular Tour Completo
               </button>
@@ -551,10 +576,10 @@ export function SystemTourGuide() {
               <button
                 type="button"
                 onClick={handleStartTour}
-                className="w-full sm:w-1/2 py-3.5 px-5 rounded-2xl text-sm font-black text-black bg-white hover:bg-slate-100 shadow-[0_0_30px_rgba(255,255,255,0.35)] transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+                className="w-full sm:w-1/2 py-3 sm:py-3.5 px-4 sm:px-5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-black text-black bg-white hover:bg-slate-100 shadow-[0_0_30px_rgba(255,255,255,0.35)] transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
               >
                 <span>🚀 Iniciar Tour Guiado</span>
-                <ChevronRight className="size-5" />
+                <ChevronRight className="size-4 sm:size-5" />
               </button>
             </div>
           </div>
@@ -565,20 +590,20 @@ export function SystemTourGuide() {
       {isOpen && isMinimized && (
         <div 
           onClick={() => setIsMinimized(false)}
-          className="fixed bottom-6 right-6 z-[99999] bg-amber-500 hover:bg-amber-400 text-black px-5 py-3 rounded-2xl shadow-[0_0_30px_rgba(245,158,11,0.6)] cursor-pointer flex items-center gap-3 font-black text-xs sm:text-sm animate-in fade-in slide-in-from-bottom-3 duration-200"
+          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[99999] bg-amber-500 hover:bg-amber-400 text-black px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl shadow-[0_0_30px_rgba(245,158,11,0.6)] cursor-pointer flex items-center gap-2.5 sm:gap-3 font-black text-xs sm:text-sm animate-in fade-in slide-in-from-bottom-3 duration-200"
         >
-          <Compass className="size-5 animate-spin-slow" />
-          <span>Tour Ativo ({currentStep + 1}/{TOUR_STEPS.length}) • Clique para Expandir</span>
-          <Maximize2 className="size-4 ml-1" />
+          <Compass className="size-4 sm:size-5 animate-spin-slow" />
+          <span>Tour ({currentStep + 1}/{activeStepsList.length}) • Expandir</span>
+          <Maximize2 className="size-3.5 sm:size-4 ml-0.5" />
         </div>
       )}
 
-      {/* ━━━ CARD FLUTUANTE AMPLIADO DO TOUR ATIVO (LEITURA NÍTIDA & CONFORTÁVEL) ━━ */}
+      {/* ━━━ CARD FLUTUANTE DO TOUR ATIVO (COMPACTO NO MOBILE & AMPLIADO NO PC) ━━ */}
       {isOpen && !isMinimized && (
-        <div className="fixed bottom-6 right-6 z-[99999] w-[620px] max-w-[calc(100vw-2rem)] bg-[#111114]/98 backdrop-blur-2xl border-2 border-white/20 rounded-3xl shadow-[0_30px_90px_rgba(0,0,0,0.98)] p-6 sm:p-7 text-white space-y-5 animate-in slide-in-from-bottom-5 duration-300">
+        <div className="fixed bottom-3 left-3 right-3 sm:left-auto sm:bottom-6 sm:right-6 z-[99999] sm:w-[620px] max-w-full sm:max-w-[calc(100vw-2rem)] max-h-[46dvh] sm:max-h-none overflow-y-auto bg-[#111114]/98 backdrop-blur-2xl border-2 border-white/20 rounded-2xl sm:rounded-3xl shadow-[0_30px_90px_rgba(0,0,0,0.98)] p-3.5 sm:p-7 text-white space-y-2.5 sm:space-y-5 animate-in slide-in-from-bottom-5 duration-300">
           
           {/* Barra de Progresso Superior */}
-          <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+          <div className="w-full bg-white/10 h-1 sm:h-1.5 rounded-full overflow-hidden">
             <div 
               className="bg-gradient-to-r from-amber-400 to-yellow-300 h-full rounded-full transition-all duration-300 shadow-[0_0_12px_rgba(245,158,11,0.8)]"
               style={{ width: `${progressPercentage}%` }}
@@ -586,16 +611,16 @@ export function SystemTourGuide() {
           </div>
 
           {/* Cabeçalho do Card */}
-          <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-4">
-            <div className="flex items-center gap-3.5">
-              <div className="size-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+          <div className="flex items-start justify-between gap-2.5 sm:gap-3 border-b border-white/10 pb-2.5 sm:pb-4">
+            <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+              <div className="size-9 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
                 {activeStep.icon}
               </div>
-              <div>
-                <span className="text-xs font-black uppercase tracking-wider text-amber-400 block mb-0.5">
+              <div className="min-w-0">
+                <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-400 block mb-0.5 truncate">
                   {activeStep.badge}
                 </span>
-                <h3 className="text-lg sm:text-xl font-black text-white leading-snug tracking-tight">
+                <h3 className="text-sm sm:text-xl font-black text-white leading-tight sm:leading-snug tracking-tight line-clamp-2">
                   {activeStep.title}
                 </h3>
               </div>
@@ -605,51 +630,51 @@ export function SystemTourGuide() {
               <button
                 type="button"
                 onClick={() => setIsMinimized(true)}
-                className="size-8 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                className="size-7 sm:size-8 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                 title="Minimizar card do tour"
               >
-                <Minimize2 className="size-4" />
+                <Minimize2 className="size-3.5 sm:size-4" />
               </button>
               <button
                 type="button"
                 onClick={handleSkipEntireTour}
-                className="size-8 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                className="size-7 sm:size-8 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                 title="Encerrar tour completo"
               >
-                <X className="size-4" />
+                <X className="size-3.5 sm:size-4" />
               </button>
             </div>
           </div>
 
-          {/* Área de Texto Ampliada com Efeito Typewriter e Alta Legibilidade */}
+          {/* Área de Texto com Efeito Typewriter e Alta Legibilidade */}
           <div 
             onClick={handleFastForwardText}
-            className="bg-black/60 border border-white/15 rounded-2xl p-5 sm:p-6 text-sm sm:text-base font-medium text-white/95 leading-relaxed cursor-pointer hover:border-amber-400/40 transition-all select-none group relative shadow-inner"
+            className="bg-black/60 border border-white/15 rounded-xl sm:rounded-2xl p-3 sm:p-6 text-xs sm:text-base font-medium text-white/95 leading-relaxed cursor-pointer hover:border-amber-400/40 transition-all select-none group relative shadow-inner"
             title="Clique para acelerar o texto"
           >
-            <p className="min-h-[75px] sm:min-h-[85px] leading-relaxed">
+            <p className="min-h-[44px] sm:min-h-[85px] leading-relaxed">
               {activeStep.description.slice(0, typedChars)}
               {isTyping && (
-                <span className="inline-block w-2 h-5 bg-amber-400 ml-1 rounded-sm shadow-[0_0_12px_rgba(245,158,11,1)] animate-pulse align-middle" />
+                <span className="inline-block w-1.5 sm:w-2 h-3.5 sm:h-5 bg-amber-400 ml-1 rounded-sm shadow-[0_0_12px_rgba(245,158,11,1)] animate-pulse align-middle" />
               )}
             </p>
 
             {isTyping && (
-              <div className="mt-3 flex items-center justify-end gap-1.5 text-xs font-bold text-amber-400/80 group-hover:text-amber-300 transition-colors">
-                <FastForward className="size-3.5" />
-                <span>Clique para exibir o texto completo</span>
+              <div className="mt-1.5 sm:mt-3 flex items-center justify-end gap-1.5 text-[10px] sm:text-xs font-bold text-amber-400/80 group-hover:text-amber-300 transition-colors">
+                <FastForward className="size-3 sm:size-3.5" />
+                <span>Toque para exibir completo</span>
               </div>
             )}
           </div>
 
           {/* Alerta Destacado de Responsabilidade Anti-Ban */}
           {activeStep.warningNote && (
-            <div className="bg-amber-500/10 border-2 border-amber-500/40 rounded-2xl p-4 text-xs sm:text-sm text-amber-200/90 flex items-start gap-3 shadow-[0_0_25px_rgba(245,158,11,0.15)] animate-in fade-in duration-200">
-              <div className="p-1.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
-                <ShieldAlert className="size-4 sm:size-5 text-amber-400" />
+            <div className="bg-amber-500/10 border-2 border-amber-500/40 rounded-xl sm:rounded-2xl p-3 sm:p-4 text-[11px] sm:text-sm text-amber-200/90 flex items-start gap-2.5 sm:gap-3 shadow-[0_0_25px_rgba(245,158,11,0.15)] animate-in fade-in duration-200">
+              <div className="p-1 sm:p-1.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                <ShieldAlert className="size-3.5 sm:size-5 text-amber-400" />
               </div>
-              <div className="space-y-1">
-                <strong className="text-amber-300 font-black uppercase tracking-wider block text-xs">
+              <div className="space-y-0.5 sm:space-y-1">
+                <strong className="text-amber-300 font-black uppercase tracking-wider block text-[10px] sm:text-xs">
                   ⚠️ Aviso de Responsabilidade & Cadência Anti-Ban:
                 </strong>
                 <span className="leading-relaxed block">
@@ -659,9 +684,9 @@ export function SystemTourGuide() {
             </div>
           )}
 
-          {/* Dicas Rápidas da Etapa com Tamanho Legível */}
+          {/* Dicas Rápidas da Etapa (Visíveis no PC, ocultas no celular para não ocupar a tela) */}
           {activeStep.tips && activeStep.tips.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="hidden sm:flex flex-wrap gap-2">
               {activeStep.tips.map((tip, idx) => (
                 <span 
                   key={idx}
@@ -675,16 +700,16 @@ export function SystemTourGuide() {
           )}
 
           {/* Barra de Ações & Navegação Card a Card */}
-          <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/10">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 sm:gap-3 pt-2 sm:pt-3 border-t border-white/10">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {currentStep > 0 && (
                 <button
                   type="button"
                   onClick={handlePrevStep}
-                  className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-white/10 hover:bg-white/15 text-white border border-white/15 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                  className="px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-white/10 hover:bg-white/15 text-white border border-white/15 transition-all cursor-pointer flex items-center gap-1 active:scale-95"
                   title="Voltar ao card anterior"
                 >
-                  <ChevronLeft className="size-4" />
+                  <ChevronLeft className="size-3.5 sm:size-4" />
                   <span>Voltar</span>
                 </button>
               )}
@@ -692,7 +717,7 @@ export function SystemTourGuide() {
               <button
                 type="button"
                 onClick={handleSkipEntireTour}
-                className="px-3 py-2 rounded-xl text-xs font-semibold text-muted-foreground hover:text-white transition-colors cursor-pointer"
+                className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[11px] sm:text-xs font-semibold text-muted-foreground hover:text-white transition-colors cursor-pointer whitespace-nowrap"
                 title="Pular tour e fechar assistente"
               >
                 Pular Tour
@@ -702,12 +727,12 @@ export function SystemTourGuide() {
             <button
               type="button"
               onClick={handleNextStep}
-              className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black bg-white hover:bg-slate-100 text-black shadow-[0_0_25px_rgba(255,255,255,0.3)] transition-all cursor-pointer flex items-center gap-2 active:scale-95"
+              className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black bg-white hover:bg-slate-100 text-black shadow-[0_0_25px_rgba(255,255,255,0.3)] transition-all cursor-pointer flex items-center gap-1.5 sm:gap-2 active:scale-95 whitespace-nowrap"
             >
               <span>
-                {currentStep === TOUR_STEPS.length - 1 ? "🎉 Concluir Tour" : "⏭️ Pular Card / Próximo"}
+                {currentStep === activeStepsList.length - 1 ? "🎉 Concluir Tour" : "⏭️ Próximo"}
               </span>
-              <ChevronRight className="size-4" />
+              <ChevronRight className="size-3.5 sm:size-4" />
             </button>
           </div>
 
