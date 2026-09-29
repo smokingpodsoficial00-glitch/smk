@@ -700,15 +700,19 @@ export default function CompanyTasksPage() {
       {/* Modal 360 de Detalhes da Tarefa */}
       {selectedTaskForDetail && (
         <TaskDetailModal
-          task={selectedTaskForDetail}
+          task={selectedTaskForDetail as any}
+          isOpen={Boolean(selectedTaskForDetail)}
           onClose={() => setSelectedTaskForDetail(null)}
-          onEdit={(task) => {
-            setSelectedTaskForDetail(null);
-            setEditingTask(task);
+          onToggleStatus={(task: any) => {
+            const nextStatus = task.status === 'PENDENTE' ? 'EM_ANDAMENTO' : task.status === 'EM_ANDAMENTO' ? 'CONCLUIDO' : 'PENDENTE';
+            handleStatusChange(task.id, nextStatus);
           }}
-          onDelete={handleDeleteTask}
-          onStatusChange={handleStatusChange}
-          onToggleSubtask={handleToggleSubtask}
+          onUpdateTask={(taskId: string, updates: any) => {
+            updateCompanyTask(taskId, updates).then(() => {
+              setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+            });
+          }}
+          onDeleteTask={handleDeleteTask}
         />
       )}
     </div>

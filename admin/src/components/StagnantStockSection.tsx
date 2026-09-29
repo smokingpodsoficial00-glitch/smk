@@ -255,6 +255,31 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
   const totalStagnantUnits = effectiveQueue.reduce((sum, item) => sum + item.stock, 0);
   const totalStagnantCapital = effectiveQueue.reduce((sum, item) => sum + item.stagnantCapital, 0);
 
+  // Lista de TODAS as promoções ativas (independente de estar parado ou não)
+  const activePromotions = useMemo(() => {
+    const promoIds = Object.keys(promotionsMap);
+    if (promoIds.length === 0) return [];
+
+    return promoIds.map(pid => {
+      const promo = promotionsMap[pid];
+      const product = (products || []).find((p: any) => p.id === pid);
+      if (!product) return null;
+
+      const stock = parseInt(product.stock) || 0;
+      const sellPrice = parseFloat(product.price) || 0;
+      const isInStagnantQueue = effectiveQueue.some((item: any) => item.id === pid);
+
+      return {
+        ...product,
+        stock,
+        sellPrice,
+        isPromotional: true,
+        promoData: promo,
+        isInStagnantQueue,
+      };
+    }).filter(Boolean);
+  }, [promotionsMap, products, effectiveQueue]);
+
   // Alternar Promoção Direta
   const handleTogglePromotion = async (product: any) => {
     if (product.isDemo) {
@@ -318,7 +343,7 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
         </div>
 
         {/* Indicadores Resumidos */}
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full sm:w-auto">
           <div className="px-3.5 py-2 rounded-xl bg-black/50 border border-white/10 text-center min-w-[110px]">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
               Produtos na Fila
@@ -380,188 +405,277 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
       )}
 
       {/* ━━━ BARRA DE PESQUISA ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div className="flex items-center justify-between gap-3 bg-[#141414] border border-white/10 rounded-2xl p-3.5">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#141414] border border-white/10 rounded-2xl p-3.5">
         <div className="relative flex-1">
           <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar por marca, modelo ou sabor na fila de parados..."
+            placeholder="Buscar por marca, modelo ou sabor..."
             className="w-full bg-black/50 border border-white/10 rounded-xl pl-10 pr-3 py-2 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-amber-400 transition-all"
           />
         </div>
-        <div className="text-xs font-medium text-muted-foreground shrink-0 pr-2">
+        <div className="text-xs font-medium text-muted-foreground shrink-0 text-right sm:pr-2">
           Mostrando <strong className="text-white">{filteredQueue.length}</strong> de {totalStagnantProducts} produtos
         </div>
       </div>
 
+      {/* ━━━ OFERTAS EM ANDAMENTO (TODAS AS PROMOÇÕES ATIVAS) ━━━━━━━━━━━ */}
+      {activePromotions.length > 0 && (
+        <div className="rounded-2xl border border-red-500/20 bg-[#141414] overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 bg-red-500/5 border-b border-red-500/20">
+            <div className="flex items-center gap-2">
+              <Tag className="size-4 text-red-400" />
+              <h4 className="text-xs font-bold text-white">
+                Ofertas em Andamento
+              </h4>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+                {activePromotions.length} {activePromotions.length === 1 ? 'ativa' : 'ativas'}
+              </span>
+            </div>
+            <span className="text-[10px] text-muted-foreground">
+              Gerencie todas as promoções ativas do seu catálogo
+            </span>
+          </div>
+          <div className="divide-y divide-white/5">
+            {activePromotions.map((item: any) => (
+              <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between px-4 py-3 gap-3 hover:bg-white/[0.02] transition-colors">
+                <div className="flex items-center gap-3 min-w-0">
+                  {item.image_url ? (
+                    <img src={item.image_url} alt={item.name} className="size-9 rounded-lg object-contain bg-black/60 p-0.5 border border-white/10 shrink-0" />
+                  ) : (
+                    <div className="size-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-muted-foreground font-bold text-[10px]">
+                      {item.brand?.substring(0, 2) || "POD"}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
+                      <span className="truncate">{item.brand} {item.name}</span>
+                      <span className="text-[10px] text-muted-foreground font-normal truncate">
+                        {item.flavor}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      <span className="text-[10px] text-muted-foreground">
+                        Estoque: <strong className="text-white">{item.stock} un.</strong>
+                      </span>
+                      <span className="text-[10px] text-muted-foreground line-through">
+                        R$ {item.sellPrice.toFixed(2)}
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-400">
+                        R$ {(item.promoData?.promoPrice || 0).toFixed(2)}
+                        {item.promoData?.discountPct ? ` (-${item.promoData.discountPct}%)` : ''}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 pl-12 sm:pl-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOfferProduct(item)}
+                    className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-colors cursor-pointer"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePromotion(item)}
+                    className="px-2.5 py-1.5 rounded-xl font-semibold text-xs border bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30 transition-colors cursor-pointer"
+                    title="Encerrar promoção e voltar ao preço normal"
+                  >
+                    Encerrar Oferta
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ━━━ TABELA PRINCIPAL DE PRODUTOS PARADOS (ORDEM DECRESCENTE) ━━━ */}
-      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#141414] custom-scrollbar">
-        <table className="w-full text-left text-xs border-collapse">
+      
+      {/* DESKTOP: Tabela */}
+      <div className="hidden md:block overflow-x-auto rounded-2xl border border-white/10 bg-[#141414] custom-scrollbar">
+        <table className="w-full text-left text-xs border-collapse min-w-[700px]">
           <thead>
             <tr className="bg-[#181818] border-b border-white/10 text-muted-foreground font-semibold uppercase tracking-wider text-[10px]">
-              <th className="p-3.5">Produto</th>
-              <th className="p-3.5">Sabor</th>
-              <th className="p-3.5">Entrada no Catálogo</th>
-              <th className="p-3.5 text-center">Dias Parado</th>
-              <th className="p-3.5 text-center">Estoque</th>
-              <th className="p-3.5 text-right">Preço de Venda</th>
-              <th className="p-3.5 text-right">Custo Unitário</th>
-              <th className="p-3.5 text-center">Ações</th>
+              <th className="p-3">Produto</th>
+              <th className="p-3">Sabor</th>
+              <th className="p-3 text-center">Dias Parado</th>
+              <th className="p-3 text-center">Estoque</th>
+              <th className="p-3 text-right">Preço</th>
+              <th className="p-3 text-right">Custo</th>
+              <th className="p-3 text-center">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5 bg-[#111111]">
             {filteredQueue.map((item, idx) => (
               <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
-                
-                {/* Produto (Imagem + Marca + Modelo) */}
-                <td className="p-3.5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-[11px] font-bold text-muted-foreground w-4 text-right">#{idx + 1}</span>
+                <td className="p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-muted-foreground w-4 text-right shrink-0">#{idx + 1}</span>
                     {item.image_url ? (
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        className="size-9 rounded-lg object-contain bg-black/60 p-0.5 border border-white/10 shrink-0"
-                      />
+                      <img src={item.image_url} alt={item.name} className="size-8 rounded-lg object-contain bg-black/60 p-0.5 border border-white/10 shrink-0" />
                     ) : (
-                      <div className="size-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-muted-foreground font-bold text-[10px]">
+                      <div className="size-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-muted-foreground font-bold text-[10px]">
                         {item.brand?.substring(0, 2) || "POD"}
                       </div>
                     )}
-                    <div>
-                      <div className="font-bold text-white flex items-center gap-1.5 flex-wrap">
-                        <span>{item.brand} {item.name}</span>
+                    <div className="min-w-0">
+                      <div className="font-bold text-white text-xs truncate flex items-center gap-1.5">
+                        <span className="truncate">{item.brand} {item.name}</span>
                         {item.isDemo && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                            DEMO
-                          </span>
+                          <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">DEMO</span>
                         )}
                         {item.isPromotional && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 border border-red-500/40 animate-in fade-in">
-                            EM PROMOÇÃO {item.promoData?.discountPct ? `(-${item.promoData.discountPct}%)` : ""}
-                          </span>
+                          <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 border border-red-500/40 shrink-0">PROMO</span>
                         )}
                       </div>
-                      <span className="text-[10px] text-muted-foreground">
-                        {item.puffs ? `${item.puffs} puffs` : "Pod"}
-                      </span>
+                      <span className="text-[10px] text-muted-foreground">{item.puffs ? `${item.puffs} puffs` : "Pod"}</span>
                     </div>
                   </div>
                 </td>
-
-                {/* Sabor */}
-                <td className="p-3.5">
-                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white font-medium text-xs">
+                <td className="p-3">
+                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white font-medium text-xs truncate inline-block max-w-[120px]">
                     {item.flavor}
                   </span>
                 </td>
-
-                {/* Data de Entrada no Catálogo */}
-                <td className="p-3.5 text-muted-foreground text-[11px]">
-                  {item.formattedEntryDate}
-                </td>
-
-                {/* Dias Parado (Destaque Principal) */}
-                <td className="p-3.5 text-center">
-                  <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-xs">
-                    {item.diasParado} {item.diasParado === 1 ? "dia" : "dias"} parado
+                <td className="p-3 text-center">
+                  <span className="px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-xs whitespace-nowrap">
+                    {item.diasParado}d parado
                   </span>
                 </td>
-
-                {/* Estoque Atual */}
-                <td className="p-3.5 text-center">
-                  <span className="font-bold text-white bg-black/50 border border-white/10 px-2 py-0.5 rounded">
-                    {item.stock} un.
-                  </span>
+                <td className="p-3 text-center">
+                  <span className="font-bold text-white">{item.stock} un.</span>
                 </td>
-
-                {/* Preço de Venda (Mostra Preço Normal e Preço Promocional se ativo) */}
-                <td className="p-3.5 text-right font-bold">
+                <td className="p-3 text-right font-bold">
                   {item.isPromotional && item.promoData?.promoPrice && item.promoData.promoPrice < item.sellPrice ? (
                     <div className="flex flex-col items-end">
-                      <span className="text-[10px] text-muted-foreground line-through font-normal">
-                        R$ {item.sellPrice.toFixed(2)}
-                      </span>
-                      <span className="text-emerald-400 text-xs font-bold">
-                        R$ {item.promoData.promoPrice.toFixed(2)}
-                      </span>
+                      <span className="text-[10px] text-muted-foreground line-through font-normal">R$ {item.sellPrice.toFixed(2)}</span>
+                      <span className="text-emerald-400 text-xs font-bold">R$ {item.promoData.promoPrice.toFixed(2)}</span>
                     </div>
                   ) : (
-                    <span className="text-white text-xs">
-                      R$ {item.sellPrice.toFixed(2)}
-                    </span>
+                    <span className="text-white text-xs">R$ {item.sellPrice.toFixed(2)}</span>
                   )}
                 </td>
-
-                {/* Custo Unitário */}
-                <td className="p-3.5 text-right text-muted-foreground text-xs">
+                <td className="p-3 text-right text-muted-foreground text-xs">
                   {item.costPrice > 0 ? `R$ ${item.costPrice.toFixed(2)}` : "—"}
                 </td>
-
-                {/* Ações (Criar Oferta, Grupo VIP & Encerrar Promoção) */}
-                <td className="p-3.5 text-center">
-                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedOfferProduct(item)}
-                      className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 shadow-md shadow-amber-500/10"
-                    >
-                      <Tag className="size-3.5 text-black" />
-                      <span>{item.isPromotional ? "Editar Oferta" : "Criar Oferta"}</span>
+                <td className="p-3 text-center">
+                  <div className="flex items-center justify-center gap-1.5">
+                    <button type="button" onClick={() => setSelectedOfferProduct(item)} className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-[11px] transition-all cursor-pointer active:scale-95 flex items-center gap-1 shadow-sm">
+                      <Tag className="size-3 text-black" />
+                      <span>{item.isPromotional ? "Editar" : "Oferta"}</span>
                     </button>
-
                     {item.isPromotional && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedVipProduct(item)}
-                        className="px-2.5 py-1.5 rounded-xl font-bold text-xs bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-colors cursor-pointer flex items-center gap-1"
-                        title="Divulgar oferta no Grupo VIP"
-                      >
-                        <Crown className="size-3.5 text-amber-400" />
-                        <span>VIP</span>
-                      </button>
+                      <>
+                        <button type="button" onClick={() => setSelectedVipProduct(item)} className="px-2 py-1 rounded-lg font-bold text-[11px] bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-colors cursor-pointer" title="Divulgar oferta no Grupo VIP">
+                          <Crown className="size-3" />
+                        </button>
+                        <button type="button" onClick={() => handleTogglePromotion(item)} className="px-2 py-1 rounded-lg font-semibold text-[11px] border bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30 transition-colors cursor-pointer" title="Encerrar promoção">
+                          ✕
+                        </button>
+                      </>
                     )}
-
-                    {item.isPromotional ? (
-                      <button
-                        type="button"
-                        onClick={() => handleTogglePromotion(item)}
-                        className="px-2.5 py-1.5 rounded-xl font-semibold text-xs border bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30 transition-colors cursor-pointer"
-                        title="Encerrar promoção e voltar ao preço normal"
-                      >
-                        Encerrar
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleTogglePromotion(item)}
-                        className="px-2.5 py-1.5 rounded-xl font-semibold text-xs border bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white border-white/10 transition-colors cursor-pointer"
-                        title="Ativar promoção rápida (-15%)"
-                      >
-                        + Promo
+                    {!item.isPromotional && (
+                      <button type="button" onClick={() => handleTogglePromotion(item)} className="px-2 py-1 rounded-lg font-semibold text-[11px] border bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white border-white/10 transition-colors cursor-pointer" title="Ativar promoção rápida (-15%)">
+                        +Promo
                       </button>
                     )}
                   </div>
                 </td>
-
               </tr>
             ))}
-
             {filteredQueue.length === 0 && (
               <tr>
-                <td colSpan={8} className="p-12 text-center text-muted-foreground space-y-2">
-                  <PackageSearch className="size-8 mx-auto text-muted-foreground/30" />
+                <td colSpan={7} className="p-10 text-center text-muted-foreground space-y-2">
+                  <PackageSearch className="size-7 mx-auto text-muted-foreground/30" />
                   <p className="text-sm font-semibold text-white">Nenhum produto parado há 7 dias ou mais.</p>
-                  <p className="text-xs text-muted-foreground">
-                    Todos os produtos em estoque estão com giro ativo ou entraram recentemente no catálogo.
-                  </p>
+                  <p className="text-xs text-muted-foreground">Todos os produtos estão com giro ativo.</p>
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* MOBILE: Cards empilhados */}
+      <div className="md:hidden space-y-3">
+        {filteredQueue.length === 0 && (
+          <div className="bg-[#141414] border border-white/10 rounded-2xl p-8 text-center space-y-2">
+            <PackageSearch className="size-7 mx-auto text-muted-foreground/30" />
+            <p className="text-sm font-semibold text-white">Nenhum produto parado.</p>
+          </div>
+        )}
+        {filteredQueue.map((item, idx) => (
+          <div key={item.id} className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-3">
+            {/* Linha 1: Produto */}
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-bold text-muted-foreground shrink-0">#{idx + 1}</span>
+              {item.image_url ? (
+                <img src={item.image_url} alt={item.name} className="size-10 rounded-lg object-contain bg-black/60 p-0.5 border border-white/10 shrink-0" />
+              ) : (
+                <div className="size-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-muted-foreground font-bold text-[10px]">
+                  {item.brand?.substring(0, 2) || "POD"}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="font-bold text-white text-sm truncate">{item.brand} {item.name}</div>
+                <div className="text-xs text-muted-foreground truncate">{item.flavor}</div>
+              </div>
+              <span className="px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[11px] shrink-0">
+                {item.diasParado}d
+              </span>
+            </div>
+            {/* Linha 2: Métricas */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-black/30 rounded-lg px-2 py-1.5">
+                <span className="text-[9px] text-muted-foreground uppercase block">Estoque</span>
+                <span className="text-xs font-bold text-white">{item.stock} un.</span>
+              </div>
+              <div className="bg-black/30 rounded-lg px-2 py-1.5">
+                <span className="text-[9px] text-muted-foreground uppercase block">Preço</span>
+                {item.isPromotional && item.promoData?.promoPrice ? (
+                  <span className="text-xs font-bold text-emerald-400">R$ {item.promoData.promoPrice.toFixed(2)}</span>
+                ) : (
+                  <span className="text-xs font-bold text-white">R$ {item.sellPrice.toFixed(2)}</span>
+                )}
+              </div>
+              <div className="bg-black/30 rounded-lg px-2 py-1.5">
+                <span className="text-[9px] text-muted-foreground uppercase block">Custo</span>
+                <span className="text-xs font-bold text-muted-foreground">{item.costPrice > 0 ? `R$ ${item.costPrice.toFixed(2)}` : "—"}</span>
+              </div>
+            </div>
+            {/* Linha 3: Badges + Ações */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                {item.isDemo && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">DEMO</span>
+                )}
+                {item.isPromotional && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 border border-red-500/40">EM PROMOÇÃO</span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button type="button" onClick={() => setSelectedOfferProduct(item)} className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-1">
+                  <Tag className="size-3" />
+                  <span>{item.isPromotional ? "Editar" : "Oferta"}</span>
+                </button>
+                {item.isPromotional && (
+                  <button type="button" onClick={() => handleTogglePromotion(item)} className="px-2.5 py-1.5 rounded-lg font-semibold text-xs border bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30 transition-colors cursor-pointer">
+                    Encerrar
+                  </button>
+                )}
+                {!item.isPromotional && (
+                  <button type="button" onClick={() => handleTogglePromotion(item)} className="px-2.5 py-1.5 rounded-lg font-semibold text-xs border bg-white/5 hover:bg-white/10 text-muted-foreground border-white/10 transition-colors cursor-pointer">
+                    +Promo
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Modal de Criar Oferta de Queima de Estoque */}
