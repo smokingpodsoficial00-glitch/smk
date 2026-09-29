@@ -709,7 +709,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                  Planejador de Estoque, Reposição & Metas
+                  Planejador de Estoque & Reposição
                 </h3>
                 <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
                   {totalUnitsInOrder} Peças no Pedido
@@ -730,118 +730,35 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
           </button>
         </div>
 
-        {/* ─── NAVEGAÇÃO DE ABAS ─── */}
+        {/* ─── BARRA DE TOPO DO PEDIDO ATIVO ─── */}
         <div className="flex flex-wrap items-center justify-between border-b border-white/10 px-5 bg-[#0d0d0d] gap-2">
           <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setActiveTab("order")}
-              className={`flex items-center gap-2 py-3 px-3.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
-                activeTab === "order"
-                  ? "border-emerald-400 text-emerald-400"
-                  : "border-transparent text-muted-foreground hover:text-white"
-              }`}
-            >
+            <div className="flex items-center gap-2 py-3 px-3.5 text-xs font-semibold border-b-2 border-emerald-400 text-emerald-400">
               <ShoppingCart className="size-3.5" />
               <span>Pedido Ativo & WhatsApp</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("goals")}
-              className={`flex items-center gap-2 py-3 px-3.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
-                activeTab === "goals"
-                  ? "border-emerald-400 text-emerald-400"
-                  : "border-transparent text-muted-foreground hover:text-white"
-              }`}
-            >
-              <Target className="size-3.5" />
-              <span>Metas & Termômetro de Caixa</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("contingency")}
-              className={`flex items-center gap-2 py-3 px-3.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
-                activeTab === "contingency"
-                  ? "border-emerald-400 text-emerald-400"
-                  : "border-transparent text-muted-foreground hover:text-white"
-              }`}
-            >
-              <ShieldCheck className="size-3.5" />
-              <span>Matriz de Substitutos</span>
-            </button>
+            </div>
           </div>
 
-          {/* Ações de Topo para Pedido e Metas */}
-          {activeTab === "order" && (
-            <div className="py-2 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowAddPodForm(!showAddPodForm)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95"
-              >
-                <Plus className="size-3.5 text-black" />
-                <span>Adicionar Produto</span>
-              </button>
-            </div>
-          )}
-
-          {activeTab === "goals" && (
-            <div className="py-2 flex items-center gap-2">
-              {savedSuccessAlert && (
-                <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 animate-in fade-in">
-                  <CheckCircle2 className="size-3.5" /> Metas salvas!
-                </span>
-              )}
-              {!isEditingGoals ? (
-                <button
-                  type="button"
-                  onClick={() => setIsEditingGoals(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95"
-                >
-                  <Edit3 className="size-3.5 text-black" />
-                  <span>Editar Todos os Gatilhos & Metas</span>
-                </button>
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleResetGoals}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium border border-red-500/20 transition-colors cursor-pointer"
-                  >
-                    <RotateCcw className="size-3" />
-                    <span>Padrão</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingGoals(false)}
-                    className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-medium transition-colors cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveGoals}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95"
-                  >
-                    <Save className="size-3.5 text-black" />
-                    <span>Salvar Alterações</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Ação de Topo para Adicionar Produto ao Pedido */}
+          <div className="py-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAddPodForm(!showAddPodForm)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95"
+            >
+              <Plus className="size-3.5 text-black" />
+              <span>Adicionar Produto</span>
+            </button>
+          </div>
         </div>
 
         {/* ─── CONTEÚDO PRINCIPAL (SCROLLÁVEL) ─── */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 custom-scrollbar">
 
           {/* ════════════════════════════════════════════════════════════
-              ABA 1: PEDIDO ATIVO & WHATSAPP (ESTRUTURA HORIZONTAL LIMPA)
+              PEDIDO ATIVO & WHATSAPP (ESTRUTURA HORIZONTAL LIMPA)
           ════════════════════════════════════════════════════════════ */}
-          {activeTab === "order" && (
-            <div className="space-y-4">
+          <div className="space-y-4">
 
               {/* Formulário Retrátil Inteligente para Adicionar Novo Pod ao Pedido */}
               {showAddPodForm && (
@@ -1336,321 +1253,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                 </div>
               </div>
 
-            </div>
-          )}
-
-          {/* ════════════════════════════════════════════════════════════
-              ABA 2: METAS & TERMÔMETRO DE CAIXA (ESTILO MINIMALISTA)
-          ════════════════════════════════════════════════════════════ */}
-          {activeTab === "goals" && (
-            <div className="space-y-4">
-
-              {/* Banner de Saldo e Patrimônio Total */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-[#141414] border border-white/10 rounded-xl p-3.5 space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
-                    CAIXA EM MÃOS
-                  </span>
-                  <div className="text-xl font-bold text-emerald-400">
-                    R$ {activeCash.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                  </div>
-                  <span className="text-[10px] text-muted-foreground block">Disponível para compras</span>
-                </div>
-
-                <div className="bg-[#141414] border border-white/10 rounded-xl p-3.5 space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
-                    ESTOQUE EM PRATELEIRA
-                  </span>
-                  <div className="text-xl font-bold text-white">
-                    R$ {stockRetailValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                  </div>
-                  <span className="text-[10px] text-muted-foreground block">
-                    {totalPodsInStock} pods a preço de venda
-                  </span>
-                </div>
-
-                <div className="bg-[#141414] border border-white/10 rounded-xl p-3.5 space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
-                    PATRIMÔNIO LÍQUIDO TOTAL
-                  </span>
-                  <div className="text-xl font-bold text-white">
-                    R$ {totalEquity.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                  </div>
-                  <span className="text-[10px] text-muted-foreground block">Caixa + Valor dos Pods</span>
-                </div>
-              </div>
-
-              {/* GATILHO #1: META DO LOTE DE COMPRA (COMPACTO) */}
-              <div className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Zap className="size-4 text-emerald-400 shrink-0" />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-xs font-bold text-white">
-                          Gatilho de Recompra: Lote Mínimo de R$ {activeReorderGoal.toLocaleString("pt-BR")}
-                        </h4>
-                        {!isEditingGoals && (
-                          <button
-                            type="button"
-                            onClick={() => setIsEditingGoals(true)}
-                            className="text-[10px] font-semibold text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer"
-                          >
-                            <Edit3 className="size-2.5" />
-                            <span>Ajustar</span>
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Diluição de frete de SP para ~R$ 2,94/pod
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right flex items-center gap-3 self-end sm:self-center">
-                    {isEditingGoals && (
-                      <div className="flex items-center gap-1 bg-black/60 border border-emerald-500/40 rounded px-2 py-0.5">
-                        <span className="text-xs font-bold text-emerald-400">R$</span>
-                        <input
-                          type="number"
-                          value={tempGoals.reorderCashGoal}
-                          onChange={(e) => setTempGoals({ ...tempGoals, reorderCashGoal: Number(e.target.value) || 0 })}
-                          className="w-20 bg-transparent text-xs font-bold text-white focus:outline-none"
-                        />
-                      </div>
-                    )}
-                    <span className="text-xs font-bold text-emerald-400">
-                      {reorderProgressPct}% Concluído
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
-                    <div
-                      className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                      style={{ width: `${reorderProgressPct}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                    <span>R$ {activeCash.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} acumulados</span>
-                    <span>Meta: R$ {activeReorderGoal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
-                  </div>
-                </div>
-
-                <div className="bg-black/30 border border-white/5 rounded-lg p-2.5 flex items-center justify-between gap-2 text-xs">
-                  <span className="text-muted-foreground">
-                    {cashNeededForReorder > 0 ? (
-                      <>Faltam <strong className="text-emerald-400">R$ {cashNeededForReorder.toFixed(2)}</strong> em vendas (~{podsNeededToSell} pods) para acionar a compra.</>
-                    ) : (
-                      <strong className="text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                        <CheckCircle2 className="size-3.5 text-emerald-400 inline" />
-                        META ATINGIDA — Saldo suficiente para o lote de R$ {activeReorderGoal.toLocaleString("pt-BR")}
-                      </strong>
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("order")}
-                    className="px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-semibold border border-emerald-500/20 transition-colors shrink-0 cursor-pointer"
-                  >
-                    Ver Pedido
-                  </button>
-                </div>
-              </div>
-
-              {/* GATILHO #2: TRANSIÇÃO DE ESCALA / PARAGUAI */}
-              <div className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Target className="size-4 text-white shrink-0" />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-xs font-bold text-white">
-                          Meta de Transição / Escala: R$ {activeParaguayGoal.toLocaleString("pt-BR")}
-                        </h4>
-                        {!isEditingGoals && (
-                          <button
-                            type="button"
-                            onClick={() => setIsEditingGoals(true)}
-                            className="text-[10px] font-semibold text-muted-foreground hover:text-white flex items-center gap-0.5 cursor-pointer"
-                          >
-                            <Edit3 className="size-2.5" />
-                            <span>Ajustar</span>
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Destrava compras diretas (+30% a +40% de margem líquida com freteiro)
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right flex items-center gap-3 self-end sm:self-center">
-                    {isEditingGoals && (
-                      <div className="flex items-center gap-1 bg-black/60 border border-white/20 rounded px-2 py-0.5">
-                        <span className="text-xs font-bold text-white">R$</span>
-                        <input
-                          type="number"
-                          value={tempGoals.paraguayScaleGoal}
-                          onChange={(e) => setTempGoals({ ...tempGoals, paraguayScaleGoal: Number(e.target.value) || 0 })}
-                          className="w-20 bg-transparent text-xs font-bold text-white focus:outline-none"
-                        />
-                      </div>
-                    )}
-                    <span className="text-xs font-semibold text-white">
-                      {paraguayProgressPct}% Concluído
-                    </span>
-                  </div>
-                </div>
-
-                <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
-                  <div
-                    className="h-full bg-white/40 rounded-full transition-all duration-300"
-                    style={{ width: `${paraguayProgressPct}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* PAINEL DE METAS PERIÓDICAS (MENSAL, TRIMESTRAL, ANUAL) */}
-              <div className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="size-4 text-emerald-400" />
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                    Metas Estratégicas Periódicas
-                  </h4>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="border border-white/10 rounded-lg p-3 bg-black/30 space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">META MENSAL</span>
-                    {isEditingGoals ? (
-                      <div className="flex items-center gap-1 bg-black/50 border border-white/20 rounded px-2 py-0.5">
-                        <span className="text-xs font-bold text-white">R$</span>
-                        <input
-                          type="number"
-                          value={tempGoals.monthlyRevenueGoal}
-                          onChange={(e) => setTempGoals({ ...tempGoals, monthlyRevenueGoal: Number(e.target.value) || 0 })}
-                          className="w-full bg-transparent text-xs font-bold text-white focus:outline-none"
-                        />
-                      </div>
-                    ) : (
-                      <div className="text-base font-bold text-white">
-                        R$ {goals.monthlyRevenueGoal.toLocaleString("pt-BR")}
-                      </div>
-                    )}
-                    <span className="text-[10px] text-muted-foreground block">
-                      ~{Math.round((isEditingGoals ? tempGoals.monthlyRevenueGoal : goals.monthlyRevenueGoal) / 85)} pods/mês
-                    </span>
-                  </div>
-
-                  <div className="border border-white/10 rounded-lg p-3 bg-black/30 space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">META TRIMESTRAL</span>
-                    {isEditingGoals ? (
-                      <div className="flex items-center gap-1 bg-black/50 border border-white/20 rounded px-2 py-0.5">
-                        <span className="text-xs font-bold text-white">R$</span>
-                        <input
-                          type="number"
-                          value={tempGoals.quarterlyRevenueGoal}
-                          onChange={(e) => setTempGoals({ ...tempGoals, quarterlyRevenueGoal: Number(e.target.value) || 0 })}
-                          className="w-full bg-transparent text-xs font-bold text-white focus:outline-none"
-                        />
-                      </div>
-                    ) : (
-                      <div className="text-base font-bold text-white">
-                        R$ {goals.quarterlyRevenueGoal.toLocaleString("pt-BR")}
-                      </div>
-                    )}
-                    <span className="text-[10px] text-muted-foreground block">Escala contínua</span>
-                  </div>
-
-                  <div className="border border-white/10 rounded-lg p-3 bg-black/30 space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-emerald-400 block">META ANUAL</span>
-                    {isEditingGoals ? (
-                      <div className="flex items-center gap-1 bg-black/50 border border-emerald-500/40 rounded px-2 py-0.5">
-                        <span className="text-xs font-bold text-emerald-400">R$</span>
-                        <input
-                          type="number"
-                          value={tempGoals.annualRevenueGoal}
-                          onChange={(e) => setTempGoals({ ...tempGoals, annualRevenueGoal: Number(e.target.value) || 0 })}
-                          className="w-full bg-transparent text-xs font-bold text-emerald-400 focus:outline-none"
-                        />
-                      </div>
-                    ) : (
-                      <div className="text-base font-bold text-emerald-400">
-                        R$ {goals.annualRevenueGoal.toLocaleString("pt-BR")}
-                      </div>
-                    )}
-                    <span className="text-[10px] text-muted-foreground block">Consolidação de mercado</span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* ════════════════════════════════════════════════════════════
-              ABA 3: MATRIZ DE SUBSTITUTOS DE FORNECEDOR (LIMPA)
-          ════════════════════════════════════════════════════════════ */}
-          {activeTab === "contingency" && (
-            <div className="space-y-4">
-              <div className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-4">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="size-4 text-emerald-400 shrink-0" />
-                  <div>
-                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                      Guia de Contingência: Substituição de Produtos
-                    </h4>
-                    <p className="text-[11px] text-muted-foreground">
-                      Regras práticas caso faltem modelos ou sabores com o fornecedor
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="border border-white/10 rounded-lg p-3.5 bg-black/30 space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-red-400 shrink-0" />
-                      <h5 className="text-xs font-bold text-white">Se faltar Elfbar BC15K</h5>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Substituir imediatamente por <strong className="text-white">Ignite V55 Ultra Thin</strong> (R$ 52), <strong className="text-white">Lost Mary OS5000</strong> ou <strong className="text-white">Elfbar BC5000</strong> para manter o ticket baixo e alto giro.
-                    </p>
-                  </div>
-
-                  <div className="border border-white/10 rounded-lg p-3.5 bg-black/30 space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-cyan-400 shrink-0" />
-                      <h5 className="text-xs font-bold text-white">Se faltar Elfbar Ice King 40K</h5>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Substituir por <strong className="text-white">Elfbar TE30K</strong> (R$ 65), <strong className="text-white">Lost Mary 30K</strong> ou <strong className="text-white">Oxbar Magic Maze 30K</strong> para manter o apelo de alta contagem de puffs e tela.
-                    </p>
-                  </div>
-
-                  <div className="border border-white/10 rounded-lg p-3.5 bg-black/30 space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-amber-400 shrink-0" />
-                      <h5 className="text-xs font-bold text-white">Se faltar Ignite V500 ou V80</h5>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Substituir por <strong className="text-white">Ignite V50 clássico</strong> (R$ 65) ou <strong className="text-white">Ignite V250</strong> (R$ 68), garantindo que a marca Ignite tenha sempre opções ativas no cardápio.
-                    </p>
-                  </div>
-
-                  <div className="border border-white/10 rounded-lg p-3.5 bg-black/30 space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-emerald-400 shrink-0" />
-                      <h5 className="text-xs font-bold text-white">Regra de Ouro dos Sabores</h5>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Priorizar sempre a grade Ice: <em className="text-white font-medium">Watermelon Ice, Blueberry Ice, Grape Ice, Menthol/Spearmint, Strawberry Kiwi e Miami Mint</em> (Zero Encalhe).
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          </div>
 
         </div>
 
@@ -1658,7 +1261,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
         <div className="px-5 py-3 border-t border-white/10 bg-[#0d0d0d] flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <ShieldCheck className="size-3.5 text-emerald-400" />
-            <span className="text-[11px]">Diretriz Salva no Obsidian: Cérebro Smoking Pods</span>
+            <span className="text-[11px]">Entrada automática sincronizada com Estoque e Financeiro</span>
           </div>
           <button
             type="button"
