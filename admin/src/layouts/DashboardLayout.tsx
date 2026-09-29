@@ -24,7 +24,7 @@ export function DashboardLayout() {
   const location = useLocation();
 
   // Fecha a gaveta mobile automaticamente ao trocar de rota
-  // E no celular (< 768px), redireciona abas exclusivas de PC (/pedidos, /clientes, /marketing, /tarefas, /gestao-saas) para /financeiro
+  // E no celular (< 768px), redireciona abas exclusivas de PC (/pedidos, /marketing, /tarefas, /gestao-saas) para /financeiro
   useEffect(() => {
     setMobileMenuOpen(false);
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
@@ -32,7 +32,6 @@ export function DashboardLayout() {
       const isDesktopOnlyRoute =
         p === '/' ||
         p.startsWith('/pedidos') ||
-        p.startsWith('/clientes') ||
         p.startsWith('/marketing') ||
         p.startsWith('/tarefas') ||
         p.startsWith('/gestao-saas');
@@ -52,7 +51,7 @@ export function DashboardLayout() {
     if (p.includes('/pedidos')) return 'Pedidos';
     if (p.includes('/financeiro')) return 'Financeiro';
     if (p.includes('/estoque')) return 'Estoque';
-    if (p.includes('/clientes')) return 'CRM & Clientes';
+    if (p.includes('/clientes')) return 'CRM & Últimas Vendas';
     if (p.includes('/marketing')) return 'Marketing';
     if (p.includes('/socios')) return 'Sócios & Equity';
     if (p.includes('/tarefas')) return 'Tarefas (QG)';
@@ -131,10 +130,11 @@ export function DashboardLayout() {
             </NavLink>
           )}
 
-          {/* CRM: Somente no Computador */}
-          {!isMobileDrawer && canAccess('clientes') && (
+          {/* CRM: Computador e Celular (Versão Simplificada no Mobile) */}
+          {canAccess('clientes') && (
             <NavLink 
               to="/clientes"
+              onClick={() => isMobileDrawer && setMobileMenuOpen(false)}
               title={collapsed ? "CRM" : undefined}
               className={({ isActive }) =>
                 `flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
@@ -532,13 +532,13 @@ export function DashboardLayout() {
         <Outlet />
       </main>
 
-      {/* ━━━ BARRA DE NAVEGAÇÃO INFERIOR ESTILO APP (Somente Mobile: Financeiro, Estoque, Sócios, Menu) ━━━━━━━ */}
-      <nav className="md:hidden h-16 px-2 bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-white/10 flex items-center justify-around shrink-0 z-30 select-none">
+      {/* ━━━ BARRA DE NAVEGAÇÃO INFERIOR ESTILO APP (Somente Mobile: Financeiro, Estoque, CRM, Sócios, Menu) ━━━━━━━ */}
+      <nav className="md:hidden h-16 px-1.5 bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-white/10 flex items-center justify-around shrink-0 z-30 select-none">
         {canAccess('financeiro') && (
           <NavLink
             to="/financeiro"
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center gap-1 py-1.5 px-3.5 rounded-xl text-[10px] font-bold transition-all ${
+              `flex flex-col items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl text-[10px] font-bold transition-all ${
                 isActive ? 'text-emerald-400 bg-emerald-500/10' : 'text-white/50 hover:text-white'
               }`
             }
@@ -552,7 +552,7 @@ export function DashboardLayout() {
           <NavLink
             to="/estoque"
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center gap-1 py-1.5 px-3.5 rounded-xl text-[10px] font-bold transition-all ${
+              `flex flex-col items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl text-[10px] font-bold transition-all ${
                 isActive ? 'text-emerald-400 bg-emerald-500/10' : 'text-white/50 hover:text-white'
               }`
             }
@@ -562,11 +562,25 @@ export function DashboardLayout() {
           </NavLink>
         )}
 
+        {canAccess('clientes') && (
+          <NavLink
+            to="/clientes"
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl text-[10px] font-bold transition-all ${
+                isActive ? 'text-emerald-400 bg-emerald-500/10' : 'text-white/50 hover:text-white'
+              }`
+            }
+          >
+            <Users className="size-4" />
+            <span>CRM</span>
+          </NavLink>
+        )}
+
         {canAccess('socios') && (
           <NavLink
             to="/socios"
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center gap-1 py-1.5 px-3.5 rounded-xl text-[10px] font-bold transition-all ${
+              `flex flex-col items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl text-[10px] font-bold transition-all ${
                 isActive ? 'text-emerald-400 bg-emerald-500/10' : 'text-white/50 hover:text-white'
               }`
             }
@@ -579,7 +593,7 @@ export function DashboardLayout() {
         <button
           type="button"
           onClick={() => setMobileMenuOpen(true)}
-          className="flex flex-col items-center justify-center gap-1 py-1.5 px-3.5 rounded-xl text-[10px] font-bold text-white/60 hover:text-white transition-all cursor-pointer"
+          className="flex flex-col items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl text-[10px] font-bold text-white/60 hover:text-white transition-all cursor-pointer"
         >
           <Menu className="size-4" />
           <span>Menu</span>
