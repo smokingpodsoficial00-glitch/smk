@@ -137,7 +137,7 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
     // 2. "Ocultar variantes esgotadas"
     const hideVariants = Boolean(config?.hide_out_of_stock_variants);
 
-    const map = new Map<string, PodModel>();
+    const map = new Map<string, { model: PodModel; rawVariants: Product[] }>();
     for (const p of productList) {
       // 1. Soberania estrita da ocultação manual por produto/variante
       if (!p.is_active) continue;
@@ -147,25 +147,40 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
 
       if (!map.has(groupKey)) {
         map.set(groupKey, {
-          name: modelDisplayName,
-          brand: p.brand,
-          puffs: p.puffs,
-          price: p.price,
-          variants: []
+          model: {
+            name: modelDisplayName,
+            brand: p.brand,
+            puffs: p.puffs,
+            price: p.price,
+            image_url: p.image_url || "",
+            variants: []
+          },
+          rawVariants: []
         });
       }
-      map.get(groupKey)!.variants.push(p);
+      const entry = map.get(groupKey)!;
+      entry.rawVariants.push(p);
+      if (!entry.model.image_url && p.image_url) {
+        entry.model.image_url = p.image_url;
+      }
     }
 
     const result: PodModel[] = [];
 
-    for (const m of map.values()) {
-      const realFlavors = m.variants.filter(v => {
+    for (const { model: m, rawVariants } of map.values()) {
+      const realFlavors = rawVariants.filter(v => {
         const f = (v.flavor || '').trim().toLowerCase();
         return f !== 'padrão' && f !== 'padrao' && f !== '';
       });
 
-      const baseVariants = realFlavors.length > 0 ? realFlavors : m.variants;
+      const baseVariants = realFlavors.length > 0 ? realFlavors : rawVariants;
+
+      // Preserva a imagem real original cadastrada do produto (mesmo se esgotado ou filtrado)
+      const modelImage = 
+        baseVariants.find(v => !!v.image_url)?.image_url || 
+        rawVariants.find(v => !!v.image_url)?.image_url || 
+        m.image_url || 
+        "";
 
       // Verifica se o modelo possui ao menos 1 variante ativa com estoque disponível (> 0)
       const hasAvailableVariant = baseVariants.some(v => (v.stock || 0) > 0);
@@ -185,7 +200,7 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
         : baseVariants;
 
       // Identificar categorias do modelo
-      const firstVariant = m.variants[0];
+      const firstVariant = rawVariants[0];
       const modelKeyStandard = `${m.brand.toLowerCase()}__${m.name.toLowerCase()}`;
       const modelKeyAlternative = firstVariant ? `${m.brand.toLowerCase()}__${firstVariant.name.toLowerCase()}` : '';
 
@@ -214,6 +229,8 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
         original_price: hasAnyPromo && maxOriginalPrice > minPrice ? maxOriginalPrice : undefined,
         is_promotional: hasAnyPromo,
         discount_pct: maxDiscountPct,
+        image_url: modelImage,
+        allVariants: baseVariants,
         variants: displayedVariants,
         categories: matchedCategories,
         displayOrder: modelDisplayOrder

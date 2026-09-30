@@ -25,7 +25,9 @@ export interface PodModel {
   original_price?: number;
   is_promotional?: boolean;
   discount_pct?: number;
+  image_url?: string;
   variants: Product[];
+  allVariants?: Product[];
   categories?: Array<{ id: string; name: string; slug: string; badge_text: string }>;
   displayOrder?: number;
 }

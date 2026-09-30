@@ -1892,15 +1892,16 @@ export default function SupplyChainDashboard() {
             />
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-white/5 pt-2">
-            {/* Filtros por Marca */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 custom-scrollbar">
+          {/* Filtros por Marca (Horizontal Scrollable, nunca comprimido) */}
+          <div className="w-full min-w-0 border-t border-white/5 pt-2">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar w-full min-w-0">
               <button
+                type="button"
                 onClick={() => setSelectedBrand(null)}
-                className={`px-2.5 py-1 rounded text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
+                className={`shrink-0 px-2.5 py-1 rounded text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
                   !selectedBrand
-                    ? "bg-white text-black font-bold"
-                    : "bg-white/5 text-muted-foreground hover:text-white"
+                    ? "bg-white text-black font-bold shadow-sm"
+                    : "bg-white/5 text-muted-foreground hover:text-white hover:bg-white/10"
                 }`}
               >
                 Todas as Marcas
@@ -1908,20 +1909,23 @@ export default function SupplyChainDashboard() {
               {availableBrands.map(b => (
                 <button
                   key={b}
+                  type="button"
                   onClick={() => setSelectedBrand(selectedBrand === b ? null : b)}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
+                  className={`shrink-0 px-2.5 py-1 rounded text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
                     selectedBrand === b
-                      ? "bg-white text-black font-bold"
-                      : "bg-white/5 text-muted-foreground hover:text-white"
+                      ? "bg-white text-black font-bold shadow-sm"
+                      : "bg-white/5 text-muted-foreground hover:text-white hover:bg-white/10"
                   }`}
                 >
                   {b}
                 </button>
               ))}
             </div>
+          </div>
 
-            {/* Filtros de Status de Estoque (4 Opções Limpas Sem Emojis) */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 custom-scrollbar text-xs">
+          {/* Filtros de Status de Estoque (Horizontal Scrollable, 4 Opções Limpas) */}
+          <div className="w-full min-w-0 border-t border-white/5 pt-2">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar w-full min-w-0 text-xs">
               {[
                 { id: "TODOS", label: "Todos" },
                 { id: "EM_ESTOQUE", label: "Em estoque" },
@@ -1930,11 +1934,12 @@ export default function SupplyChainDashboard() {
               ].map(tab => (
                 <button
                   key={tab.id}
+                  type="button"
                   onClick={() => setFilterTab(tab.id as any)}
-                  className={`px-2.5 py-1 rounded font-medium transition-all whitespace-nowrap cursor-pointer ${
+                  className={`shrink-0 px-3 py-1 rounded font-medium transition-all whitespace-nowrap cursor-pointer ${
                     filterTab === tab.id
-                      ? "bg-white text-black font-bold"
-                      : "bg-white/5 text-muted-foreground hover:text-white"
+                      ? "bg-white text-black font-bold shadow-sm"
+                      : "bg-white/5 text-muted-foreground hover:text-white hover:bg-white/10"
                   }`}
                 >
                   {tab.label}

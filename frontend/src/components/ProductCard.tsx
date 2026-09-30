@@ -10,9 +10,10 @@ const brandImages: Record<string, string> = {
 };
 
 export function ProductCard({ model, onClick }: { model: PodModel; onClick: () => void }) {
-  const outOfStock = model.variants.length === 0 || model.variants.every(v => (v.stock || 0) <= 0);
-  const variantWithImage = model.variants.find(v => !!v.image_url);
-  const image = variantWithImage?.image_url || brandImages[model.brand] || vapeIgnite;
+  const allVars = model.allVariants && model.allVariants.length > 0 ? model.allVariants : model.variants;
+  const outOfStock = allVars.length === 0 || allVars.every(v => (v.stock || 0) <= 0);
+  const variantWithImage = model.variants.find(v => !!v.image_url) || model.allVariants?.find(v => !!v.image_url);
+  const image = model.image_url || variantWithImage?.image_url || brandImages[model.brand] || vapeIgnite;
   const flavorsCount = model.variants.length;
 
   const primaryCategory = model.categories && model.categories.length > 0 ? model.categories[0] : null;
