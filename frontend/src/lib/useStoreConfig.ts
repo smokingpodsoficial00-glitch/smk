@@ -15,6 +15,7 @@ export interface StoreConfig {
   address: string;
   instagram_url: string;
   description: string;
+  auto_hide_out_of_stock?: boolean;
 }
 
 const DEFAULT_CONFIG: StoreConfig = {
@@ -30,6 +31,7 @@ const DEFAULT_CONFIG: StoreConfig = {
   address: "",
   instagram_url: "",
   description: "",
+  auto_hide_out_of_stock: false,
 };
 
 // Limpa chave legada não escopada que causava contaminação cruzada
@@ -125,16 +127,22 @@ async function fetchConfig(): Promise<StoreConfig> {
   }
 
   // 3. Tentar ler da tabela `companies` para a empresa correta
+  let companyAutoHide: boolean | undefined = undefined;
   try {
     const { data: compData } = await supabase
       .from("companies")
-      .select("name, logo_url")
+      .select("name, logo_url, payment_gateway")
       .eq("id", companyId)
       .maybeSingle();
 
-    if (compData && compData.name) {
-      if (mainConfig) mainConfig.store_name = compData.name;
-      if (fallbackConfig) fallbackConfig.store_name = compData.name;
+    if (compData) {
+      if (compData.name) {
+        if (mainConfig) mainConfig.store_name = compData.name;
+        if (fallbackConfig) fallbackConfig.store_name = compData.name;
+      }
+      if (compData.payment_gateway && typeof compData.payment_gateway === "object") {
+        companyAutoHide = Boolean(compData.payment_gateway.auto_hide_out_of_stock);
+      }
     }
   } catch (e) {}
 
@@ -156,6 +164,9 @@ async function fetchConfig(): Promise<StoreConfig> {
   }
 
   let finalConfig: StoreConfig = mainConfig || fallbackConfig || local;
+  if (companyAutoHide !== undefined) {
+    finalConfig.auto_hide_out_of_stock = companyAutoHide;
+  }
 
   const bestLogo = mainConfig?.logo_url || fallbackConfig?.logo_url || local.logo_url;
   if (bestLogo) {
@@ -196,6 +207,11 @@ export function useStoreConfig() {
         .on(
           "postgres_changes" as any,
           { event: "*", schema: "public", table: "store_config" },
+          () => { fetchConfig().then(result => setConfig(result)); }
+        )
+        .on(
+          "postgres_changes" as any,
+          { event: "*", schema: "public", table: "companies" },
           () => { fetchConfig().then(result => setConfig(result)); }
         )
         .on(

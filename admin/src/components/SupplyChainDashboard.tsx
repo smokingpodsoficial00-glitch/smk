@@ -33,6 +33,11 @@ export default function SupplyChainDashboard() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // ─── Visibilidade Automática no Catálogo por Estoque ──
+  const [autoHideOutOfStock, setAutoHideOutOfStock] = useState<boolean>(false);
+  const [isSavingVisibility, setIsSavingVisibility] = useState<boolean>(false);
+  const [saveVisibilitySuccess, setSaveVisibilitySuccess] = useState<boolean>(false);
+
   // ─── Modal de Planejador de Reposição & Metas de Escala ──
   const [showReplenishmentModal, setShowReplenishmentModal] = useState(false);
   const [financialGoals, setFinancialGoals] = useState<FinancialGoals>(loadSavedGoals);
@@ -271,7 +276,7 @@ export default function SupplyChainDashboard() {
         : "id, name, brand, flavor, price, cost_price, stock, puffs, is_active, created_at, company_id";
 
       // Executa todas as consultas ao Supabase em paralelo para carregamento ultrarrápido
-      const [prodRes, ordersRes, costsMap, cats, catMapRes] = await Promise.all([
+      const [prodRes, ordersRes, costsMap, cats, catMapRes, compRes] = await Promise.all([
         supabase
           .from("smoking_products")
           .select(productsSelectCols)
@@ -286,11 +291,21 @@ export default function SupplyChainDashboard() {
           .neq("delivery_status", "CANCELADO"),
         fetchProductCostsMap(targetCompanyId),
         fetchCategories(),
-        fetchProductCategoryMappings(targetCompanyId)
+        fetchProductCategoryMappings(targetCompanyId),
+        supabase
+          .from("companies")
+          .select("payment_gateway")
+          .eq("id", targetCompanyId)
+          .maybeSingle()
       ]);
 
       const prodData = prodRes.data;
       const realOrders = ordersRes.data;
+      const compData = compRes?.data;
+
+      if (compData?.payment_gateway && typeof compData.payment_gateway === "object") {
+        setAutoHideOutOfStock(Boolean(compData.payment_gateway.auto_hide_out_of_stock));
+      }
 
       if (realOrders) {
         setRawOrdersList(realOrders);
@@ -1013,6 +1028,55 @@ export default function SupplyChainDashboard() {
     } catch (err) { fetchData(); }
   };
 
+  const handleToggleAutoHide = async () => {
+    const nextValue = !autoHideOutOfStock;
+    setAutoHideOutOfStock(nextValue);
+    setIsSavingVisibility(true);
+    setSaveVisibilitySuccess(false);
+
+    try {
+      const { data: compData } = await supabase
+        .from("companies")
+        .select("payment_gateway")
+        .eq("id", targetCompanyId)
+        .maybeSingle();
+
+      const currentGateway = (compData?.payment_gateway && typeof compData.payment_gateway === "object")
+        ? compData.payment_gateway
+        : {};
+
+      const updatedGateway = {
+        ...currentGateway,
+        auto_hide_out_of_stock: nextValue,
+      };
+
+      const { error } = await supabase
+        .from("companies")
+        .update({ payment_gateway: updatedGateway })
+        .eq("id", targetCompanyId);
+
+      if (error) throw error;
+
+      try {
+        const storageKey = `store_config_v5_${targetCompanyId}`;
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          parsed.auto_hide_out_of_stock = nextValue;
+          localStorage.setItem(storageKey, JSON.stringify(parsed));
+        }
+      } catch {}
+
+      setSaveVisibilitySuccess(true);
+      setTimeout(() => setSaveVisibilitySuccess(false), 3000);
+    } catch (err: any) {
+      console.error("Erro ao salvar visibilidade automática no Supabase:", err);
+      setAutoHideOutOfStock(!nextValue);
+    } finally {
+      setIsSavingVisibility(false);
+    }
+  };
+
   const handleDeleteProduct = async (id: string, flavorName: string) => {
     if (!confirm(`Tem certeza que deseja excluir o SKU "${flavorName}" permanentemente?`)) return;
     try {
@@ -1637,6 +1701,61 @@ export default function SupplyChainDashboard() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* ── CARD: VISIBILIDADE NO CATÁLOGO ──────────────────────── */}
+        <div className="bg-[#141414] border border-white/10 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className={`size-10 rounded-xl grid place-items-center shrink-0 border transition-all ${
+              autoHideOutOfStock 
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)]" 
+                : "bg-white/5 border-white/10 text-muted-foreground"
+            }`}>
+              {autoHideOutOfStock ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                  Visibilidade no catálogo
+                </span>
+                {saveVisibilitySuccess && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 animate-in fade-in">
+                    <CheckCircle2 className="size-3" />
+                    Configuração salva
+                  </span>
+                )}
+              </div>
+              <h3 className="text-sm font-semibold text-white mt-0.5">
+                Ocultar automaticamente itens sem estoque
+              </h3>
+              <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 max-w-xl">
+                Itens sem estoque são ocultados automaticamente do catálogo. A ocultação manual continua independente desta configuração.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+            <span className={`text-xs font-bold tracking-wider ${autoHideOutOfStock ? 'text-emerald-400' : 'text-white/40'}`}>
+              {autoHideOutOfStock ? 'ATIVADO' : 'DESATIVADO'}
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoHideOutOfStock}
+              disabled={isSavingVisibility}
+              onClick={handleToggleAutoHide}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                autoHideOutOfStock ? 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.4)]' : 'bg-white/20'
+              } ${isSavingVisibility ? 'opacity-60 cursor-not-allowed' : ''}`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  autoHideOutOfStock ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
         </div>
 

@@ -8,6 +8,7 @@ import { CartProvider } from "@/lib/cart";
 import type { SortOption } from "@/components/SortDropdown";
 import { fetchProductsFromSupabase, resolveCatalogCompanyId, getCatalogCompanyId, type Product, type PodModel } from "@/lib/products";
 import { fetchCategories, fetchProductCategoryMappings, DEFAULT_CATEGORIES, type Category } from "@/lib/categories";
+import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
 import { Loader2, Star } from "lucide-react";
 
@@ -80,6 +81,7 @@ function MainApp() {
 
 
 function Menu({ onBackToHub }: { onBackToHub: () => void }) {
+  const { config } = useStoreConfig();
   const [productList, setProductList] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [categoryMappings, setCategoryMappings] = useState<Record<string, { category_ids: string[]; display_order: number }>>({});
@@ -113,10 +115,13 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
   useEffect(() => {
     loadProducts();
 
-    // Inscrição em tempo real para atualizações no estoque e catálogo (smoking_products)
+    // Inscrição em tempo real para atualizações no estoque, catálogo e configurações
     const subscription = supabase
       .channel("public:realtime_menu")
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => {
+        loadProducts();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "companies" }, () => {
         loadProducts();
       })
       .subscribe();
@@ -127,9 +132,15 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
   }, []);
 
   const models = useMemo(() => {
+    const autoHide = Boolean(config?.auto_hide_out_of_stock);
     const map = new Map<string, PodModel>();
     for (const p of productList) {
+      // 1. Soberania da ocultação manual por produto/variante
       if (!p.is_active) continue;
+
+      // 2. Se a configuração global estiver ATIVADA, esconde variantes sem estoque (stock <= 0)
+      if (autoHide && (p.stock || 0) <= 0) continue;
+
       const modelDisplayName = p.name.toLowerCase().includes(p.brand.toLowerCase()) ? p.name : `${p.brand} ${p.name}`;
       const groupKey = `${p.brand}-${modelDisplayName}`.toLowerCase();
 
@@ -187,15 +198,18 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
         displayOrder: modelDisplayOrder
       };
     });
-  }, [productList, categories, categoryMappings]);
+  }, [productList, categories, categoryMappings, config?.auto_hide_out_of_stock]);
 
   const availableBrands = useMemo(() => {
+    const autoHide = Boolean(config?.auto_hide_out_of_stock);
     const set = new Set<string>();
     for (const p of productList) {
-      if (p.is_active && p.brand && p.brand.trim()) set.add(p.brand.trim());
+      if (!p.is_active) continue;
+      if (autoHide && (p.stock || 0) <= 0) continue;
+      if (p.brand && p.brand.trim()) set.add(p.brand.trim());
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [productList]);
+  }, [productList, config?.auto_hide_out_of_stock]);
 
   // Separar produtos com ⭐ (Mais Vendidos) e produtos normais sem duplicação
   const { topFeaturedModels, mainCatalogModels, isOnlyMaisVendidosMode } = useMemo(() => {

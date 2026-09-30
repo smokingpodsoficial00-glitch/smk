@@ -32,6 +32,7 @@ export interface StoreConfig {
   extra_km_fee?: number;
   instagram_url: string;
   description: string;
+  auto_hide_out_of_stock?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -54,6 +55,7 @@ const DEFAULT_SMOKING_PODS_CONFIG: StoreConfig = {
   extra_km_fee: 1.40,
   instagram_url: "",
   description: "",
+  auto_hide_out_of_stock: false,
 };
 
 function getDefaultConfigForCompany(companyId: string, companyName?: string): StoreConfig {
@@ -146,23 +148,32 @@ export async function fetchStoreConfig(targetCompanyId?: string, targetCompanyNa
     console.warn("Tabela store_config não acessível:", e);
   }
 
-  // 2. Tentar ler da tabela `companies` para garantir nome canônico no banco
+  // 2. Tentar ler da tabela `companies` para garantir nome canônico no banco e configurações adicionais
   let companyCanonicalName = targetCompanyName;
+  let companyAutoHide: boolean | undefined = undefined;
   try {
     const { data: compData } = await supabase
       .from("companies")
-      .select("name, logo_url, phone")
+      .select("name, logo_url, phone, payment_gateway")
       .eq("id", companyId)
       .maybeSingle();
 
-    if (compData && compData.name) {
-      companyCanonicalName = compData.name;
+    if (compData) {
+      if (compData.name) {
+        companyCanonicalName = compData.name;
+      }
+      if (compData.payment_gateway && typeof compData.payment_gateway === "object") {
+        companyAutoHide = Boolean(compData.payment_gateway.auto_hide_out_of_stock);
+      }
     }
   } catch (e) {}
 
   // 3. Fallback seguro isolado por empresa
   const local = getLocalFallback(companyId, companyCanonicalName);
   let finalConfig: StoreConfig = mainConfig || local;
+  if (companyAutoHide !== undefined) {
+    finalConfig.auto_hide_out_of_stock = companyAutoHide;
+  }
 
   // 🛡️ Blindagem estrita de identidade:
   if (companyId === OFFICIAL_SMOKING_PODS_COMPANY_ID) {
@@ -255,12 +266,12 @@ export function useStoreConfig(companyIdOverride?: string) {
       // 2. Salva na tabela dedicada `store_config` e na tabela `companies` no Supabase
       try {
         const supabase = await getSupabase();
-        const { id: _ignoreId, ...configWithoutId } = newConfig;
+        const { id: _ignoreId, auto_hide_out_of_stock: _ignoreAutoHide, ...configForStoreConfig } = newConfig;
 
         await supabase
           .from("store_config")
           .upsert({
-            ...configWithoutId,
+            ...configForStoreConfig,
             company_id: activeCompanyId,
             updated_at: new Date().toISOString()
           }, { onConflict: 'company_id' });
@@ -268,6 +279,20 @@ export function useStoreConfig(companyIdOverride?: string) {
         const companyUpdates: any = {};
         if (updates.store_name) companyUpdates.name = updates.store_name;
         if (updates.logo_url !== undefined) companyUpdates.logo_url = updates.logo_url;
+        if (updates.auto_hide_out_of_stock !== undefined) {
+          const { data: compData } = await supabase
+            .from("companies")
+            .select("payment_gateway")
+            .eq("id", activeCompanyId)
+            .maybeSingle();
+          const currentGateway = (compData?.payment_gateway && typeof compData.payment_gateway === "object")
+            ? compData.payment_gateway
+            : {};
+          companyUpdates.payment_gateway = {
+            ...currentGateway,
+            auto_hide_out_of_stock: updates.auto_hide_out_of_stock,
+          };
+        }
         if (Object.keys(companyUpdates).length > 0) {
           await supabase.from("companies").update(companyUpdates).eq("id", activeCompanyId);
         }
