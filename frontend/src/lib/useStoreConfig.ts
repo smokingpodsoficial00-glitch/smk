@@ -15,6 +15,8 @@ export interface StoreConfig {
   address: string;
   instagram_url: string;
   description: string;
+  hide_out_of_stock_products?: boolean;
+  hide_out_of_stock_variants?: boolean;
   auto_hide_out_of_stock?: boolean;
 }
 
@@ -31,6 +33,8 @@ const DEFAULT_CONFIG: StoreConfig = {
   address: "",
   instagram_url: "",
   description: "",
+  hide_out_of_stock_products: false,
+  hide_out_of_stock_variants: false,
   auto_hide_out_of_stock: false,
 };
 
@@ -127,7 +131,8 @@ async function fetchConfig(): Promise<StoreConfig> {
   }
 
   // 3. Tentar ler da tabela `companies` para a empresa correta
-  let companyAutoHide: boolean | undefined = undefined;
+  let companyHideProducts: boolean | undefined = undefined;
+  let companyHideVariants: boolean | undefined = undefined;
   try {
     const { data: compData } = await supabase
       .from("companies")
@@ -141,7 +146,14 @@ async function fetchConfig(): Promise<StoreConfig> {
         if (fallbackConfig) fallbackConfig.store_name = compData.name;
       }
       if (compData.payment_gateway && typeof compData.payment_gateway === "object") {
-        companyAutoHide = Boolean(compData.payment_gateway.auto_hide_out_of_stock);
+        const gw = compData.payment_gateway;
+        const legacyAutoHide = Boolean(gw.auto_hide_out_of_stock);
+        companyHideProducts = gw.hide_out_of_stock_products !== undefined
+          ? Boolean(gw.hide_out_of_stock_products)
+          : legacyAutoHide;
+        companyHideVariants = gw.hide_out_of_stock_variants !== undefined
+          ? Boolean(gw.hide_out_of_stock_variants)
+          : legacyAutoHide;
       }
     }
   } catch (e) {}
@@ -164,9 +176,13 @@ async function fetchConfig(): Promise<StoreConfig> {
   }
 
   let finalConfig: StoreConfig = mainConfig || fallbackConfig || local;
-  if (companyAutoHide !== undefined) {
-    finalConfig.auto_hide_out_of_stock = companyAutoHide;
+  if (companyHideProducts !== undefined) {
+    finalConfig.hide_out_of_stock_products = companyHideProducts;
   }
+  if (companyHideVariants !== undefined) {
+    finalConfig.hide_out_of_stock_variants = companyHideVariants;
+  }
+  finalConfig.auto_hide_out_of_stock = Boolean(finalConfig.hide_out_of_stock_products || finalConfig.hide_out_of_stock_variants);
 
   const bestLogo = mainConfig?.logo_url || fallbackConfig?.logo_url || local.logo_url;
   if (bestLogo) {

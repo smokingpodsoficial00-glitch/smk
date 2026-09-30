@@ -132,14 +132,15 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
   }, []);
 
   const models = useMemo(() => {
-    const autoHide = Boolean(config?.auto_hide_out_of_stock);
+    // 1. "Ocultar produtos totalmente esgotados"
+    const hideProducts = Boolean(config?.hide_out_of_stock_products);
+    // 2. "Ocultar variantes esgotadas"
+    const hideVariants = Boolean(config?.hide_out_of_stock_variants);
+
     const map = new Map<string, PodModel>();
     for (const p of productList) {
-      // 1. Soberania da ocultação manual por produto/variante
+      // 1. Soberania estrita da ocultação manual por produto/variante
       if (!p.is_active) continue;
-
-      // 2. Se a configuração global estiver ATIVADA, esconde variantes sem estoque (stock <= 0)
-      if (autoHide && (p.stock || 0) <= 0) continue;
 
       const modelDisplayName = p.name.toLowerCase().includes(p.brand.toLowerCase()) ? p.name : `${p.brand} ${p.name}`;
       const groupKey = `${p.brand}-${modelDisplayName}`.toLowerCase();
@@ -156,13 +157,32 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
       map.get(groupKey)!.variants.push(p);
     }
 
-    return Array.from(map.values()).map(m => {
+    const result: PodModel[] = [];
+
+    for (const m of map.values()) {
       const realFlavors = m.variants.filter(v => {
         const f = (v.flavor || '').trim().toLowerCase();
         return f !== 'padrão' && f !== 'padrao' && f !== '';
       });
 
-      const modelVariants = realFlavors.length > 0 ? realFlavors : m.variants;
+      const baseVariants = realFlavors.length > 0 ? realFlavors : m.variants;
+
+      // Verifica se o modelo possui ao menos 1 variante ativa com estoque disponível (> 0)
+      const hasAvailableVariant = baseVariants.some(v => (v.stock || 0) > 0);
+
+      // REGRA 1: "Ocultar produtos totalmente esgotados"
+      // Se a configuração estiver ATIVADA e TODAS as variantes estiverem com estoque <= 0,
+      // o modelo inteiro desaparece do catálogo.
+      if (hideProducts && !hasAvailableVariant) {
+        continue;
+      }
+
+      // REGRA 2: "Ocultar variantes esgotadas"
+      // Se a configuração estiver ATIVADA, esconde das opções as variantes com estoque <= 0.
+      // Se estiver DESATIVADA, exibe todas as variantes (as zeradas seguem o comportamento de "Esgotado").
+      const displayedVariants = hideVariants
+        ? baseVariants.filter(v => (v.stock || 0) > 0)
+        : baseVariants;
 
       // Identificar categorias do modelo
       const firstVariant = m.variants[0];
@@ -178,38 +198,38 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
 
       const matchedCategories = categories.filter(c => modelCategoryIds.includes(c.id));
 
-      const hasAnyPromo = modelVariants.some(v => v.is_promotional);
-      const minPrice = modelVariants.length > 0 ? Math.min(...modelVariants.map(v => v.price)) : m.price;
+      const priceVariants = displayedVariants.length > 0 ? displayedVariants : baseVariants;
+      const hasAnyPromo = priceVariants.some(v => v.is_promotional);
+      const minPrice = priceVariants.length > 0 ? Math.min(...priceVariants.map(v => v.price)) : m.price;
       const maxOriginalPrice = hasAnyPromo 
-        ? Math.max(...modelVariants.filter(v => v.is_promotional).map(v => v.original_price || v.price))
+        ? Math.max(...priceVariants.filter(v => v.is_promotional).map(v => v.original_price || v.price))
         : minPrice;
       const maxDiscountPct = hasAnyPromo
-        ? Math.max(...modelVariants.filter(v => v.is_promotional).map(v => v.discount_pct || 0))
+        ? Math.max(...priceVariants.filter(v => v.is_promotional).map(v => v.discount_pct || 0))
         : 0;
 
-      return {
+      result.push({
         ...m,
         price: minPrice,
         original_price: hasAnyPromo && maxOriginalPrice > minPrice ? maxOriginalPrice : undefined,
         is_promotional: hasAnyPromo,
         discount_pct: maxDiscountPct,
-        variants: modelVariants,
+        variants: displayedVariants,
         categories: matchedCategories,
         displayOrder: modelDisplayOrder
-      };
-    });
-  }, [productList, categories, categoryMappings, config?.auto_hide_out_of_stock]);
+      });
+    }
+
+    return result;
+  }, [productList, categories, categoryMappings, config?.hide_out_of_stock_products, config?.hide_out_of_stock_variants]);
 
   const availableBrands = useMemo(() => {
-    const autoHide = Boolean(config?.auto_hide_out_of_stock);
     const set = new Set<string>();
-    for (const p of productList) {
-      if (!p.is_active) continue;
-      if (autoHide && (p.stock || 0) <= 0) continue;
-      if (p.brand && p.brand.trim()) set.add(p.brand.trim());
+    for (const m of models) {
+      if (m.brand && m.brand.trim()) set.add(m.brand.trim());
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [productList, config?.auto_hide_out_of_stock]);
+  }, [models]);
 
   // Separar produtos com ⭐ (Mais Vendidos) e produtos normais sem duplicação
   const { topFeaturedModels, mainCatalogModels, isOnlyMaisVendidosMode } = useMemo(() => {

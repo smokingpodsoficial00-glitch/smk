@@ -42,11 +42,17 @@ export function FlavorSheet({ model, open, onClose }: { model: PodModel | null; 
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 pb-6">
-              <ul className="flex flex-col gap-2.5">
-                {model.variants.map(v => (
-                  <FlavorItem key={v.id} product={v} />
-                ))}
-              </ul>
+              {model.variants.length === 0 ? (
+                <div className="text-center py-10 text-xs sm:text-sm text-muted-foreground">
+                  Nenhuma opção disponível no momento.
+                </div>
+              ) : (
+                <ul className="flex flex-col gap-2.5">
+                  {model.variants.map(v => (
+                    <FlavorItem key={v.id} product={v} />
+                  ))}
+                </ul>
+              )}
             </div>
           </>
         )}

@@ -10,7 +10,7 @@ const brandImages: Record<string, string> = {
 };
 
 export function ProductCard({ model, onClick }: { model: PodModel; onClick: () => void }) {
-  const outOfStock = model.variants.every(v => v.stock === 0);
+  const outOfStock = model.variants.length === 0 || model.variants.every(v => (v.stock || 0) <= 0);
   const variantWithImage = model.variants.find(v => !!v.image_url);
   const image = variantWithImage?.image_url || brandImages[model.brand] || vapeIgnite;
   const flavorsCount = model.variants.length;
@@ -46,7 +46,9 @@ export function ProductCard({ model, onClick }: { model: PodModel; onClick: () =
         <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
           <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.25em] text-muted-foreground">{model.brand}</span>
           <h3 className="text-sm sm:text-lg font-semibold tracking-tight truncate">{model.name}</h3>
-          <span className="text-[11px] sm:text-xs text-primary truncate">{flavorsCount} {flavorsCount === 1 ? 'sabor disponível' : 'sabores disponíveis'}</span>
+          <span className="text-[11px] sm:text-xs text-primary truncate">
+            {flavorsCount === 0 ? 'Indisponível no momento' : flavorsCount === 1 ? '1 opção disponível' : `${flavorsCount} opções disponíveis`}
+          </span>
         </div>
 
         <div className="mt-auto flex items-center justify-between gap-2 sm:gap-3 pt-1">

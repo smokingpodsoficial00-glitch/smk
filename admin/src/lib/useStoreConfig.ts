@@ -32,6 +32,8 @@ export interface StoreConfig {
   extra_km_fee?: number;
   instagram_url: string;
   description: string;
+  hide_out_of_stock_products?: boolean;
+  hide_out_of_stock_variants?: boolean;
   auto_hide_out_of_stock?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -55,6 +57,8 @@ const DEFAULT_SMOKING_PODS_CONFIG: StoreConfig = {
   extra_km_fee: 1.40,
   instagram_url: "",
   description: "",
+  hide_out_of_stock_products: false,
+  hide_out_of_stock_variants: false,
   auto_hide_out_of_stock: false,
 };
 
@@ -150,7 +154,8 @@ export async function fetchStoreConfig(targetCompanyId?: string, targetCompanyNa
 
   // 2. Tentar ler da tabela `companies` para garantir nome canônico no banco e configurações adicionais
   let companyCanonicalName = targetCompanyName;
-  let companyAutoHide: boolean | undefined = undefined;
+  let companyHideProducts: boolean | undefined = undefined;
+  let companyHideVariants: boolean | undefined = undefined;
   try {
     const { data: compData } = await supabase
       .from("companies")
@@ -163,7 +168,14 @@ export async function fetchStoreConfig(targetCompanyId?: string, targetCompanyNa
         companyCanonicalName = compData.name;
       }
       if (compData.payment_gateway && typeof compData.payment_gateway === "object") {
-        companyAutoHide = Boolean(compData.payment_gateway.auto_hide_out_of_stock);
+        const gw = compData.payment_gateway;
+        const legacyAutoHide = Boolean(gw.auto_hide_out_of_stock);
+        companyHideProducts = gw.hide_out_of_stock_products !== undefined
+          ? Boolean(gw.hide_out_of_stock_products)
+          : legacyAutoHide;
+        companyHideVariants = gw.hide_out_of_stock_variants !== undefined
+          ? Boolean(gw.hide_out_of_stock_variants)
+          : legacyAutoHide;
       }
     }
   } catch (e) {}
@@ -171,9 +183,13 @@ export async function fetchStoreConfig(targetCompanyId?: string, targetCompanyNa
   // 3. Fallback seguro isolado por empresa
   const local = getLocalFallback(companyId, companyCanonicalName);
   let finalConfig: StoreConfig = mainConfig || local;
-  if (companyAutoHide !== undefined) {
-    finalConfig.auto_hide_out_of_stock = companyAutoHide;
+  if (companyHideProducts !== undefined) {
+    finalConfig.hide_out_of_stock_products = companyHideProducts;
   }
+  if (companyHideVariants !== undefined) {
+    finalConfig.hide_out_of_stock_variants = companyHideVariants;
+  }
+  finalConfig.auto_hide_out_of_stock = Boolean(finalConfig.hide_out_of_stock_products || finalConfig.hide_out_of_stock_variants);
 
   // 🛡️ Blindagem estrita de identidade:
   if (companyId === OFFICIAL_SMOKING_PODS_COMPANY_ID) {
@@ -266,7 +282,13 @@ export function useStoreConfig(companyIdOverride?: string) {
       // 2. Salva na tabela dedicada `store_config` e na tabela `companies` no Supabase
       try {
         const supabase = await getSupabase();
-        const { id: _ignoreId, auto_hide_out_of_stock: _ignoreAutoHide, ...configForStoreConfig } = newConfig;
+        const {
+          id: _ignoreId,
+          auto_hide_out_of_stock: _i1,
+          hide_out_of_stock_products: _i2,
+          hide_out_of_stock_variants: _i3,
+          ...configForStoreConfig
+        } = newConfig;
 
         await supabase
           .from("store_config")
@@ -279,7 +301,12 @@ export function useStoreConfig(companyIdOverride?: string) {
         const companyUpdates: any = {};
         if (updates.store_name) companyUpdates.name = updates.store_name;
         if (updates.logo_url !== undefined) companyUpdates.logo_url = updates.logo_url;
-        if (updates.auto_hide_out_of_stock !== undefined) {
+        
+        if (
+          updates.hide_out_of_stock_products !== undefined ||
+          updates.hide_out_of_stock_variants !== undefined ||
+          updates.auto_hide_out_of_stock !== undefined
+        ) {
           const { data: compData } = await supabase
             .from("companies")
             .select("payment_gateway")
@@ -290,7 +317,9 @@ export function useStoreConfig(companyIdOverride?: string) {
             : {};
           companyUpdates.payment_gateway = {
             ...currentGateway,
-            auto_hide_out_of_stock: updates.auto_hide_out_of_stock,
+            ...(updates.hide_out_of_stock_products !== undefined && { hide_out_of_stock_products: updates.hide_out_of_stock_products }),
+            ...(updates.hide_out_of_stock_variants !== undefined && { hide_out_of_stock_variants: updates.hide_out_of_stock_variants }),
+            ...(updates.auto_hide_out_of_stock !== undefined && { auto_hide_out_of_stock: updates.auto_hide_out_of_stock }),
           };
         }
         if (Object.keys(companyUpdates).length > 0) {
