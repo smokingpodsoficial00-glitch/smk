@@ -156,9 +156,11 @@ export default function CRMDashboard() {
             <ClientProfileModal 
               client={selectedClient} 
               onClose={() => setSelectedClient(null)} 
-              onClientUpdated={() => {
-                setSelectedClient(null);
+              onClientUpdated={(updatedClient?: RealClient) => {
                 setRefreshKey(prev => prev + 1);
+                if (updatedClient) {
+                  setSelectedClient(updatedClient);
+                }
               }}
             />
           </CRMErrorBoundary>

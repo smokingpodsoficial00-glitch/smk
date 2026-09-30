@@ -105,6 +105,134 @@ export async function updateClientCrmProfile(
   }
 }
 
+/**
+ * Normaliza o telefone para armazenamento padronizado em smoking_clients
+ */
+export function normalizePhoneForStorage(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const trimmed = String(phone).trim();
+  if (!trimmed) return null;
+
+  // Preservar identificadores especiais de Instagram ou sem WhatsApp
+  if (trimmed.startsWith('INSTA_') || trimmed.startsWith('SEM_WPP_') || trimmed.toLowerCase().includes('instagram') || trimmed.toLowerCase() === 'status') {
+    return trimmed;
+  }
+
+  const cleanDigits = trimmed.replace(/\D/g, '');
+  if (!cleanDigits) return null;
+
+  // Se tiver 10 ou 11 dígitos (DDD + número), prefixa com 55 (padrão Brasil)
+  if (cleanDigits.length === 10 || cleanDigits.length === 11) {
+    return `55${cleanDigits}`;
+  }
+
+  // Se já tiver 12 ou 13 dígitos começando com 55, mantém
+  if ((cleanDigits.length === 12 || cleanDigits.length === 13) && cleanDigits.startsWith('55')) {
+    return cleanDigits;
+  }
+
+  return cleanDigits;
+}
+
+/**
+ * Formata telefone para exibição amigável
+ */
+export function formatPhoneForDisplay(phone: string | null | undefined): string {
+  if (!phone) return 'Sem telefone';
+  const trimmed = String(phone).trim();
+  if (trimmed.startsWith('INSTA_') || trimmed.startsWith('SEM_WPP_') || trimmed.toLowerCase().includes('instagram')) {
+    return 'Sem WhatsApp (Instagram)';
+  }
+  const clean = trimmed.replace(/\D/g, '');
+  if (clean.length === 11) {
+    return `(${clean.substring(0, 2)}) ${clean.substring(2, 7)}-${clean.substring(7)}`;
+  }
+  if (clean.length === 10) {
+    return `(${clean.substring(0, 2)}) ${clean.substring(2, 6)}-${clean.substring(6)}`;
+  }
+  if (clean.length === 13 && clean.startsWith('55')) {
+    return `+55 (${clean.substring(2, 4)}) ${clean.substring(4, 9)}-${clean.substring(9)}`;
+  }
+  if (clean.length === 12 && clean.startsWith('55')) {
+    return `+55 (${clean.substring(2, 4)}) ${clean.substring(4, 8)}-${clean.substring(8)}`;
+  }
+  return trimmed;
+}
+
+export interface UpdateBasicClientDataParams {
+  clientId: string;
+  name: string;
+  phone: string | null;
+  companyId?: string;
+}
+
+/**
+ * Atualiza dados cadastrais básicos (nome e telefone) do cliente
+ * EXCLUSIVAMENTE pelo seu ID primário (customer.id).
+ * Não faz merge, não move pedidos, não altera históricos.
+ */
+export async function updateBasicClientData({
+  clientId,
+  name,
+  phone,
+  companyId,
+}: UpdateBasicClientDataParams): Promise<{ 
+  success: boolean; 
+  error?: string;
+  savedPhone?: string | null;
+  savedName?: string;
+}> {
+  try {
+    const trimmedName = name ? name.trim() : '';
+    if (!trimmedName) {
+      return { success: false, error: 'O nome do cliente não pode ficar em branco.' };
+    }
+
+    if (!clientId) {
+      return { success: false, error: 'Identificador (ID) do cliente não informado.' };
+    }
+
+    const finalPhone = normalizePhoneForStorage(phone);
+
+    // UPDATE estrito baseado EXCLUSIVAMENTE no ID do cliente (customer.id)
+    let updateQuery = supabase
+      .from('smoking_clients')
+      .update({
+        name: trimmedName,
+        phone: finalPhone,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', clientId);
+
+    if (companyId) {
+      updateQuery = updateQuery.eq('company_id', companyId);
+    }
+
+    const { error } = await updateQuery;
+
+    if (error) {
+      console.error('Erro ao atualizar dados básicos do cliente por ID:', error);
+      if (error.code === '23505') {
+        return { 
+          success: false, 
+          error: 'Já existe outro cliente cadastrado no banco com este número de telefone (restrição de telefone único).' 
+        };
+      }
+      return { success: false, error: error.message || 'Erro ao atualizar dados do cliente.' };
+    }
+
+    return { 
+      success: true, 
+      savedName: trimmedName, 
+      savedPhone: finalPhone 
+    };
+  } catch (err: any) {
+    console.error('Exceção ao atualizar dados do cliente:', err);
+    return { success: false, error: err?.message || 'Erro inesperado ao salvar alterações.' };
+  }
+}
+
+
 export async function fetchLiveClients(companyId?: string): Promise<RealClient[]> {
   if (!companyId) return [];
   try {

@@ -2,10 +2,17 @@ import { useState } from "react";
 import { 
   X, MessageSquare, ShoppingBag, MapPin, Phone, Crown, Calendar, 
   Sparkles, CheckCircle2, Save, Tag, Flame, ShieldAlert, HeartHandshake,
-  Send, ExternalLink, Trash2
+  Send, ExternalLink, Trash2, Edit2, Loader2
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
-import { type RealClient, type FlavorProfileType, type ProspectingStatusType, updateClientCrmProfile } from "@/lib/crm";
+import { 
+  type RealClient, 
+  type FlavorProfileType, 
+  type ProspectingStatusType, 
+  updateClientCrmProfile,
+  updateBasicClientData,
+  formatPhoneForDisplay
+} from "@/lib/crm";
 import { useAuth } from "../../contexts/AuthContext";
 import { NewFollowUpModal } from "./NewFollowUpModal";
 import { deleteOrderWithStockRestoration, deleteClientRecord } from "@/lib/orders";
@@ -17,12 +24,23 @@ export function ClientProfileModal({
 }: { 
   client: RealClient; 
   onClose: () => void;
-  onClientUpdated?: () => void;
+  onClientUpdated?: (updatedClient?: RealClient) => void;
 }) {
   const { company } = useAuth();
   
-  // Estados Locais Editáveis
+  // Estados de Exibição e Edição Básica de Cliente (Nome e Telefone por customer.id)
+  const [currentName, setCurrentName] = useState<string>(client.name || '');
+  const [currentPhone, setCurrentPhone] = useState<string>(client.phone || '');
+  const [isEditingClient, setIsEditingClient] = useState(false);
+  const [editName, setEditName] = useState<string>(client.name || '');
+  const [editPhone, setEditPhone] = useState<string>(client.cleanPhone || client.phone || '');
+  const [isSavingClient, setIsSavingClient] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSuccess, setEditSuccess] = useState<string | null>(null);
+
+  // Estados Locais Editáveis (Preferências de CRM)
   const [flavorProfile, setFlavorProfile] = useState<FlavorProfileType>(client.flavorProfile || 'fruity');
+
   const [favoriteBrand, setFavoriteBrand] = useState<string>(client.favoriteBrand || 'Ignite');
   const [inVipGroup, setInVipGroup] = useState<boolean>(Boolean(client.inVipGroup));
   const [prospectingStatus, setProspectingStatus] = useState<ProspectingStatusType>(client.prospectingStatus || 'base_antiga');
@@ -94,6 +112,62 @@ export function ClientProfileModal({
     }
   };
 
+  const handleSaveBasicClient = async () => {
+    const trimmedName = editName.trim();
+    if (!trimmedName) {
+      setEditError("O nome do cliente não pode ficar em branco.");
+      return;
+    }
+
+    setIsSavingClient(true);
+    setEditError(null);
+    setEditSuccess(null);
+
+    const res = await updateBasicClientData({
+      clientId: client.id,
+      name: trimmedName,
+      phone: editPhone,
+      companyId: company?.id,
+    });
+
+    setIsSavingClient(false);
+
+    if (res.success) {
+      const newPhoneDisplay = formatPhoneForDisplay(res.savedPhone);
+      const newName = res.savedName || trimmedName;
+      setCurrentName(newName);
+      setCurrentPhone(newPhoneDisplay);
+      setEditSuccess("✅ Dados cadastrais atualizados com sucesso!");
+      
+      const updatedClientObj: RealClient = {
+        ...client,
+        name: newName,
+        phone: newPhoneDisplay,
+        cleanPhone: res.savedPhone ? res.savedPhone.replace(/\D/g, '') : '',
+      };
+
+      if (onClientUpdated) {
+        onClientUpdated(updatedClientObj);
+      }
+
+      setTimeout(() => {
+        setIsEditingClient(false);
+        setEditSuccess(null);
+      }, 1500);
+    } else {
+      setEditError(res.error || "Erro ao salvar alterações no banco.");
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditName(currentName);
+    setEditPhone(currentPhone);
+    setIsEditingClient(false);
+    setEditError(null);
+    setEditSuccess(null);
+  };
+
+
   return (
     <div 
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
@@ -108,11 +182,11 @@ export function ClientProfileModal({
         <header className="px-6 py-5 border-b border-white/5 flex items-start justify-between bg-[#0f0f0f] rounded-t-2xl shrink-0">
           <div className="flex items-center gap-4">
             <div className="size-10 rounded-full bg-[#141414] text-emerald-400 flex items-center justify-center text-lg font-bold border border-white/5">
-              {client.name.charAt(0).toUpperCase()}
+              {currentName.charAt(0).toUpperCase()}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-white tracking-wide">{client.name}</h2>
+                <h2 className="text-base font-bold text-white tracking-wide">{currentName}</h2>
                 {client.segment === 'champion' && (
                   <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] uppercase font-bold flex items-center gap-1 tracking-wider">
                     <Crown className="size-3" /> VIP
@@ -121,7 +195,7 @@ export function ClientProfileModal({
               </div>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-[11px] text-muted-foreground flex items-center gap-1 font-mono">
-                  <Phone className="size-3 text-muted-foreground/50" /> {client.phone}
+                  <Phone className="size-3 text-muted-foreground/50" /> {currentPhone}
                 </span>
                 <span className="text-[11px] text-emerald-400 font-semibold uppercase tracking-wider">
                   • {client.prospectingStatusLabel}
@@ -130,7 +204,27 @@ export function ClientProfileModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            <button 
+              type="button"
+              onClick={() => {
+                if (isEditingClient) {
+                  handleCancelEdit();
+                } else {
+                  setIsEditingClient(true);
+                  setEditName(currentName);
+                  setEditPhone(client.cleanPhone || currentPhone || '');
+                  setEditError(null);
+                  setEditSuccess(null);
+                }
+              }} 
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs font-semibold transition-colors cursor-pointer"
+              title="Editar dados cadastrais do cliente"
+            >
+              <Edit2 className="size-3.5" />
+              <span>Editar cliente</span>
+            </button>
+
             <button 
               onClick={handleDeleteClient} 
               className="p-1.5 hover:bg-red-500/10 rounded-lg text-white/30 hover:text-red-400 transition-colors cursor-pointer"
@@ -146,6 +240,93 @@ export function ClientProfileModal({
             </button>
           </div>
         </header>
+
+        {/* Formulário Elegante e Direto de Edição Básica de Cliente */}
+        {isEditingClient && (
+          <div className="bg-[#121214] border-b border-amber-500/20 p-5 space-y-4 shrink-0 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Edit2 className="size-3.5 text-amber-400" />
+                  Editar cliente
+                </h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Nome atual: <span className="text-white font-medium">{currentName}</span> • Telefone atual: <span className="font-mono text-white">{currentPhone || '(vazio)'}</span>
+                </p>
+              </div>
+              <span className="text-[10px] font-mono text-white/40">ID: {client.id}</span>
+            </div>
+
+            {editError && (
+              <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+                {editError}
+              </div>
+            )}
+
+            {editSuccess && (
+              <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 flex items-center gap-1.5">
+                <CheckCircle2 className="size-3.5" />
+                <span>{editSuccess}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-semibold text-white/70 block mb-1">
+                  Nome
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Nome do cliente"
+                  className="w-full bg-[#18181b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400/50 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-white/70 block mb-1">
+                  Telefone
+                </label>
+                <input
+                  type="text"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="11999999999 ou (11) 99999-9999"
+                  className="w-full bg-[#18181b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400/50 transition-colors font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                disabled={isSavingClient}
+                onClick={handleCancelEdit}
+                className="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-semibold cursor-pointer transition-colors border border-white/10 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={isSavingClient}
+                onClick={handleSaveBasicClient}
+                className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-[0_0_12px_rgba(245,158,11,0.2)] disabled:opacity-50"
+              >
+                {isSavingClient ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin text-black" />
+                    <span>Salvando...</span>
+                  </>
+                ) : (
+                  <span>Salvar alterações</span>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
 
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar flex flex-col gap-6">
           
