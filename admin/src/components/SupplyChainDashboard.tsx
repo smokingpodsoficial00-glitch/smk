@@ -511,6 +511,12 @@ export default function SupplyChainDashboard() {
       .map(v => ({ name: v.name.trim(), stock: parseInt(v.stock) || 0 }))
       .filter(v => v.name.length > 0);
 
+    // REGRA ESTRUTURAL: Bloquear cadastro se nenhum sabor válido for informado
+    if (validVariants.length === 0) {
+      alert("Adicione pelo menos um sabor para cadastrar este modelo.");
+      return;
+    }
+
     // Validar duplicidade de sabores na lista informada
     const flavorNamesSeen = new Set<string>();
     for (const v of validVariants) {
@@ -522,9 +528,7 @@ export default function SupplyChainDashboard() {
       flavorNamesSeen.add(lower);
     }
 
-    const flavorsToCreate = validVariants.length > 0
-      ? validVariants
-      : [{ name: "Padrão", stock: 0 }];
+    const flavorsToCreate = validVariants;
 
     setSubmitting(true);
     try {
@@ -1341,12 +1345,7 @@ export default function SupplyChainDashboard() {
       group.cost_price = parseFloat(validCostFlavor.cost_price);
     }
 
-    const specificFlavors = group.flavors.filter((f: any) => {
-      const fName = (f.flavor || '').trim().toLowerCase();
-      return fName !== 'padrão' && fName !== 'padrao' && fName !== '';
-    });
-
-    group.realFlavors = specificFlavors.length > 0 ? specificFlavors : group.flavors;
+    group.realFlavors = group.flavors;
 
     group.totalStock = group.realFlavors.reduce((sum, f) => sum + (f.stock || 0), 0);
     group.outOfStockFlavors = group.realFlavors.filter(f => (f.stock || 0) <= 0);
@@ -1395,11 +1394,7 @@ export default function SupplyChainDashboard() {
   });
 
   Object.values(globalGroupedMap).forEach(group => {
-    const specificFlavors = group.flavors.filter((f: any) => {
-      const fName = (f.flavor || '').trim().toLowerCase();
-      return fName !== 'padrão' && fName !== 'padrao' && fName !== '';
-    });
-    group.realFlavors = specificFlavors.length > 0 ? specificFlavors : group.flavors;
+    group.realFlavors = group.flavors;
     group.totalStock = group.realFlavors.reduce((sum, f) => sum + (f.stock || 0), 0);
   });
 
@@ -1423,7 +1418,7 @@ export default function SupplyChainDashboard() {
     const displayName = getGroupDisplayName(group.brand, group.name);
     const flavorsList = group.realFlavors.map((f: any) => ({
       id: f.id,
-      flavor: f.flavor || 'Padrão',
+      flavor: f.flavor || '',
       totalSold: 0,
       stock: f.stock || 0,
     }));
@@ -2349,7 +2344,7 @@ export default function SupplyChainDashboard() {
                         <div className={`size-2.5 rounded-full shrink-0 ${f.is_active === false ? "bg-red-400" : "bg-emerald-400"}`} />
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-bold text-white truncate flex flex-wrap items-center gap-2">
-                            <span className="truncate">{f.flavor || 'Padrão'}</span>
+                            <span className="truncate">{f.flavor}</span>
                             {f.is_active === false && (
                               <span className="text-[10px] px-2 py-0.2 rounded-md bg-red-500/20 text-red-400 font-normal">
                                 Oculto do cardápio
@@ -2383,7 +2378,7 @@ export default function SupplyChainDashboard() {
                         {/* Botão Excluir Sabor Permanentemente */}
                         <button
                           type="button"
-                          onClick={() => handleDeleteProduct(f.id, f.flavor || 'Padrão')}
+                          onClick={() => handleDeleteProduct(f.id, f.flavor || '')}
                           className="p-2 rounded-xl border border-white/5 bg-white/5 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 hover:border-red-500/20 transition-all cursor-pointer"
                           title="Excluir sabor do sistema"
                         >
@@ -2658,8 +2653,8 @@ export default function SupplyChainDashboard() {
                     ))}
 
                     {newModelVariants.length === 0 && (
-                      <div className="text-center py-2 text-xs text-muted-foreground/60">
-                        Nenhum sabor adicionado. O modelo será cadastrado com sabor "Padrão".
+                      <div className="text-center py-2 text-xs text-amber-400/80">
+                        Adicione pelo menos um sabor para cadastrar este modelo.
                       </div>
                     )}
                   </div>

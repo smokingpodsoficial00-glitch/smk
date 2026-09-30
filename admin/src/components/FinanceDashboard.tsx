@@ -1318,11 +1318,7 @@ export default function FinanceDashboard() {
           const stock = Number(p.stock) || 0;
           const price = Number(p.price) || 0;
 
-          // Exclui linhas fantasma de "Padrão" zeradas do cálculo
-          const flavorName = (p.flavor || "").trim().toLowerCase();
-          const isPadrao = flavorName === "padrão" || flavorName === "padrao" || flavorName === "";
-
-          if (stock > 0 && !isPadrao) {
+          if (stock > 0) {
             const pCosts = (persistedCosts || {}) as Record<string, number>;
             const dCosts = (DEFAULT_MODEL_COSTS || {}) as Record<string, number>;
             const brandName = (p.brand || "").trim();

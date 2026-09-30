@@ -710,10 +710,7 @@ export function calculatePartnersFinancials(params: {
   for (const p of products || []) {
     const stock = Number(p.stock) || 0;
     const price = Number(p.price) || 0;
-    const flavorName = (p.flavor || "").trim().toLowerCase();
-    const isPadrao = flavorName === "padrão" || flavorName === "padrao" || flavorName === "";
-
-    if (stock > 0 && !isPadrao && p.is_active !== false) {
+    if (stock > 0 && p.is_active !== false) {
       const brandName = (p.brand || "").trim();
       const modelName = (p.name || "").trim();
       const groupKey = `${brandName.toLowerCase()}__${modelName.toLowerCase()}`;

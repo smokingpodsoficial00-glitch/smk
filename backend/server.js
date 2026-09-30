@@ -719,7 +719,7 @@ async function extractOrderItemsFromHistory(senderNumber) {
             const flavorStr = (p.flavor || '').toLowerCase();
 
             if (nameStr && fullText.includes(nameStr)) {
-                if (flavorStr && flavorStr !== 'padrão' && flavorStr !== 'padrao' && fullText.includes(flavorStr)) {
+                if (flavorStr && fullText.includes(flavorStr)) {
                     matchedProduct = p;
                     break;
                 }

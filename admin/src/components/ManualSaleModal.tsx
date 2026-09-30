@@ -248,10 +248,10 @@ export function ManualSaleModal({
     if (!selectedModelKey) return [];
     const q = normalizeText(flavorQuery);
     const currentFlavor = availableFlavors.find((f) => f.id === selectedFlavorId);
-    if (!q || (currentFlavor && normalizeText(currentFlavor.flavor || "Padrão") === q)) {
+    if (!q || (currentFlavor && normalizeText(currentFlavor.flavor || "") === q)) {
       return availableFlavors;
     }
-    return availableFlavors.filter((f) => normalizeText(f.flavor || "Padrão").includes(q));
+    return availableFlavors.filter((f) => normalizeText(f.flavor || "").includes(q));
   }, [availableFlavors, flavorQuery, selectedFlavorId, selectedModelKey]);
 
   // Preencher valor do produto e sincronizar query ao selecionar o sabor
@@ -260,7 +260,7 @@ export function ManualSaleModal({
       const prod = productsList.find((p) => p.id === selectedFlavorId);
       if (prod) {
         setCustomPrice(prod.price ? String(prod.price) : "");
-        setFlavorQuery(prod.flavor || "Padrão");
+        setFlavorQuery(prod.flavor || "");
       }
     }
   }, [selectedFlavorId, productsList]);
@@ -298,7 +298,7 @@ export function ManualSaleModal({
 
   const handleSelectFlavor = (f: any) => {
     setSelectedFlavorId(f.id);
-    setFlavorQuery(f.flavor || "Padrão");
+    setFlavorQuery(f.flavor || "");
     setIsFlavorDropdownOpen(false);
     setCustomPrice(f.price ? String(f.price) : "");
   };
@@ -321,7 +321,7 @@ export function ManualSaleModal({
       productId: prod.id,
       brand: prod.brand,
       modelName: prod.name,
-      flavor: prod.flavor || "Padrão",
+      flavor: prod.flavor || "",
       quantity: itemQuantity,
       price: unitPrice,
       costPrice: Number(prod.cost_price) || 0,
@@ -1306,7 +1306,7 @@ export function ManualSaleModal({
                                 }`}
                               >
                                 <div className="min-w-0">
-                                  <div className="font-bold truncate text-white">{f.flavor || "Padrão"}</div>
+                                  <div className="font-bold truncate text-white">{f.flavor}</div>
                                   <div className="flex items-center gap-2 text-[10px] text-white/50">
                                     <span className={stockNum > 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
                                       {stockNum > 0 ? `${stockNum} un em estoque` : "Sem estoque"}

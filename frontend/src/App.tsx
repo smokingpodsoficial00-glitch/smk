@@ -168,11 +168,7 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
     const result: PodModel[] = [];
 
     for (const { model: m, rawVariants } of map.values()) {
-      const realFlavors = rawVariants.filter(v => {
-        const f = (v.flavor || '').trim().toLowerCase();
-        return f !== 'padrão' && f !== 'padrao' && f !== '';
-      });
-
+      const realFlavors = rawVariants.filter(v => (v.flavor || '').trim() !== '');
       const baseVariants = realFlavors.length > 0 ? realFlavors : rawVariants;
 
       // Preserva a imagem real original cadastrada do produto (mesmo se esgotado ou filtrado)

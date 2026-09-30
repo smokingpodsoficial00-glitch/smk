@@ -350,7 +350,7 @@ export default function ChatbotPage() {
           const brandLower = (p.brand || '').toLowerCase();
           const nameLower = (p.name || '').toLowerCase();
 
-          const flavorFound = (flavorLower !== 'padrão' && flavorLower !== 'padrao') && 
+          const flavorFound = flavorLower.length > 0 && 
             (text.includes(flavorLower) || fuzzy(text, flavorLower) || flavorLower.split(' ').some((w: string) => w.length > 3 && text.includes(w)));
 
           const brandOrModelFound = (brandLower && text.includes(brandLower)) || (nameLower && text.includes(nameLower));

@@ -119,7 +119,7 @@ export function extractPuffsFromModel(modelName: string): number {
 
 export function parseFlavorsString(flavorsStr: string, totalQty: number): { flavor: string; qty: number }[] {
   const trimmed = (flavorsStr || "").trim();
-  if (!trimmed) return [{ flavor: "Padrão", qty: totalQty }];
+  if (!trimmed) return [];
 
   const parts = trimmed.split(/,\s*/);
   if (parts.length <= 1) {
@@ -141,7 +141,9 @@ export function parseFlavorsString(flavorsStr: string, totalQty: number): { flav
     }
 
     allocated += q;
-    result.push({ flavor: cleanFlavor || "Padrão", qty: Math.max(1, q) });
+    if (cleanFlavor) {
+      result.push({ flavor: cleanFlavor, qty: Math.max(1, q) });
+    }
   });
 
   return result;
@@ -249,13 +251,13 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
               model,
               costPrice: cost,
               sellPrice: sell,
-              flavors: flavor && flavor.toLowerCase() !== "padrão" && flavor.toLowerCase() !== "padrao" ? [flavor] : [],
+              flavors: flavor ? [flavor] : [],
               totalStock: stock
             });
           } else {
             const existing = groupMap.get(key)!;
             existing.totalStock += stock;
-            if (flavor && flavor.toLowerCase() !== "padrão" && flavor.toLowerCase() !== "padrao" && !existing.flavors.includes(flavor)) {
+            if (flavor && !existing.flavors.includes(flavor)) {
               existing.flavors.push(flavor);
             }
           }
@@ -626,6 +628,11 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
         const extractedPuffs = extractPuffsFromModel(itemModel);
 
         const flavorBreakdown = parseFlavorsString(item.flavors, itemQty);
+        if (flavorBreakdown.length === 0) {
+          alert(`O modelo "${itemBrand} ${itemModel}" precisa ter pelo menos um sabor especificado para dar entrada de estoque.`);
+          setIsProcessingStockEntry(false);
+          return;
+        }
         for (const subItem of flavorBreakdown) {
           rpcItems.push({
             brand: itemBrand,

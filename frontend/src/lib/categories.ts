@@ -276,7 +276,7 @@ export async function updateModelCategories(params: {
         category_id: categoryIds[0],
         display_order: displayOrder,
         name: modelKey,
-        flavor: "Padrão",
+        flavor: "",
         quantity: 1,
         price: 0,
         unit_price: 0
@@ -291,7 +291,7 @@ export async function updateModelCategories(params: {
           category_id: categoryIds[0],
           display_order: displayOrder,
           name: cleanKey,
-          flavor: "Padrão",
+          flavor: "",
           quantity: 1,
           price: 0,
           unit_price: 0
@@ -308,7 +308,7 @@ export async function updateModelCategories(params: {
             category_id: categoryIds[0],
             display_order: displayOrder,
             name: modelKey,
-            flavor: "Padrão",
+            flavor: "",
             quantity: 1,
             price: 0,
             unit_price: 0

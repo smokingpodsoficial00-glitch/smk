@@ -119,12 +119,10 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
       );
     });
 
-    // Filtra apenas produtos com estoque > 0 e desconsidera variações vazias/padrão
+    // Filtra apenas produtos com estoque > 0
     const activeProducts = (products || []).filter((p: any) => {
       const stock = parseInt(p.stock) || 0;
-      const flavorName = (p.flavor || "").trim().toLowerCase();
-      const isPadrao = flavorName === "padrão" || flavorName === "padrao" || flavorName === "";
-      return stock > 0 && !isPadrao;
+      return stock > 0;
     });
 
     const stagnantList: any[] = [];
