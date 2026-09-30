@@ -884,26 +884,15 @@ export function ManualSaleModal({
                               >
                                 <div className="flex items-center gap-2.5 min-w-0">
                                   <div
-                                    className={`size-8 rounded-xl flex items-center justify-center text-[11px] font-extrabold shrink-0 border ${
-                                      idx === 0
-                                        ? "bg-amber-500/25 text-amber-300 border-amber-500/40"
-                                        : "bg-white/5 text-white/70 border-white/10"
-                                    }`}
+                                    className="size-8 rounded-xl flex items-center justify-center text-[11px] font-extrabold shrink-0 border bg-white/5 text-white/70 border-white/10"
                                   >
                                     {initials || "CL"}
                                   </div>
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs font-bold text-white truncate">
-                                        {c.name}
-                                      </span>
-                                      {idx === 0 && (
-                                        <span className="text-[9px] font-extrabold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-md shrink-0">
-                                          ★ Topo
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-1.5 text-[11px] text-white/50 font-mono truncate">
+                                  <div className="min-w-0 flex-1">
+                                    <span className="text-xs font-bold text-white block">
+                                      {c.name}
+                                    </span>
+                                    <div className="flex items-center gap-1.5 text-[11px] text-white/50 font-mono">
                                       <Phone className="size-2.5 text-emerald-400 shrink-0" />
                                       <span>{displayPhone}</span>
                                     </div>
