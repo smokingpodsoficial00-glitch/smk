@@ -28,6 +28,11 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
   const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set());
   const [exportSuccessMessage, setExportSuccessMessage] = useState<string | null>(null);
 
+  // Reset de página ao filtrar ou pesquisar (declarado no topo para conformidade com Rules of Hooks)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterSegment, filterFlavor, filterVip]);
+
   const loadClients = async () => {
     try {
       const live = await fetchLiveClients(company?.id);
@@ -105,21 +110,10 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
     return true;
   });
 
-  // Reset de página ao filtrar ou pesquisar
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, filterSegment, filterFlavor, filterVip]);
-
-  // Cálculos de Paginação (baseados na lista após todos os filtros e busca)
+  // Cálculos de Paginação (100% síncronos e derivados, sem nenhum Hook abaixo de early returns)
   const totalPages = Math.max(1, Math.ceil(filteredClients.length / PAGE_SIZE));
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
-  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE;
   const paginatedClients = filteredClients.slice(startIndex, startIndex + PAGE_SIZE);
   const startRecord = filteredClients.length === 0 ? 0 : startIndex + 1;
   const endRecord = Math.min(startIndex + PAGE_SIZE, filteredClients.length);
@@ -484,8 +478,8 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
 
             <div className="flex items-center gap-1.5">
               <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(Math.max(safeCurrentPage - 1, 1))}
+                disabled={safeCurrentPage <= 1}
                 className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-white/70 hover:text-white transition-colors flex items-center gap-1 font-medium text-xs cursor-pointer"
                 title="Página Anterior"
               >
@@ -494,7 +488,7 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
               </button>
 
               <div className="flex items-center gap-1">
-                {getVisiblePages(currentPage, totalPages).map((p, idx) => {
+                {getVisiblePages(safeCurrentPage, totalPages).map((p, idx) => {
                   if (p === '...') {
                     return (
                       <span key={`dots-${idx}`} className="px-1.5 text-white/40 font-bold">
@@ -508,7 +502,7 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
                       className={`min-w-7 h-7 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer ${
-                        currentPage === pageNum
+                        safeCurrentPage === pageNum
                           ? 'bg-emerald-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.3)]'
                           : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
                       }`}
@@ -520,8 +514,8 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
               </div>
 
               <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(Math.min(safeCurrentPage + 1, totalPages))}
+                disabled={safeCurrentPage >= totalPages}
                 className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-white/70 hover:text-white transition-colors flex items-center gap-1 font-medium text-xs cursor-pointer"
                 title="Próxima Página"
               >
