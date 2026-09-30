@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { resetStoreConfigCache } from '../lib/useStoreConfig';
@@ -62,6 +62,25 @@ interface AuthContextType {
 const LOCAL_SESSION_KEY = 'saas_auth_session_v2';
 const LOCAL_CREDS_KEY = 'saas_registered_creds_v2';
 
+// Timeout controlado de 8 segundos para operações críticas de boot em redes móveis e conexões frias
+const QUERY_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number, operationName: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`[AuthBoot] Timeout de ${timeoutMs}ms excedido na operação: ${operationName}`));
+    }, timeoutMs);
+  });
+
+  return Promise.race([
+    Promise.resolve(promise),
+    timeoutPromise,
+  ]).finally(() => {
+    clearTimeout(timer);
+  });
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -70,20 +89,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [companyUser, setCompanyUser] = useState<CompanyUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Auxiliar para limpar completamente o estado e o cache local
+  // Guardas de ciclo de vida e single-flight para evitar concorrência e fugas de memória
+  const isMountedRef = useRef(true);
+  const inFlightFetchRef = useRef<Promise<void> | null>(null);
+
+  // Auxiliar para limpar completamente o estado e o cache local com garantia de finalização do loading
   const clearSession = () => {
-    setUser(null);
-    setCompany(null);
-    setCompanyUser(null);
+    if (isMountedRef.current) {
+      setUser(null);
+      setCompany(null);
+      setCompanyUser(null);
+    }
     try {
       localStorage.removeItem(LOCAL_SESSION_KEY);
       localStorage.removeItem('smk_auth_company_id');
       localStorage.removeItem('store_config_fallback_v4');
     } catch (e) {
-      console.warn('Erro ao remover sessão local:', e);
+      console.warn('[AuthBoot] Erro ao remover sessão local:', e);
     }
     resetStoreConfigCache();
-    setLoading(false);
+    if (isMountedRef.current) {
+      setLoading(false);
+      console.info('[AuthBoot] Sessão encerrada/inexistente. Boot concluído: loading = false');
+    }
   };
 
   // Auxiliar para persistir cache local secundário
@@ -94,61 +122,113 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('smk_auth_company_id', comp.id);
       }
     } catch (e) {
-      console.warn('Erro ao salvar sessão local:', e);
+      console.warn('[AuthBoot] Erro ao salvar sessão local:', e);
     }
   };
 
-  const fetchUserData = async (authUser: User) => {
-    try {
-      // 1. Busca os dados do usuário em company_users
-      const { data: compUsers, error: compUserError } = await supabase
-        .from('company_users')
-        .select('*')
-        .eq('auth_user_id', authUser.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-      if (compUserError) {
-        console.warn('[AuthContext] Erro ao consultar company_users:', compUserError.message);
-      }
-
-      const compUserData = compUsers && compUsers.length > 0 ? compUsers[0] : null;
-
-      if (compUserData && compUserData.company_id) {
-        const { data: companyData, error: companyError } = await supabase
-          .from('companies')
-          .select('*')
-          .eq('id', compUserData.company_id)
-          .maybeSingle();
-
-        if (companyError) {
-          console.warn('[AuthContext] Erro ao consultar companies:', companyError.message);
-        }
-
-        if (companyData) {
-          setUser(authUser);
-          setCompany(companyData as Company);
-          setCompanyUser(compUserData as CompanyUser);
-          saveLocalSession(authUser, companyData as Company, compUserData as CompanyUser);
-          setLoading(false);
-          return;
-        }
-      }
-
-      // 2. Acesso Negado: Usuário autenticado no Supabase Auth mas sem vínculo ativo em company_users
-      console.warn('[AuthContext] Acesso administrativo negado: Usuário autenticado não possui vínculo ativo em company_users.');
-      setUser(authUser);
-      setCompany(null);
-      setCompanyUser(null);
-      try {
-        localStorage.removeItem(LOCAL_SESSION_KEY);
-      } catch (e) {}
-    } catch (err) {
-      console.error('Erro ao carregar dados do usuário:', err);
-      clearSession();
-    } finally {
-      setLoading(false);
+  const fetchUserData = (authUser: User): Promise<void> => {
+    // 🛡️ Deduplicação Single-Flight: Se getSession e onAuthStateChange chamarem juntos,
+    // reutiliza a mesmíssima Promise em andamento, impedindo requisições duplicadas.
+    if (inFlightFetchRef.current) {
+      console.info('[AuthBoot] Reutilizando busca de dados do usuário em andamento (single-flight)');
+      return inFlightFetchRef.current;
     }
+
+    const fetchPromise = (async () => {
+      const startTime = performance.now();
+      console.info('[AuthBoot] Iniciando fetchUserData...');
+      try {
+        // ⚡ Otimização SWR: Se já temos sessão persistida válida para este mesmo usuário,
+        // reidrata o estado imediatamente para liberar a interface em 0ms sem bloquear o usuário
+        try {
+          const raw = localStorage.getItem(LOCAL_SESSION_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed?.user?.id === authUser.id && parsed?.company && parsed?.companyUser) {
+              if (isMountedRef.current) {
+                setUser(authUser);
+                setCompany(parsed.company as Company);
+                setCompanyUser(parsed.companyUser as CompanyUser);
+                setLoading(false);
+              }
+            }
+          }
+        } catch (cacheErr) {
+          console.warn('[AuthContext] Erro ao ler cache de sessão local:', cacheErr);
+        }
+
+        // 1. Busca dados do usuário em company_users com timeout controlado
+        const { data: compUsers, error: compUserError } = await withTimeout(
+          supabase
+            .from('company_users')
+            .select('*')
+            .eq('auth_user_id', authUser.id)
+            .eq('is_active', true)
+            .order('created_at', { ascending: false }),
+          QUERY_TIMEOUT_MS,
+          'company_users (fetchUserData)'
+        );
+
+        if (compUserError) {
+          console.warn('[AuthContext] Erro ao consultar company_users:', compUserError.message);
+        }
+
+        const compUserData = compUsers && compUsers.length > 0 ? compUsers[0] : null;
+
+        if (compUserData && compUserData.company_id) {
+          // 2. Busca dados da empresa com timeout controlado
+          const { data: companyData, error: companyError } = await withTimeout(
+            supabase
+              .from('companies')
+              .select('*')
+              .eq('id', compUserData.company_id)
+              .maybeSingle(),
+            QUERY_TIMEOUT_MS,
+            'companies (fetchUserData)'
+          );
+
+          if (companyError) {
+            console.warn('[AuthContext] Erro ao consultar companies:', companyError.message);
+          }
+
+          if (companyData && isMountedRef.current) {
+            setUser(authUser);
+            setCompany(companyData as Company);
+            setCompanyUser(compUserData as CompanyUser);
+            saveLocalSession(authUser, companyData as Company, compUserData as CompanyUser);
+            setLoading(false);
+            const duration = Math.round(performance.now() - startTime);
+            console.info(`[AuthBoot] Finalizando fetchUserData: empresa validada com sucesso (${duration}ms). loading = false`);
+            return;
+          }
+        }
+
+        // Acesso Negado: Usuário autenticado no Supabase Auth mas sem vínculo ativo em company_users
+        console.warn('[AuthBoot] Acesso administrativo negado: Usuário autenticado não possui vínculo ativo em company_users.');
+        if (isMountedRef.current) {
+          setUser(authUser);
+          setCompany(null);
+          setCompanyUser(null);
+          try {
+            localStorage.removeItem(LOCAL_SESSION_KEY);
+          } catch (e) {}
+        }
+      } catch (err: any) {
+        console.error('[AuthBoot] Falha no carregamento dos dados do usuário:', err?.message || err);
+        if (isMountedRef.current) {
+          clearSession();
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setLoading(false);
+          console.info('[AuthBoot] Fim do loading do ciclo de autenticação: loading = false');
+        }
+        inFlightFetchRef.current = null;
+      }
+    })();
+
+    inFlightFetchRef.current = fetchPromise;
+    return fetchPromise;
   };
 
   // Helper para tentar restaurar sessão de contingência (contas criadas durante rate-limit de e-mail do Supabase)
@@ -159,104 +239,133 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const parsed = JSON.parse(raw);
       if (!parsed?.user?.id || !parsed?.company?.id) return false;
 
-      const { data: compUsers } = await supabase
-        .from('company_users')
-        .select('*')
-        .eq('auth_user_id', parsed.user.id)
-        .eq('is_active', true)
-        .limit(1);
+      const { data: compUsers } = await withTimeout(
+        supabase
+          .from('company_users')
+          .select('*')
+          .eq('auth_user_id', parsed.user.id)
+          .eq('is_active', true)
+          .limit(1),
+        QUERY_TIMEOUT_MS,
+        'company_users (tryRestoreFallbackSession)'
+      );
 
       const compUser = compUsers && compUsers.length > 0 ? compUsers[0] : null;
       if (!compUser) return false;
 
-      const { data: compData } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', compUser.company_id)
-        .maybeSingle();
+      const { data: compData } = await withTimeout(
+        supabase
+          .from('companies')
+          .select('*')
+          .eq('id', compUser.company_id)
+          .maybeSingle(),
+        QUERY_TIMEOUT_MS,
+        'companies (tryRestoreFallbackSession)'
+      );
 
       if (!compData || compData.is_active === false) return false;
 
-      setUser(parsed.user as User);
-      setCompany(compData as Company);
-      setCompanyUser(compUser as CompanyUser);
-      saveLocalSession(parsed.user as User, compData as Company, compUser as CompanyUser);
-      setLoading(false);
+      if (isMountedRef.current) {
+        setUser(parsed.user as User);
+        setCompany(compData as Company);
+        setCompanyUser(compUser as CompanyUser);
+        saveLocalSession(parsed.user as User, compData as Company, compUser as CompanyUser);
+        setLoading(false);
+      }
       return true;
-    } catch (e) {
+    } catch (e: any) {
+      console.warn('[AuthContext] Falha ao verificar sessão de contingência:', e?.message || e);
       return false;
     }
   };
 
   useEffect(() => {
-    let isMounted = true;
+    isMountedRef.current = true;
+    console.info('[AuthBoot] Iniciando checagem de sessão...');
 
-    // 1. O Supabase Auth é a autoridade primária da sessão, com suporte a contingência verificada no banco
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-      if (!isMounted) return;
-      if (error || !session || !session.user) {
+    // Gerenciador centralizado de sessão: previne buscas duplicadas e garante finalização do loading
+    const handleAuthSession = async (session: any, source: string) => {
+      if (!isMountedRef.current) return;
+
+      if (!session || !session.user) {
+        console.info(`[AuthBoot] Nenhuma sessão ativa via ${source}.`);
         const restored = await tryRestoreFallbackSession();
-        if (!restored && isMounted) {
+        if (!restored && isMountedRef.current) {
           clearSession();
         }
-      } else {
-        setUser(session.user);
-        fetchUserData(session.user);
+        return;
       }
-    }).catch(async (err) => {
-      console.warn('[AuthContext] Falha ao verificar getSession():', err);
-      if (isMounted) {
-        const restored = await tryRestoreFallbackSession();
-        if (!restored) clearSession();
-      }
-    });
+
+      console.info(`[AuthBoot] Sessão ativa detectada via ${source}.`);
+      setUser(session.user);
+      await fetchUserData(session.user);
+    };
+
+    // 1. Obter sessão inicial via getSession() com timeout e tratamento seguro
+    withTimeout(supabase.auth.getSession(), QUERY_TIMEOUT_MS, 'supabase.auth.getSession()')
+      .then(async ({ data: { session }, error }: any) => {
+        if (!isMountedRef.current) return;
+        if (error) {
+          console.warn('[AuthBoot] Erro ao obter getSession():', error.message);
+          const restored = await tryRestoreFallbackSession();
+          if (!restored && isMountedRef.current) clearSession();
+          return;
+        }
+        await handleAuthSession(session, 'getSession');
+      })
+      .catch(async (err: any) => {
+        console.warn('[AuthBoot] Falha ou timeout em getSession():', err?.message || err);
+        if (isMountedRef.current) {
+          const restored = await tryRestoreFallbackSession();
+          if (!restored && isMountedRef.current) clearSession();
+        }
+      });
 
     // 2. Listener de mudanças de estado de autenticação nativo do Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!isMounted) return;
+      if (!isMountedRef.current) return;
 
       if (event === 'SIGNED_OUT' || (event as string) === 'USER_DELETED') {
         clearSession();
         return;
       }
 
-      if (!session || !session.user) {
-        const restored = await tryRestoreFallbackSession();
-        if (!restored && isMounted) {
-          clearSession();
-        }
-        return;
-      }
-
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        setUser(session.user);
-        await fetchUserData(session.user);
-        return;
-      }
-
       if (event === 'TOKEN_REFRESHED') {
-        setUser(session.user);
-        if (!company || !companyUser) {
-          await fetchUserData(session.user);
-        } else {
-          saveLocalSession(session.user, company, companyUser);
+        if (session?.user) {
+          setUser(session.user);
+          if (!company || !companyUser) {
+            await fetchUserData(session.user);
+          } else {
+            saveLocalSession(session.user, company, companyUser);
+          }
         }
         return;
       }
+
+      // INITIAL_SESSION ou SIGNED_IN
+      await handleAuthSession(session, event);
     });
 
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
       subscription.unsubscribe();
     };
   }, []);
 
   const refreshCompany = async () => {
     if (!company?.id) return;
-    const { data } = await supabase.from('companies').select('*').eq('id', company.id).single();
-    if (data) {
-      setCompany(data as Company);
-      if (user && companyUser) saveLocalSession(user, data as Company, companyUser);
+    try {
+      const { data } = await withTimeout(
+        supabase.from('companies').select('*').eq('id', company.id).single(),
+        QUERY_TIMEOUT_MS,
+        'companies (refreshCompany)'
+      );
+      if (data && isMountedRef.current) {
+        setCompany(data as Company);
+        if (user && companyUser) saveLocalSession(user, data as Company, companyUser);
+      }
+    } catch (err: any) {
+      console.warn('[AuthContext] Erro ao atualizar dados da empresa:', err?.message || err);
     }
   };
 
