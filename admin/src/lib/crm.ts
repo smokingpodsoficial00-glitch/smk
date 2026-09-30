@@ -35,6 +35,7 @@ export type RealClient = {
   lastOrderTimestamp?: number;
   lastActivityTimestamp?: number;
   clientCreatedAt?: string;
+  lastReplenishmentAlertAt?: string | null;
 };
 
 // Exportação de tempo de execução para compatibilidade
@@ -683,6 +684,7 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
           lastOrderTimestamp,
           lastActivityTimestamp: lastOrderTimestamp,
           clientCreatedAt: client.created_at,
+          lastReplenishmentAlertAt: client.last_replenishment_alert_at || null,
         });
       } else {
         // --- CLIENTE NOVO CADASTRADO (0 COMPRAS) ---
@@ -731,6 +733,7 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
           lastOrderTimestamp: 0,
           lastActivityTimestamp: client.created_at ? new Date(client.created_at).getTime() : 0,
           clientCreatedAt: client.created_at,
+          lastReplenishmentAlertAt: client.last_replenishment_alert_at || null,
         });
       }
     }
@@ -901,6 +904,87 @@ export async function fetchUnlinkedLegacyOrders(companyId?: string): Promise<{ o
   } catch (e) {
     console.error('Erro ao buscar pedidos legados não vinculados:', e);
     return [];
+  }
+}
+
+export interface RecordReplenishmentAlertParams {
+  clientId: string;
+  companyId?: string;
+}
+
+export interface RecordReplenishmentAlertResult {
+  success: boolean;
+  timestamp?: string;
+  error?: string;
+}
+
+/**
+ * Registra o envio explícito de um aviso de recompra para um cliente específico.
+ * Identidade estrita baseada exclusivamente no UUID (customer_id / smoking_clients.id).
+ * 
+ * 1. Atualiza persistente e imediatamente a coluna last_replenishment_alert_at em smoking_clients.
+ * 2. Grava evento no log de auditoria append-only em smoking_replenishment_alerts.
+ */
+export async function recordReplenishmentAlert({
+  clientId,
+  companyId,
+}: RecordReplenishmentAlertParams): Promise<RecordReplenishmentAlertResult> {
+  try {
+    if (!clientId) {
+      return { success: false, error: 'Identificador (ID) do cliente não informado.' };
+    }
+
+    const nowIso = new Date().toISOString();
+
+    // 1. Atualizar registro no cliente em smoking_clients (Identidade estrita por ID)
+    let updateQuery = supabase
+      .from('smoking_clients')
+      .update({
+        last_replenishment_alert_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq('id', clientId);
+
+    if (companyId && companyId !== 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5') {
+      updateQuery = updateQuery.eq('company_id', companyId);
+    }
+
+    const { error: clientError } = await updateQuery;
+
+    if (clientError) {
+      console.error('Erro ao registrar aviso de recompra em smoking_clients:', clientError);
+      return { 
+        success: false, 
+        error: clientError.message || 'Erro ao persistir aviso de recompra no banco de dados.' 
+      };
+    }
+
+    // 2. Gravar no log de auditoria append-only (smoking_replenishment_alerts)
+    if (companyId) {
+      try {
+        await supabase
+          .from('smoking_replenishment_alerts')
+          .insert({
+            company_id: companyId,
+            customer_id: clientId,
+            channel: 'whatsapp',
+            sent_at: nowIso,
+          });
+      } catch (auditErr) {
+        console.warn('Aviso ao registrar histórico append-only em smoking_replenishment_alerts:', auditErr);
+      }
+    }
+
+    return {
+      success: true,
+      timestamp: nowIso,
+    };
+  } catch (err: any) {
+    console.error('Exceção ao registrar aviso de recompra:', err);
+    return {
+      success: false,
+      error: err?.message || 'Falha inesperada ao registrar envio do aviso de recompra.',
+    };
   }
 }
 

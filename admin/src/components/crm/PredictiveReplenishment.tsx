@@ -1,14 +1,28 @@
 import { useState, useEffect } from "react";
 import { Clock, Send, Loader2, Sparkles, MessageCircle, AlertTriangle, Flame, CheckCircle2, Calendar } from "lucide-react";
-import { fetchLiveClients, type RealClient } from "@/lib/crm";
+import { fetchLiveClients, recordReplenishmentAlert, type RealClient } from "@/lib/crm";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
+
+function formatReplenishmentAlertDate(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `Último aviso: ${day}/${month}/${year} às ${hours}:${minutes}`;
+}
 
 export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (client: RealClient) => void }) {
   const { company } = useAuth();
   const [clients, setClients] = useState<RealClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [urgencyFilter, setUrgencyFilter] = useState<'all' | 'urgent' | 'warning' | 'ok'>('all');
+  const [submittingAlerts, setSubmittingAlerts] = useState<Set<string>>(new Set());
+  const [alertErrors, setAlertErrors] = useState<Record<string, string | null>>({});
 
   const loadClients = async () => {
     try {
@@ -19,6 +33,47 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
       setClients([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMarkAsSent = async (clientId: string) => {
+    if (!clientId || submittingAlerts.has(clientId)) return;
+
+    // Proteção contra double-click: trava o botão imediatamente
+    setSubmittingAlerts(prev => new Set(prev).add(clientId));
+    setAlertErrors(prev => ({ ...prev, [clientId]: null }));
+
+    try {
+      const res = await recordReplenishmentAlert({
+        clientId,
+        companyId: company?.id,
+      });
+
+      if (res.success && res.timestamp) {
+        // Atualização reativa imediata no estado local do CRM
+        setClients(prev =>
+          prev.map(c =>
+            c.id === clientId ? { ...c, lastReplenishmentAlertAt: res.timestamp } : c
+          )
+        );
+      } else {
+        setAlertErrors(prev => ({
+          ...prev,
+          [clientId]: res.error || 'Falha ao registrar envio no Supabase',
+        }));
+      }
+    } catch (err: any) {
+      console.error('Erro ao marcar aviso de recompra como enviado:', err);
+      setAlertErrors(prev => ({
+        ...prev,
+        [clientId]: err?.message || 'Erro inesperado ao salvar envio.',
+      }));
+    } finally {
+      setSubmittingAlerts(prev => {
+        const next = new Set(prev);
+        next.delete(clientId);
+        return next;
+      });
     }
   };
 
@@ -48,6 +103,7 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
   const urgentClients = clients.filter(c => c && c.urgencyLevel === 'urgent');
   const warningClients = clients.filter(c => c && c.urgencyLevel === 'warning');
   const okClients = clients.filter(c => c && c.urgencyLevel === 'ok');
+  const alertedClients = clients.filter(c => c && Boolean(c.lastReplenishmentAlertAt));
 
   const filteredClients = urgencyFilter === 'all'
     ? clients
@@ -75,13 +131,19 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <span className="px-3 py-1.5 rounded-xl bg-[#141414] border border-red-500/20 text-red-400 text-[11px] font-bold uppercase tracking-wider">
             {urgentClients.length} Pods Secos
           </span>
           <span className="px-3 py-1.5 rounded-xl bg-[#141414] border border-amber-500/20 text-amber-400 text-[11px] font-bold uppercase tracking-wider">
             {warningClients.length} Secando
           </span>
+          {alertedClients.length > 0 && (
+            <span className="px-3 py-1.5 rounded-xl bg-[#141414] border border-emerald-500/20 text-emerald-400 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+              <CheckCircle2 className="size-3 text-emerald-400" />
+              {alertedClients.length} Avisos Enviados
+            </span>
+          )}
         </div>
       </div>
 
@@ -143,6 +205,9 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
             const progress = Math.min((item.daysSinceLastOrder / item.expectedCycleDays) * 100, 100);
             const isOverdue = item.urgencyLevel === 'urgent';
             const isNearEnd = item.urgencyLevel === 'warning';
+            const isSending = submittingAlerts.has(item.id);
+            const hasAlertSent = Boolean(item.lastReplenishmentAlertAt);
+            const errorMsg = alertErrors[item.id];
 
             const phoneClean = item.cleanPhone || item.phone.replace(/\D/g, '');
             const msg = `E aí ${item.name}! Tudo certo? 💨 Vi que já faz um tempinho desde a sua última compra do ${item.lastProduct}. Seu pod já tá na final? Já quer ir garantindo o próximo para não ficar na mão no rolê? Me avisa aqui!`;
@@ -167,7 +232,7 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
                     {item.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <h4 className="font-bold text-white text-sm hover:text-emerald-400 transition-colors flex items-center gap-2">
+                    <h4 className="font-bold text-white text-sm hover:text-emerald-400 transition-colors flex flex-wrap items-center gap-2">
                       {item.name}
                       {isOverdue ? (
                         <span className="text-[9px] bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded uppercase font-bold tracking-wider">
@@ -182,12 +247,25 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
                           Pod Novo
                         </span>
                       )}
+
+                      {hasAlertSent && (
+                        <span className="inline-flex items-center gap-1 text-[9px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                          <CheckCircle2 className="size-3 text-emerald-400" />
+                          Recompra Enviada
+                        </span>
+                      )}
                     </h4>
                     <div className="text-[11px] text-muted-foreground mt-1 flex flex-wrap items-center gap-1.5">
                       <span>Último: <strong className="text-white/80 font-medium">{item.lastProduct}</strong> ({item.lastPuffs} puffs)</span>
                       <span>•</span>
                       <span className="text-white/50">compra em {item.lastOrderDate}</span>
                     </div>
+                    {hasAlertSent && (
+                      <div className="text-[11px] text-emerald-400 font-medium mt-1 flex items-center gap-1.5">
+                        <Clock className="size-3 text-emerald-400/80" />
+                        <span>{formatReplenishmentAlertDate(item.lastReplenishmentAlertAt)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -213,17 +291,58 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
                   </div>
                 </div>
 
-                {/* Botão de Disparo 1-a-1 */}
-                <div className="flex items-center gap-3 justify-end shrink-0">
-                  <a
-                    href={waUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[11px] font-bold transition-all cursor-pointer uppercase tracking-wider"
-                  >
-                    <MessageCircle className="size-3.5" />
-                    <span>Recompra</span>
-                  </a>
+                {/* Botões de Ação (Disparo WhatsApp e Registro de Envio) */}
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={waUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[11px] font-bold transition-all cursor-pointer uppercase tracking-wider"
+                      title="Abrir conversa no WhatsApp com mensagem de recompra pré-pronta"
+                    >
+                      <MessageCircle className="size-3.5" />
+                      <span>Recompra</span>
+                    </a>
+
+                    <button
+                      type="button"
+                      disabled={isSending}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMarkAsSent(item.id);
+                      }}
+                      className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                        hasAlertSent
+                          ? 'bg-[#141414] hover:bg-[#1f1f1f] text-zinc-300 border border-white/10 hover:border-emerald-500/40'
+                          : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/40 border border-emerald-500'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      title={hasAlertSent ? "Clique para registrar nova data de envio caso tenha mandado novo aviso" : "Confirmar explicitamente que a mensagem de recompra foi enviada no WhatsApp"}
+                    >
+                      {isSending ? (
+                        <>
+                          <Loader2 className="size-3.5 animate-spin" />
+                          <span>Salvando...</span>
+                        </>
+                      ) : hasAlertSent ? (
+                        <>
+                          <CheckCircle2 className="size-3.5 text-emerald-400" />
+                          <span>Atualizar Envio</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="size-3.5" />
+                          <span>Marcar como Enviado</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {errorMsg && (
+                    <span className="text-[10px] text-red-400 font-medium max-w-[220px] text-right">
+                      {errorMsg}
+                    </span>
+                  )}
                 </div>
               </div>
             );
