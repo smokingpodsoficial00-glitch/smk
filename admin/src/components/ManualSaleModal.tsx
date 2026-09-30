@@ -696,19 +696,13 @@ export function ManualSaleModal({
         {/* Cabeçalho do Modal */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-3">
-            <div className="size-10 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <div className="size-10 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-white">
               <ShoppingCart className="size-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-white flex items-center gap-2">
-                <span>⚡ Registrar Venda Manual</span>
-                <span className="text-[10px] font-semibold bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">
-                  Atendimento
-                </span>
+              <h3 className="font-bold text-base text-white">
+                Registrar Venda
               </h3>
-              <p className="text-xs text-muted-foreground">
-                Atualiza estoque, ranking de vendas, financeiro e CRM automaticamente.
-              </p>
             </div>
           </div>
           <button
@@ -722,7 +716,7 @@ export function ManualSaleModal({
 
         {loadingProducts ? (
           <div className="py-12 text-center space-y-3">
-            <Loader2 className="size-8 animate-spin text-amber-400 mx-auto" />
+            <Loader2 className="size-8 animate-spin text-emerald-400 mx-auto" />
             <p className="text-xs text-muted-foreground">Carregando catálogo de produtos...</p>
           </div>
         ) : (
@@ -740,17 +734,12 @@ export function ManualSaleModal({
               </div>
             )}
 
-            {/* 1. DADOS DO CLIENTE */}
+            {/* DADOS DO CLIENTE */}
             <div className="space-y-3 bg-white/5 border border-white/10 rounded-2xl p-4">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs uppercase font-bold text-amber-400 tracking-wider flex items-center gap-1.5">
-                  <User className="size-3.5" /> 1. Dados do Cliente
+                <span className="text-xs uppercase font-bold text-white tracking-wider">
+                  Dados do Cliente
                 </span>
-                {clientsList.length > 0 && (
-                  <span className="text-[10px] font-bold text-white/50 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
-                    {clientsList.length} clientes salvos
-                  </span>
-                )}
               </div>
 
               {/* CARD DE CLIENTE SELECIONADO OU BUSCA INTEGRADA DIRETO NO CAMPO DE NOME */}
@@ -775,7 +764,7 @@ export function ManualSaleModal({
                   <button
                     type="button"
                     onClick={handleClearSelectedClient}
-                    className="text-xs text-amber-400 hover:text-amber-300 font-semibold px-3 py-1.5 rounded-xl border border-amber-500/30 hover:bg-amber-500/10 transition-colors cursor-pointer shrink-0"
+                    className="text-xs text-zinc-300 hover:text-white font-semibold px-3 py-1.5 rounded-xl border border-white/20 hover:bg-white/10 transition-colors cursor-pointer shrink-0"
                   >
                     Alterar cliente
                   </button>
@@ -829,7 +818,7 @@ export function ManualSaleModal({
                           }
                         }}
                         placeholder="Digite o nome do cliente..."
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400/50 font-semibold"
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-white/40 font-semibold"
                       />
                       {clientName && (
                         <button
@@ -849,12 +838,12 @@ export function ManualSaleModal({
 
                     {/* Dropdown Flutuante de Sugestões de Clientes do CRM */}
                     {isClientDropdownOpen && filteredAndRankedClients.length > 0 && (
-                      <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-[#16161a] border border-amber-500/30 rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                      <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-[#16161a] border border-white/15 rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                         <div className="px-3 py-2 bg-black/50 border-b border-white/10 flex items-center justify-between text-[10px] text-white/50">
                           <span>
                             {filteredAndRankedClients.length} cliente(s) no CRM
                           </span>
-                          <span className="text-amber-400/80 font-semibold hidden sm:inline">
+                          <span className="text-zinc-400 font-semibold hidden sm:inline">
                             Clique ou Enter ↵
                           </span>
                         </div>
@@ -878,7 +867,7 @@ export function ManualSaleModal({
                                 onClick={() => handleSelectExistingClient(c)}
                                 className={`w-full px-3.5 py-2.5 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer ${
                                   isHighlighted
-                                    ? "bg-amber-500/15 text-white"
+                                    ? "bg-white/10 text-white"
                                     : "hover:bg-white/5 text-white/85"
                                 }`}
                               >
@@ -886,7 +875,7 @@ export function ManualSaleModal({
                                   <div
                                     className={`size-8 rounded-xl flex items-center justify-center text-[11px] font-extrabold shrink-0 border ${
                                       idx === 0
-                                        ? "bg-amber-500/25 text-amber-300 border-amber-500/40"
+                                        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
                                         : "bg-white/5 text-white/70 border-white/10"
                                     }`}
                                   >
@@ -908,7 +897,7 @@ export function ManualSaleModal({
                                 <span
                                   className={`text-[10px] font-bold px-2 py-1 rounded-lg border shrink-0 transition-all ${
                                     isHighlighted
-                                      ? "bg-amber-500 text-black border-amber-400"
+                                      ? "bg-white text-black border-white font-extrabold"
                                       : "bg-white/5 text-white/50 border-white/10"
                                   }`}
                                 >
@@ -924,32 +913,35 @@ export function ManualSaleModal({
 
                   {/* Campo WhatsApp */}
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-[11px] text-silver font-medium">WhatsApp (DDD + Número)</label>
-                      <label className="flex items-center gap-1.5 text-[10px] text-white/50 hover:text-white/80 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={isNoWhatsApp}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setIsNoWhatsApp(checked);
-                            if (checked) {
-                              setClientPhone("");
-                              setAutoAddToMarketingList(false);
-                            }
-                          }}
-                          className="size-3 rounded accent-amber-500 cursor-pointer"
-                        />
+                    <div className="flex items-center justify-between mb-1 min-h-[17px]">
+                      <label className="text-[11px] text-silver font-medium">WhatsApp</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextState = !isNoWhatsApp;
+                          setIsNoWhatsApp(nextState);
+                          if (nextState) {
+                            setClientPhone("");
+                            setAutoAddToMarketingList(false);
+                          }
+                        }}
+                        className={`px-2.5 py-0.5 rounded-lg text-[10px] font-semibold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                          isNoWhatsApp
+                            ? "bg-zinc-800 text-white border-zinc-600 shadow-sm"
+                            : "bg-white/5 text-zinc-400 border-white/10 hover:border-white/20 hover:text-white"
+                        }`}
+                      >
+                        <span className={`size-1.5 rounded-full ${isNoWhatsApp ? "bg-emerald-400" : "bg-zinc-500"}`} />
                         <span>Sem WhatsApp (Insta)</span>
-                      </label>
+                      </button>
                     </div>
                     <input
                       type="text"
                       disabled={isNoWhatsApp}
                       value={isNoWhatsApp ? "(Venda Instagram / Sem WhatsApp)" : clientPhone}
                       onChange={(e) => setClientPhone(e.target.value)}
-                      placeholder="Ex: 11943856234"
-                      className={`w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400/50 font-semibold ${
+                      placeholder="Número do WhatsApp..."
+                      className={`w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-white/40 font-semibold ${
                         isNoWhatsApp ? "opacity-50 cursor-not-allowed italic text-white/60 bg-white/5" : ""
                       }`}
                     />
@@ -974,11 +966,11 @@ export function ManualSaleModal({
               </div>
             </div>
 
-            {/* TOGGLE & CARD: 📦 VENDA NACIONAL (FORA DE SP / CORREIOS) */}
+            {/* CARD: VENDA NACIONAL */}
             <div
               className={`border rounded-2xl p-4 transition-all space-y-3 ${
                 isNationalSale
-                  ? "bg-amber-500/10 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+                  ? "bg-emerald-500/[0.06] border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.08)]"
                   : "bg-white/5 border-white/10 hover:border-white/20"
               }`}
             >
@@ -988,22 +980,17 @@ export function ManualSaleModal({
                     type="checkbox"
                     checked={isNationalSale}
                     onChange={(e) => setIsNationalSale(e.target.checked)}
-                    className="size-4 rounded accent-amber-500 cursor-pointer"
+                    className="size-4 rounded accent-emerald-500 cursor-pointer"
                   />
                   <div className="flex items-center gap-2">
-                    <Globe className={`size-4 ${isNationalSale ? "text-amber-400" : "text-white/60"}`} />
-                    <div>
-                      <span className={`text-xs font-bold ${isNationalSale ? "text-amber-300" : "text-white/90"}`}>
-                        Venda Nacional (Fora de São Paulo / Correios)
-                      </span>
-                      <span className="text-[10px] text-white/50 block">
-                        Isola o frete dos motoboys locais de SBC e contabiliza no Painel de Vendas Nacionais
-                      </span>
-                    </div>
+                    <Globe className={`size-4 ${isNationalSale ? "text-emerald-400" : "text-white/60"}`} />
+                    <span className={`text-xs font-bold ${isNationalSale ? "text-white" : "text-white/90"}`}>
+                      Venda Nacional
+                    </span>
                   </div>
                 </label>
                 {isNationalSale && (
-                  <span className="text-[10px] font-black uppercase bg-amber-500/20 text-amber-400 border border-amber-500/40 px-2 py-0.5 rounded-full shrink-0">
+                  <span className="text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full shrink-0">
                     Correios / BR
                   </span>
                 )}
@@ -1011,7 +998,7 @@ export function ManualSaleModal({
 
               {/* Card de Região e Destino */}
               {isNationalSale && (
-                <div className="pt-3 border-t border-amber-500/20 space-y-3 animate-in fade-in duration-200">
+                <div className="pt-3 border-t border-white/10 space-y-3 animate-in fade-in duration-200">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="text-[11px] text-silver font-medium block mb-1">
@@ -1020,7 +1007,7 @@ export function ManualSaleModal({
                       <select
                         value={nationalState}
                         onChange={(e) => setNationalState(e.target.value)}
-                        className="w-full bg-black/60 border border-amber-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 font-semibold cursor-pointer"
+                        className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-400 font-semibold cursor-pointer"
                       >
                         {BRAZILIAN_STATES.map((st) => (
                           <option key={st.uf} value={st.uf}>
@@ -1039,7 +1026,7 @@ export function ManualSaleModal({
                         value={nationalCity}
                         onChange={(e) => setNationalCity(e.target.value)}
                         placeholder="Ex: Rio de Janeiro, Curitiba..."
-                        className="w-full bg-black/40 border border-amber-500/30 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400 font-semibold"
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-emerald-400 font-semibold"
                       />
                     </div>
                   </div>
@@ -1053,7 +1040,7 @@ export function ManualSaleModal({
                       value={nationalStreetAddress}
                       onChange={(e) => setNationalStreetAddress(e.target.value)}
                       placeholder="Ex: Av. Atlântica, 1500, Apto 402 - Copacabana, CEP 22021-001"
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-amber-400/50"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-emerald-400/50"
                     />
                   </div>
 
@@ -1066,17 +1053,17 @@ export function ManualSaleModal({
                       value={nationalTrackingCode}
                       onChange={(e) => setNationalTrackingCode(e.target.value.toUpperCase())}
                       placeholder="Ex: QC123456789BR"
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-amber-400 font-mono placeholder:text-muted-foreground/40 focus:outline-none focus:border-amber-400 font-bold"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder:text-muted-foreground/40 focus:outline-none focus:border-emerald-400 font-bold"
                     />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* 2. SELEÇÃO DE PODS (MODELO -> SABOR SIMPLIFICADO) */}
+            {/* SELEÇÃO DE PODS (MODELO -> SABOR) */}
             <div className="space-y-3 bg-white/5 border border-white/10 rounded-2xl p-4">
-              <span className="text-xs uppercase font-bold text-amber-400 tracking-wider flex items-center gap-1.5">
-                <Package className="size-3.5" /> 2. Selecionar Modelo & Sabor
+              <span className="text-xs uppercase font-bold text-white tracking-wider">
+                Selecionar Modelo & Sabor
               </span>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1089,7 +1076,7 @@ export function ManualSaleModal({
                       setSelectedModelKey(e.target.value);
                       setSelectedFlavorId("");
                     }}
-                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400/50 font-semibold cursor-pointer"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-white/30 font-semibold cursor-pointer hover:border-white/20 transition-all"
                   >
                     <option value="">-- Selecione o Modelo --</option>
                     {availableModels.map((m) => (
@@ -1107,7 +1094,7 @@ export function ManualSaleModal({
                     disabled={!selectedModelKey}
                     value={selectedFlavorId}
                     onChange={(e) => setSelectedFlavorId(e.target.value)}
-                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400/50 disabled:opacity-40 font-semibold cursor-pointer"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-white/30 disabled:opacity-40 font-semibold cursor-pointer hover:border-white/20 transition-all"
                   >
                     <option value="">-- Selecione o Sabor --</option>
                     {availableFlavors.map((p) => (
@@ -1130,7 +1117,7 @@ export function ManualSaleModal({
                         min="1"
                         value={itemQuantity}
                         onChange={(e) => setItemQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-20 bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-center text-white focus:outline-none focus:border-amber-400/50 font-bold"
+                        className="w-20 bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-center text-white focus:outline-none focus:border-white/30 font-bold"
                       />
                     </div>
                     <div>
@@ -1148,9 +1135,9 @@ export function ManualSaleModal({
                   <button
                     type="button"
                     onClick={handleAddAnotherItem}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all border border-white/10 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold transition-all border border-white/10 cursor-pointer"
                   >
-                    <Plus className="size-3.5 text-amber-400" />
+                    <Plus className="size-3.5 text-emerald-400" />
                     <span>+ Outro Pod neste Pedido</span>
                   </button>
                 </div>
@@ -1255,7 +1242,7 @@ export function ManualSaleModal({
                     value={shippingCost}
                     onChange={(e) => setShippingCost(e.target.value)}
                     placeholder="0,00"
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-amber-300 focus:outline-none focus:border-amber-400/50 font-bold"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-white/30 font-bold"
                   />
                   <span className="text-[9px] text-white/40 block mt-1">
                     {isNationalSale ? "Gasto real com postagem/PAC/Sedex" : "Gasto que você terá na entrega"}
@@ -1265,7 +1252,7 @@ export function ManualSaleModal({
             </div>
 
             {/* RESUMO DO PEDIDO E MARGEM DE LUCRO */}
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-2">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-silver">Subtotal dos Pods:</span>
                 <span className="font-bold text-white">R$ {subtotal.toFixed(2).replace(".", ",")}</span>
@@ -1276,9 +1263,9 @@ export function ManualSaleModal({
                   <span className="font-bold text-white">R$ {numericShippingFee.toFixed(2).replace(".", ",")}</span>
                 </div>
               )}
-              <div className="flex items-center justify-between text-sm pt-2 border-t border-amber-500/20">
-                <span className="font-bold text-white uppercase tracking-wider">TOTAL DO PEDIDO:</span>
-                <span className="font-extrabold text-lg text-emerald-400">
+              <div className="flex items-center justify-between text-sm pt-2 border-t border-white/10">
+                <span className="font-bold text-white uppercase tracking-wider text-xs">TOTAL DO PEDIDO:</span>
+                <span className="font-extrabold text-xl text-emerald-400">
                   R$ {grandTotal.toFixed(2).replace(".", ",")}
                 </span>
               </div>
