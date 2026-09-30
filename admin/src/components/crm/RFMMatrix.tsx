@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { 
-  Star, UserCheck, Crown, ShieldAlert, Phone, Loader2, MessageSquare, 
-  Trophy, Filter, Sparkles, Megaphone, CheckSquare, Square, Search, 
-  Flame, CheckCircle2, RefreshCw, Users
+  UserCheck, Crown, ShieldAlert, Phone, Loader2, MessageSquare, 
+  Megaphone, CheckSquare, Square, Search, 
+  CheckCircle2, Users, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
-import { fetchLiveClients, matchesVisualSearch, type RealClient, type FlavorProfileType } from "@/lib/crm";
+import { fetchLiveClients, matchesVisualSearch, type RealClient } from "@/lib/crm";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -19,6 +19,10 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
   const [filterFlavor, setFilterFlavor] = useState<string>('all');
   const [filterVip, setFilterVip] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Paginação (15 clientes por página)
+  const PAGE_SIZE = 15;
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Seleção em lote para envio ao Módulo de Marketing
   const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set());
@@ -100,6 +104,32 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
 
     return true;
   });
+
+  // Reset de página ao filtrar ou pesquisar
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterSegment, filterFlavor, filterVip]);
+
+  // Cálculos de Paginação (baseados na lista após todos os filtros e busca)
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const paginatedClients = filteredClients.slice(startIndex, startIndex + PAGE_SIZE);
+  const startRecord = filteredClients.length === 0 ? 0 : startIndex + 1;
+  const endRecord = Math.min(startIndex + PAGE_SIZE, filteredClients.length);
+
+  const getVisiblePages = (current: number, total: number) => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    if (current <= 4) return [1, 2, 3, 4, 5, '...', total];
+    if (current >= total - 3) return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+    return [1, '...', current - 1, current, current + 1, '...', total];
+  };
 
   // Seleção em massa
   const handleToggleSelectAll = () => {
@@ -349,7 +379,6 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
                 <tr>
                   <th className="px-4 py-3 w-10"></th>
                   <th className="px-5 py-3 text-muted-foreground font-semibold">Cliente & Telefone</th>
-                  <th className="px-5 py-3 text-muted-foreground font-semibold">Perfil de Sabor</th>
                   <th className="px-5 py-3 text-muted-foreground font-semibold">Grupo VIP</th>
                   <th className="px-5 py-3 text-muted-foreground font-semibold">LTV (Total Gasto)</th>
                   <th className="px-5 py-3 text-muted-foreground font-semibold">Último Pod / Puffs</th>
@@ -357,7 +386,7 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {filteredClients.map(client => {
+                {paginatedClients.map(client => {
                   if (!client) return null;
                   const isSelected = selectedClientIds.has(client.id);
                   const phoneClean = client.cleanPhone || (client.phone || '').replace(/\D/g, '');
@@ -388,18 +417,12 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
                                 <Crown className="size-3.5 text-emerald-400" />
                               )}
                             </div>
-                            <div className="text-xs text-muted-foreground font-mono flex items-center gap-1 mt-0.5">
+                            <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                               <Phone className="size-3 text-muted-foreground/60" />
                               {client.phone || 'Sem telefone'}
                             </div>
                           </div>
                         </div>
-                      </td>
-
-                      <td className="px-5 py-4" onClick={() => onSelectClient(client)}>
-                        <span className="bg-[#141414] text-white/70 border border-white/5 px-2.5 py-1 rounded-full text-[11px] font-semibold">
-                          {client.flavorProfileLabel}
-                        </span>
                       </td>
 
                       <td className="px-5 py-4" onClick={() => onSelectClient(client)}>
@@ -414,9 +437,9 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
                         )}
                       </td>
 
-                      <td className="px-5 py-4 font-mono font-extrabold text-emerald-400 text-base" onClick={() => onSelectClient(client)}>
+                      <td className="px-5 py-4 font-extrabold text-emerald-400 text-base" onClick={() => onSelectClient(client)}>
                         {formatBRL(client.spent || 0)}
-                        <div className="text-[10px] font-normal text-muted-foreground font-sans">
+                        <div className="text-[10px] font-normal text-muted-foreground">
                           {client.ordersCount || 1} {client.ordersCount === 1 ? 'pedido' : 'pedidos'}
                         </div>
                       </td>
@@ -450,6 +473,62 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {filteredClients.length > 0 && (
+          <div className="p-4 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 bg-black/40 text-xs">
+            <div className="text-muted-foreground">
+              Mostrando <span className="font-semibold text-white">{startRecord}–{endRecord}</span> de <span className="font-semibold text-white">{filteredClients.length}</span> clientes
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage <= 1}
+                className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-white/70 hover:text-white transition-colors flex items-center gap-1 font-medium text-xs cursor-pointer"
+                title="Página Anterior"
+              >
+                <ChevronLeft className="size-3.5" />
+                <span className="hidden sm:inline">Anterior</span>
+              </button>
+
+              <div className="flex items-center gap-1">
+                {getVisiblePages(currentPage, totalPages).map((p, idx) => {
+                  if (p === '...') {
+                    return (
+                      <span key={`dots-${idx}`} className="px-1.5 text-white/40 font-bold">
+                        ...
+                      </span>
+                    );
+                  }
+                  const pageNum = p as number;
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`min-w-7 h-7 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer ${
+                        currentPage === pageNum
+                          ? 'bg-emerald-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                          : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage >= totalPages}
+                className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-white/70 hover:text-white transition-colors flex items-center gap-1 font-medium text-xs cursor-pointer"
+                title="Próxima Página"
+              >
+                <span className="hidden sm:inline">Próxima</span>
+                <ChevronRight className="size-3.5" />
+              </button>
+            </div>
           </div>
         )}
       </div>
