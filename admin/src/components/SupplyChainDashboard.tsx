@@ -745,9 +745,9 @@ export default function SupplyChainDashboard() {
     }
   };
 
-  const handleSaveAllStockChanges = async () => {
+  const handleSaveAllStockChanges = async (): Promise<boolean> => {
     const entries = Object.entries(pendingStockChangesRef.current);
-    if (entries.length === 0) return;
+    if (entries.length === 0) return true;
     setIsSavingStock(true);
     try {
       for (const [id, stock] of entries) {
@@ -755,16 +755,20 @@ export default function SupplyChainDashboard() {
         if (company?.id) query = query.eq("company_id", company.id);
         const { data, error } = await query.select();
         if (error || !data || data.length === 0) {
-          await supabase.from("smoking_products").update({ stock }).eq("id", id);
+          const fallbackRes = await supabase.from("smoking_products").update({ stock }).eq("id", id);
+          if (fallbackRes.error) {
+            throw fallbackRes.error;
+          }
         }
       }
       pendingStockChangesRef.current = {};
       setPendingStockChanges({});
-      alert("Alterações de estoque salvas com sucesso no Supabase e sincronizadas com o cardápio!");
       await fetchData();
-    } catch (err) {
+      return true;
+    } catch (err: any) {
       console.error("Erro ao salvar alterações de estoque:", err);
-      alert("Ocorreu um erro ao salvar as alterações de estoque.");
+      alert("Ocorreu um erro ao salvar as alterações de estoque: " + (err.message || "Falha na comunicação com o banco."));
+      return false;
     } finally {
       setIsSavingStock(false);
     }
@@ -2284,11 +2288,7 @@ export default function SupplyChainDashboard() {
 
         const handleCloseViewingFlavors = () => {
           if (hasModalPendingChanges) {
-            if (window.confirm("Você possui alterações de estoque pendentes para este modelo. Deseja salvar no cardápio antes de fechar?")) {
-              handleSaveAllStockChanges();
-            } else {
-              handleDiscardStockChanges();
-            }
+            handleDiscardStockChanges();
           }
           setViewingFlavorsGroup(null);
         };
@@ -2439,21 +2439,47 @@ export default function SupplyChainDashboard() {
 
               {/* Modal Footer */}
               <div className="p-4 border-t border-border bg-black/40 flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">
-                  {hasModalPendingChanges ? "Alterações de estoque pendentes serão salvas automaticamente" : ""}
+                <span className="text-xs text-muted-foreground font-medium">
+                  {hasModalPendingChanges 
+                    ? `${realFlavors.filter((f: any) => pendingStockChanges[f.id] !== undefined).length} alteração(ões) pendente(s)` 
+                    : ""}
                 </span>
-                <button
-                  onClick={async () => {
-                    if (hasModalPendingChanges) {
-                      await handleSaveAllStockChanges();
-                    }
-                    setViewingFlavorsGroup(null);
-                  }}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
-                >
-                  <Check className="size-4" />
-                  Salvar e Concluir
-                </button>
+                <div className="flex items-center gap-2">
+                  {hasModalPendingChanges && (
+                    <button
+                      type="button"
+                      disabled={isSavingStock}
+                      onClick={handleCloseViewingFlavors}
+                      className="px-3.5 py-2.5 rounded-xl bg-elevated hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      Descartar
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={isSavingStock}
+                    onClick={async () => {
+                      if (hasModalPendingChanges) {
+                        const ok = await handleSaveAllStockChanges();
+                        if (!ok) return;
+                      }
+                      setViewingFlavorsGroup(null);
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                  >
+                    {isSavingStock ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin text-black" />
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="size-4" />
+                        Salvar e Concluir
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
             </div>
@@ -3440,53 +3466,6 @@ export default function SupplyChainDashboard() {
               >
                 {isSavingCategory ? <Loader2 className="size-4 animate-spin text-black" /> : <Save className="size-4" />}
                 <span>Salvar Categorias</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ━━━ BARRA FLUTUANTE FIXA NO CANTO INFERIOR DIREITO: SALVAR ALTERAÇÕES ━━━ */}
-      {Object.keys(pendingStockChanges).length > 0 && (
-        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 duration-200">
-          <div className="bg-[#121212] border border-emerald-500/40 rounded-2xl p-4 shadow-[0_0_30px_rgba(16,185,129,0.35)] flex items-center gap-4 border-l-4 border-l-emerald-500 backdrop-blur-xl">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="size-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs font-bold text-white uppercase tracking-wider">Alterações de Estoque</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-                {Object.keys(pendingStockChanges).length} {Object.keys(pendingStockChanges).length === 1 ? 'item alterado' : 'itens alterados'} no rascunho
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleDiscardStockChanges}
-                disabled={isSavingStock}
-                className="px-3.5 py-2 rounded-xl bg-elevated hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-semibold transition-all cursor-pointer"
-              >
-                Descartar
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSaveAllStockChanges}
-                disabled={isSavingStock}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.4)] cursor-pointer active:scale-95 disabled:opacity-50"
-              >
-                {isSavingStock ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin text-black" />
-                    Salvando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="size-4" />
-                    Salvar Alterações
-                  </>
-                )}
               </button>
             </div>
           </div>
