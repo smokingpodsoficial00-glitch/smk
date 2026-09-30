@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { fetchSalesHistory, type DetailedSale } from "@/lib/salesHistory";
-import { fetchLiveClients, type RealClient } from "@/lib/crm";
+import { fetchLiveClients, matchesVisualSearch, type RealClient } from "@/lib/crm";
 import { supabase } from "@/lib/supabase";
 import { deleteOrderWithStockRestoration } from "@/lib/orders";
 import { SaleDetailModal } from "./SaleDetailModal";
@@ -187,11 +187,11 @@ export function MobileCRMView({
       }
 
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchName = (client.name || "").toLowerCase().includes(q);
-        const matchPhone = (client.cleanPhone || "").includes(q) || (client.phone || "").includes(q);
-        const matchProduct = (client.lastProduct || "").toLowerCase().includes(q);
-        const matchFlavor = (client.lastFlavor || "").toLowerCase().includes(q);
+        const qCleanPhone = searchQuery.replace(/\D/g, '');
+        const matchName = matchesVisualSearch(client.name, searchQuery);
+        const matchPhone = qCleanPhone ? (client.cleanPhone || client.phone || "").replace(/\D/g, '').includes(qCleanPhone) : false;
+        const matchProduct = matchesVisualSearch(client.lastProduct, searchQuery);
+        const matchFlavor = matchesVisualSearch(client.lastFlavor, searchQuery);
         if (!matchName && !matchPhone && !matchProduct && !matchFlavor) return false;
       }
 

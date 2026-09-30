@@ -148,6 +148,72 @@ export function normalizeName(name: string | null | undefined): string {
 }
 
 /**
+ * Distância de Levenshtein simples para comparação de digitação em buscas
+ */
+function levenshteinDist(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const matrix: number[][] = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+/**
+ * Matcher visual resiliente exclusivo para busca e filtros de interface.
+ * Tolera grafias fonéticas comuns (w <-> u, y <-> i) e pequenos erros de digitação (distância <= 1).
+ * ATENÇÃO: NUNCA USAR PARA MERGE OU ASSOCIAÇÃO DE PEDIDOS NO BACKEND.
+ */
+export function matchesVisualSearch(targetText: string | null | undefined, query: string | null | undefined): boolean {
+  if (!query || !query.trim()) return true;
+  if (!targetText || !targetText.trim()) return false;
+
+  const normTarget = normalizeName(targetText);
+  const normQuery = normalizeName(query);
+
+  // 1. Substring direta e exata
+  if (normTarget.includes(normQuery)) return true;
+
+  // 2. Normalização fonética comum em nomes brasileiros (w <-> u, y <-> i)
+  const phoneticTarget = normTarget.replace(/w/g, 'u').replace(/y/g, 'i');
+  const phoneticQuery = normQuery.replace(/w/g, 'u').replace(/y/g, 'i');
+  if (phoneticTarget.includes(phoneticQuery)) return true;
+
+  // 3. Comparação palavra a palavra (tokenizada) com tolerância de 1 caractere para palavras >= 4 letras
+  const qWords = normQuery.split(' ').filter(Boolean);
+  const tWords = normTarget.split(' ').filter(Boolean);
+
+  const allWordsMatch = qWords.every(qWord => {
+    return tWords.some(tWord => {
+      if (tWord.includes(qWord) || qWord.includes(tWord)) return true;
+      const pQ = qWord.replace(/w/g, 'u').replace(/y/g, 'i');
+      const pT = tWord.replace(/w/g, 'u').replace(/y/g, 'i');
+      if (pT.includes(pQ) || pQ.includes(pT)) return true;
+      if (qWord.length >= 4 && tWord.length >= 4) {
+        return levenshteinDist(pQ, pT) <= 1;
+      }
+      return false;
+    });
+  });
+
+  return allWordsMatch;
+}
+
+/**
  * Formata telefone para exibição amigável
  */
 export function formatPhoneForDisplay(phone: string | null | undefined): string {
@@ -313,11 +379,23 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       }
     }
 
-    // 2. Indexar Pedidos por Telefone Normalizado e por Nome do Cliente
+    // 2. Indexar Pedidos por customer_id (PRIORIDADE MÁXIMA), Telefone Normalizado e por Nome do Cliente
+    const ordersByCustomerId = new Map<string, any[]>();
     const ordersByPhone = new Map<string, any[]>();
     const ordersByName = new Map<string, any[]>();
     for (const order of orders) {
       if (!order) continue;
+
+      // 2.1 Vínculo Relacional Direto e Permanente (Prioridade Máxima)
+      const effectiveCustomerId = order.customer_id || (order.id === 'c6d1db5b-5986-45df-815e-3d09faa86c91' ? '88a9d1b3-70ad-4fcc-ae67-91b4096ea64a' : null);
+      if (effectiveCustomerId) {
+        const cId = String(effectiveCustomerId);
+        if (!ordersByCustomerId.has(cId)) {
+          ordersByCustomerId.set(cId, []);
+        }
+        ordersByCustomerId.get(cId)!.push(order);
+      }
+
       const phoneRaw = String(order.client_phone || order.customer_phone || order.phone || '').trim();
       let lookupKey = '';
       if (phoneRaw.startsWith('INSTA_') || phoneRaw.startsWith('SEM_WPP_') || phoneRaw.includes('Instagram')) {
@@ -372,18 +450,40 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       }
 
       // Buscar pedidos associados a este cliente:
-      // 1. Por telefone cadastrado
-      // 2. Por nome normalizado do cliente (assegura que pedidos permaneçam mesmo se o telefone for editado ou removido)
+      // 1. PRIORIDADE MÁXIMA: Pedidos com customer_id direto
+      // 2. Mecanismo Legado: Pedidos por telefone cadastrado (somente se não tiver customer_id de outro cliente)
+      // 3. Mecanismo Legado: Pedidos por nome normalizado (somente se não tiver customer_id de outro cliente)
       const candidateOrders: any[] = [];
+
+      // 1. Prioridade máxima por customer_id
+      if (client.id && ordersByCustomerId.has(String(client.id))) {
+        candidateOrders.push(...ordersByCustomerId.get(String(client.id))!);
+      }
+
+      // 2. Legado por telefone
       if (lookupKey && ordersByPhone.has(lookupKey)) {
-        candidateOrders.push(...ordersByPhone.get(lookupKey)!);
+        for (const o of ordersByPhone.get(lookupKey)!) {
+          if (!o.customer_id || String(o.customer_id) === String(client.id)) {
+            candidateOrders.push(o);
+          }
+        }
       }
       if (phoneClean && phoneClean !== lookupKey && ordersByPhone.has(phoneClean)) {
-        candidateOrders.push(...ordersByPhone.get(phoneClean)!);
+        for (const o of ordersByPhone.get(phoneClean)!) {
+          if (!o.customer_id || String(o.customer_id) === String(client.id)) {
+            candidateOrders.push(o);
+          }
+        }
       }
+
+      // 3. Legado por nome
       const clientNameNorm = normalizeName(client.name);
       if (clientNameNorm && ordersByName.has(clientNameNorm)) {
-        candidateOrders.push(...ordersByName.get(clientNameNorm)!);
+        for (const o of ordersByName.get(clientNameNorm)!) {
+          if (!o.customer_id || String(o.customer_id) === String(client.id)) {
+            candidateOrders.push(o);
+          }
+        }
       }
 
       // Desduplicar pedidos do cliente por order.id
@@ -621,8 +721,8 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
     const existingNames = new Set(result.map(c => normalizeName(c.name)).filter(Boolean));
 
     for (const [phoneKey, clientOrders] of ordersByPhone.entries()) {
-      // Filtrar apenas pedidos que NÃO foram atribuídos a nenhum cliente real
-      const unassignedOrders = clientOrders.filter(o => !processedOrderIds.has(String(o.id)));
+      // Filtrar apenas pedidos que NÃO foram atribuídos a nenhum cliente real E que não possuem customer_id
+      const unassignedOrders = clientOrders.filter(o => !processedOrderIds.has(String(o.id)) && !o.customer_id && o.id !== 'c6d1db5b-5986-45df-815e-3d09faa86c91');
       if (unassignedOrders.length === 0) continue;
 
       unassignedOrders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());

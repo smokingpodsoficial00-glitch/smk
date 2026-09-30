@@ -5,7 +5,7 @@ import {
   Flame, CheckCircle2, RefreshCw, Users
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
-import { fetchLiveClients, type RealClient, type FlavorProfileType } from "@/lib/crm";
+import { fetchLiveClients, matchesVisualSearch, type RealClient, type FlavorProfileType } from "@/lib/crm";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -85,14 +85,14 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
     if (filterVip === 'in_group' && !client.inVipGroup) return false;
     if (filterVip === 'out_group' && client.inVipGroup) return false;
 
-    // Busca textual (nome, telefone, produto, sabor, endereço)
+    // Busca textual resiliente (nome com tolerância a grafias fonéticas, telefone, produto, sabor, endereço)
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchName = (client.name || '').toLowerCase().includes(q);
-      const matchPhone = (client.phone || '').replace(/\D/g, '').includes(q);
-      const matchProduct = (client.lastProduct || '').toLowerCase().includes(q);
-      const matchFlavor = (client.lastFlavor || '').toLowerCase().includes(q);
-      const matchAddress = (client.address || '').toLowerCase().includes(q);
+      const qCleanPhone = searchQuery.replace(/\D/g, '');
+      const matchName = matchesVisualSearch(client.name, searchQuery);
+      const matchPhone = qCleanPhone ? (client.phone || '').replace(/\D/g, '').includes(qCleanPhone) : false;
+      const matchProduct = matchesVisualSearch(client.lastProduct, searchQuery);
+      const matchFlavor = matchesVisualSearch(client.lastFlavor, searchQuery);
+      const matchAddress = matchesVisualSearch(client.address, searchQuery);
       if (!matchName && !matchPhone && !matchProduct && !matchFlavor && !matchAddress) {
         return false;
       }
