@@ -1,17 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ShoppingBag, Search, Filter, Calendar, DollarSign, 
-  TrendingUp, Users, RefreshCw, Eye, ArrowUpRight, 
-  ChevronRight, Phone, MapPin, Tag, Download, Sparkles,
-  CheckCircle2, Clock, AlertTriangle, X, Receipt, CreditCard,
-  Flame, Layers, Box, Compass, Trash2
+  Search, Calendar, Eye, Phone, MapPin, 
+  Download, Receipt, CreditCard, Trash2 
 } from 'lucide-react';
 import { formatBRL } from '@/lib/cart';
-import { 
-  fetchSalesHistory, 
-  type DetailedSale, 
-  type SalesMacroMetrics 
-} from '@/lib/salesHistory';
+import { fetchSalesHistory, type DetailedSale } from '@/lib/salesHistory';
 import { useAuth } from '@/contexts/AuthContext';
 import { SaleDetailModal } from './SaleDetailModal';
 import { supabase } from '@/lib/supabase';
@@ -20,7 +13,6 @@ import { deleteOrderWithStockRestoration } from '@/lib/orders';
 export function SalesHistoryTab() {
   const { company } = useAuth();
   const [sales, setSales] = useState<DetailedSale[]>([]);
-  const [metrics, setMetrics] = useState<SalesMacroMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Filtros
@@ -51,8 +43,11 @@ export function SalesHistoryTab() {
     if (!company?.id) return;
     try {
       const data = await fetchSalesHistory(company.id);
-      setSales(data.sales);
-      setMetrics(data.metrics);
+      // Garantir ordenação estritamente cronológica: mais recente -> mais antigo
+      const sorted = (data.sales || []).sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setSales(sorted);
     } catch (e) {
       console.error("Erro ao carregar histórico de vendas:", e);
     } finally {
@@ -139,202 +134,15 @@ export function SalesHistoryTab() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `mural_vendas_detalhado_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `historico_vendas_detalhado_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   return (
-    <div className="space-y-6">
-      
-      {/* ━━━ 1. MURAL MACRO: FATURAMENTO ANUAL, SEMESTRAL, TRIMESTRAL E MENSAL ━━━ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* 1. Faturamento Anual (12M) */}
-        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
-              Faturamento Anual (12M)
-            </span>
-            <div className="size-9 rounded-xl bg-white/5 border border-white/15 flex items-center justify-center text-amber-400">
-              <TrendingUp className="size-5" />
-            </div>
-          </div>
-
-          <div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
-              {formatBRL(metrics?.revenueAnnual || 0)}
-            </div>
-            <p className="text-xs font-medium text-white/60 mt-1 flex items-center gap-1.5">
-              <ShoppingBag className="size-3.5 text-white/60" />
-              <span>{metrics?.ordersAnnual || 0} pedidos no período</span>
-            </p>
-          </div>
-
-          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-white/50">
-            <span>Janela de 12 Meses</span>
-            <span className="text-amber-400 font-mono font-bold">LTV: {formatBRL(metrics?.ltvAnnual || 0)}</span>
-          </div>
-        </div>
-
-        {/* 2. Faturamento Semestral (6M) */}
-        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
-              Faturamento Semestral (6M)
-            </span>
-            <div className="size-9 rounded-xl bg-white/5 border border-white/15 flex items-center justify-center text-blue-400">
-              <Sparkles className="size-5" />
-            </div>
-          </div>
-
-          <div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
-              {formatBRL(metrics?.revenueSemiannual || 0)}
-            </div>
-            <p className="text-xs font-medium text-white/60 mt-1 flex items-center gap-1.5">
-              <ShoppingBag className="size-3.5 text-white/60" />
-              <span>{metrics?.ordersSemiannual || 0} pedidos no período</span>
-            </p>
-          </div>
-
-          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-white/50">
-            <span>Janela de 6 Meses</span>
-            <span className="text-blue-400 font-mono font-bold">LTV: {formatBRL(metrics?.ltvSemiannual || 0)}</span>
-          </div>
-        </div>
-
-        {/* 3. Faturamento Trimestral (3M) */}
-        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-lg hover:border-white/30 transition-all flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
-              Faturamento Trimestral (3M)
-            </span>
-            <div className="size-9 rounded-xl bg-white/5 border border-white/15 flex items-center justify-center text-purple-400">
-              <Calendar className="size-5" />
-            </div>
-          </div>
-
-          <div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
-              {formatBRL(metrics?.revenueQuarterly || 0)}
-            </div>
-            <p className="text-xs font-medium text-white/60 mt-1 flex items-center gap-1.5">
-              <ShoppingBag className="size-3.5 text-white/60" />
-              <span>{metrics?.ordersQuarterly || 0} pedidos no período</span>
-            </p>
-          </div>
-
-          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-white/50">
-            <span>Janela de 3 Meses</span>
-            <span className="text-purple-400 font-mono font-bold">LTV: {formatBRL(metrics?.ltvQuarterly || 0)}</span>
-          </div>
-        </div>
-
-        {/* 4. Faturamento Mensal (30D) - Destaque Esmeralda */}
-        <div className="bg-[#0e0e10] border border-emerald-500/40 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-xl bg-gradient-to-b from-emerald-500/5 to-transparent hover:border-emerald-400 transition-all flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider">
-              Faturamento do Mês (30D)
-            </span>
-            <div className="size-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-300">
-              <ShoppingBag className="size-5" />
-            </div>
-          </div>
-
-          <div>
-            <div className="text-2xl sm:text-3xl font-black text-emerald-300 font-mono tracking-tight">
-              {formatBRL(metrics?.revenueMonthly || 0)}
-            </div>
-            <p className="text-xs font-extrabold text-emerald-400 mt-1 flex items-center gap-1.5">
-              <span>{metrics?.ordersMonthly || 0} pedidos nos últimos 30 dias</span>
-            </p>
-          </div>
-
-          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-white/50">
-            <span>Ticket Médio: <strong className="text-emerald-400 font-mono">{formatBRL(metrics?.averageTicket || 0)}</strong></span>
-            <span className="text-emerald-400/80 font-mono font-bold">Ativo</span>
-          </div>
-        </div>
-
-      </div>
-
-      {/* ━━━ 2. TOP SABORES & PUFFS MAIS PEDIDOS (CONTAINER ESTRUTURADO) ━━━ */}
-      {metrics && (metrics.topFlavors.length > 0 || metrics.topPuffs.length > 0) && (
-        <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 sm:p-6 space-y-4 shadow-lg">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="size-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
-                <Flame className="size-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  Sabores Campeões de Venda & Modelos em Destaque
-                </h3>
-                <p className="text-xs text-white/40 mt-0.5">
-                  Giro de sabores e capacidade de puffs com maior recorrência de pedidos.
-                </p>
-              </div>
-            </div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#16161a] border border-white/10 text-white/80 self-start sm:self-auto">
-              <Sparkles className="size-3.5 text-amber-400" />
-              <span>Alta Demanda</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-1">
-            {/* Sabores Campeões */}
-            <div className="bg-[#141418] border border-white/5 rounded-xl p-4 space-y-2.5">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
-                <Flame className="size-3.5 text-amber-400" />
-                Sabores Mais Vendidos
-              </span>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {metrics.topFlavors.length === 0 ? (
-                  <span className="text-xs text-white/40">Nenhum sabor registrado ainda.</span>
-                ) : (
-                  metrics.topFlavors.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="inline-flex items-center gap-2 bg-[#1c1c22] border border-white/10 text-white text-xs px-3 py-1.5 rounded-xl font-medium shadow-sm hover:border-white/20 transition-all"
-                    >
-                      <span className="size-1.5 rounded-full bg-amber-400 shrink-0" />
-                      <span>{item.flavor}</span>
-                      <span className="text-amber-400 font-mono font-bold text-[11px]">({item.count} un)</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Modelos / Puffs */}
-            <div className="bg-[#141418] border border-white/5 rounded-xl p-4 space-y-2.5">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
-                <Box className="size-3.5 text-emerald-400" />
-                Capacidade & Puffs Mais Populares
-              </span>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {metrics.topPuffs.length === 0 ? (
-                  <span className="text-xs text-white/40">Nenhum modelo registrado ainda.</span>
-                ) : (
-                  metrics.topPuffs.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="inline-flex items-center gap-2 bg-[#1c1c22] border border-white/10 text-emerald-400 text-xs px-3 py-1.5 rounded-xl font-mono font-bold shadow-sm hover:border-emerald-500/30 transition-all"
-                    >
-                      <span>{item.puffs}</span>
-                      <span className="text-white/40 text-[11px] font-normal">({item.count} un)</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ━━━ 3. BARRA DE CONTROLES: Busca, Período, Status & Exportação ━━━ */}
+    <div className="space-y-4">
+      {/* ━━━ 1. BARRA DE CONTROLES: Busca, Período, Status & Exportação ━━━ */}
       <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-lg">
         
         {/* Campo de Busca por Venda */}
@@ -391,7 +199,7 @@ export function SalesHistoryTab() {
         </div>
       </div>
 
-      {/* ━━━ 4. MURAL TRANSACIONAL DE VENDAS (FEED DETALHADO) ━━━ */}
+      {/* ━━━ 2. HISTÓRICO DE VENDAS (FEED DETALHADO) ━━━ */}
       {loading ? (
         <div className="p-12 text-center text-white/50 text-xs font-mono">Carregando histórico de vendas...</div>
       ) : filteredSales.length === 0 ? (

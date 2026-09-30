@@ -66,7 +66,7 @@ export default function CRMDashboard() {
   const tabs = [
     { id: 'rfm', label: 'Ranking & Fidelidade', icon: <Crown className="size-4 text-amber-400" /> },
     { id: 'replenishment', label: 'Aviso de Fim de Pod & Recompra', icon: <RefreshCw className="size-4 text-white" /> },
-    { id: 'sales_history', label: 'Histórico & Mural de Vendas', icon: <Receipt className="size-4 text-white/80" /> },
+    { id: 'sales_history', label: 'Histórico de Vendas', icon: <Receipt className="size-4 text-white/80" /> },
   ] as const;
 
   return (
