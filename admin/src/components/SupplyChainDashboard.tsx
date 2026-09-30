@@ -1565,22 +1565,7 @@ export default function SupplyChainDashboard() {
                 <span className="hidden sm:inline">de Recompra</span>
               </button>
 
-              {/* Botão Ação Principal de Venda */}
-              <button
-                type="button"
-                data-tour="btn-registrar-venda"
-                onClick={() => {
-                  setPreSelectedFlavorIdForSale(null);
-                  setPreSelectedGroupForSale(null);
-                  setIsManualSaleModalOpen(true);
-                }}
-                className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-[11px] sm:text-xs font-bold transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] cursor-pointer active:scale-[0.97] flex-1 sm:flex-initial"
-              >
-                <ShoppingCart className="size-3.5 text-black shrink-0" />
-                <span className="truncate">Registrar Venda</span>
-              </button>
-
-              {/* Botão Secundário Mais Discreto */}
+              {/* Botão Novo Produto */}
               <button
                 data-tour="btn-novo-produto"
                 onClick={() => {
