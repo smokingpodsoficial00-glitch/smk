@@ -884,15 +884,21 @@ export function ManualSaleModal({
                               >
                                 <div className="flex items-center gap-2.5 min-w-0">
                                   <div
-                                    className="size-8 rounded-xl flex items-center justify-center text-[11px] font-extrabold shrink-0 border bg-white/5 text-white/70 border-white/10"
+                                    className={`size-8 rounded-xl flex items-center justify-center text-[11px] font-extrabold shrink-0 border ${
+                                      idx === 0
+                                        ? "bg-amber-500/25 text-amber-300 border-amber-500/40"
+                                        : "bg-white/5 text-white/70 border-white/10"
+                                    }`}
                                   >
                                     {initials || "CL"}
                                   </div>
-                                  <div className="min-w-0 flex-1">
-                                    <span className="text-xs font-bold text-white block">
-                                      {c.name}
-                                    </span>
-                                    <div className="flex items-center gap-1.5 text-[11px] text-white/50 font-mono">
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-bold text-white whitespace-normal break-words">
+                                        {c.name}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-[11px] text-white/50 font-mono truncate">
                                       <Phone className="size-2.5 text-emerald-400 shrink-0" />
                                       <span>{displayPhone}</span>
                                     </div>
