@@ -1271,7 +1271,7 @@ export default function SupplyChainDashboard() {
     group.realFlavors = specificFlavors.length > 0 ? specificFlavors : group.flavors;
 
     group.totalStock = group.realFlavors.reduce((sum, f) => sum + (f.stock || 0), 0);
-    group.outOfStockFlavors = group.realFlavors.filter(f => (f.stock || 0) === 0);
+    group.outOfStockFlavors = group.realFlavors.filter(f => (f.stock || 0) <= 0);
     group.lowStockFlavors = group.realFlavors.filter(f => (f.stock || 0) > 0 && (f.stock || 0) < 5);
     group.inStockFlavors = group.realFlavors.filter(f => (f.stock || 0) > 0);
   });
@@ -1279,10 +1279,20 @@ export default function SupplyChainDashboard() {
   // Step 4: Apply filterTab based on stock status
   const skuGroups = Object.values(groupedMap)
     .filter(group => {
-      if (filterTab === 'SEM_ESTOQUE') return group.totalStock === 0 || group.outOfStockFlavors.length > 0;
-      if (filterTab === 'BAIXO_ESTOQUE') return group.lowStockFlavors.length > 0;
-      if (filterTab === 'EM_ESTOQUE') return group.totalStock > 0;
-      return true; // TODOS
+      // 1. "Sem estoque": SOMENTE modelos onde todas as variantes estão esgotadas (estoque total zerado)
+      if (filterTab === 'SEM_ESTOQUE') {
+        return group.totalStock <= 0;
+      }
+      // 2. "Baixo estoque": SOMENTE modelos com estoque disponível que possuem variantes em baixo estoque (1 a 4 unidades)
+      if (filterTab === 'BAIXO_ESTOQUE') {
+        return group.totalStock > 0 && group.lowStockFlavors.length > 0;
+      }
+      // 3. "Em estoque": SOMENTE modelos com estoque disponível (> 0)
+      if (filterTab === 'EM_ESTOQUE') {
+        return group.totalStock > 0;
+      }
+      // 4. "Todos": exibe todos os modelos correspondentes aos filtros de busca e marca
+      return true;
     })
     .sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name));
 
@@ -1880,20 +1890,74 @@ export default function SupplyChainDashboard() {
 
         {/* ── PESQUISA + FILTROS DE ESTOQUE COMPACTOS SAAS ───────────────────────── */}
         <div className="bg-[#141414] border border-white/10 rounded-xl p-3.5 space-y-3">
-          {/* Campo de Busca */}
-          <div className="relative w-full">
-            <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input 
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Pesquisar por marca, modelo ou sabor..."
-              className="w-full bg-[#0d0d0d] border border-white/10 rounded-lg pl-10 pr-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-white/30 transition-all"
-            />
+          {/* Linha 1: Campo de Busca + Filtros de Disponibilidade (Segmented Control) */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+            {/* Campo de Busca */}
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input 
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Pesquisar por marca, modelo ou sabor..."
+                className="w-full bg-[#0d0d0d] border border-white/10 rounded-lg pl-10 pr-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-white/30 transition-all"
+              />
+            </div>
+
+            {/* Segmented Control dos 4 Filtros de Disponibilidade */}
+            <div className="flex items-center gap-1 bg-[#0d0d0d] p-1 rounded-xl border border-white/10 shrink-0 overflow-x-auto custom-scrollbar">
+              <button
+                type="button"
+                onClick={() => setFilterTab("TODOS")}
+                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer select-none ${
+                  filterTab === "TODOS"
+                    ? "bg-white text-black font-bold shadow-sm"
+                    : "text-muted-foreground hover:text-white hover:bg-white/5"
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterTab("EM_ESTOQUE")}
+                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer select-none flex items-center gap-1.5 ${
+                  filterTab === "EM_ESTOQUE"
+                    ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+                    : "text-muted-foreground hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <span className="size-1.5 rounded-full bg-emerald-400 shrink-0" />
+                Em estoque
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterTab("BAIXO_ESTOQUE")}
+                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer select-none flex items-center gap-1.5 ${
+                  filterTab === "BAIXO_ESTOQUE"
+                    ? "bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.2)]"
+                    : "text-muted-foreground hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <span className="size-1.5 rounded-full bg-amber-400 shrink-0" />
+                Baixo estoque
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterTab("SEM_ESTOQUE")}
+                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer select-none flex items-center gap-1.5 ${
+                  filterTab === "SEM_ESTOQUE"
+                    ? "bg-red-500/20 text-red-300 font-bold border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]"
+                    : "text-muted-foreground hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <span className="size-1.5 rounded-full bg-red-400 shrink-0" />
+                Sem estoque
+              </button>
+            </div>
           </div>
 
-          {/* Filtros por Marca (Horizontal Scrollable, nunca comprimido) */}
-          <div className="w-full min-w-0 border-t border-white/5 pt-2">
+          {/* Linha 2: Filtros por Marca (Horizontal Scrollable, nunca comprimido) */}
+          <div className="w-full min-w-0 border-t border-white/5 pt-2.5">
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar w-full min-w-0">
               <button
                 type="button"
@@ -1918,31 +1982,6 @@ export default function SupplyChainDashboard() {
                   }`}
                 >
                   {b}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Filtros de Status de Estoque (Horizontal Scrollable, 4 Opções Limpas) */}
-          <div className="w-full min-w-0 border-t border-white/5 pt-2">
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar w-full min-w-0 text-xs">
-              {[
-                { id: "TODOS", label: "Todos" },
-                { id: "EM_ESTOQUE", label: "Em estoque" },
-                { id: "BAIXO_ESTOQUE", label: "Baixo estoque" },
-                { id: "SEM_ESTOQUE", label: "Sem estoque" },
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setFilterTab(tab.id as any)}
-                  className={`shrink-0 px-3 py-1 rounded font-medium transition-all whitespace-nowrap cursor-pointer ${
-                    filterTab === tab.id
-                      ? "bg-white text-black font-bold shadow-sm"
-                      : "bg-white/5 text-muted-foreground hover:text-white hover:bg-white/10"
-                  }`}
-                >
-                  {tab.label}
                 </button>
               ))}
             </div>
@@ -1974,16 +2013,20 @@ export default function SupplyChainDashboard() {
               let stockBadgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
               let stockLabel = `Em estoque (${group.totalStock} un)`;
 
-              if (group.outOfStockFlavors.length > 0) {
+              if (group.totalStock <= 0) {
                 stockBarColor = "bg-red-400";
                 stockBadgeClass = "bg-red-500/10 text-red-400 border-red-500/20";
-                const numOut = group.outOfStockFlavors.length;
-                stockLabel = `${numOut} ${numOut === 1 ? 'sabor esgotado' : 'sabores esgotados'}`;
+                stockLabel = "Sem estoque";
               } else if (group.lowStockFlavors.length > 0) {
                 stockBarColor = "bg-amber-400";
                 stockBadgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
                 const numLow = group.lowStockFlavors.length;
-                stockLabel = `${numLow} ${numLow === 1 ? 'sabor em baixo estoque' : 'sabores em baixo estoque'}`;
+                stockLabel = `${numLow} ${numLow === 1 ? 'sabor baixo estoque' : 'sabores baixo estoque'} (${group.totalStock} un)`;
+              } else if (group.outOfStockFlavors.length > 0) {
+                stockBarColor = "bg-emerald-400";
+                stockBadgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+                const numOut = group.outOfStockFlavors.length;
+                stockLabel = `Em estoque (${group.totalStock} un) · ${numOut} esgotado`;
               }
 
               return (
