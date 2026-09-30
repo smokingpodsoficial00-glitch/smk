@@ -450,7 +450,7 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
                   <div className="min-w-0">
                     <div className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
                       <span className="truncate">{item.brand} {item.name}</span>
-                      <span className="text-[10px] text-muted-foreground font-normal truncate">
+                      <span className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-white/90 font-medium text-[11px] shrink-0">
                         {item.flavor}
                       </span>
                     </div>
@@ -495,22 +495,22 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
       
       {/* DESKTOP: Tabela */}
       <div className="hidden md:block overflow-x-auto rounded-2xl border border-white/10 bg-[#141414] custom-scrollbar">
-        <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+        <table className="w-full text-left text-xs border-collapse min-w-[860px]">
           <thead>
             <tr className="bg-[#181818] border-b border-white/10 text-muted-foreground font-semibold uppercase tracking-wider text-[10px]">
-              <th className="p-3">Produto</th>
-              <th className="p-3">Sabor</th>
-              <th className="p-3 text-center">Dias Parado</th>
-              <th className="p-3 text-center">Estoque</th>
-              <th className="p-3 text-right">Preço</th>
-              <th className="p-3 text-right">Custo</th>
-              <th className="p-3 text-center">Ações</th>
+              <th className="p-3 pl-4 min-w-[220px]">Produto</th>
+              <th className="p-3 min-w-[190px]">Sabor</th>
+              <th className="p-3 text-center min-w-[120px]">Dias Parado</th>
+              <th className="p-3 text-center min-w-[80px]">Estoque</th>
+              <th className="p-3 text-right min-w-[90px]">Preço</th>
+              <th className="p-3 text-right min-w-[85px]">Custo</th>
+              <th className="p-3 pr-4 text-center min-w-[150px]">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5 bg-[#111111]">
             {filteredQueue.map((item, idx) => (
               <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
-                <td className="p-3">
+                <td className="p-3 pl-4">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold text-muted-foreground w-4 text-right shrink-0">#{idx + 1}</span>
                     {item.image_url ? (
@@ -535,13 +535,13 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
                   </div>
                 </td>
                 <td className="p-3">
-                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white font-medium text-xs truncate inline-block max-w-[120px]">
+                  <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white font-medium text-xs whitespace-nowrap inline-flex items-center">
                     {item.flavor}
                   </span>
                 </td>
                 <td className="p-3 text-center">
-                  <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/90 font-bold text-xs whitespace-nowrap">
-                    {item.diasParado}d parado
+                  <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/90 font-bold text-xs whitespace-nowrap inline-flex items-center justify-center">
+                    {item.diasParado} {item.diasParado === 1 ? "dia" : "dias"}
                   </span>
                 </td>
                 <td className="p-3 text-center">
@@ -560,7 +560,7 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
                 <td className="p-3 text-right text-muted-foreground text-xs">
                   {item.costPrice > 0 ? `R$ ${item.costPrice.toFixed(2)}` : "—"}
                 </td>
-                <td className="p-3 text-center">
+                <td className="p-3 pr-4 text-center">
                   <div className="flex items-center justify-center gap-1.5">
                     <button
                       type="button"
@@ -643,10 +643,10 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
               )}
               <div className="min-w-0 flex-1">
                 <div className="font-bold text-white text-sm truncate">{item.brand} {item.name}</div>
-                <div className="text-xs text-muted-foreground truncate">{item.flavor}</div>
+                <div className="text-xs text-white/90 font-medium mt-0.5">{item.flavor}</div>
               </div>
-              <span className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-white/90 font-bold text-[11px] shrink-0">
-                {item.diasParado}d
+              <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/90 font-bold text-xs shrink-0 whitespace-nowrap">
+                {item.diasParado} {item.diasParado === 1 ? "dia" : "dias"}
               </span>
             </div>
             {/* Linha 2: Métricas */}
