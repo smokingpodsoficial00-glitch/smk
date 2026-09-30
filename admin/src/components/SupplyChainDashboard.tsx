@@ -68,6 +68,35 @@ export default function SupplyChainDashboard() {
   const [costPrice, setCostPrice] = useState("");
   const [puffs, setPuffs] = useState("");
 
+  // Sabores / Variantes do Novo Modelo
+  const [newModelVariants, setNewModelVariants] = useState<{ id: string; name: string; stock: string }[]>([
+    { id: '1', name: '', stock: '' }
+  ]);
+
+  const handleAddVariantRow = () => {
+    setNewModelVariants(prev => [
+      ...prev,
+      { id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`, name: '', stock: '' }
+    ]);
+  };
+
+  const handleRemoveVariantRow = (index: number) => {
+    setNewModelVariants(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateVariantRow = (index: number, field: 'name' | 'stock', value: string) => {
+    setNewModelVariants(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
+  };
+
+  const handleCloseNewProductModal = () => {
+    if (submitting) return;
+    setShowNewProductModal(false);
+    setName(""); setBrand(""); setPrice(""); setCostPrice(""); setPuffs("");
+    setImageFile(null); setImagePreview("");
+    setNewModelVariants([{ id: '1', name: '', stock: '' }]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   // Upload state
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
@@ -465,16 +494,44 @@ export default function SupplyChainDashboard() {
       return;
     }
 
+    const newBrandName = brand.trim() || "Genérico";
+    const newModelName = name.trim();
+    const newPuffsVal = parseInt(puffs) || 5000;
+    const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+    const groupKey = `${newBrandName.toLowerCase()}__${newModelName.toLowerCase()}`;
+
+    // Validar duplicidade de modelo existente
+    if (groupedMap[groupKey]) {
+      alert(`Já existe um modelo cadastrado com a marca "${newBrandName}" e modelo "${newModelName}".\nPara adicionar mais sabores a este produto, localize-o no Estoque e utilize a opção "Adicionar Sabor".`);
+      return;
+    }
+
+    // Processar e validar lista de sabores / variantes
+    const validVariants = newModelVariants
+      .map(v => ({ name: v.name.trim(), stock: parseInt(v.stock) || 0 }))
+      .filter(v => v.name.length > 0);
+
+    // Validar duplicidade de sabores na lista informada
+    const flavorNamesSeen = new Set<string>();
+    for (const v of validVariants) {
+      const lower = v.name.toLowerCase();
+      if (flavorNamesSeen.has(lower)) {
+        alert(`O sabor "${v.name}" foi informado mais de uma vez. Por favor, remova ou altere o sabor duplicado.`);
+        return;
+      }
+      flavorNamesSeen.add(lower);
+    }
+
+    const flavorsToCreate = validVariants.length > 0
+      ? validVariants
+      : [{ name: "Padrão", stock: 0 }];
+
     setSubmitting(true);
     try {
       let imageUrl = "";
-      if (imageFile) imageUrl = await uploadProductImage(imageFile);
-
-      const newBrandName = brand.trim() || "Genérico";
-      const newModelName = name.trim();
-      const newPuffsVal = parseInt(puffs) || 5000;
-      const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
-      const groupKey = `${newBrandName.toLowerCase()}__${newModelName.toLowerCase()}`;
+      if (imageFile) {
+        imageUrl = await uploadProductImage(imageFile);
+      }
 
       // Persiste o custo no localStorage sob a chave do grupo/modelo
       try {
@@ -483,18 +540,19 @@ export default function SupplyChainDashboard() {
         console.warn("Erro ao salvar custo localmente:", e);
       }
 
-      let insertPayload: any = {
-        name: newModelName, 
-        brand: newBrandName, 
-        flavor: "Padrão",
-        price: parsedPrice, 
-        cost_price: finalCostVal, 
-        stock: 0,
-        puffs: newPuffsVal, 
-        image_url: imageUrl, 
+      // Preparar payload de inserção para todas as variantes
+      const rowsToInsert = flavorsToCreate.map(f => ({
+        name: newModelName,
+        brand: newBrandName,
+        flavor: f.name,
+        price: parsedPrice,
+        cost_price: finalCostVal,
+        stock: f.stock,
+        puffs: newPuffsVal,
+        image_url: imageUrl,
         is_active: true,
         company_id: targetCompanyId,
-      };
+      }));
 
       // Garante que o vínculo company_users existe no Supabase antes de inserir
       if (company?.id) {
@@ -514,11 +572,11 @@ export default function SupplyChainDashboard() {
         }
       }
 
-      let { data, error } = await supabase.from("smoking_products").insert(insertPayload).select();
+      let { data, error } = await supabase.from("smoking_products").insert(rowsToInsert).select();
 
       if (error && (error.message?.includes("cost_price") || error.code === "PGRST204")) {
-        delete insertPayload.cost_price;
-        const fallbackRes = await supabase.from("smoking_products").insert(insertPayload).select();
+        const fallbackRows = rowsToInsert.map(({ cost_price, ...rest }) => rest);
+        const fallbackRes = await supabase.from("smoking_products").insert(fallbackRows).select();
         data = fallbackRes.data; error = fallbackRes.error;
       }
 
@@ -528,44 +586,56 @@ export default function SupplyChainDashboard() {
         return;
       }
 
-      const insertedId = (data && data[0]) ? data[0].id : `prod-${Date.now()}`;
-      try {
-        localStorage.setItem(`smk_cost_${insertedId}`, finalCostVal.toString());
-      } catch (e) {}
+      const insertedProducts = (data && Array.isArray(data)) ? data : [];
+      const insertedIds = insertedProducts.map((p: any) => p.id);
 
-      const createdProduct = (data && data[0]) ? {
-        ...data[0],
-        cost_price: finalCostVal
-      } : {
-        id: insertedId,
-        name: newModelName,
-        brand: newBrandName,
-        flavor: "Padrão",
-        price: parsedPrice,
-        cost_price: finalCostVal,
-        stock: 0,
-        puffs: newPuffsVal,
-        image_url: imageUrl,
-        is_active: true,
-        company_id: targetCompanyId,
-        created_at: new Date().toISOString()
-      };
+      // CRÍTICO: Registrar imagem no cache local imediatamente para todos os IDs criados
+      if (imageUrl) {
+        insertedIds.forEach((id: string) => {
+          productImageCacheRef.current[id] = imageUrl;
+        });
+      }
 
-      setProducts(prev => [createdProduct, ...prev]);
+      // Persistir custo no sistema de custos
+      if (finalCostVal > 0 && insertedIds.length > 0) {
+        try {
+          await updateProductCost({
+            modelKey: groupKey,
+            productIds: insertedIds,
+            costPrice: finalCostVal,
+            companyId: targetCompanyId
+          });
+        } catch (e) {
+          console.warn("Aviso ao salvar custo do produto:", e);
+        }
+      }
 
+      // Atualização otimista no estado local
+      const createdItems = insertedProducts.length > 0
+        ? insertedProducts.map((p: any) => ({
+            ...p,
+            cost_price: finalCostVal,
+            image_url: imageUrl || p.image_url || ""
+          }))
+        : rowsToInsert.map((r, i) => ({
+            id: `prod-${Date.now()}-${i}`,
+            ...r,
+            created_at: new Date().toISOString()
+          }));
+
+      setProducts(prev => [...createdItems, ...prev]);
+
+      // Limpar formulário e fechar modal
       setName(""); setBrand(""); setPrice(""); setCostPrice(""); setPuffs("");
       setImageFile(null); setImagePreview("");
+      setNewModelVariants([{ id: '1', name: '', stock: '' }]);
       if (fileInputRef.current) fileInputRef.current.value = "";
       setShowNewProductModal(false);
 
-      alert("Modelo cadastrado com sucesso.");
+      alert(`Modelo "${getGroupDisplayName(newBrandName, newModelName)}" cadastrado com sucesso com ${flavorsToCreate.length} sabor(es)!`);
 
-      setAddingFlavorGroup({
-        brand: newBrandName, name: newModelName, price: parsedPrice,
-        cost_price: finalCostVal, puffs: newPuffsVal, image_url: imageUrl,
-      });
-      setNewFlavorName(""); setNewFlavorStock("");
-      await fetchData();
+      // Forçar recarregamento completo dos dados incluindo imagens
+      await fetchData(true);
     } catch (err: any) {
       console.error("Erro inesperado ao cadastrar produto:", err);
       alert("Não foi possível cadastrar o produto. Tente novamente.");
@@ -646,12 +716,16 @@ export default function SupplyChainDashboard() {
         created_at: new Date().toISOString()
       };
 
+      if (createdFlavor.id && addingFlavorGroup.image_url) {
+        productImageCacheRef.current[createdFlavor.id] = addingFlavorGroup.image_url;
+      }
+
       setProducts(prev => [createdFlavor, ...prev]);
       setAddingFlavorGroup(null); 
       setNewFlavorName(""); 
       setNewFlavorStock("");
       alert(`Sabor "${addedName}" salvo com sucesso e atualizado no cardápio digital!`);
-      await fetchData();
+      await fetchData(true);
     } catch (err: any) {
       console.error(err);
       alert("Erro ao adicionar sabor: " + err.message);
@@ -1505,7 +1579,10 @@ export default function SupplyChainDashboard() {
               {/* Botão Secundário Mais Discreto */}
               <button
                 data-tour="btn-novo-produto"
-                onClick={() => setShowNewProductModal(true)}
+                onClick={() => {
+                  setNewModelVariants([{ id: '1', name: '', stock: '' }]);
+                  setShowNewProductModal(true);
+                }}
                 className="inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-[11px] sm:text-xs font-medium border border-white/15 transition-all cursor-pointer active:scale-[0.97] flex-1 sm:flex-initial"
               >
                 <Plus className="size-3.5 shrink-0" />
@@ -2386,29 +2463,32 @@ export default function SupplyChainDashboard() {
 
       {/* ━━━ MODAL FLUTUANTE CENTRALIZADO ("BOLHA"): NOVO PRODUTO ━━━━━━━━ */}
       {showNewProductModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
           <div 
             className="absolute inset-0" 
-            onClick={() => setShowNewProductModal(false)} 
+            onClick={handleCloseNewProductModal} 
           />
-          <div className="relative bg-[#121212] border border-border rounded-3xl w-full max-w-lg shadow-2xl p-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200 space-y-5">
-            <div className="flex items-center justify-between border-b border-border pb-4">
+          <div className="relative bg-[#121212] border border-border rounded-3xl w-full max-w-lg shadow-2xl p-5 sm:p-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-border pb-3 sm:pb-4 shrink-0">
               <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                   <Plus className="size-5 text-emerald-400" />
                   Cadastrar Novo Modelo
                 </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Preencha as informações do produto</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Preencha as informações do produto e seus sabores</p>
               </div>
               <button 
-                onClick={() => setShowNewProductModal(false)}
-                className="p-2 rounded-xl text-muted-foreground hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                type="button"
+                onClick={handleCloseNewProductModal}
+                disabled={submitting}
+                className="p-2 rounded-xl text-muted-foreground hover:text-white hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
               >
                 <X className="size-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddProduct} className="space-y-4">
+            <form onSubmit={handleAddProduct} className="flex flex-col flex-1 overflow-hidden min-h-0 mt-3 sm:mt-4">
+              <div className="space-y-4 overflow-y-auto custom-scrollbar pr-1 flex-1 pb-2">
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Marca</label>
@@ -2501,10 +2581,84 @@ export default function SupplyChainDashboard() {
                 </div>
               </div>
 
-              <div className="flex gap-2.5 pt-3 border-t border-border">
+                {/* Sabores / Variantes */}
+                <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">
+                        Sabores / Variantes
+                      </label>
+                      <span className="text-[10px] text-muted-foreground block">
+                        {newModelVariants.filter(v => v.name.trim()).length > 0
+                          ? `${newModelVariants.filter(v => v.name.trim()).length} sabor(es) preenchido(s)`
+                          : "Adicione os sabores e estoque inicial deste modelo"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={handleAddVariantRow}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <Plus className="size-3.5" />
+                      Adicionar Sabor
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                    {newModelVariants.map((variant, index) => (
+                      <div key={variant.id} className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground/60 w-4 text-right shrink-0">
+                          {index + 1}.
+                        </span>
+                        <input
+                          type="text"
+                          value={variant.name}
+                          disabled={submitting}
+                          onChange={(e) => handleUpdateVariantRow(index, 'name', e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddVariantRow();
+                            }
+                          }}
+                          placeholder="Nome do sabor (ex.: Watermelon Ice)"
+                          className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 transition-all disabled:opacity-50"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          value={variant.stock}
+                          disabled={submitting}
+                          onChange={(e) => handleUpdateVariantRow(index, 'stock', e.target.value)}
+                          placeholder="Estoque (0)"
+                          className="w-24 bg-[#0a0a0a] border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 transition-all font-medium text-center disabled:opacity-50"
+                        />
+                        <button
+                          type="button"
+                          disabled={submitting}
+                          onClick={() => handleRemoveVariantRow(index)}
+                          className="p-1.5 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                          title="Remover sabor"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {newModelVariants.length === 0 && (
+                      <div className="text-center py-2 text-xs text-muted-foreground/60">
+                        Nenhum sabor adicionado. O modelo será cadastrado com sabor "Padrão".
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2.5 pt-3 border-t border-border shrink-0 mt-auto">
                 <button 
                   type="button"
-                  onClick={() => setShowNewProductModal(false)}
+                  onClick={handleCloseNewProductModal}
                   disabled={submitting}
                   className="flex-1 bg-elevated hover:bg-white/10 text-muted-foreground text-xs font-semibold py-2.5 rounded-xl border border-border transition-all cursor-pointer disabled:opacity-50"
                 >
