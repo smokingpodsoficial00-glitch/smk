@@ -1,5 +1,5 @@
 import React, { Component, type ReactNode, useState } from "react";
-import { Users, Crown, RefreshCw, AlertTriangle, Receipt, ShoppingCart } from "lucide-react";
+import { Users, Crown, RefreshCw, AlertTriangle, Receipt } from "lucide-react";
 import type { RealClient } from "@/lib/crm";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -85,7 +85,7 @@ export default function CRMDashboard() {
         {/* ━━━ VISÃO COMPLETA COMPUTADOR (>= 768px) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         <div className="hidden md:block space-y-6">
           {/* ━━━ CABEÇALHO EXECUTIVO PADRONIZADO (DESIGN SYSTEM) ━━━━━━━━━━━ */}
-          <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <header className="border-b border-white/10 pb-4">
             <div className="space-y-1">
               <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
                 <Users className="size-6 text-white shrink-0" />
@@ -94,21 +94,6 @@ export default function CRMDashboard() {
               <p className="text-xs text-muted-foreground">
                 Ranking de Fidelidade, Previsão de Recompra e Histórico Técnico de Vendas.
               </p>
-            </div>
-            
-            <div className="flex items-center gap-3 self-start sm:self-auto">
-              <button
-                onClick={() => setIsManualSaleModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] cursor-pointer active:scale-[0.97]"
-              >
-                <ShoppingCart className="size-3.5 text-black" />
-                <span>Registrar Venda</span>
-              </button>
-
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-white/10 text-white border border-white/20 shadow-sm">
-                <div className="size-2 rounded-full bg-white animate-ping" />
-                <span>Base Conectada</span>
-              </div>
             </div>
           </header>
 
