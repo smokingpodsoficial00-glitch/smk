@@ -132,12 +132,12 @@ export const VipGroupOfferModal: React.FC<VipGroupOfferModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
-      <div className="bg-[#111111] border border-amber-500/40 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
+      <div className="bg-[#111111] border border-white/15 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
         
         {/* Header */}
         <div className="px-5 py-4 border-b border-white/10 bg-[#161616] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="size-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <div className="size-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
               <Crown className="size-4.5" />
             </div>
             <div>
@@ -177,7 +177,7 @@ export const VipGroupOfferModal: React.FC<VipGroupOfferModalProps> = ({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold text-white truncate">{product.brand} {product.name}</span>
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white/10 text-white border border-white/15">
                   {product.flavor}
                 </span>
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
@@ -193,9 +193,9 @@ export const VipGroupOfferModal: React.FC<VipGroupOfferModalProps> = ({
           </div>
 
           {/* Guia Visual Rápido em 3 Passos */}
-          <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 flex items-center justify-between text-xs text-amber-300">
+          <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs text-white/90">
             <span className="font-semibold flex items-center gap-1.5">
-              <Sparkles className="size-3.5 text-amber-400 shrink-0" />
+              <Sparkles className="size-3.5 text-emerald-400 shrink-0" />
               1. Copie a mensagem &nbsp;→&nbsp; 2. Baixe a foto &nbsp;→&nbsp; 3. Cole no Grupo VIP!
             </span>
           </div>
@@ -207,7 +207,7 @@ export const VipGroupOfferModal: React.FC<VipGroupOfferModalProps> = ({
               <button
                 type="button"
                 onClick={handleCopyMessage}
-                className="text-amber-400 hover:text-amber-300 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+                className="text-emerald-400 hover:text-emerald-300 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
               >
                 {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
                 <span>{copied ? "Copiado!" : "Copiar Texto"}</span>
@@ -218,7 +218,7 @@ export const VipGroupOfferModal: React.FC<VipGroupOfferModalProps> = ({
                 readOnly
                 value={message}
                 rows={10}
-                className="w-full bg-black/60 border border-white/10 rounded-xl p-3 text-xs font-mono text-white/90 leading-relaxed focus:outline-none focus:border-amber-400 select-all resize-none custom-scrollbar"
+                className="w-full bg-black/60 border border-white/10 rounded-xl p-3 text-xs font-mono text-white/90 leading-relaxed focus:outline-none focus:border-emerald-500/50 select-all resize-none custom-scrollbar"
               />
             </div>
           </div>

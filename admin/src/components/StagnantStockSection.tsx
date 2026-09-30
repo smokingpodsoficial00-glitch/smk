@@ -321,14 +321,14 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
       <div className="bg-[#141414] border border-white/10 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <div className="size-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <div className="size-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
               <Clock className="size-4" />
             </div>
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 📦 Produtos Parados
                 {isSimulated && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-white/10 text-white/90 border border-white/20">
                     EXEMPLO DEMO
                   </span>
                 )}
@@ -346,7 +346,7 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
               Produtos na Fila
             </span>
-            <span className="text-lg font-extrabold text-amber-400">
+            <span className="text-lg font-extrabold text-white">
               {totalStagnantProducts} <span className="text-xs font-normal text-muted-foreground">sabores</span>
             </span>
           </div>
@@ -373,15 +373,15 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
 
       {/* Banner de Demonstração para Contas Novas */}
       {stagnantQueue.length === 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="size-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+            <div className="size-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
               <Sparkles className="size-4" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h4 className="text-xs font-bold text-white">Radar de Produtos Parados</h4>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                   {isDemoActive ? "MODO DEMONSTRAÇÃO ATIVO" : "SIMULAÇÃO OCULTA"}
                 </span>
               </div>
@@ -411,7 +411,7 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Buscar por marca, modelo ou sabor..."
-            className="w-full bg-black/50 border border-white/10 rounded-xl pl-10 pr-3 py-2 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-amber-400 transition-all"
+            className="w-full bg-black/50 border border-white/10 rounded-xl pl-10 pr-3 py-2 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
           />
         </div>
         <div className="text-xs font-medium text-muted-foreground shrink-0 text-right sm:pr-2">
@@ -421,14 +421,14 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
 
       {/* ━━━ OFERTAS EM ANDAMENTO (TODAS AS PROMOÇÕES ATIVAS) ━━━━━━━━━━━ */}
       {activePromotions.length > 0 && (
-        <div className="rounded-2xl border border-red-500/20 bg-[#141414] overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 bg-red-500/5 border-b border-red-500/20">
+        <div className="rounded-2xl border border-white/10 bg-[#141414] overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 bg-white/[0.02] border-b border-white/10">
             <div className="flex items-center gap-2">
-              <Tag className="size-4 text-red-400" />
+              <Tag className="size-4 text-emerald-400" />
               <h4 className="text-xs font-bold text-white">
                 Ofertas em Andamento
               </h4>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                 {activePromotions.length} {activePromotions.length === 1 ? 'ativa' : 'ativas'}
               </span>
             </div>
@@ -472,14 +472,14 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
                   <button
                     type="button"
                     onClick={() => setSelectedOfferProduct(item)}
-                    className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-colors cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-white border border-white/15 transition-colors cursor-pointer"
                   >
                     Editar
                   </button>
                   <button
                     type="button"
                     onClick={() => handleTogglePromotion(item)}
-                    className="px-2.5 py-1.5 rounded-xl font-semibold text-xs border bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30 transition-colors cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl font-semibold text-xs border bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 transition-colors cursor-pointer"
                     title="Encerrar promoção e voltar ao preço normal"
                   >
                     Encerrar Oferta
@@ -524,10 +524,10 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
                       <div className="font-bold text-white text-xs truncate flex items-center gap-1.5">
                         <span className="truncate">{item.brand} {item.name}</span>
                         {item.isDemo && (
-                          <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">DEMO</span>
+                          <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-white/10 text-white/90 border border-white/20 shrink-0">DEMO</span>
                         )}
                         {item.isPromotional && (
-                          <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 border border-red-500/40 shrink-0">PROMO</span>
+                          <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">PROMO</span>
                         )}
                       </div>
                       <span className="text-[10px] text-muted-foreground">{item.puffs ? `${item.puffs} puffs` : "Pod"}</span>
@@ -540,7 +540,7 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
                   </span>
                 </td>
                 <td className="p-3 text-center">
-                  <span className="px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-xs whitespace-nowrap">
+                  <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/90 font-bold text-xs whitespace-nowrap">
                     {item.diasParado}d parado
                   </span>
                 </td>
@@ -562,22 +562,45 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
                 </td>
                 <td className="p-3 text-center">
                   <div className="flex items-center justify-center gap-1.5">
-                    <button type="button" onClick={() => setSelectedOfferProduct(item)} className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-[11px] transition-all cursor-pointer active:scale-95 flex items-center gap-1 shadow-sm">
-                      <Tag className="size-3 text-black" />
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOfferProduct(item)}
+                      className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all cursor-pointer active:scale-95 flex items-center gap-1 ${
+                        item.isPromotional
+                          ? "bg-white/10 hover:bg-white/15 text-white border border-white/15"
+                          : "bg-emerald-500 hover:bg-emerald-400 text-black shadow-sm shadow-emerald-500/20"
+                      }`}
+                    >
+                      <Tag className={`size-3 ${item.isPromotional ? "text-white" : "text-black"}`} />
                       <span>{item.isPromotional ? "Editar" : "Oferta"}</span>
                     </button>
                     {item.isPromotional && (
                       <>
-                        <button type="button" onClick={() => setSelectedVipProduct(item)} className="px-2 py-1 rounded-lg font-bold text-[11px] bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-colors cursor-pointer" title="Divulgar oferta no Grupo VIP">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedVipProduct(item)}
+                          className="px-2 py-1 rounded-lg font-bold text-[11px] bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition-colors cursor-pointer"
+                          title="Divulgar oferta no Grupo VIP"
+                        >
                           <Crown className="size-3" />
                         </button>
-                        <button type="button" onClick={() => handleTogglePromotion(item)} className="px-2 py-1 rounded-lg font-semibold text-[11px] border bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30 transition-colors cursor-pointer" title="Encerrar promoção">
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePromotion(item)}
+                          className="px-2 py-1 rounded-lg font-semibold text-[11px] border bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 transition-colors cursor-pointer"
+                          title="Encerrar promoção"
+                        >
                           ✕
                         </button>
                       </>
                     )}
                     {!item.isPromotional && (
-                      <button type="button" onClick={() => handleTogglePromotion(item)} className="px-2 py-1 rounded-lg font-semibold text-[11px] border bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white border-white/10 transition-colors cursor-pointer" title="Ativar promoção rápida (-15%)">
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePromotion(item)}
+                        className="px-2 py-1 rounded-lg font-semibold text-[11px] border bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white border-white/10 transition-colors cursor-pointer"
+                        title="Ativar promoção rápida (-15%)"
+                      >
                         +Promo
                       </button>
                     )}
@@ -622,7 +645,7 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
                 <div className="font-bold text-white text-sm truncate">{item.brand} {item.name}</div>
                 <div className="text-xs text-muted-foreground truncate">{item.flavor}</div>
               </div>
-              <span className="px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[11px] shrink-0">
+              <span className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-white/90 font-bold text-[11px] shrink-0">
                 {item.diasParado}d
               </span>
             </div>
@@ -649,24 +672,40 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
                 {item.isDemo && (
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">DEMO</span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white/10 text-white/90 border border-white/20">DEMO</span>
                 )}
                 {item.isPromotional && (
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 border border-red-500/40">EM PROMOÇÃO</span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">EM PROMOÇÃO</span>
                 )}
               </div>
               <div className="flex items-center gap-1.5">
-                <button type="button" onClick={() => setSelectedOfferProduct(item)} className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-1">
-                  <Tag className="size-3" />
+                <button
+                  type="button"
+                  onClick={() => setSelectedOfferProduct(item)}
+                  className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-1 ${
+                    item.isPromotional
+                      ? "bg-white/10 hover:bg-white/15 text-white border border-white/15"
+                      : "bg-emerald-500 hover:bg-emerald-400 text-black shadow-sm shadow-emerald-500/20"
+                  }`}
+                >
+                  <Tag className={`size-3 ${item.isPromotional ? "text-white" : "text-black"}`} />
                   <span>{item.isPromotional ? "Editar" : "Oferta"}</span>
                 </button>
                 {item.isPromotional && (
-                  <button type="button" onClick={() => handleTogglePromotion(item)} className="px-2.5 py-1.5 rounded-lg font-semibold text-xs border bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30 transition-colors cursor-pointer">
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePromotion(item)}
+                    className="px-2.5 py-1.5 rounded-lg font-semibold text-xs border bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 transition-colors cursor-pointer"
+                  >
                     Encerrar
                   </button>
                 )}
                 {!item.isPromotional && (
-                  <button type="button" onClick={() => handleTogglePromotion(item)} className="px-2.5 py-1.5 rounded-lg font-semibold text-xs border bg-white/5 hover:bg-white/10 text-muted-foreground border-white/10 transition-colors cursor-pointer">
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePromotion(item)}
+                    className="px-2.5 py-1.5 rounded-lg font-semibold text-xs border bg-white/5 hover:bg-white/10 text-muted-foreground border-white/10 transition-colors cursor-pointer"
+                  >
                     +Promo
                   </button>
                 )}

@@ -1537,7 +1537,7 @@ export default function SupplyChainDashboard() {
                   onClick={() => setActiveMainView("PARADOS")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     activeMainView === "PARADOS"
-                      ? "bg-amber-500 text-black shadow-md shadow-amber-500/20"
+                      ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.2)]"
                       : "text-muted-foreground hover:text-white"
                   }`}
                 >
