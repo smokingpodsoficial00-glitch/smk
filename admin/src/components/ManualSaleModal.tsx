@@ -330,16 +330,18 @@ export function ManualSaleModal({
     };
   }, [selectedFlavorId, itemQuantity, customPrice, productsList]);
 
-  // Lista Efetiva de Itens no Pedido (se a lista de itens estiver vazia mas houver um pod selecionado no formulário, inclui automaticamente)
+  // Lista Efetiva de Itens no Pedido (soma os itens confirmados + o pod selecionado no formulário)
   const effectiveItems = useMemo(() => {
-    if (items.length > 0) return items;
-    return activeFormItem ? [activeFormItem] : [];
+    if (activeFormItem) {
+      return [...items, activeFormItem];
+    }
+    return items;
   }, [items, activeFormItem]);
 
-  // Adicionar Pod Adicional (para pedidos com múltiplos pods)
+  // Confirmar e Adicionar Pod à Lista
   const handleAddAnotherItem = () => {
     if (!activeFormItem) {
-      setErrorMessage("Por favor, selecione um sabor disponível antes de adicionar outro.");
+      setErrorMessage("Por favor, selecione um sabor disponível antes de confirmar.");
       return;
     }
 
@@ -353,7 +355,11 @@ export function ManualSaleModal({
       setItems([...items, activeFormItem]);
     }
 
+    // Resetar campos de seleção para permitir novo pod
+    setSelectedModelKey("");
+    setModelQuery("");
     setSelectedFlavorId("");
+    setFlavorQuery("");
     setItemQuantity(1);
     setCustomPrice("");
     setErrorMessage("");
@@ -1350,10 +1356,10 @@ export function ManualSaleModal({
                   <button
                     type="button"
                     onClick={handleAddAnotherItem}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold transition-all border border-white/10 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-white text-xs font-bold transition-all border border-emerald-500/30 hover:border-emerald-500/50 cursor-pointer shadow-sm self-end mb-0.5"
                   >
-                    <Plus className="size-3.5 text-emerald-400" />
-                    <span>+ Outro Pod neste Pedido</span>
+                    <CheckCircle2 className="size-3.5 text-emerald-400" />
+                    <span>Confirmar Pod</span>
                   </button>
                 </div>
               )}
