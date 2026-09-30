@@ -2132,28 +2132,6 @@ export default function SupplyChainDashboard() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const modelMapping = categoryMappings[group.groupKey];
-                                  const firstFlavor = group.flavors[0];
-                                  const flavorMapping = firstFlavor ? categoryMappings[firstFlavor.id] : null;
-
-                                  const catIds = (modelMapping && modelMapping.category_ids.length > 0)
-                                    ? modelMapping.category_ids
-                                    : (flavorMapping?.category_ids || []);
-                                  const order = modelMapping?.display_order || flavorMapping?.display_order || 1;
-
-                                  setEditingCategoryGroup(group);
-                                  setSelectedCategoryIds(catIds);
-                                  setSelectedDisplayOrder(order.toString());
-                                  setActiveGroupMenuKey(null);
-                                }}
-                                className="w-full text-left px-3.5 py-2.5 hover:bg-white/15 hover:text-white flex items-center gap-2.5 text-silver transition-colors cursor-pointer"
-                              >
-                                <Star className="size-3.5 text-amber-400" />
-                                Organizar Posição no Topo
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
                                   setEditingFullProduct(group);
                                   setEditBrand(group.brand || "");
                                   setEditName(group.name || "");
@@ -2168,60 +2146,6 @@ export default function SupplyChainDashboard() {
                               >
                                 <Edit3 className="size-3.5 text-emerald-400" />
                                 Editar Produto
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingGroup(group);
-                                  setBatchPrice(group.price.toString());
-                                  setBatchCostPrice(group.cost_price.toString());
-                                  setActiveGroupMenuKey(null);
-                                }}
-                                className="w-full text-left px-3.5 py-2.5 hover:bg-white/15 hover:text-white flex items-center gap-2.5 text-silver transition-colors cursor-pointer"
-                              >
-                                <Tag className="size-3.5 text-blue-400" />
-                                Editar Preço / Custo em Lote
-                              </button>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  const maisVendidosCatId = "11111111-1111-4111-a111-111111111111";
-                                  const currentModelMapping = categoryMappings[group.groupKey];
-                                  const currentCatIds = currentModelMapping?.category_ids || [];
-                                  const isPinned = currentCatIds.includes(maisVendidosCatId);
-
-                                  let newCatIds: string[];
-                                  if (isPinned) {
-                                    newCatIds = currentCatIds.filter(id => id !== maisVendidosCatId);
-                                  } else {
-                                    newCatIds = [...currentCatIds, maisVendidosCatId];
-                                  }
-
-                                  const pIds = group.flavors.map((f: any) => f.id);
-                                  const modelKey = group.groupKey;
-                                  const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
-
-                                  await updateModelCategories({
-                                    productIds: pIds,
-                                    modelKey: modelKey,
-                                    categoryIds: newCatIds,
-                                    displayOrder: currentModelMapping?.display_order || 1,
-                                    companyId: targetCompanyId,
-                                  });
-
-                                  setCategoryMappings(prev => ({
-                                    ...prev,
-                                    [modelKey]: { category_ids: newCatIds, display_order: currentModelMapping?.display_order || 1 }
-                                  }));
-
-                                  setActiveGroupMenuKey(null);
-                                }}
-                                className="w-full text-left px-3.5 py-2.5 hover:bg-white/15 hover:text-white flex items-center gap-2.5 text-silver transition-colors cursor-pointer"
-                              >
-                                <Star className="size-3.5 text-amber-400 fill-amber-400" />
-                                {categoryMappings[group.groupKey]?.category_ids?.includes("11111111-1111-4111-a111-111111111111")
-                                  ? "Desafixar de Mais Vendidos"
-                                  : "Fixar no Topo (Mais Vendidos)"}
                               </button>
                               <div className="h-px bg-white/10 my-1" />
                               <button
