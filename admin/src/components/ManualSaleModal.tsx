@@ -109,9 +109,19 @@ export function ManualSaleModal({
     }>
   >([]);
 
-  // Seletores do formulário de adição de item (Modelo -> Sabor)
+  // Seletores do formulário de adição de item (Modelo -> Sabor) com Pesquisa Inteligente
   const [selectedModelKey, setSelectedModelKey] = useState("");
+  const [modelQuery, setModelQuery] = useState("");
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const modelPickerRef = useRef<HTMLDivElement>(null);
+  const modelInputRef = useRef<HTMLInputElement>(null);
+
   const [selectedFlavorId, setSelectedFlavorId] = useState("");
+  const [flavorQuery, setFlavorQuery] = useState("");
+  const [isFlavorDropdownOpen, setIsFlavorDropdownOpen] = useState(false);
+  const flavorPickerRef = useRef<HTMLDivElement>(null);
+  const flavorInputRef = useRef<HTMLInputElement>(null);
+
   const [itemQuantity, setItemQuantity] = useState(1);
   const [customPrice, setCustomPrice] = useState<string>("");
 
@@ -119,11 +129,17 @@ export function ManualSaleModal({
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  // Fechar dropdown de clientes ao clicar fora
+  // Fechar dropdowns flutuantes ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (clientPickerRef.current && !clientPickerRef.current.contains(event.target as Node)) {
         setIsClientDropdownOpen(false);
+      }
+      if (modelPickerRef.current && !modelPickerRef.current.contains(event.target as Node)) {
+        setIsModelDropdownOpen(false);
+      }
+      if (flavorPickerRef.current && !flavorPickerRef.current.contains(event.target as Node)) {
+        setIsFlavorDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -208,6 +224,16 @@ export function ManualSaleModal({
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [productsList]);
 
+  // Modelos filtrados pela busca
+  const filteredModels = useMemo(() => {
+    const q = normalizeText(modelQuery);
+    const currentModel = availableModels.find((m) => m.key === selectedModelKey);
+    if (!q || (currentModel && normalizeText(currentModel.label) === q)) {
+      return availableModels;
+    }
+    return availableModels.filter((m) => normalizeText(m.label).includes(q));
+  }, [availableModels, modelQuery, selectedModelKey]);
+
   // Sabores filtrados por Modelo selecionado
   const availableFlavors = useMemo(() => {
     if (!selectedModelKey) return [];
@@ -217,28 +243,72 @@ export function ManualSaleModal({
     });
   }, [productsList, selectedModelKey]);
 
-  // Ao selecionar um modelo, auto-seleciona o primeiro sabor disponível e carrega o preço de venda imediatamente
-  useEffect(() => {
-    if (selectedModelKey && availableFlavors.length > 0) {
-      // Se ainda não tem sabor selecionado ou o sabor atual não pertence a este modelo
-      const currentValid = availableFlavors.some(f => f.id === selectedFlavorId);
-      if (!selectedFlavorId || !currentValid) {
-        const firstFlavor = availableFlavors[0];
-        setSelectedFlavorId(firstFlavor.id);
-        setCustomPrice(firstFlavor.price ? String(firstFlavor.price) : "");
-      }
+  // Sabores filtrados pela busca de sabor
+  const filteredFlavors = useMemo(() => {
+    if (!selectedModelKey) return [];
+    const q = normalizeText(flavorQuery);
+    const currentFlavor = availableFlavors.find((f) => f.id === selectedFlavorId);
+    if (!q || (currentFlavor && normalizeText(currentFlavor.flavor || "Padrão") === q)) {
+      return availableFlavors;
     }
-  }, [selectedModelKey, availableFlavors, selectedFlavorId]);
+    return availableFlavors.filter((f) => normalizeText(f.flavor || "Padrão").includes(q));
+  }, [availableFlavors, flavorQuery, selectedFlavorId, selectedModelKey]);
 
-  // Preencher valor do produto ao selecionar o sabor
+  // Preencher valor do produto e sincronizar query ao selecionar o sabor
   useEffect(() => {
     if (selectedFlavorId) {
       const prod = productsList.find((p) => p.id === selectedFlavorId);
       if (prod) {
         setCustomPrice(prod.price ? String(prod.price) : "");
+        setFlavorQuery(prod.flavor || "Padrão");
       }
     }
   }, [selectedFlavorId, productsList]);
+
+  // Sincronizar nome do modelo selecionado
+  useEffect(() => {
+    if (selectedModelKey) {
+      const found = availableModels.find((m) => m.key === selectedModelKey);
+      if (found) {
+        setModelQuery(found.label);
+      }
+    }
+  }, [selectedModelKey, availableModels]);
+
+  const handleSelectModel = (m: { label: string; key: string }) => {
+    setSelectedModelKey(m.key);
+    setModelQuery(m.label);
+    setIsModelDropdownOpen(false);
+    setSelectedFlavorId("");
+    setFlavorQuery("");
+    setTimeout(() => {
+      setIsFlavorDropdownOpen(true);
+      flavorInputRef.current?.focus();
+    }, 50);
+  };
+
+  const handleClearModel = () => {
+    setSelectedModelKey("");
+    setModelQuery("");
+    setSelectedFlavorId("");
+    setFlavorQuery("");
+    setIsModelDropdownOpen(true);
+    setTimeout(() => modelInputRef.current?.focus(), 50);
+  };
+
+  const handleSelectFlavor = (f: any) => {
+    setSelectedFlavorId(f.id);
+    setFlavorQuery(f.flavor || "Padrão");
+    setIsFlavorDropdownOpen(false);
+    setCustomPrice(f.price ? String(f.price) : "");
+  };
+
+  const handleClearFlavor = () => {
+    setSelectedFlavorId("");
+    setFlavorQuery("");
+    setIsFlavorDropdownOpen(true);
+    setTimeout(() => flavorInputRef.current?.focus(), 50);
+  };
 
   // Item ativo no formulário (caso o usuário tenha selecionado nos dropdowns mas não tenha clicado no botão adicional)
   const activeFormItem = useMemo(() => {
@@ -677,7 +747,11 @@ export function ManualSaleModal({
         setIsNoWhatsApp(false);
         setShippingAddress("");
         setSelectedModelKey("");
+        setModelQuery("");
         setSelectedFlavorId("");
+        setFlavorQuery("");
+        setIsModelDropdownOpen(false);
+        setIsFlavorDropdownOpen(false);
         setSuccessMessage("");
       }, 1000);
     } catch (err: any) {
@@ -773,9 +847,11 @@ export function ManualSaleModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Campo Inteligente de Nome com Dropdown Flutuante */}
                   <div ref={clientPickerRef} className="relative">
-                    <label className="text-[11px] text-silver font-medium block mb-1">
-                      Nome do Cliente *
-                    </label>
+                    <div className="flex items-center justify-between h-5 mb-1.5">
+                      <label className="text-[11px] text-silver font-medium">
+                        Nome do Cliente *
+                      </label>
+                    </div>
                     <div className="relative">
                       <input
                         ref={clientInputRef}
@@ -913,7 +989,7 @@ export function ManualSaleModal({
 
                   {/* Campo WhatsApp */}
                   <div>
-                    <div className="flex items-center justify-between mb-1 min-h-[17px]">
+                    <div className="flex items-center justify-between h-5 mb-1.5">
                       <label className="text-[11px] text-silver font-medium">WhatsApp</label>
                       <button
                         type="button"
@@ -925,14 +1001,14 @@ export function ManualSaleModal({
                             setAutoAddToMarketingList(false);
                           }
                         }}
-                        className={`px-2.5 py-0.5 rounded-lg text-[10px] font-semibold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all border flex items-center gap-1 cursor-pointer leading-none ${
                           isNoWhatsApp
-                            ? "bg-zinc-800 text-white border-zinc-600 shadow-sm"
+                            ? "bg-zinc-800 text-emerald-400 border-emerald-500/40 shadow-sm"
                             : "bg-white/5 text-zinc-400 border-white/10 hover:border-white/20 hover:text-white"
                         }`}
                       >
                         <span className={`size-1.5 rounded-full ${isNoWhatsApp ? "bg-emerald-400" : "bg-zinc-500"}`} />
-                        <span>Sem WhatsApp (Insta)</span>
+                        <span>Sem número</span>
                       </button>
                     </div>
                     <input
@@ -1067,42 +1143,181 @@ export function ManualSaleModal({
               </span>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Dropdown 1: Modelo */}
-                <div>
-                  <label className="text-[11px] text-silver font-medium block mb-1">Modelo do Pod</label>
-                  <select
-                    value={selectedModelKey}
-                    onChange={(e) => {
-                      setSelectedModelKey(e.target.value);
-                      setSelectedFlavorId("");
-                    }}
-                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-white/30 font-semibold cursor-pointer hover:border-white/20 transition-all"
-                  >
-                    <option value="">-- Selecione o Modelo --</option>
-                    {availableModels.map((m) => (
-                      <option key={m.key} value={m.key}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
+                {/* Combobox Inteligente: Modelo do Pod */}
+                <div ref={modelPickerRef} className="relative">
+                  <div className="flex items-center justify-between h-5 mb-1.5">
+                    <label className="text-[11px] text-silver font-medium">Modelo do Pod *</label>
+                  </div>
+                  <div className="relative">
+                    <input
+                      ref={modelInputRef}
+                      type="text"
+                      value={modelQuery}
+                      onFocus={() => setIsModelDropdownOpen(true)}
+                      onChange={(e) => {
+                        setModelQuery(e.target.value);
+                        setIsModelDropdownOpen(true);
+                      }}
+                      placeholder="Digite ou selecione o modelo..."
+                      className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-white/30 font-semibold pr-16 hover:border-white/20 transition-all cursor-pointer"
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                      {modelQuery && (
+                        <button
+                          type="button"
+                          onClick={handleClearModel}
+                          className="text-white/40 hover:text-white p-1 transition-colors cursor-pointer"
+                          title="Limpar modelo"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsModelDropdownOpen((prev) => !prev);
+                          modelInputRef.current?.focus();
+                        }}
+                        className="text-white/40 hover:text-white p-1 transition-colors cursor-pointer"
+                      >
+                        <ChevronDown className={`size-3.5 transition-transform duration-150 ${isModelDropdownOpen ? "rotate-180" : ""}`} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Dropdown Flutuante de Modelos */}
+                  {isModelDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-[#16161a] border border-white/15 rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                      <div className="px-3 py-1.5 bg-black/60 border-b border-white/10 flex items-center justify-between text-[10px] text-white/50">
+                        <span>{filteredModels.length} modelo(s)</span>
+                        <span className="text-zinc-400">Clique para selecionar</span>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto divide-y divide-white/5 custom-scrollbar">
+                        {filteredModels.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-white/40">
+                            Nenhum modelo encontrado
+                          </div>
+                        ) : (
+                          filteredModels.map((m) => {
+                            const isSelected = selectedModelKey === m.key;
+                            return (
+                              <button
+                                key={m.key}
+                                type="button"
+                                onClick={() => handleSelectModel(m)}
+                                className={`w-full px-3.5 py-2.5 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer text-xs ${
+                                  isSelected
+                                    ? "bg-emerald-500/15 text-emerald-300 font-bold"
+                                    : "hover:bg-white/10 text-white/85"
+                                }`}
+                              >
+                                <span className="truncate">{m.label}</span>
+                                {isSelected && <CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Dropdown 2: Sabor Disponível */}
-                <div>
-                  <label className="text-[11px] text-silver font-medium block mb-1">Sabor Disponível</label>
-                  <select
-                    disabled={!selectedModelKey}
-                    value={selectedFlavorId}
-                    onChange={(e) => setSelectedFlavorId(e.target.value)}
-                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-white/30 disabled:opacity-40 font-semibold cursor-pointer hover:border-white/20 transition-all"
-                  >
-                    <option value="">-- Selecione o Sabor --</option>
-                    {availableFlavors.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.flavor || "Padrão"} ({p.stock} un em estoque)
-                      </option>
-                    ))}
-                  </select>
+                {/* Combobox Inteligente: Sabor Disponível */}
+                <div ref={flavorPickerRef} className="relative">
+                  <div className="flex items-center justify-between h-5 mb-1.5">
+                    <label className="text-[11px] text-silver font-medium">Sabor Disponível *</label>
+                  </div>
+                  <div className="relative">
+                    <input
+                      ref={flavorInputRef}
+                      type="text"
+                      disabled={!selectedModelKey}
+                      value={flavorQuery}
+                      onFocus={() => {
+                        if (selectedModelKey) setIsFlavorDropdownOpen(true);
+                      }}
+                      onChange={(e) => {
+                        setFlavorQuery(e.target.value);
+                        setIsFlavorDropdownOpen(true);
+                      }}
+                      placeholder={selectedModelKey ? "Digite ou selecione o sabor..." : "Selecione o modelo primeiro..."}
+                      className={`w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-white/30 font-semibold pr-16 hover:border-white/20 transition-all ${
+                        !selectedModelKey ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+                      }`}
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                      {flavorQuery && selectedModelKey && (
+                        <button
+                          type="button"
+                          onClick={handleClearFlavor}
+                          className="text-white/40 hover:text-white p-1 transition-colors cursor-pointer"
+                          title="Limpar sabor"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={!selectedModelKey}
+                        onClick={() => {
+                          if (selectedModelKey) {
+                            setIsFlavorDropdownOpen((prev) => !prev);
+                            flavorInputRef.current?.focus();
+                          }
+                        }}
+                        className="text-white/40 hover:text-white p-1 transition-colors cursor-pointer disabled:opacity-30"
+                      >
+                        <ChevronDown className={`size-3.5 transition-transform duration-150 ${isFlavorDropdownOpen ? "rotate-180" : ""}`} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Dropdown Flutuante de Sabores */}
+                  {isFlavorDropdownOpen && selectedModelKey && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-[#16161a] border border-white/15 rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                      <div className="px-3 py-1.5 bg-black/60 border-b border-white/10 flex items-center justify-between text-[10px] text-white/50">
+                        <span>{filteredFlavors.length} sabor(es) disponível(is)</span>
+                        <span className="text-zinc-400">Clique para selecionar</span>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto divide-y divide-white/5 custom-scrollbar">
+                        {filteredFlavors.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-white/40">
+                            Nenhum sabor encontrado
+                          </div>
+                        ) : (
+                          filteredFlavors.map((f) => {
+                            const isSelected = selectedFlavorId === f.id;
+                            const stockNum = Number(f.stock) || 0;
+                            return (
+                              <button
+                                key={f.id}
+                                type="button"
+                                onClick={() => handleSelectFlavor(f)}
+                                className={`w-full px-3.5 py-2.5 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer text-xs ${
+                                  isSelected
+                                    ? "bg-emerald-500/15 text-emerald-300 font-bold"
+                                    : "hover:bg-white/10 text-white/85"
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <div className="font-bold truncate text-white">{f.flavor || "Padrão"}</div>
+                                  <div className="flex items-center gap-2 text-[10px] text-white/50">
+                                    <span className={stockNum > 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
+                                      {stockNum > 0 ? `${stockNum} un em estoque` : "Sem estoque"}
+                                    </span>
+                                    {f.price && (
+                                      <span>• R$ {Number(f.price).toFixed(2).replace(".", ",")}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                {isSelected && <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
