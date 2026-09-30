@@ -135,6 +135,19 @@ export function normalizePhoneForStorage(phone: string | null | undefined): stri
 }
 
 /**
+ * Normaliza o nome do cliente para comparações insensíveis a acentos e maiúsculas
+ */
+export function normalizeName(name: string | null | undefined): string {
+  if (!name) return '';
+  return String(name)
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+/**
  * Formata telefone para exibição amigável
  */
 export function formatPhoneForDisplay(phone: string | null | undefined): string {
@@ -300,8 +313,9 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       }
     }
 
-    // 2. Agrupar Pedidos por Telefone Normalizado (ou Chave Exclusiva de Instagram)
+    // 2. Indexar Pedidos por Telefone Normalizado e por Nome do Cliente
     const ordersByPhone = new Map<string, any[]>();
+    const ordersByName = new Map<string, any[]>();
     for (const order of orders) {
       if (!order) continue;
       const phoneRaw = String(order.client_phone || order.customer_phone || order.phone || '').trim();
@@ -310,49 +324,94 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
         lookupKey = phoneRaw;
       } else {
         const phoneClean = phoneRaw.replace(/\D/g, '');
-        if (!phoneClean) continue;
-        lookupKey = phoneClean.length === 10 || phoneClean.length === 11 ? `55${phoneClean}` : phoneClean;
+        if (phoneClean) {
+          lookupKey = phoneClean.length === 10 || phoneClean.length === 11 ? `55${phoneClean}` : phoneClean;
+        }
       }
 
-      if (!ordersByPhone.has(lookupKey)) {
-        ordersByPhone.set(lookupKey, []);
+      if (lookupKey) {
+        if (!ordersByPhone.has(lookupKey)) {
+          ordersByPhone.set(lookupKey, []);
+        }
+        ordersByPhone.get(lookupKey)!.push(order);
       }
-      ordersByPhone.get(lookupKey)!.push(order);
+
+      const nameNorm = normalizeName(order.client_name);
+      if (nameNorm) {
+        if (!ordersByName.has(nameNorm)) {
+          ordersByName.set(nameNorm, []);
+        }
+        ordersByName.get(nameNorm)!.push(order);
+      }
     }
 
     const result: RealClient[] = [];
     const processedPhones = new Set<string>();
+    const processedOrderIds = new Set<string>();
     const now = new Date().getTime();
 
     // 3. Processar smoking_clients como FONTE PRIMÁRIA
     const clientsData = clientsRes.data || [];
     for (const client of clientsData) {
-      if (!client || !client.phone) continue;
-      const rawPhone = String(client.phone).trim();
+      if (!client) continue;
+      const rawPhone = client.phone ? String(client.phone).trim() : '';
       let lookupKey = '';
       let phoneClean = '';
       const isInsta = rawPhone.startsWith('INSTA_') || rawPhone.startsWith('SEM_WPP_') || rawPhone.includes('Instagram');
       
-      if (isInsta) {
-        lookupKey = rawPhone;
-        phoneClean = '';
-      } else {
-        phoneClean = rawPhone.replace(/\D/g, '');
-        lookupKey = phoneClean.length === 10 || phoneClean.length === 11 ? `55${phoneClean}` : phoneClean;
+      if (rawPhone) {
+        if (isInsta) {
+          lookupKey = rawPhone;
+          phoneClean = '';
+        } else {
+          phoneClean = rawPhone.replace(/\D/g, '');
+          lookupKey = phoneClean.length === 10 || phoneClean.length === 11 ? `55${phoneClean}` : phoneClean;
+        }
+        if (lookupKey) processedPhones.add(lookupKey);
+        if (phoneClean) processedPhones.add(phoneClean);
       }
-      
-      processedPhones.add(lookupKey);
-      if (phoneClean) processedPhones.add(phoneClean);
 
-      // Buscar pedidos associados a este cliente
-      const clientOrders = ordersByPhone.get(lookupKey) || (phoneClean ? ordersByPhone.get(phoneClean) : []) || [];
+      // Buscar pedidos associados a este cliente:
+      // 1. Por telefone cadastrado
+      // 2. Por nome normalizado do cliente (assegura que pedidos permaneçam mesmo se o telefone for editado ou removido)
+      const candidateOrders: any[] = [];
+      if (lookupKey && ordersByPhone.has(lookupKey)) {
+        candidateOrders.push(...ordersByPhone.get(lookupKey)!);
+      }
+      if (phoneClean && phoneClean !== lookupKey && ordersByPhone.has(phoneClean)) {
+        candidateOrders.push(...ordersByPhone.get(phoneClean)!);
+      }
+      const clientNameNorm = normalizeName(client.name);
+      if (clientNameNorm && ordersByName.has(clientNameNorm)) {
+        candidateOrders.push(...ordersByName.get(clientNameNorm)!);
+      }
+
+      // Desduplicar pedidos do cliente por order.id
+      const clientOrders: any[] = [];
+      const seenOrderIds = new Set<string>();
+      for (const ord of candidateOrders) {
+        const ordId = String(ord.id || '');
+        if (ordId && !seenOrderIds.has(ordId)) {
+          seenOrderIds.add(ordId);
+          clientOrders.push(ord);
+          processedOrderIds.add(ordId);
+          const ordPhone = String(ord.client_phone || '').replace(/\D/g, '');
+          if (ordPhone) {
+            processedPhones.add(ordPhone);
+            if (ordPhone.length === 10 || ordPhone.length === 11) processedPhones.add(`55${ordPhone}`);
+          }
+        }
+      }
+
       clientOrders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
 
       const latestOrder = clientOrders[0] || null;
 
       // Formatação de telefone para exibição
       let displayPhone = rawPhone;
-      if (isInsta) {
+      if (!rawPhone) {
+        displayPhone = 'Sem telefone';
+      } else if (isInsta) {
         displayPhone = 'Sem WhatsApp (Instagram)';
       } else if (phoneClean.length === 11) {
         displayPhone = `(${phoneClean.substring(0, 2)}) ${phoneClean.substring(2, 7)}-${phoneClean.substring(7)}`;
@@ -366,8 +425,9 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
         displayPhone = rawPhone;
       }
 
-      const name = String(client.name || latestOrder?.client_name || `Cliente ${phoneClean.slice(-4)}`).trim();
+      const name = String(client.name || latestOrder?.client_name || (phoneClean ? `Cliente ${phoneClean.slice(-4)}` : 'Cliente')).trim();
       const address = String(client.address || latestOrder?.shipping_address || 'Atendimento Balcão / WhatsApp').trim();
+
 
       if (clientOrders.length > 0 && latestOrder) {
         // --- CLIENTE COM COMPRAS HISTÓRICAS ---
@@ -557,11 +617,25 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       }
     }
 
-    // 4. Fallback de Segurança: Compradores em orders mas que ainda não estavam em smoking_clients
+    // 4. Fallback de Segurança: Apenas para pedidos que AINDA NÃO foram atribuídos a nenhum cliente cadastrado
+    const existingNames = new Set(result.map(c => normalizeName(c.name)).filter(Boolean));
+
     for (const [phoneKey, clientOrders] of ordersByPhone.entries()) {
+      // Filtrar apenas pedidos que NÃO foram atribuídos a nenhum cliente real
+      const unassignedOrders = clientOrders.filter(o => !processedOrderIds.has(String(o.id)));
+      if (unassignedOrders.length === 0) continue;
+
+      unassignedOrders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      const latestOrder = unassignedOrders[0] || {};
+      const candidateNameNorm = normalizeName(latestOrder.client_name);
+
+      // Se já existe um cliente com este nome em smoking_clients, NÃO criar duplicata na tela!
+      if (candidateNameNorm && existingNames.has(candidateNameNorm)) continue;
       if (processedPhones.has(phoneKey)) continue;
-      clientOrders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-      const latestOrder = clientOrders[0] || {};
+
+      unassignedOrders.forEach(o => processedOrderIds.add(String(o.id)));
+      processedPhones.add(phoneKey);
+
       const rawPhone = latestOrder.client_phone || phoneKey;
       const isInsta = String(rawPhone).startsWith('INSTA_') || String(rawPhone).startsWith('SEM_WPP_') || String(rawPhone).includes('Instagram');
       const cleanPhone = isInsta ? '' : phoneKey.replace(/\D/g, '');
@@ -569,9 +643,9 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       const name = String(latestOrder.client_name || (cleanPhone ? `Cliente ${cleanPhone.slice(-4)}` : 'Cliente Instagram')).trim();
       const address = String(latestOrder.shipping_address || 'Atendimento Balcão / WhatsApp').trim();
 
-      const validOrders = clientOrders.filter(o => o && o.delivery_status !== 'CANCELADO');
+      const validOrders = unassignedOrders.filter(o => o && o.delivery_status !== 'CANCELADO');
       const spent = validOrders.reduce((sum, o) => sum + (parseFloat(o.total_amount || 0) || 0), 0);
-      const ordersCount = clientOrders.length;
+      const ordersCount = unassignedOrders.length;
       const lastOrderDateStr = latestOrder.created_at ? new Date(latestOrder.created_at).toLocaleDateString('pt-BR') : 'Hoje';
       const lastOrderTimestamp = latestOrder.created_at ? new Date(latestOrder.created_at).getTime() : now;
       const daysSinceLastOrder = Math.max(0, Math.floor((now - lastOrderTimestamp) / (1000 * 60 * 60 * 24)));
@@ -608,7 +682,7 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
         customNotes: '',
         urgencyLevel: 'ok',
         nextReplenishmentDate: '-',
-        orders: clientOrders,
+        orders: unassignedOrders,
         lastOrderTimestamp,
         lastActivityTimestamp: lastOrderTimestamp,
         clientCreatedAt: latestOrder.created_at,

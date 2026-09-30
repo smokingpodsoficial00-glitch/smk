@@ -79,8 +79,9 @@ export function ClientProfileModal({
     }
   };
 
-  const phoneClean = client.cleanPhone || client.phone.replace(/\D/g, '');
-  const waNumber = phoneClean.startsWith('55') ? phoneClean : `55${phoneClean}`;
+  const phoneClean = client.cleanPhone || (client.phone && client.phone !== 'Sem telefone' ? String(client.phone).replace(/\D/g, '') : '');
+  const waNumber = phoneClean ? (phoneClean.startsWith('55') ? phoneClean : `55${phoneClean}`) : '';
+
 
   // Templates Rápidos de Mensagem 1-a-1
   const copyRetornoSbc = `Oii ${client.name}, tudo bem? 💨\nPassando pra te avisar que a *Smoking Pods tá de volta oficialmente à ativa em SBC!*\n\nAs entregas pro final de semana já estão rolando a todo vapor pra você *garantir o seu pod a tempo e não ficar na mão no rolê*. Reabrimos com estoque 100% renovado, produtos originais e o delivery rápido de sempre de *30 a 40 min* pelo Uber Direct.\n\n📦 *Cardápio Digital:* https://smoking-pods.vercel.app\n\nQual modelo e sabor posso separar pra você já garantir pro fds?`;
@@ -213,7 +214,10 @@ export function ClientProfileModal({
                 } else {
                   setIsEditingClient(true);
                   setEditName(currentName);
-                  setEditPhone(client.cleanPhone || currentPhone || '');
+                  const initialPhone = currentPhone && currentPhone !== 'Sem telefone' 
+                    ? (client.cleanPhone || currentPhone) 
+                    : '';
+                  setEditPhone(initialPhone);
                   setEditError(null);
                   setEditSuccess(null);
                 }
@@ -292,7 +296,7 @@ export function ClientProfileModal({
                   type="text"
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
-                  placeholder="11999999999 ou (11) 99999-9999"
+                  placeholder="11999999999 ou vazio para remover"
                   className="w-full bg-[#18181b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400/50 transition-colors font-mono"
                 />
               </div>
@@ -585,15 +589,22 @@ export function ClientProfileModal({
 
         {/* Footer com Ação no WhatsApp */}
         <footer className="p-4 border-t border-white/5 bg-[#0f0f0f] rounded-b-2xl shrink-0">
-          <a
-            href={client.whatsappUrl || `https://wa.me/${waNumber}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer text-xs uppercase tracking-wider"
-          >
-            <MessageSquare className="size-4" />
-            Abrir Conversa Direta no WhatsApp Web
-          </a>
+          {phoneClean && !currentPhone.includes('Instagram') && !currentPhone.startsWith('INSTA_') ? (
+            <a
+              href={client.whatsappUrl || `https://wa.me/${waNumber}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer text-xs uppercase tracking-wider"
+            >
+              <MessageSquare className="size-4" />
+              Abrir Conversa Direta no WhatsApp Web
+            </a>
+          ) : (
+            <div className="w-full bg-white/5 text-white/40 border border-white/10 font-medium py-3 rounded-xl flex items-center justify-center gap-2 text-xs uppercase tracking-wider cursor-not-allowed select-none">
+              <Phone className="size-4 text-white/30" />
+              Cliente sem WhatsApp / sem telefone cadastrado
+            </div>
+          )}
         </footer>
       </div>
 
