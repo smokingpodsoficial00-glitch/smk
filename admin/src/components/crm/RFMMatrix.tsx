@@ -16,7 +16,6 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
   
   // Filtros
   const [filterSegment, setFilterSegment] = useState<string>('all');
-  const [filterFlavor, setFilterFlavor] = useState<string>('all');
   const [filterVip, setFilterVip] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -31,7 +30,7 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
   // Reset de página ao filtrar ou pesquisar (declarado no topo para conformidade com Rules of Hooks)
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, filterSegment, filterFlavor, filterVip]);
+  }, [searchQuery, filterSegment, filterVip]);
 
   const loadClients = async () => {
     try {
@@ -73,8 +72,6 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
   const loyals = clients.filter(c => c && c.segment === 'loyal');
   const atRisk = clients.filter(c => c && c.segment === 'at_risk');
   const vipGroupCount = clients.filter(c => c && c.inVipGroup).length;
-  const iceLovers = clients.filter(c => c && c.flavorProfile === 'ice').length;
-  const fruitLovers = clients.filter(c => c && c.flavorProfile === 'fruity').length;
 
   // Filtragem Dinâmica Combinada
   const filteredClients = clients.filter(client => {
@@ -82,11 +79,6 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
 
     // Filtro por Segmento / Fidelidade
     if (filterSegment !== 'all' && client.segment !== filterSegment) {
-      return false;
-    }
-
-    // Filtro por Perfil de Sabor
-    if (filterFlavor !== 'all' && client.flavorProfile !== filterFlavor) {
       return false;
     }
 
@@ -162,7 +154,7 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
       const newList = {
         id: `list_crm_${Date.now()}`,
         name: listName.trim(),
-        description: `Exportado do CRM (${filterFlavor !== 'all' ? `Sabor: ${filterFlavor}` : 'Geral'})`,
+        description: 'Exportado do CRM (Geral)',
         contacts: selectedList.map(c => ({
           id: c.id,
           name: c.name,
@@ -267,7 +259,7 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
           <Search className="size-4 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
           <input 
             type="text"
-            placeholder="Buscar por nome, telefone ou sabor..."
+            placeholder="Buscar por nome, telefone ou produto..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-[#141414] border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder:text-white/40 focus:outline-none focus:border-emerald-500"
@@ -276,20 +268,6 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
 
         {/* Filtros Dropdown */}
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-          
-          {/* Filtro Perfil de Sabor */}
-          <select
-            value={filterFlavor}
-            onChange={(e) => setFilterFlavor(e.target.value)}
-            className="bg-[#141414] border border-white/10 text-white text-xs rounded-xl px-3 py-2 cursor-pointer focus:outline-none focus:border-emerald-500"
-          >
-            <option value="all">Todos os Sabores</option>
-            <option value="ice">Mentolado / Ice ({iceLovers})</option>
-            <option value="fruity">Frutado / Doce ({fruitLovers})</option>
-            <option value="tobacco">Atabacado / Intenso</option>
-            <option value="dessert">Sobremesa</option>
-          </select>
-
           {/* Filtro Grupo VIP */}
           <select
             value={filterVip}
@@ -312,11 +290,10 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
             </button>
           )}
 
-          {(filterSegment !== 'all' || filterFlavor !== 'all' || filterVip !== 'all' || searchQuery) && (
+          {(filterSegment !== 'all' || filterVip !== 'all' || searchQuery) && (
             <button
               onClick={() => {
                 setFilterSegment('all');
-                setFilterFlavor('all');
                 setFilterVip('all');
                 setSearchQuery('');
               }}
