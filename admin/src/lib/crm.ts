@@ -87,61 +87,7 @@ export function normalizePhoneForStorage(phone: string | null | undefined): stri
   return cleanDigits;
 }
 
-// Helper para salvar edições de CRM do cliente no Supabase EXCLUSIVAMENTE pelo ID (customer.id)
-export async function updateClientCrmProfile(
-  clientId: string, 
-  updates: {
-    name?: string;
-    phone?: string | null;
-    flavorProfile?: FlavorProfileType;
-    favoriteBrand?: string;
-    inVipGroup?: boolean;
-    prospectingStatus?: ProspectingStatusType;
-    customNotes?: string;
-    address?: string;
-  },
-  companyId?: string
-): Promise<boolean> {
-  try {
-    if (!clientId) {
-      console.error("Identificador de cliente (ID) obrigatório para atualizar perfil.");
-      return false;
-    }
 
-    const dbPayload: any = {
-      updated_at: new Date().toISOString()
-    };
-
-    if (updates.name !== undefined) dbPayload.name = updates.name.trim();
-    if (updates.phone !== undefined) dbPayload.phone = normalizePhoneForStorage(updates.phone);
-    if (updates.address !== undefined) dbPayload.address = updates.address;
-    if (updates.flavorProfile !== undefined) dbPayload.flavor_profile = updates.flavorProfile;
-    if (updates.favoriteBrand !== undefined) dbPayload.favorite_brand = updates.favoriteBrand;
-    if (updates.inVipGroup !== undefined) dbPayload.in_vip_group = updates.inVipGroup;
-    if (updates.prospectingStatus !== undefined) dbPayload.prospecting_status = updates.prospectingStatus;
-    if (updates.customNotes !== undefined) dbPayload.custom_notes = updates.customNotes;
-
-    let query = supabase
-      .from('smoking_clients')
-      .update(dbPayload)
-      .eq('id', clientId);
-
-    if (companyId) {
-      query = query.eq('company_id', companyId);
-    }
-
-    const { error } = await query;
-
-    if (error) {
-      console.warn("Aviso ao salvar em smoking_clients por ID:", error.message);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error("Erro ao atualizar perfil do CRM:", err);
-    return false;
-  }
-}
 
 /**
  * Normaliza o nome do cliente para comparações insensíveis a acentos e maiúsculas
