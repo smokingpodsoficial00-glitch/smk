@@ -541,14 +541,16 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
           });
         }
       } else if (nameClient) {
-        // Caso B: Nome corresponde a UM cliente.
-        // Só atribui se o telefone não conflitar com outro cliente
-        if (isPhoneCompatible(ord.client_phone, nameClient.phone)) {
+        // Caso B: Nome corresponde a UM único cliente cadastrado.
+        // Só atribui se o telefone não pertencer a OUTRO cliente cadastrado.
+        // Se o telefone do pedido for genérico/antigo e não pertencer a ninguém na base, o histórico permanece com o titular.
+        const phoneBelongsToOtherClient = phoneMatching.length > 0 && phoneMatching.some(c => String(c.id) !== String(nameClient.id));
+        if (!phoneBelongsToOtherClient) {
           orderAssignment.set(ordId, String(nameClient.id));
         } else {
           unlinkedLegacyOrders.push({
             order: ord,
-            reason: `Incompatibilidade de telefone no pedido com o cliente cadastrado [${nameClient.name}]`
+            reason: `Conflito: Telefone no pedido pertence a outro cliente cadastrado no sistema`
           });
         }
       } else {
@@ -934,10 +936,11 @@ export async function fetchUnlinkedLegacyOrders(companyId?: string): Promise<{ o
           });
         }
       } else if (nameClient) {
-        if (!isPhoneCompatible(ord.client_phone, nameClient.phone)) {
+        const phoneBelongsToOtherClient = phoneMatching.length > 0 && phoneMatching.some(c => String(c.id) !== String(nameClient.id));
+        if (phoneBelongsToOtherClient) {
           unlinked.push({
             order: ord,
-            reason: `Incompatibilidade de telefone no pedido com o cliente cadastrado [${nameClient.name}]`
+            reason: `Conflito: Telefone no pedido pertence a outro cliente cadastrado no sistema`
           });
         }
       } else {
