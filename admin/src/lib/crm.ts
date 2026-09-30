@@ -58,53 +58,6 @@ export function detectFlavorProfile(text: string = ''): { type: FlavorProfileTyp
   return { type: 'fruity', label: 'Frutado / Doce' };
 }
 
-// Helper para salvar edições de CRM do cliente no Supabase
-export async function updateClientCrmProfile(
-  phone: string, 
-  updates: {
-    name?: string;
-    flavorProfile?: FlavorProfileType;
-    favoriteBrand?: string;
-    inVipGroup?: boolean;
-    prospectingStatus?: ProspectingStatusType;
-    customNotes?: string;
-    address?: string;
-  },
-  companyId?: string
-): Promise<boolean> {
-  try {
-    const cleanPhone = phone.replace(/\D/g, '');
-    const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-
-    const dbPayload: any = {
-      phone: formattedPhone,
-      updated_at: new Date().toISOString()
-    };
-
-    if (updates.name !== undefined) dbPayload.name = updates.name;
-    if (updates.address !== undefined) dbPayload.address = updates.address;
-    if (updates.flavorProfile !== undefined) dbPayload.flavor_profile = updates.flavorProfile;
-    if (updates.favoriteBrand !== undefined) dbPayload.favorite_brand = updates.favoriteBrand;
-    if (updates.inVipGroup !== undefined) dbPayload.in_vip_group = updates.inVipGroup;
-    if (updates.prospectingStatus !== undefined) dbPayload.prospecting_status = updates.prospectingStatus;
-    if (updates.customNotes !== undefined) dbPayload.custom_notes = updates.customNotes;
-    if (companyId) dbPayload.company_id = companyId;
-
-    const { error } = await supabase
-      .from('smoking_clients')
-      .upsert(dbPayload, { onConflict: 'phone' });
-
-    if (error) {
-      console.warn("Aviso ao salvar em smoking_clients:", error.message);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error("Erro ao atualizar perfil do CRM:", err);
-    return false;
-  }
-}
-
 /**
  * Normaliza o telefone para armazenamento padronizado em smoking_clients
  */
@@ -134,6 +87,62 @@ export function normalizePhoneForStorage(phone: string | null | undefined): stri
   return cleanDigits;
 }
 
+// Helper para salvar edições de CRM do cliente no Supabase EXCLUSIVAMENTE pelo ID (customer.id)
+export async function updateClientCrmProfile(
+  clientId: string, 
+  updates: {
+    name?: string;
+    phone?: string | null;
+    flavorProfile?: FlavorProfileType;
+    favoriteBrand?: string;
+    inVipGroup?: boolean;
+    prospectingStatus?: ProspectingStatusType;
+    customNotes?: string;
+    address?: string;
+  },
+  companyId?: string
+): Promise<boolean> {
+  try {
+    if (!clientId) {
+      console.error("Identificador de cliente (ID) obrigatório para atualizar perfil.");
+      return false;
+    }
+
+    const dbPayload: any = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (updates.name !== undefined) dbPayload.name = updates.name.trim();
+    if (updates.phone !== undefined) dbPayload.phone = normalizePhoneForStorage(updates.phone);
+    if (updates.address !== undefined) dbPayload.address = updates.address;
+    if (updates.flavorProfile !== undefined) dbPayload.flavor_profile = updates.flavorProfile;
+    if (updates.favoriteBrand !== undefined) dbPayload.favorite_brand = updates.favoriteBrand;
+    if (updates.inVipGroup !== undefined) dbPayload.in_vip_group = updates.inVipGroup;
+    if (updates.prospectingStatus !== undefined) dbPayload.prospecting_status = updates.prospectingStatus;
+    if (updates.customNotes !== undefined) dbPayload.custom_notes = updates.customNotes;
+
+    let query = supabase
+      .from('smoking_clients')
+      .update(dbPayload)
+      .eq('id', clientId);
+
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
+
+    const { error } = await query;
+
+    if (error) {
+      console.warn("Aviso ao salvar em smoking_clients por ID:", error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("Erro ao atualizar perfil do CRM:", err);
+    return false;
+  }
+}
+
 /**
  * Normaliza o nome do cliente para comparações insensíveis a acentos e maiúsculas
  */
@@ -145,6 +154,39 @@ export function normalizeName(name: string | null | undefined): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ');
+}
+
+/**
+ * Valida compatibilidade estrita entre o nome do pedido e o cliente.
+ * NUNCA mescla nomes incompatíveis.
+ */
+export function isNameCompatible(orderName: string | null | undefined, clientName: string | null | undefined): boolean {
+  if (!orderName || !orderName.trim()) return true; // Pedido sem nome não gera conflito impeditivo
+  if (!clientName || !clientName.trim()) return true; // Cliente sem nome não gera conflito impeditivo
+  const nO = normalizeName(orderName);
+  const nC = normalizeName(clientName);
+  if (!nO || !nC) return true;
+  // Match exato ou contenção direta de nome
+  if (nO === nC || nO.includes(nC) || nC.includes(nO)) return true;
+  // Equivalência fonética brasileira direta (w <-> u, y <-> i)
+  const pO = nO.replace(/w/g, 'u').replace(/y/g, 'i');
+  const pC = nC.replace(/w/g, 'u').replace(/y/g, 'i');
+  if (pO === pC || pO.includes(pC) || pC.includes(pO)) return true;
+  return false;
+}
+
+/**
+ * Valida compatibilidade de telefone entre o pedido e o cliente.
+ */
+export function isPhoneCompatible(orderPhone: string | null | undefined, clientPhone: string | null | undefined): boolean {
+  if (!orderPhone || !orderPhone.trim()) return true; // Pedido sem telefone não gera conflito impeditivo
+  if (!clientPhone || !clientPhone.trim()) return true; // Cliente sem telefone não gera conflito impeditivo
+  const cleanO = orderPhone.replace(/\D/g, '');
+  const cleanC = clientPhone.replace(/\D/g, '');
+  if (!cleanO || !cleanC) return true;
+  const keyO = cleanO.length === 10 || cleanO.length === 11 ? `55${cleanO}` : cleanO;
+  const keyC = cleanC.length === 10 || cleanC.length === 11 ? `55${cleanC}` : cleanC;
+  return keyO === keyC;
 }
 
 /**
@@ -379,133 +421,161 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       }
     }
 
-    // 2. Indexar Pedidos por customer_id (PRIORIDADE MÁXIMA), Telefone Normalizado e por Nome do Cliente
-    const ordersByCustomerId = new Map<string, any[]>();
-    const ordersByPhone = new Map<string, any[]>();
-    const ordersByName = new Map<string, any[]>();
-    for (const order of orders) {
-      if (!order) continue;
+    // 2. Indexação de Clientes em smoking_clients (FONTE PRIMÁRIA)
+    const clientsData = clientsRes.data || [];
+    const clientById = new Map<string, any>();
+    const clientsByPhone = new Map<string, any[]>();
+    const clientsByName = new Map<string, any[]>();
 
-      // 2.1 Vínculo Relacional Direto e Permanente (Prioridade Máxima)
-      const effectiveCustomerId = order.customer_id || (order.id === 'c6d1db5b-5986-45df-815e-3d09faa86c91' ? '88a9d1b3-70ad-4fcc-ae67-91b4096ea64a' : null);
-      if (effectiveCustomerId) {
-        const cId = String(effectiveCustomerId);
-        if (!ordersByCustomerId.has(cId)) {
-          ordersByCustomerId.set(cId, []);
+    for (const client of clientsData) {
+      if (!client || !client.id) continue;
+      const cId = String(client.id);
+      clientById.set(cId, client);
+
+      const rawPhone = client.phone ? String(client.phone).trim() : '';
+      if (rawPhone) {
+        let phoneKey = '';
+        if (rawPhone.startsWith('INSTA_') || rawPhone.startsWith('SEM_WPP_') || rawPhone.includes('Instagram')) {
+          phoneKey = rawPhone;
+        } else {
+          const clean = rawPhone.replace(/\D/g, '');
+          if (clean) {
+            phoneKey = clean.length === 10 || clean.length === 11 ? `55${clean}` : clean;
+          }
         }
-        ordersByCustomerId.get(cId)!.push(order);
+        if (phoneKey) {
+          if (!clientsByPhone.has(phoneKey)) clientsByPhone.set(phoneKey, []);
+          clientsByPhone.get(phoneKey)!.push(client);
+        }
       }
 
-      const phoneRaw = String(order.client_phone || order.customer_phone || order.phone || '').trim();
-      let lookupKey = '';
-      if (phoneRaw.startsWith('INSTA_') || phoneRaw.startsWith('SEM_WPP_') || phoneRaw.includes('Instagram')) {
-        lookupKey = phoneRaw;
+      const normN = normalizeName(client.name);
+      if (normN) {
+        if (!clientsByName.has(normN)) clientsByName.set(normN, []);
+        clientsByName.get(normN)!.push(client);
+      }
+    }
+
+    // 3. Resolução Determinística de Identidade: 1 PEDIDO = 1 CLIENTE NO MÁXIMO
+    // Mapeamento estrito: orderAssignment (orderId -> clientId)
+    const orderAssignment = new Map<string, string>();
+    const unlinkedLegacyOrders: { order: any; reason: string }[] = [];
+
+    for (const ord of orders) {
+      if (!ord || !ord.id) continue;
+      const ordId = String(ord.id);
+
+      // REGRA ABSOLUTA (Prioridade 1): customer_id direto do banco
+      if (ord.customer_id) {
+        const targetClientId = String(ord.customer_id);
+        // Validar integridade referencial com os clientes do tenant atual
+        if (clientById.has(targetClientId)) {
+          orderAssignment.set(ordId, targetClientId);
+        } else {
+          unlinkedLegacyOrders.push({
+            order: ord,
+            reason: 'customer_id aponta para cliente inexistente ou não autorizado neste tenant'
+          });
+        }
+        continue;
+      }
+
+      // REGRA PARA PEDIDOS LEGADOS SEM customer_id:
+      // Avaliar correspondência estrita por telefone e nome
+      let phoneMatching: any[] = [];
+      const ordRawPhone = String(ord.client_phone || ord.customer_phone || ord.phone || '').trim();
+      if (ordRawPhone) {
+        let pKey = '';
+        if (ordRawPhone.startsWith('INSTA_') || ordRawPhone.startsWith('SEM_WPP_') || ordRawPhone.includes('Instagram')) {
+          pKey = ordRawPhone;
+        } else {
+          const clean = ordRawPhone.replace(/\D/g, '');
+          if (clean) {
+            pKey = clean.length === 10 || clean.length === 11 ? `55${clean}` : clean;
+          }
+        }
+        if (pKey && clientsByPhone.has(pKey)) {
+          phoneMatching = clientsByPhone.get(pKey)!;
+        }
+      }
+
+      let nameMatching: any[] = [];
+      const ordNormName = normalizeName(ord.client_name);
+      if (ordNormName && clientsByName.has(ordNormName)) {
+        nameMatching = clientsByName.get(ordNormName)!;
+      }
+
+      // Casos de ambiguidade com múltiplos clientes
+      if (phoneMatching.length > 1 || nameMatching.length > 1) {
+        unlinkedLegacyOrders.push({
+          order: ord,
+          reason: 'Ambiguidade: telefone ou nome corresponde a múltiplos clientes'
+        });
+        continue;
+      }
+
+      const phoneClient = phoneMatching.length === 1 ? phoneMatching[0] : null;
+      const nameClient = nameMatching.length === 1 ? nameMatching[0] : null;
+
+      if (phoneClient && nameClient) {
+        if (String(phoneClient.id) === String(nameClient.id)) {
+          // Telefone e Nome apontam exatamente para o mesmo cliente
+          orderAssignment.set(ordId, String(phoneClient.id));
+        } else {
+          // CONFLITO CRUZADO (Caso C): Telefone aponta para A e Nome aponta para B
+          // AMBIGUIDADE: Não atribuir automaticamente a nenhum dos dois!
+          unlinkedLegacyOrders.push({
+            order: ord,
+            reason: `Conflito cruzado: Telefone aponta para [${phoneClient.name}] mas Nome aponta para [${nameClient.name}]`
+          });
+        }
+      } else if (phoneClient) {
+        // Caso A: Telefone corresponde a UM cliente.
+        // Só atribui se o nome do pedido não conflitar com outro cliente
+        if (isNameCompatible(ord.client_name, phoneClient.name)) {
+          orderAssignment.set(ordId, String(phoneClient.id));
+        } else {
+          unlinkedLegacyOrders.push({
+            order: ord,
+            reason: `Incompatibilidade de nome no pedido com o titular da linha [${phoneClient.name}]`
+          });
+        }
+      } else if (nameClient) {
+        // Caso B: Nome corresponde a UM cliente.
+        // Só atribui se o telefone não conflitar com outro cliente
+        if (isPhoneCompatible(ord.client_phone, nameClient.phone)) {
+          orderAssignment.set(ordId, String(nameClient.id));
+        } else {
+          unlinkedLegacyOrders.push({
+            order: ord,
+            reason: `Incompatibilidade de telefone no pedido com o cliente cadastrado [${nameClient.name}]`
+          });
+        }
       } else {
-        const phoneClean = phoneRaw.replace(/\D/g, '');
-        if (phoneClean) {
-          lookupKey = phoneClean.length === 10 || phoneClean.length === 11 ? `55${phoneClean}` : phoneClean;
-        }
-      }
-
-      if (lookupKey) {
-        if (!ordersByPhone.has(lookupKey)) {
-          ordersByPhone.set(lookupKey, []);
-        }
-        ordersByPhone.get(lookupKey)!.push(order);
-      }
-
-      const nameNorm = normalizeName(order.client_name);
-      if (nameNorm) {
-        if (!ordersByName.has(nameNorm)) {
-          ordersByName.set(nameNorm, []);
-        }
-        ordersByName.get(nameNorm)!.push(order);
+        // Caso F: Pedido sem correspondência em smoking_clients
+        unlinkedLegacyOrders.push({
+          order: ord,
+          reason: 'Pedido sem cliente correspondente em smoking_clients'
+        });
       }
     }
 
     const result: RealClient[] = [];
-    const processedPhones = new Set<string>();
-    const processedOrderIds = new Set<string>();
     const now = new Date().getTime();
 
-    // 3. Processar smoking_clients como FONTE PRIMÁRIA
-    const clientsData = clientsRes.data || [];
+    // 4. Montar a lista oficial de clientes do CRM (Apenas clientes reais de smoking_clients)
     for (const client of clientsData) {
-      if (!client) continue;
-      const rawPhone = client.phone ? String(client.phone).trim() : '';
-      let lookupKey = '';
-      let phoneClean = '';
-      const isInsta = rawPhone.startsWith('INSTA_') || rawPhone.startsWith('SEM_WPP_') || rawPhone.includes('Instagram');
-      
-      if (rawPhone) {
-        if (isInsta) {
-          lookupKey = rawPhone;
-          phoneClean = '';
-        } else {
-          phoneClean = rawPhone.replace(/\D/g, '');
-          lookupKey = phoneClean.length === 10 || phoneClean.length === 11 ? `55${phoneClean}` : phoneClean;
-        }
-        if (lookupKey) processedPhones.add(lookupKey);
-        if (phoneClean) processedPhones.add(phoneClean);
-      }
+      if (!client || !client.id) continue;
+      const clientId = String(client.id);
 
-      // Buscar pedidos associados a este cliente:
-      // 1. PRIORIDADE MÁXIMA: Pedidos com customer_id direto
-      // 2. Mecanismo Legado: Pedidos por telefone cadastrado (somente se não tiver customer_id de outro cliente)
-      // 3. Mecanismo Legado: Pedidos por nome normalizado (somente se não tiver customer_id de outro cliente)
-      const candidateOrders: any[] = [];
-
-      // 1. Prioridade máxima por customer_id
-      if (client.id && ordersByCustomerId.has(String(client.id))) {
-        candidateOrders.push(...ordersByCustomerId.get(String(client.id))!);
-      }
-
-      // 2. Legado por telefone
-      if (lookupKey && ordersByPhone.has(lookupKey)) {
-        for (const o of ordersByPhone.get(lookupKey)!) {
-          if (!o.customer_id || String(o.customer_id) === String(client.id)) {
-            candidateOrders.push(o);
-          }
-        }
-      }
-      if (phoneClean && phoneClean !== lookupKey && ordersByPhone.has(phoneClean)) {
-        for (const o of ordersByPhone.get(phoneClean)!) {
-          if (!o.customer_id || String(o.customer_id) === String(client.id)) {
-            candidateOrders.push(o);
-          }
-        }
-      }
-
-      // 3. Legado por nome
-      const clientNameNorm = normalizeName(client.name);
-      if (clientNameNorm && ordersByName.has(clientNameNorm)) {
-        for (const o of ordersByName.get(clientNameNorm)!) {
-          if (!o.customer_id || String(o.customer_id) === String(client.id)) {
-            candidateOrders.push(o);
-          }
-        }
-      }
-
-      // Desduplicar pedidos do cliente por order.id
-      const clientOrders: any[] = [];
-      const seenOrderIds = new Set<string>();
-      for (const ord of candidateOrders) {
-        const ordId = String(ord.id || '');
-        if (ordId && !seenOrderIds.has(ordId)) {
-          seenOrderIds.add(ordId);
-          clientOrders.push(ord);
-          processedOrderIds.add(ordId);
-          const ordPhone = String(ord.client_phone || '').replace(/\D/g, '');
-          if (ordPhone) {
-            processedPhones.add(ordPhone);
-            if (ordPhone.length === 10 || ordPhone.length === 11) processedPhones.add(`55${ordPhone}`);
-          }
-        }
-      }
-
+      // Obter pedidos atribuídos EXCLUSIVAMENTE a este cliente
+      const clientOrders = orders.filter(o => orderAssignment.get(String(o.id)) === clientId);
       clientOrders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
 
       const latestOrder = clientOrders[0] || null;
+      const rawPhone = client.phone ? String(client.phone).trim() : '';
+      const isInsta = rawPhone.startsWith('INSTA_') || rawPhone.startsWith('SEM_WPP_') || rawPhone.includes('Instagram');
+      const phoneClean = isInsta ? '' : rawPhone.replace(/\D/g, '');
 
       // Formatação de telefone para exibição
       let displayPhone = rawPhone;
@@ -634,7 +704,7 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
         const whatsappUrl = phoneClean ? `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}` : '';
 
         result.push({
-          id: String(client.id || lookupKey),
+          id: clientId,
           phone: String(displayPhone),
           cleanPhone: phoneClean,
           name: String(name),
@@ -678,7 +748,7 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
         const whatsappUrl = phoneClean ? `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}` : '';
 
         result.push({
-          id: String(client.id || lookupKey),
+          id: clientId,
           phone: String(displayPhone),
           cleanPhone: phoneClean,
           name: String(name),
@@ -717,80 +787,8 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       }
     }
 
-    // 4. Fallback de Segurança: Apenas para pedidos que AINDA NÃO foram atribuídos a nenhum cliente cadastrado
-    const existingNames = new Set(result.map(c => normalizeName(c.name)).filter(Boolean));
-
-    for (const [phoneKey, clientOrders] of ordersByPhone.entries()) {
-      // Filtrar apenas pedidos que NÃO foram atribuídos a nenhum cliente real E que não possuem customer_id
-      const unassignedOrders = clientOrders.filter(o => !processedOrderIds.has(String(o.id)) && !o.customer_id && o.id !== 'c6d1db5b-5986-45df-815e-3d09faa86c91');
-      if (unassignedOrders.length === 0) continue;
-
-      unassignedOrders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-      const latestOrder = unassignedOrders[0] || {};
-      const candidateNameNorm = normalizeName(latestOrder.client_name);
-
-      // Se já existe um cliente com este nome em smoking_clients, NÃO criar duplicata na tela!
-      if (candidateNameNorm && existingNames.has(candidateNameNorm)) continue;
-      if (processedPhones.has(phoneKey)) continue;
-
-      unassignedOrders.forEach(o => processedOrderIds.add(String(o.id)));
-      processedPhones.add(phoneKey);
-
-      const rawPhone = latestOrder.client_phone || phoneKey;
-      const isInsta = String(rawPhone).startsWith('INSTA_') || String(rawPhone).startsWith('SEM_WPP_') || String(rawPhone).includes('Instagram');
-      const cleanPhone = isInsta ? '' : phoneKey.replace(/\D/g, '');
-      const displayPhone = isInsta ? 'Sem WhatsApp (Instagram)' : rawPhone;
-      const name = String(latestOrder.client_name || (cleanPhone ? `Cliente ${cleanPhone.slice(-4)}` : 'Cliente Instagram')).trim();
-      const address = String(latestOrder.shipping_address || 'Atendimento Balcão / WhatsApp').trim();
-
-      const validOrders = unassignedOrders.filter(o => o && o.delivery_status !== 'CANCELADO');
-      const spent = validOrders.reduce((sum, o) => sum + (parseFloat(o.total_amount || 0) || 0), 0);
-      const ordersCount = unassignedOrders.length;
-      const lastOrderDateStr = latestOrder.created_at ? new Date(latestOrder.created_at).toLocaleDateString('pt-BR') : 'Hoje';
-      const lastOrderTimestamp = latestOrder.created_at ? new Date(latestOrder.created_at).getTime() : now;
-      const daysSinceLastOrder = Math.max(0, Math.floor((now - lastOrderTimestamp) / (1000 * 60 * 60 * 24)));
-
-      const waNumber = cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone;
-      const whatsappMessage = `E aí ${name}! Tudo certo?`;
-      const whatsappUrl = cleanPhone ? `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}` : '';
-
-      result.push({
-        id: phoneKey,
-        phone: displayPhone,
-        cleanPhone,
-        name,
-        address,
-        spent,
-        ordersCount,
-        lastOrderDate: lastOrderDateStr,
-        daysSinceLastOrder,
-        lastProduct: 'Ignite V50',
-        lastFlavor: 'Frutado',
-        lastPuffs: 5000,
-        expectedCycleDays: 20,
-        estimatedDaysLeft: 20,
-        isEndingSoon: false,
-        whatsappMessage,
-        whatsappUrl,
-        segment: 'new',
-        flavorProfile: 'fruity',
-        flavorProfileLabel: 'Frutado / Doce',
-        favoriteBrand: 'Ignite',
-        inVipGroup: false,
-        prospectingStatus: 'base_antiga',
-        prospectingStatusLabel: 'Base Antiga',
-        customNotes: '',
-        urgencyLevel: 'ok',
-        nextReplenishmentDate: '-',
-        orders: unassignedOrders,
-        lastOrderTimestamp,
-        lastActivityTimestamp: lastOrderTimestamp,
-        clientCreatedAt: latestOrder.created_at,
-      });
-    }
-
     // 5. Ordenação Definitiva do CRM (Bloco 37):
-    // 1. data/hora do último pedido do cliente (latestOrder.created_at);
+    // 1. data/hora do último pedido do cliente (lastActivityTimestamp);
     // 2. se o cliente ainda não possuir pedido, usar created_at como fallback.
     result.sort((a, b) => {
       const timeA = a.lastActivityTimestamp || 0;
@@ -802,6 +800,157 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
     return result;
   } catch (err) {
     console.error("Erro ao buscar clientes do Supabase:", err);
+    return [];
+  }
+}
+
+/**
+ * Consulta pedidos legados que não possuem customer_id e que não puderam ser
+ * vinculados deterministicamente a nenhum cliente cadastrado devido a ambiguidade ou ausência de cadastro.
+ */
+export async function fetchUnlinkedLegacyOrders(companyId?: string): Promise<{ order: any; reason: string }[]> {
+  if (!companyId) return [];
+  try {
+    const isOfficialStore = companyId === 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+
+    let ordersQuery = supabase
+      .from('smoking_orders')
+      .select('*')
+      .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
+      .order('created_at', { ascending: false });
+
+    if (isOfficialStore) {
+      ordersQuery = ordersQuery.or(`company_id.eq.${companyId},company_id.is.null`);
+    } else {
+      ordersQuery = ordersQuery.eq('company_id', companyId);
+    }
+
+    let clientsQuery = supabase
+      .from('smoking_clients')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (isOfficialStore) {
+      clientsQuery = clientsQuery.or(`company_id.eq.${companyId},company_id.is.null`);
+    } else {
+      clientsQuery = clientsQuery.eq('company_id', companyId);
+    }
+
+    const [ordersRes, clientsRes] = await Promise.all([ordersQuery, clientsQuery]);
+    const rawOrders = ordersRes.data || [];
+    const orders = rawOrders.filter(
+      (o: any) => o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' && (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_'))
+    );
+    const clientsData = clientsRes.data || [];
+
+    const clientById = new Map<string, any>();
+    const clientsByPhone = new Map<string, any[]>();
+    const clientsByName = new Map<string, any[]>();
+
+    for (const client of clientsData) {
+      if (!client || !client.id) continue;
+      const cId = String(client.id);
+      clientById.set(cId, client);
+
+      const rawPhone = client.phone ? String(client.phone).trim() : '';
+      if (rawPhone) {
+        let phoneKey = '';
+        if (rawPhone.startsWith('INSTA_') || rawPhone.startsWith('SEM_WPP_') || rawPhone.includes('Instagram')) {
+          phoneKey = rawPhone;
+        } else {
+          const clean = rawPhone.replace(/\D/g, '');
+          if (clean) {
+            phoneKey = clean.length === 10 || clean.length === 11 ? `55${clean}` : clean;
+          }
+        }
+        if (phoneKey) {
+          if (!clientsByPhone.has(phoneKey)) clientsByPhone.set(phoneKey, []);
+          clientsByPhone.get(phoneKey)!.push(client);
+        }
+      }
+
+      const normN = normalizeName(client.name);
+      if (normN) {
+        if (!clientsByName.has(normN)) clientsByName.set(normN, []);
+        clientsByName.get(normN)!.push(client);
+      }
+    }
+
+    const unlinked: { order: any; reason: string }[] = [];
+
+    for (const ord of orders) {
+      if (!ord || !ord.id) continue;
+
+      if (ord.customer_id) {
+        if (!clientById.has(String(ord.customer_id))) {
+          unlinked.push({ order: ord, reason: 'customer_id não encontrado no tenant' });
+        }
+        continue;
+      }
+
+      let phoneMatching: any[] = [];
+      const ordRawPhone = String(ord.client_phone || ord.customer_phone || ord.phone || '').trim();
+      if (ordRawPhone) {
+        let pKey = '';
+        if (ordRawPhone.startsWith('INSTA_') || ordRawPhone.startsWith('SEM_WPP_') || ordRawPhone.includes('Instagram')) {
+          pKey = ordRawPhone;
+        } else {
+          const clean = ordRawPhone.replace(/\D/g, '');
+          if (clean) {
+            pKey = clean.length === 10 || clean.length === 11 ? `55${clean}` : clean;
+          }
+        }
+        if (pKey && clientsByPhone.has(pKey)) {
+          phoneMatching = clientsByPhone.get(pKey)!;
+        }
+      }
+
+      let nameMatching: any[] = [];
+      const ordNormName = normalizeName(ord.client_name);
+      if (ordNormName && clientsByName.has(ordNormName)) {
+        nameMatching = clientsByName.get(ordNormName)!;
+      }
+
+      if (phoneMatching.length > 1 || nameMatching.length > 1) {
+        unlinked.push({ order: ord, reason: 'Ambiguidade: telefone ou nome coincide com múltiplos clientes' });
+        continue;
+      }
+
+      const phoneClient = phoneMatching.length === 1 ? phoneMatching[0] : null;
+      const nameClient = nameMatching.length === 1 ? nameMatching[0] : null;
+
+      if (phoneClient && nameClient) {
+        if (String(phoneClient.id) !== String(nameClient.id)) {
+          unlinked.push({
+            order: ord,
+            reason: `Conflito cruzado: Telefone aponta para [${phoneClient.name}] mas Nome aponta para [${nameClient.name}]`
+          });
+        }
+      } else if (phoneClient) {
+        if (!isNameCompatible(ord.client_name, phoneClient.name)) {
+          unlinked.push({
+            order: ord,
+            reason: `Incompatibilidade de nome no pedido com o titular da linha [${phoneClient.name}]`
+          });
+        }
+      } else if (nameClient) {
+        if (!isPhoneCompatible(ord.client_phone, nameClient.phone)) {
+          unlinked.push({
+            order: ord,
+            reason: `Incompatibilidade de telefone no pedido com o cliente cadastrado [${nameClient.name}]`
+          });
+        }
+      } else {
+        unlinked.push({
+          order: ord,
+          reason: 'Pedido sem correspondência em smoking_clients'
+        });
+      }
+    }
+
+    return unlinked;
+  } catch (e) {
+    console.error('Erro ao buscar pedidos legados não vinculados:', e);
     return [];
   }
 }

@@ -81,6 +81,7 @@ export function ManualSaleModal({
   const clientSearchInputRef = useRef<HTMLInputElement>(null);
 
   // Dados do Cliente
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
@@ -160,7 +161,7 @@ export function ManualSaleModal({
         // 2. Buscar Clientes Oficiais de smoking_clients E histórico de smoking_orders em paralelo
         let clientsQuery = supabase
           .from("smoking_clients")
-          .select("name, phone, address")
+          .select("id, name, phone, address")
           .order("name", { ascending: true });
 
         let ordersQuery = supabase
@@ -187,7 +188,7 @@ export function ManualSaleModal({
           setProductsList(prods);
         }
 
-        const mergedClients = new Map<string, { client_name: string; client_phone: string; shipping_address: string }>();
+        const mergedClients = new Map<string, { id?: string; client_name: string; client_phone: string; shipping_address: string }>();
 
         const getClientLookupKey = (rawPhone: string, rawName: string) => {
           const p = (rawPhone || "").trim();
@@ -206,9 +207,10 @@ export function ManualSaleModal({
             const name = (c.name || "").trim();
             const phone = (c.phone || "").trim();
             if (!name || phone.startsWith("__SYSTEM_") || name.toLowerCase().includes("system")) return;
-            const key = getClientLookupKey(phone, name);
+            const key = c.id || getClientLookupKey(phone, name);
             if (key && !mergedClients.has(key)) {
               mergedClients.set(key, {
+                id: c.id,
                 client_name: name,
                 client_phone: phone,
                 shipping_address: c.address || "",
@@ -445,6 +447,7 @@ export function ManualSaleModal({
         : clientObjOrPhone;
 
     if (found) {
+      setSelectedClientId(found.id || null);
       setSelectedExistingClientPhone(found.client_phone || found.client_name);
       setClientSearchQuery("");
       setIsClientDropdownOpen(false);
@@ -484,6 +487,7 @@ export function ManualSaleModal({
   };
 
   const handleClearSelectedClient = () => {
+    setSelectedClientId(null);
     setSelectedExistingClientPhone("");
     setClientSearchQuery("");
     setClientName("");
@@ -531,21 +535,78 @@ export function ManualSaleModal({
         ? `${nationalCity.trim() || "Nacional"} - ${nationalState}`
         : (shippingAddress.trim() || "Atendimento Balcão / WhatsApp");
 
-      try {
-        const { data: _clientData, error: clientErr } = await supabase.from("smoking_clients").upsert(
-          {
-            phone: formattedPhone,
-            name: clientName.trim(),
-            address: clientAddressToSave,
-            company_id: companyId,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "phone" }
-        );
+      // 1. Identificar ou Cadastrar Cliente Oficialmente em smoking_clients (SEM onConflict: 'phone'!)
+      let finalCustomerId: string | null = selectedClientId;
 
-        if (clientErr) {
-          console.error("❌ Erro ao atualizar/salvar cliente em smoking_clients:", clientErr);
-          clientSaveWarning = "Não foi possível atualizar o cadastro do cliente.";
+      try {
+        if (finalCustomerId) {
+          // Atualizar dados cadastrais do cliente selecionado EXCLUSIVAMENTE pelo ID (customer.id)
+          let clientUpdQuery = supabase
+            .from("smoking_clients")
+            .update({
+              name: clientName.trim(),
+              ...(formattedPhone ? { phone: formattedPhone } : {}),
+              address: clientAddressToSave,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", finalCustomerId);
+
+          if (companyId) {
+            clientUpdQuery = clientUpdQuery.eq("company_id", companyId);
+          }
+
+          const { error: clientErr } = await clientUpdQuery;
+          if (clientErr) {
+            console.warn("Aviso ao atualizar cliente por ID:", clientErr.message);
+          }
+        } else {
+          // Se não foi selecionado cliente com ID, verificar se já existe pelo telefone exato (se fornecido)
+          let existingClient: any = null;
+          if (formattedPhone && !isNoWhatsApp) {
+            let chkQuery = supabase
+              .from("smoking_clients")
+              .select("id")
+              .eq("phone", formattedPhone);
+            if (companyId) chkQuery = chkQuery.eq("company_id", companyId);
+            const { data } = await chkQuery.maybeSingle();
+            existingClient = data;
+          }
+
+          if (existingClient?.id) {
+            finalCustomerId = existingClient.id;
+            let clientUpdQuery = supabase
+              .from("smoking_clients")
+              .update({
+                name: clientName.trim(),
+                address: clientAddressToSave,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", finalCustomerId);
+            if (companyId) clientUpdQuery = clientUpdQuery.eq("company_id", companyId);
+            await clientUpdQuery;
+          } else {
+            // Inserir NOVO cliente em smoking_clients e capturar seu ID
+            const newClientPayload: any = {
+              name: clientName.trim(),
+              phone: formattedPhone || null,
+              address: clientAddressToSave,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            if (companyId) newClientPayload.company_id = companyId;
+
+            const { data: newClientData, error: newClientErr } = await supabase
+              .from("smoking_clients")
+              .insert(newClientPayload)
+              .select("id")
+              .single();
+
+            if (!newClientErr && newClientData?.id) {
+              finalCustomerId = newClientData.id;
+            } else if (newClientErr) {
+              console.warn("Aviso ao cadastrar novo cliente em smoking_clients:", newClientErr.message);
+            }
+          }
         }
       } catch (custErr) {
         console.error("❌ Exceção ao salvar cliente em smoking_clients:", custErr);
@@ -582,6 +643,7 @@ export function ManualSaleModal({
       const safePaymentMethod = paymentMethod === "CARTAO" ? "CREDITO_LINK" : "PIX";
 
       const payload: any = {
+        customer_id: finalCustomerId,
         client_name: clientName.trim(),
         client_phone: formattedPhone,
         shipping_address: finalAddress,
@@ -696,6 +758,7 @@ export function ManualSaleModal({
         setItems([]);
         setClientName("");
         setClientPhone("");
+        setSelectedClientId(null);
         setSelectedExistingClientPhone("");
         setClientSearchQuery("");
         setIsClientDropdownOpen(false);

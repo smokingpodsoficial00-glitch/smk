@@ -68,7 +68,7 @@ export function ClientProfileModal({
 
   const handleDeleteClient = async () => {
     if (confirm(`Deseja realmente remover o cadastro de ${client.name} do CRM?`)) {
-      const res = await deleteClientRecord(client.cleanPhone || client.phone, company?.id);
+      const res = await deleteClientRecord(client.id, company?.id);
       if (res.success) {
         alert('✅ Cliente removido do CRM.');
         if (onClientUpdated) onClientUpdated();
@@ -93,7 +93,7 @@ export function ClientProfileModal({
   const handleSaveProfile = async () => {
     setIsSaving(true);
     const success = await updateClientCrmProfile(
-      client.phone,
+      client.id,
       {
         flavorProfile,
         favoriteBrand,
@@ -550,7 +550,7 @@ export function ClientProfileModal({
                 const items: any[] = Array.isArray(order.items) ? order.items : [];
 
                 return (
-                  <div key={order.id || idx} className="bg-[#141414] border border-white/5 rounded-xl p-3.5 flex flex-col gap-2">
+                  <div key={order.id} className="bg-[#141414] border border-white/5 rounded-xl p-3.5 flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-mono text-muted-foreground flex items-center gap-1">
                         <Calendar className="size-3" />

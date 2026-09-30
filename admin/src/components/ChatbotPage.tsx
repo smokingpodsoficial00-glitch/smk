@@ -406,7 +406,34 @@ export default function ChatbotPage() {
       const nameHash = (clientName || "Cliente Demo").split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
       const simulatedPhone = `119888${String(nameHash).padStart(5, '0').slice(-5)}`;
 
+      let customerId: string | null = null;
+      if (simulatedPhone) {
+        let clientQuery = supabase
+          .from('smoking_clients')
+          .select('id')
+          .eq('phone', simulatedPhone);
+        if (company?.id) clientQuery = clientQuery.eq('company_id', company.id);
+        const { data: existingClient } = await clientQuery.maybeSingle();
+
+        if (existingClient?.id) {
+          customerId = existingClient.id;
+        } else {
+          const { data: newC } = await supabase
+            .from('smoking_clients')
+            .insert({
+              name: clientName || "Cliente WhatsApp",
+              phone: simulatedPhone,
+              address: address || "Endereço Não Informado",
+              ...(company?.id ? { company_id: company.id } : {})
+            })
+            .select('id')
+            .maybeSingle();
+          if (newC?.id) customerId = newC.id;
+        }
+      }
+
       const newOrderPayload = {
+        customer_id: customerId,
         client_name: clientName || "Cliente WhatsApp",
         client_phone: simulatedPhone,
         shipping_address: address || "Endereço Não Informado",

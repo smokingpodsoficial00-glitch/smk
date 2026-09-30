@@ -365,7 +365,7 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
 
                   return (
                     <tr 
-                      key={client.id || phoneClean} 
+                      key={client.id} 
                       className={`hover:bg-white/5 transition-colors cursor-pointer group ${isSelected ? 'bg-emerald-500/5' : ''}`}
                     >
                       <td className="px-4 py-4" onClick={(e) => { e.stopPropagation(); handleToggleSelectOne(client.id); }}>

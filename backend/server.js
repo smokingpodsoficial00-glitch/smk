@@ -909,9 +909,13 @@ async function syncWhatsAppOrderToKanbanAndDeductStock(senderNumber, contactName
         };
         if (companyId) clientPayload.company_id = companyId;
 
-        await supabase
+        const { data: savedClient } = await supabase
             .from('smoking_clients')
-            .upsert(clientPayload, { onConflict: 'phone' });
+            .upsert(clientPayload, { onConflict: 'phone' })
+            .select('id')
+            .maybeSingle();
+
+        const customerId = savedClient ? savedClient.id : null;
 
         // 5. Se houver um pedido na aba "AGUARDANDO_PAGAMENTO", atualiza os dados dele.
         // Caso o pedido anterior já esteja em "PREPARANDO", "EM_ROTA" ou "ENTREGUE", cria um NOVO pedido separado!
@@ -930,6 +934,7 @@ async function syncWhatsAppOrderToKanbanAndDeductStock(senderNumber, contactName
             const { error: updateErr } = await supabase
                 .from('smoking_orders')
                 .update({
+                    ...(customerId ? { customer_id: customerId } : {}),
                     client_name: clientName,
                     client_phone: displayPhone,
                     shipping_address: shippingAddress,
@@ -951,6 +956,7 @@ async function syncWhatsAppOrderToKanbanAndDeductStock(senderNumber, contactName
                 .from('smoking_orders')
                 .insert({
                     company_id: companyId,
+                    customer_id: customerId,
                     client_phone: displayPhone,
                     client_name: clientName,
                     shipping_address: shippingAddress,

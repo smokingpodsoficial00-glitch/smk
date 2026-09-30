@@ -20,15 +20,20 @@ export async function deleteOrderWithStockRestoration(
   }
 ): Promise<DeleteOrderResult> {
   const shouldRestoreStock = options?.restoreStock !== false;
-  const shouldDeleteClientIfNoOrders = options?.deleteClientIfNoOrders ?? true;
+  const shouldDeleteClientIfNoOrders = options?.deleteClientIfNoOrders ?? false;
 
   try {
     // 1. Buscar o pedido para ler os itens e informações do cliente
-    const { data: order, error: fetchErr } = await supabase
+    let fetchQuery = supabase
       .from('smoking_orders')
       .select('*')
-      .eq('id', orderId)
-      .maybeSingle();
+      .eq('id', orderId);
+
+    if (options?.companyId) {
+      fetchQuery = fetchQuery.eq('company_id', options.companyId);
+    }
+
+    const { data: order, error: fetchErr } = await fetchQuery.maybeSingle();
 
     if (fetchErr) {
       console.error('[deleteOrder] Erro ao buscar pedido:', fetchErr);
@@ -81,30 +86,35 @@ export async function deleteOrderWithStockRestoration(
     }
 
     // 3. Deletar o pedido de smoking_orders
-    const { error: delErr } = await supabase
+    let delQuery = supabase
       .from('smoking_orders')
       .delete()
       .eq('id', orderId);
+
+    if (options?.companyId) {
+      delQuery = delQuery.eq('company_id', options.companyId);
+    }
+
+    const { error: delErr } = await delQuery;
 
     if (delErr) {
       console.error('[deleteOrder] Erro ao deletar pedido:', delErr);
       return { success: false, error: delErr.message };
     }
 
-    // 4. Se solicitado e o cliente não tiver mais nenhum pedido no histórico, remover cliente órfão/acidental
-    if (shouldDeleteClientIfNoOrders && order.client_phone) {
+    // 4. Se expressamente solicitado e o cliente não tiver mais nenhum pedido, limpar exclusivamente por customer_id
+    if (shouldDeleteClientIfNoOrders && order.customer_id) {
       try {
         const { count, error: countErr } = await supabase
           .from('smoking_orders')
           .select('id', { count: 'exact', head: true })
-          .eq('client_phone', order.client_phone);
+          .eq('customer_id', order.customer_id);
 
         if (!countErr && count === 0) {
-          // Cliente não possui mais nenhum pedido! Se for cliente com telefone de Instagram gerado ou sem compras
           let clientDelQuery = supabase
             .from('smoking_clients')
             .delete()
-            .eq('phone', order.client_phone);
+            .eq('id', order.customer_id);
 
           if (order.company_id) {
             clientDelQuery = clientDelQuery.eq('company_id', order.company_id);
@@ -112,7 +122,7 @@ export async function deleteOrderWithStockRestoration(
 
           const { error: clientDelErr } = await clientDelQuery;
           if (!clientDelErr) {
-            console.log(`[deleteOrder] Cliente sem outros pedidos removido automaticamente: ${order.client_phone}`);
+            console.log(`[deleteOrder] Cliente sem outros pedidos removido por ID: ${order.customer_id}`);
           }
         }
       } catch (cleanClientErr) {
@@ -131,17 +141,22 @@ export async function deleteOrderWithStockRestoration(
 }
 
 /**
- * Remove um cliente do cadastro de smoking_clients
+ * Remove um cliente do cadastro de smoking_clients EXCLUSIVAMENTE pelo ID primário (customer.id).
+ * NUNCA remove por telefone.
  */
 export async function deleteClientRecord(
-  clientPhone: string,
+  clientId: string,
   companyId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!clientId) {
+      return { success: false, error: 'Identificador (ID) do cliente não informado.' };
+    }
+
     let query = supabase
       .from('smoking_clients')
       .delete()
-      .eq('phone', clientPhone);
+      .eq('id', clientId);
 
     if (companyId) {
       query = query.eq('company_id', companyId);
