@@ -44,6 +44,7 @@ export default function SupplyChainDashboard() {
   // ─── Modal de Planejador de Reposição & Metas de Escala ──
   const [showReplenishmentModal, setShowReplenishmentModal] = useState(false);
   const [financialGoals, setFinancialGoals] = useState<FinancialGoals>(loadSavedGoals);
+  const [copiedStockFeedback, setCopiedStockFeedback] = useState(false);
 
   // ─── Modal Flutuante Centralizado de Novo Produto ──────
   const [showNewProductModal, setShowNewProductModal] = useState(false);
@@ -213,6 +214,131 @@ export default function SupplyChainDashboard() {
     if (!n) return b;
     if (n.toLowerCase().startsWith(b.toLowerCase())) return n;
     return `${b} ${n}`;
+  };
+
+  // ─── Copiar Estoque Disponível Formatado para WhatsApp ─────────
+  const generateAvailableStockText = (): { text: string; totalUnits: number } => {
+    const groupsMap = new Map<string, {
+      modelTitle: string;
+      flavors: Array<{ name: string; stock: number }>;
+    }>();
+
+    let totalUnits = 0;
+
+    (products || []).forEach((p: any) => {
+      // 1. Somente produtos ativos
+      if (p.is_active === false) return;
+
+      // 2. Somente estoque real >= 1
+      const stockQty = typeof p.stock === "number" ? p.stock : parseInt(p.stock, 10);
+      if (isNaN(stockQty) || stockQty < 1) return;
+
+      // 3. Somente sabores válidos e reais (sem placeholders artificiais)
+      const rawFlavor = (p.flavor || "").trim();
+      if (!rawFlavor) return;
+      const lowerFlavor = rawFlavor.toLowerCase();
+      if (lowerFlavor === "padrão" || lowerFlavor === "padrao" || lowerFlavor === "sem sabor") return;
+
+      // 4. Marca e modelo válidos
+      const brand = (p.brand || "").trim();
+      if (brand === "__STORE_CONFIG__") return;
+      const name = (p.name || "").trim();
+      if (!name && !brand) return;
+
+      const groupKey = `${brand.toLowerCase()}__${name.toLowerCase()}`;
+      const modelTitle = getGroupDisplayName(brand, name).toUpperCase();
+
+      if (!groupsMap.has(groupKey)) {
+        groupsMap.set(groupKey, {
+          modelTitle,
+          flavors: []
+        });
+      }
+
+      const group = groupsMap.get(groupKey)!;
+      const existingFlavor = group.flavors.find(
+        (f) => f.name.toLowerCase() === rawFlavor.toLowerCase()
+      );
+      if (existingFlavor) {
+        existingFlavor.stock += stockQty;
+      } else {
+        group.flavors.push({
+          name: rawFlavor,
+          stock: stockQty
+        });
+      }
+
+      totalUnits += stockQty;
+    });
+
+    if (groupsMap.size === 0 || totalUnits === 0) {
+      return {
+        text: "📦 ESTOQUE DISPONÍVEL\n\n────────────────\nTotal: 0 unidades",
+        totalUnits: 0
+      };
+    }
+
+    // Ordenação alfabética dos modelos para facilitar visualização
+    const sortedGroups = Array.from(groupsMap.values()).sort((a, b) =>
+      a.modelTitle.localeCompare(b.modelTitle, "pt-BR")
+    );
+
+    const sections: string[] = ["📦 ESTOQUE DISPONÍVEL"];
+
+    sortedGroups.forEach((group) => {
+      // Ordenação alfabética dos sabores
+      group.flavors.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+
+      const lines: string[] = [group.modelTitle];
+      group.flavors.forEach((f) => {
+        lines.push(`• ${f.name} — ${f.stock} un.`);
+      });
+
+      sections.push(lines.join("\n"));
+    });
+
+    sections.push(`────────────────\nTotal: ${totalUnits} ${totalUnits === 1 ? "unidade" : "unidades"}`);
+
+    return {
+      text: sections.join("\n\n"),
+      totalUnits
+    };
+  };
+
+  const handleCopyAvailableStock = async () => {
+    const { text } = generateAvailableStockText();
+    let copied = false;
+
+    if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      } catch (e) {
+        console.warn("navigator.clipboard falhou, tentando fallback textarea:", e);
+      }
+    }
+
+    if (!copied) {
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        copied = document.execCommand("copy");
+        document.body.removeChild(textArea);
+      } catch (err) {
+        console.error("Erro no fallback de cópia:", err);
+      }
+    }
+
+    setCopiedStockFeedback(true);
+    setTimeout(() => {
+      setCopiedStockFeedback(false);
+    }, 2500);
   };
 
   const compressImage = (file: File, maxWidth = 500, quality = 0.75): Promise<string> => {
@@ -1549,6 +1675,30 @@ export default function SupplyChainDashboard() {
 
             {/* Botões Superiores com Hierarquia Clara */}
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Botão Copiar Estoque (Discreto, ao lado de Planejador de Recompra) */}
+              <button
+                type="button"
+                onClick={handleCopyAvailableStock}
+                className={`inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-semibold border transition-all cursor-pointer active:scale-[0.97] flex-1 sm:flex-initial ${
+                  copiedStockFeedback
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm shadow-emerald-500/20"
+                    : "bg-[#1c1c1c] hover:bg-white/10 text-white border-white/20"
+                }`}
+                title="Copiar lista de estoque disponível"
+              >
+                {copiedStockFeedback ? (
+                  <>
+                    <Check className="size-3.5 text-emerald-400 shrink-0" />
+                    <span className="truncate">Estoque copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="size-3.5 text-white shrink-0" />
+                    <span className="truncate">Copiar Estoque</span>
+                  </>
+                )}
+              </button>
+
               {/* Botão Neutro Escuro com Borda Clara */}
               <button
                 type="button"
