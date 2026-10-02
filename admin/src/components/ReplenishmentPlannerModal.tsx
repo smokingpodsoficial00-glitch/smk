@@ -22,6 +22,8 @@ import {
   Flame,
   Layers,
   ChevronRight,
+  ChevronDown,
+  Search,
   Sliders,
   CheckCircle2,
   Plus,
@@ -74,15 +76,15 @@ export const DEFAULT_GOALS: FinancialGoals = {
 };
 
 export const DEFAULT_ORDER_ITEMS: OrderItem[] = [
-  { id: "1", brand: "Elfbar", model: "BC15K", qty: 3, unitCost: 48, unitSell: 64.99, badge: "Alto Giro / Menor Custo", flavors: "Blue Razz Ice (2x), Strawberry Kiwi" },
-  { id: "2", brand: "Elfbar", model: "Ice King 40K", qty: 2, unitCost: 70, unitSell: 89.90, badge: "Campeão #1 de Vendas", flavors: "Green Apple Ice, Watermelon Ice" },
-  { id: "3", brand: "Lost Mary", model: "Dura 35K", qty: 3, unitCost: 65, unitSell: 79.90, badge: "Excelente Retenção", flavors: "Pom. Cherry Pineapple, Grape Ice" },
-  { id: "4", brand: "Oxbar", model: "50K", qty: 1, unitCost: 65, unitSell: 99.90, badge: "Maior Margem Líquida", flavors: "Pineapple Ice" },
-  { id: "5", brand: "Elfbar", model: "GH23K", qty: 1, unitCost: 65, unitSell: 86.90, badge: "Desejo de Catálogo", flavors: "Grape Ice" },
-  { id: "6", brand: "Ignite", model: "V500", qty: 1, unitCost: 80, unitSell: 108.90, badge: "Modelo Premium", flavors: "Strawberry Kiwi" },
-  { id: "7", brand: "Ignite", model: "V55 Ultra Thin", qty: 1, unitCost: 52, unitSell: 71.90, badge: "Entrada Acessível", flavors: "Strawberry Ice" },
-  { id: "8", brand: "Ignite", model: "V80 Ultra Slim", qty: 1, unitCost: 55, unitSell: 78.90, badge: "Margem & Variedade", flavors: "Passion Fruit Sour Kiwi" },
-  { id: "9", brand: "Geek Bar", model: "Pulse 15K", qty: 2, unitCost: 70, unitSell: 94.90, badge: "Marca Nova / Novidade", flavors: "Sabores Sortidos / Menta" },
+  { id: "1", brand: "Elfbar", model: "BC15K", qty: 3, unitCost: 48, unitSell: 64.99, flavors: "Blue Razz Ice (2x), Strawberry Kiwi" },
+  { id: "2", brand: "Elfbar", model: "Ice King 40K", qty: 2, unitCost: 70, unitSell: 89.90, flavors: "Green Apple Ice, Watermelon Ice" },
+  { id: "3", brand: "Lost Mary", model: "Dura 35K", qty: 3, unitCost: 65, unitSell: 79.90, flavors: "Pom. Cherry Pineapple, Grape Ice" },
+  { id: "4", brand: "Oxbar", model: "50K", qty: 1, unitCost: 65, unitSell: 99.90, flavors: "Pineapple Ice" },
+  { id: "5", brand: "Elfbar", model: "GH23K", qty: 1, unitCost: 65, unitSell: 86.90, flavors: "Grape Ice" },
+  { id: "6", brand: "Ignite", model: "V500", qty: 1, unitCost: 80, unitSell: 108.90, flavors: "Strawberry Kiwi" },
+  { id: "7", brand: "Ignite", model: "V55 Ultra Thin", qty: 1, unitCost: 52, unitSell: 71.90, flavors: "Strawberry Ice" },
+  { id: "8", brand: "Ignite", model: "V80 Ultra Slim", qty: 1, unitCost: 55, unitSell: 78.90, flavors: "Passion Fruit Sour Kiwi" },
+  { id: "9", brand: "Geek Bar", model: "Pulse 15K", qty: 2, unitCost: 70, unitSell: 94.90, flavors: "Sabores Sortidos / Menta" },
 ];
 
 export const LOCAL_STORAGE_GOALS_KEY = "smk_financial_goals_v1";
@@ -149,6 +151,15 @@ export function parseFlavorsString(flavorsStr: string, totalQty: number): { flav
   return result;
 }
 
+export function formatFlavorsList(list: { flavor: string; qty: number }[]): string {
+  if (!list || list.length === 0) return "Sabores Sortidos";
+  const valid = list.filter(f => f.flavor && f.flavor.trim().length > 0);
+  if (valid.length === 0) return "Sabores Sortidos";
+  return valid
+    .map(f => (f.qty > 1 ? `${f.flavor.trim()} (${f.qty}x)` : f.flavor.trim()))
+    .join(", ");
+}
+
 interface ReplenishmentPlannerModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -206,6 +217,10 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
   const [newPodCost, setNewPodCost] = useState("65");
   const [newPodSell, setNewPodSell] = useState("89.90");
   const [newPodFlavors, setNewPodFlavors] = useState("Sabores Sortidos");
+
+  // Gerenciamento Interativo de Sabores por Pod
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [flavorSearchQuery, setFlavorSearchQuery] = useState("");
 
   // Sugestões Inteligentes puxadas do Estoque em Tempo Real
   const [stockSuggestions, setStockSuggestions] = useState<StockModelSuggestion[]>([]);
@@ -455,7 +470,6 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
       unitCost: parseFloat(newPodCost) || 65,
       unitSell: parseFloat(newPodSell) || 89.90,
       flavors: newPodFlavors.trim() || "Sabores Sortidos",
-      badge: "Novo Item Adicionado"
     };
 
     const updated = [...orderItems, newItem];
@@ -472,6 +486,79 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
     setShowAddPodForm(false);
     setShowModelDropdown(false);
     setShowBrandDropdown(false);
+  };
+
+  // Obter sabores cadastrados no catálogo/estoque para um modelo específico
+  const getCatalogFlavorsForItem = (brand: string, model: string): string[] => {
+    const qBrand = (brand || "").trim().toLowerCase();
+    const qModel = (model || "").trim().toLowerCase();
+    const match = stockSuggestions.find(
+      (s) => s.model.toLowerCase() === qModel && (!qBrand || s.brand.toLowerCase() === qBrand)
+    );
+    return match ? match.flavors : [];
+  };
+
+  // Adicionar sabor à lista do item
+  const handleAddFlavorToItem = (itemId: string, flavorName: string) => {
+    const cleanName = flavorName.trim();
+    if (!cleanName) return;
+
+    const item = orderItems.find((it) => it.id === itemId);
+    if (!item) return;
+
+    const currentList = parseFlavorsString(item.flavors, item.qty);
+    const existingIndex = currentList.findIndex(
+      (f) => f.flavor.toLowerCase() === cleanName.toLowerCase()
+    );
+
+    let updatedList: { flavor: string; qty: number }[];
+    if (existingIndex >= 0) {
+      updatedList = currentList.map((f, idx) =>
+        idx === existingIndex ? { ...f, qty: f.qty + 1 } : f
+      );
+    } else {
+      updatedList = [
+        ...currentList.filter((f) => f.flavor !== "Sabores Sortidos"),
+        { flavor: cleanName, qty: 1 },
+      ];
+    }
+
+    const newFlavorsStr = formatFlavorsList(updatedList);
+    handleUpdateItemField(itemId, "flavors", newFlavorsStr);
+    setFlavorSearchQuery("");
+  };
+
+  // Alterar quantidade de um sabor (+ ou -)
+  const handleUpdateFlavorQty = (itemId: string, flavorName: string, delta: number) => {
+    const item = orderItems.find((it) => it.id === itemId);
+    if (!item) return;
+
+    const currentList = parseFlavorsString(item.flavors, item.qty);
+    const updatedList = currentList
+      .map((f) => {
+        if (f.flavor.toLowerCase() === flavorName.toLowerCase()) {
+          const newQ = f.qty + delta;
+          return newQ > 0 ? { ...f, qty: newQ } : null;
+        }
+        return f;
+      })
+      .filter(Boolean) as { flavor: string; qty: number }[];
+
+    const newFlavorsStr = formatFlavorsList(updatedList);
+    handleUpdateItemField(itemId, "flavors", newFlavorsStr);
+  };
+
+  // Remover sabor da lista
+  const handleRemoveFlavorFromItem = (itemId: string, flavorName: string) => {
+    const item = orderItems.find((it) => it.id === itemId);
+    if (!item) return;
+
+    const currentList = parseFlavorsString(item.flavors, item.qty);
+    const updatedList = currentList.filter(
+      (f) => f.flavor.toLowerCase() !== flavorName.toLowerCase()
+    );
+    const newFlavorsStr = formatFlavorsList(updatedList);
+    handleUpdateItemField(itemId, "flavors", newFlavorsStr);
   };
 
   const handleResetOrderToDefault = () => {
@@ -718,13 +805,10 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                 <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
                   Planejador de Estoque & Reposição
                 </h3>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
-                  {totalUnitsInOrder} Peças no Pedido
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
+                  {totalUnitsInOrder} {totalUnitsInOrder === 1 ? "peça" : "peças"} no pedido
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                Monte, adicione e personalize o pedido exato para envio ao fornecedor
-              </p>
             </div>
           </div>
 
@@ -751,10 +835,10 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
             <button
               type="button"
               onClick={() => setShowAddPodForm(!showAddPodForm)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-sm shadow-emerald-500/20"
             >
               <Plus className="size-3.5 text-black" />
-              <span>Adicionar Produto</span>
+              <span>Adicionar Pod ao Pedido</span>
             </button>
           </div>
         </div>
@@ -775,10 +859,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                       <div className="size-6 rounded-lg bg-emerald-500/20 text-emerald-400 grid place-items-center">
                         <Plus className="size-3.5" />
                       </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">Adicionar Modelo / Pod ao Pedido</h4>
-                        <p className="text-[10px] text-muted-foreground">Sugestão automática inteligente do estoque para preenchimento rápido</p>
-                      </div>
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Adicionar Pod ao Pedido</h4>
                     </div>
                     <button
                       type="button"
@@ -792,12 +873,9 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                   {/* Pílulas de Sugestão Rápida do Estoque */}
                   {stockSuggestions.length > 0 && (
                     <div className="space-y-1.5 pb-2.5 border-b border-white/5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase text-emerald-400 flex items-center gap-1">
-                          <Zap className="size-3" /> Sugestões Rápidas do seu Estoque:
-                        </span>
-                        <span className="text-[9px] text-muted-foreground">Clique para preencher Custo e Venda automaticamente</span>
-                      </div>
+                      <span className="text-[10px] font-bold uppercase text-emerald-400 flex items-center gap-1">
+                        <Zap className="size-3" /> Modelos Frequentes do Estoque:
+                      </span>
                       <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
                         {stockSuggestions.slice(0, 10).map((sug) => {
                           const isSelected =
@@ -1055,98 +1133,292 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                 {/* Linhas dos Produtos */}
                 <div className="divide-y divide-white/5">
                   {orderItems.map((item) => (
-                    <div key={item.id} className="px-4 py-2.5 flex flex-col sm:grid sm:grid-cols-12 gap-2 items-center hover:bg-white/[0.02] transition-colors">
-                      
-                      {/* Qtd Stepper */}
-                      <div className="col-span-2 flex items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-start">
-                        <div className="flex items-center bg-black/50 border border-white/10 rounded-lg p-0.5">
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateItemQty(item.id, -1)}
-                            className="size-5 rounded bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors"
-                          >
-                            <Minus className="size-3" />
-                          </button>
-                          <span className="w-7 text-center text-xs font-bold text-emerald-400">
-                            {item.qty}x
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateItemQty(item.id, 1)}
-                            className="size-5 rounded bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors"
-                          >
-                            <Plus className="size-3" />
-                          </button>
-                        </div>
-                        <span className="sm:hidden text-xs font-bold text-white">
-                          {item.brand} {item.model}
-                        </span>
-                      </div>
-
-                      {/* Produto & Sabores */}
-                      <div className="col-span-4 min-w-0 w-full">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-bold text-white truncate hidden sm:inline">
+                    <div key={item.id} className="px-4 py-2.5 hover:bg-white/[0.02] transition-colors">
+                      <div className="flex flex-col sm:grid sm:grid-cols-12 gap-2 items-center">
+                        
+                        {/* Qtd Stepper */}
+                        <div className="col-span-2 flex items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-start">
+                          <div className="flex items-center bg-black/50 border border-white/10 rounded-lg p-0.5">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateItemQty(item.id, -1)}
+                              className="size-5 rounded bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors"
+                            >
+                              <Minus className="size-3" />
+                            </button>
+                            <span className="w-7 text-center text-xs font-bold text-emerald-400">
+                              {item.qty}x
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateItemQty(item.id, 1)}
+                              className="size-5 rounded bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors"
+                            >
+                              <Plus className="size-3" />
+                            </button>
+                          </div>
+                          <span className="sm:hidden text-xs font-bold text-white">
                             {item.brand} {item.model}
                           </span>
-                          {item.badge && (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-white/5 text-muted-foreground border border-white/10">
-                              {item.badge}
+                        </div>
+
+                        {/* Produto & Sabores */}
+                        <div className="col-span-4 min-w-0 w-full">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="text-xs font-bold text-white truncate hidden sm:inline">
+                              {item.brand} {item.model}
                             </span>
-                          )}
+                            <button
+                              type="button"
+                              onClick={() => setExpandedItemId(expandedItemId === item.id ? null : item.id)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                                expandedItemId === item.id
+                                  ? "bg-emerald-500 text-black shadow-sm"
+                                  : "bg-white/5 hover:bg-white/10 text-emerald-400 hover:text-emerald-300 border border-white/10"
+                              }`}
+                              title="Gerenciar sabores deste pod"
+                            >
+                              <span>{expandedItemId === item.id ? "Fechar" : "Sabores"}</span>
+                              <ChevronDown className={`size-3 transition-transform duration-200 ${expandedItemId === item.id ? "rotate-180" : ""}`} />
+                            </button>
+                          </div>
+                          
+                          {/* Resumo de Chips de Sabores */}
+                          <div
+                            onClick={() => setExpandedItemId(expandedItemId === item.id ? null : item.id)}
+                            className="flex items-center gap-1 flex-wrap mt-1 cursor-pointer group"
+                          >
+                            {parseFlavorsString(item.flavors, item.qty).map((flv, fIdx) => (
+                              <span
+                                key={fIdx}
+                                className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-zinc-300 text-[10px] font-medium group-hover:border-emerald-500/30 transition-colors"
+                              >
+                                {flv.flavor} {flv.qty > 1 && <strong className="text-emerald-400 font-bold">({flv.qty}x)</strong>}
+                              </span>
+                            ))}
+                            {(!item.flavors || item.flavors === "Sabores Sortidos") && (
+                              <span className="text-[10px] text-muted-foreground italic group-hover:text-emerald-300">
+                                + Definir sabores...
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        
-                        <input
-                          type="text"
-                          value={item.flavors}
-                          onChange={(e) => handleUpdateItemField(item.id, "flavors", e.target.value)}
-                          className="w-full bg-transparent border-b border-transparent hover:border-white/20 focus:border-emerald-400 text-[11px] text-muted-foreground focus:text-white px-0.5 py-0 focus:outline-none transition-colors"
-                          placeholder="Sabores..."
-                        />
-                      </div>
 
-                      {/* Custo Unitário */}
-                      <div className="col-span-2 text-right w-full sm:w-auto flex sm:block justify-between items-center">
-                        <span className="sm:hidden text-[10px] text-muted-foreground uppercase">Custo Unit:</span>
-                        <div className="flex items-center justify-end gap-1">
-                          <span className="text-[11px] text-muted-foreground">R$</span>
-                          <input
-                            type="number"
-                            value={item.unitCost}
-                            onChange={(e) => handleUpdateItemField(item.id, "unitCost", parseFloat(e.target.value) || 0)}
-                            className="w-14 bg-black/40 border border-white/10 hover:border-white/25 focus:border-emerald-400 rounded px-1.5 py-0.5 text-xs font-bold text-white text-right focus:outline-none"
-                          />
+                        {/* Custo Unitário */}
+                        <div className="col-span-2 text-right w-full sm:w-auto flex sm:block justify-between items-center">
+                          <span className="sm:hidden text-[10px] text-muted-foreground uppercase">Custo Unit:</span>
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="text-[11px] text-muted-foreground">R$</span>
+                            <input
+                              type="number"
+                              value={item.unitCost}
+                              onChange={(e) => handleUpdateItemField(item.id, "unitCost", parseFloat(e.target.value) || 0)}
+                              className="w-14 bg-black/40 border border-white/10 hover:border-white/25 focus:border-emerald-400 rounded px-1.5 py-0.5 text-xs font-bold text-white text-right focus:outline-none"
+                            />
+                          </div>
                         </div>
+
+                        {/* Custo Total */}
+                        <div className="col-span-2 text-right w-full sm:w-auto flex sm:block justify-between items-center">
+                          <span className="sm:hidden text-[10px] text-muted-foreground uppercase">Custo Total:</span>
+                          <span className="text-xs font-bold text-white">
+                            R$ {(item.qty * item.unitCost).toFixed(2)}
+                          </span>
+                        </div>
+
+                        {/* Venda Pretendida */}
+                        <div className="col-span-1 text-right w-full sm:w-auto flex sm:block justify-between items-center">
+                          <span className="sm:hidden text-[10px] text-muted-foreground uppercase">Venda Est:</span>
+                          <span className="text-xs font-semibold text-emerald-400">
+                            R$ {item.unitSell.toFixed(2)}
+                          </span>
+                        </div>
+
+                        {/* Ações */}
+                        <div className="col-span-1 text-center flex justify-end sm:justify-center w-full sm:w-auto">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(item.id)}
+                            className="size-6 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 grid place-items-center cursor-pointer transition-colors"
+                            title="Remover item"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+
                       </div>
 
-                      {/* Custo Total */}
-                      <div className="col-span-2 text-right w-full sm:w-auto flex sm:block justify-between items-center">
-                        <span className="sm:hidden text-[10px] text-muted-foreground uppercase">Custo Total:</span>
-                        <span className="text-xs font-bold text-white">
-                          R$ {(item.qty * item.unitCost).toFixed(2)}
-                        </span>
-                      </div>
+                      {/* Sub-painel Expansível de Gerenciamento de Sabores */}
+                      {expandedItemId === item.id && (() => {
+                        const parsedFlavors = parseFlavorsString(item.flavors, item.qty);
+                        const allocatedFlavorsCount = parsedFlavors.reduce((acc, f) => acc + f.qty, 0);
+                        const catalogFlavors = getCatalogFlavorsForItem(item.brand, item.model);
+                        const filteredCatalog = catalogFlavors.filter((cf) =>
+                          !flavorSearchQuery || cf.toLowerCase().includes(flavorSearchQuery.toLowerCase())
+                        );
 
-                      {/* Venda Pretendida */}
-                      <div className="col-span-1 text-right w-full sm:w-auto flex sm:block justify-between items-center">
-                        <span className="sm:hidden text-[10px] text-muted-foreground uppercase">Venda Est:</span>
-                        <span className="text-xs font-semibold text-emerald-400">
-                          R$ {item.unitSell.toFixed(2)}
-                        </span>
-                      </div>
+                        return (
+                          <div className="w-full mt-2.5 p-3 rounded-xl bg-[#0d0d0f] border border-emerald-500/30 space-y-2.5 animate-in fade-in slide-in-from-top-1 shadow-xl">
+                            {/* Cabeçalho do Sub-painel */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/10">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-bold text-white">
+                                  Sabores: {item.brand} {item.model}
+                                </span>
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    allocatedFlavorsCount === item.qty
+                                      ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                                      : "bg-white/10 text-zinc-300 border border-white/15"
+                                  }`}
+                                >
+                                  {allocatedFlavorsCount} de {item.qty} un
+                                </span>
+                              </div>
 
-                      {/* Ações */}
-                      <div className="col-span-1 text-center flex justify-end sm:justify-center w-full sm:w-auto">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(item.id)}
-                          className="size-6 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 grid place-items-center cursor-pointer transition-colors"
-                          title="Remover item"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </div>
+                              <div className="flex items-center gap-2">
+                                {allocatedFlavorsCount !== item.qty && allocatedFlavorsCount > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateItemField(item.id, "qty", allocatedFlavorsCount)}
+                                    className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition-colors cursor-pointer"
+                                  >
+                                    Ajustar Pod para {allocatedFlavorsCount} un
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedItemId(null)}
+                                  className="size-5 rounded bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white grid place-items-center cursor-pointer transition-colors"
+                                >
+                                  <X className="size-3" />
+                                </button>
+                              </div>
+                            </div>
 
+                            {/* Barra de Busca / Adicionar Sabor */}
+                            <div className="flex items-center gap-2">
+                              <div className="relative flex-1">
+                                <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                  type="text"
+                                  placeholder="Pesquisar sabor ou digitar novo..."
+                                  value={flavorSearchQuery}
+                                  onChange={(e) => setFlavorSearchQuery(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && flavorSearchQuery.trim()) {
+                                      e.preventDefault();
+                                      handleAddFlavorToItem(item.id, flavorSearchQuery);
+                                    }
+                                  }}
+                                  className="w-full bg-black/60 border border-white/10 rounded-lg pl-8 pr-3 py-1 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-emerald-400 transition-colors"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleAddFlavorToItem(item.id, flavorSearchQuery)}
+                                disabled={!flavorSearchQuery.trim()}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-black text-xs font-bold transition-all cursor-pointer shrink-0"
+                              >
+                                + Adicionar
+                              </button>
+                            </div>
+
+                            {/* Chips de Sugestões de Sabores do Estoque para esse Modelo */}
+                            {filteredCatalog.length > 0 && (
+                              <div className="space-y-1">
+                                <span className="text-[9px] text-muted-foreground font-semibold uppercase block">
+                                  Sabores no cadastro deste pod:
+                                </span>
+                                <div className="flex items-center gap-1 flex-wrap max-h-20 overflow-y-auto custom-scrollbar">
+                                  {filteredCatalog.map((flv) => {
+                                    const inList = parsedFlavors.find(
+                                      (f) => f.flavor.toLowerCase() === flv.toLowerCase()
+                                    );
+                                    return (
+                                      <button
+                                        key={flv}
+                                        type="button"
+                                        onClick={() => handleAddFlavorToItem(item.id, flv)}
+                                        className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all cursor-pointer flex items-center gap-1 ${
+                                          inList
+                                            ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300 font-bold"
+                                            : "bg-white/5 border-white/10 text-zinc-300 hover:border-emerald-500/40 hover:text-white"
+                                        }`}
+                                      >
+                                        <span>{inList ? "✓" : "+"}</span>
+                                        <span>{flv}</span>
+                                        {inList && <span className="text-emerald-400">({inList.qty}x)</span>}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Lista de Sabores Selecionados no Pod */}
+                            <div className="space-y-1 pt-0.5">
+                              {parsedFlavors.length === 0 ? (
+                                <p className="text-[11px] text-muted-foreground italic py-0.5">
+                                  Nenhum sabor adicionado ainda.
+                                </p>
+                              ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5 max-h-40 overflow-y-auto custom-scrollbar">
+                                  {parsedFlavors.map((flv, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center justify-between p-1.5 px-2 rounded-lg bg-black/40 border border-white/10 gap-2"
+                                    >
+                                      <span className="text-xs font-semibold text-white truncate min-w-0 flex-1">
+                                        {flv.flavor}
+                                      </span>
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <div className="flex items-center bg-black/60 border border-white/10 rounded p-0.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleUpdateFlavorQty(item.id, flv.flavor, -1)}
+                                            className="size-4 rounded bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors"
+                                          >
+                                            <Minus className="size-2.5" />
+                                          </button>
+                                          <span className="w-5 text-center text-[10px] font-bold text-emerald-400">
+                                            {flv.qty}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleUpdateFlavorQty(item.id, flv.flavor, 1)}
+                                            className="size-4 rounded bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors"
+                                          >
+                                            <Plus className="size-2.5" />
+                                          </button>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveFlavorFromItem(item.id, flv.flavor)}
+                                          className="size-4 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 grid place-items-center cursor-pointer transition-colors"
+                                          title="Remover sabor"
+                                        >
+                                          <Trash2 className="size-2.5" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex justify-end pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setExpandedItemId(null)}
+                                className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition-colors cursor-pointer"
+                              >
+                                Concluir
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   ))}
 
@@ -1268,7 +1540,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
         <div className="px-5 py-3 border-t border-white/10 bg-[#0d0d0d] flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <ShieldCheck className="size-3.5 text-emerald-400" />
-            <span className="text-[11px]">Entrada automática sincronizada com Estoque e Financeiro</span>
+            <span className="text-[11px] text-muted-foreground">Sincronizado com Estoque e Financeiro</span>
           </div>
           <button
             type="button"
