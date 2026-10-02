@@ -216,14 +216,12 @@ export default function SupplyChainDashboard() {
     return `${b} ${n}`;
   };
 
-  // ─── Copiar Estoque Disponível Formatado para WhatsApp ─────────
-  const generateAvailableStockText = (): { text: string; totalUnits: number } => {
+  // ─── Copiar Tabela de Estoque Disponível Formatada para WhatsApp ───
+  const generateAvailableStockText = (): string => {
     const groupsMap = new Map<string, {
       modelTitle: string;
-      flavors: Array<{ name: string; stock: number }>;
+      flavors: Set<string>;
     }>();
-
-    let totalUnits = 0;
 
     (products || []).forEach((p: any) => {
       // 1. Somente produtos ativos
@@ -251,62 +249,45 @@ export default function SupplyChainDashboard() {
       if (!groupsMap.has(groupKey)) {
         groupsMap.set(groupKey, {
           modelTitle,
-          flavors: []
+          flavors: new Set<string>()
         });
       }
 
-      const group = groupsMap.get(groupKey)!;
-      const existingFlavor = group.flavors.find(
-        (f) => f.name.toLowerCase() === rawFlavor.toLowerCase()
-      );
-      if (existingFlavor) {
-        existingFlavor.stock += stockQty;
-      } else {
-        group.flavors.push({
-          name: rawFlavor,
-          stock: stockQty
-        });
-      }
-
-      totalUnits += stockQty;
+      groupsMap.get(groupKey)!.flavors.add(rawFlavor);
     });
 
-    if (groupsMap.size === 0 || totalUnits === 0) {
-      return {
-        text: "📦 ESTOQUE DISPONÍVEL\n\n────────────────\nTotal: 0 unidades",
-        totalUnits: 0
-      };
+    if (groupsMap.size === 0) {
+      return "*TABELA DISPONÍVEL*\n\nNenhum produto disponível no momento.";
     }
 
-    // Ordenação alfabética dos modelos para facilitar visualização
+    // Ordenação alfabética dos modelos
     const sortedGroups = Array.from(groupsMap.values()).sort((a, b) =>
       a.modelTitle.localeCompare(b.modelTitle, "pt-BR")
     );
 
-    const sections: string[] = ["📦 ESTOQUE DISPONÍVEL"];
+    const sections: string[] = ["*TABELA DISPONÍVEL*"];
 
     sortedGroups.forEach((group) => {
       // Ordenação alfabética dos sabores
-      group.flavors.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      const sortedFlavors = Array.from(group.flavors).sort((a, b) =>
+        a.localeCompare(b, "pt-BR")
+      );
 
-      const lines: string[] = [group.modelTitle];
-      group.flavors.forEach((f) => {
-        lines.push(`• ${f.name} — ${f.stock} un.`);
+      if (sortedFlavors.length === 0) return;
+
+      const lines: string[] = [`*${group.modelTitle}*`];
+      sortedFlavors.forEach((flavor) => {
+        lines.push(`- ${flavor}`);
       });
 
       sections.push(lines.join("\n"));
     });
 
-    sections.push(`────────────────\nTotal: ${totalUnits} ${totalUnits === 1 ? "unidade" : "unidades"}`);
-
-    return {
-      text: sections.join("\n\n"),
-      totalUnits
-    };
+    return sections.join("\n\n");
   };
 
   const handleCopyAvailableStock = async () => {
-    const { text } = generateAvailableStockText();
+    const text = generateAvailableStockText();
     let copied = false;
 
     if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
@@ -1689,7 +1670,7 @@ export default function SupplyChainDashboard() {
                 {copiedStockFeedback ? (
                   <>
                     <Check className="size-3.5 text-emerald-400 shrink-0" />
-                    <span className="truncate">Estoque copiado!</span>
+                    <span className="truncate">Tabela copiada!</span>
                   </>
                 ) : (
                   <>
