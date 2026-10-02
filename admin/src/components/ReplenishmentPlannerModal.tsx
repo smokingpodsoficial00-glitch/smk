@@ -922,44 +922,6 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
           </div>
         </div>
 
-        {/* ─── LINHA HORIZONTAL FINA DE ATALHOS RÁPIDOS ─── */}
-        {stockSuggestions.length > 0 && (
-          <div className="px-5 py-2 border-b border-white/5 bg-[#101012] flex items-center gap-2 overflow-x-auto custom-scrollbar">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1 shrink-0">
-              <Zap className="size-3 text-emerald-400" /> Atalhos:
-            </span>
-            <div className="flex items-center gap-1.5 flex-nowrap shrink-0">
-              {stockSuggestions.slice(0, 12).map((sug) => {
-                const inOrder = orderItems.find(
-                  (it) => it.model.toLowerCase() === sug.model.toLowerCase() && it.brand.toLowerCase() === sug.brand.toLowerCase()
-                );
-                return (
-                  <button
-                    key={sug.key}
-                    type="button"
-                    onClick={() => handleQuickAddSuggestion(sug)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer active:scale-95 ${
-                      inOrder
-                        ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300 font-semibold"
-                        : "bg-white/5 border-white/10 text-zinc-300 hover:bg-white/10 hover:border-emerald-500/40 hover:text-white"
-                    }`}
-                    title={`Clique para abrir sabores de ${sug.brand} ${sug.model}`}
-                  >
-                    <span className="text-[9px] uppercase font-bold text-muted-foreground">{sug.brand}</span>
-                    <span className="font-semibold text-white">{sug.model}</span>
-                    <span className="text-[10px] text-emerald-400 font-semibold">R$ {sug.costPrice.toFixed(0)}</span>
-                    {inOrder && inOrder.qty > 0 && (
-                      <span className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">
-                        {inOrder.qty}x
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* ─── CONTEÚDO PRINCIPAL (SCROLLÁVEL) ─── */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 custom-scrollbar">
 
