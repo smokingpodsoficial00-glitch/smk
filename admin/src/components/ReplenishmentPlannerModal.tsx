@@ -1160,107 +1160,87 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                 </div>
               )}
 
-              {/* Lista Principal de Produtos (Cards Compactos e Ergonômicos) */}
-              <div className="space-y-2.5">
+              {/* Lista Principal de Produtos (Compacta e Minimalista) */}
+              <div className="space-y-1.5">
                 {orderItems.map((item) => {
                   const flavorsSummary = formatFlavorsSummary(item.flavors, item.qty);
 
                   return (
                     <div
                       key={item.id}
-                      className="rounded-xl border border-white/10 bg-[#121214] hover:border-white/20 p-3 sm:p-3.5 space-y-2 transition-all shadow-sm"
+                      className="rounded-xl border border-white/10 bg-[#121214] hover:border-white/20 p-2.5 sm:px-3 sm:py-2.5 space-y-1.5 transition-all shadow-sm"
                     >
-                      {/* Linha 1: Nome do Modelo (Esquerda) e Métricas Rápidas (Direita) */}
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs sm:text-sm font-bold text-white uppercase tracking-wide">
+                      {/* Linha 1: [MODELO] [X unidades] ... [Adicionar sabor] [Excluir] */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-xs sm:text-sm font-bold text-white uppercase tracking-wide truncate">
                             {item.brand} {item.model}
                           </span>
-                          <span className="text-muted-foreground text-xs">·</span>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                            item.qty > 0
-                              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                              : "bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                          }`}>
+                          <span className="text-zinc-600 text-xs">·</span>
+                          <span className="text-xs font-semibold text-emerald-400 whitespace-nowrap">
                             {item.qty} {item.qty === 1 ? "unidade" : "unidades"}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2 text-xs text-zinc-300 flex-wrap">
-                          <span className="text-muted-foreground">
-                            R$ {item.unitCost.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} custo/un.
-                          </span>
-                          <span className="text-muted-foreground">·</span>
-                          <span className="font-bold text-white">
-                            R$ {(item.qty * item.unitCost).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Linha 2: Resumo dos Sabores */}
-                      <div className="text-xs">
-                        {flavorsSummary ? (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-zinc-300 font-medium">{flavorsSummary}</span>
-                          </div>
-                        ) : (
-                          <span className="text-amber-400/80 italic text-[11px] flex items-center gap-1">
-                            <AlertCircle className="size-3" /> Nenhum sabor definido (clique em Editar Sabores para adicionar)
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Linha 3: Ajuste de Custo + Ações (Editar Sabores e Excluir) */}
-                      <div className="pt-2 border-t border-white/5 flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <div className="flex items-center gap-3 text-zinc-400">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] text-muted-foreground uppercase">Custo:</span>
-                            <div className="flex items-center gap-0.5">
-                              <span className="text-[11px] text-muted-foreground">R$</span>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={item.unitCost}
-                                onChange={(e) => handleUpdateItemField(item.id, "unitCost", parseFloat(e.target.value) || 0)}
-                                className="w-16 bg-black/50 border border-white/10 hover:border-emerald-500/40 focus:border-emerald-400 rounded px-1.5 py-0.5 text-xs font-bold text-white text-right focus:outline-none transition-colors"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] text-muted-foreground uppercase">Venda prev.:</span>
-                            <span className="text-emerald-400 font-semibold">
-                              R$ {item.unitSell.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             type="button"
                             onClick={() => {
                               setFlavorSearchQuery("");
                               setActiveFlavorModalItemId(item.id);
                             }}
-                            className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer active:scale-95"
+                            className="px-2.5 py-1 rounded-lg text-xs font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-colors cursor-pointer active:scale-95"
                           >
-                            <Sparkles className="size-3.5" />
-                            <span>Editar Sabores</span>
-                            {item.qty > 0 && (
-                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold">
-                                {item.qty} un.
-                              </span>
-                            )}
+                            Adicionar sabor
                           </button>
-
                           <button
                             type="button"
                             onClick={() => handleRemoveItem(item.id)}
-                            className="size-7 rounded-lg hover:bg-red-500/15 text-muted-foreground hover:text-red-400 grid place-items-center cursor-pointer transition-colors"
-                            title="Remover produto da lista"
+                            className="size-6 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 grid place-items-center transition-colors cursor-pointer"
+                            title="Excluir produto"
                           >
                             <Trash2 className="size-3.5" />
                           </button>
+                        </div>
+                      </div>
+
+                      {/* Linha 2: [Sabores selecionados com quantidade] */}
+                      <div className="text-xs text-zinc-300 truncate">
+                        {flavorsSummary ? (
+                          <span>{flavorsSummary}</span>
+                        ) : (
+                          <span className="text-zinc-500 italic text-[11px]">Nenhum sabor selecionado</span>
+                        )}
+                      </div>
+
+                      {/* Linha 3: CUSTO: R$ [48] VENDA PREV.: R$ 64,99 TOTAL: R$ 144,00 */}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1.5 border-t border-white/5 text-xs text-zinc-400">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-semibold text-muted-foreground uppercase">CUSTO:</span>
+                          <div className="flex items-center gap-0.5">
+                            <span className="text-[11px] text-muted-foreground">R$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.unitCost}
+                              onChange={(e) => handleUpdateItemField(item.id, "unitCost", parseFloat(e.target.value) || 0)}
+                              className="w-14 bg-black/50 border border-white/10 hover:border-emerald-500/40 focus:border-emerald-400 rounded px-1.5 py-0.5 text-xs font-semibold text-white text-right focus:outline-none transition-colors"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] font-semibold text-muted-foreground uppercase">VENDA PREV.:</span>
+                          <span className="font-medium text-zinc-200">
+                            R$ {item.unitSell.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 sm:ml-auto">
+                          <span className="text-[10px] font-semibold text-muted-foreground uppercase">TOTAL:</span>
+                          <span className="font-bold text-emerald-400">
+                            R$ {(item.qty * item.unitCost).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
                         </div>
                       </div>
                     </div>
