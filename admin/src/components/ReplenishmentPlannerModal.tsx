@@ -101,9 +101,20 @@ export function loadSavedGoals(): FinancialGoals {
 export function loadSavedOrderItems(): OrderItem[] {
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_ORDER_KEY);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const items: OrderItem[] = JSON.parse(saved);
+      return items.map((it) => {
+        const parsed = parseFlavorsString(it.flavors, it.qty);
+        const sumQty = parsed.reduce((acc, f) => acc + f.qty, 0);
+        return { ...it, qty: sumQty };
+      });
+    }
   } catch (e) {}
-  return DEFAULT_ORDER_ITEMS;
+  return DEFAULT_ORDER_ITEMS.map((it) => {
+    const parsed = parseFlavorsString(it.flavors, it.qty);
+    const sumQty = parsed.reduce((acc, f) => acc + f.qty, 0);
+    return { ...it, qty: sumQty };
+  });
 }
 
 export function extractPuffsFromModel(modelName: string): number {
@@ -166,10 +177,10 @@ export function formatFlavorsList(list: { flavor: string; qty: number }[]): stri
 
 export function formatFlavorsSummary(flavorsStr: string, totalQty: number): string {
   const parsed = parseFlavorsString(flavorsStr, totalQty);
-  if (parsed.length === 0) return "";
+  if (!parsed || parsed.length === 0) return "";
   return parsed
-    .map(f => `${f.flavor} ${f.qty > 1 ? `${f.qty}x` : "1x"}`)
-    .join(" • ");
+    .map(f => `${f.flavor} ×${f.qty}`)
+    .join(" · ");
 }
 
 interface ReplenishmentPlannerModalProps {
@@ -225,12 +236,11 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
   const [showAddPodForm, setShowAddPodForm] = useState(false);
   const [newPodBrand, setNewPodBrand] = useState("");
   const [newPodModel, setNewPodModel] = useState("");
-  const [newPodQty, setNewPodQty] = useState("1");
   const [newPodCost, setNewPodCost] = useState("65");
   const [newPodSell, setNewPodSell] = useState("89.90");
 
-  // Gerenciamento Interativo de Sabores por Pod
-  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  // Modal Pequeno de Gerenciamento de Sabores por Pod
+  const [activeFlavorModalItemId, setActiveFlavorModalItemId] = useState<string | null>(null);
   const [flavorSearchQuery, setFlavorSearchQuery] = useState("");
 
   // Sugestões Inteligentes puxadas do Estoque em Tempo Real
@@ -364,6 +374,8 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
       setOrderItems(loadSavedOrderItems());
       setIsEditingGoals(false);
       setShowAddPodForm(false);
+      setActiveFlavorModalItemId(null);
+      setFlavorSearchQuery("");
       setSavedSuccessAlert(false);
       setShowConfirmStockEntryModal(false);
       setIsProcessingStockEntry(false);
@@ -467,6 +479,32 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
     return Array.from(set);
   }, [stockSuggestions]);
 
+  const handleQuickAddSuggestion = (sug: StockModelSuggestion) => {
+    const existing = orderItems.find(
+      (it) => it.model.toLowerCase() === sug.model.toLowerCase() && it.brand.toLowerCase() === sug.brand.toLowerCase()
+    );
+
+    if (existing) {
+      setActiveFlavorModalItemId(existing.id);
+      return;
+    }
+
+    const newItemId = Date.now().toString();
+    const newItem: OrderItem = {
+      id: newItemId,
+      brand: sug.brand,
+      model: sug.model,
+      qty: 0,
+      unitCost: sug.costPrice || 65,
+      unitSell: sug.sellPrice || 89.90,
+      flavors: "",
+    };
+
+    const updated = [...orderItems, newItem];
+    saveOrderItemsToStorage(updated);
+    setActiveFlavorModalItemId(newItemId);
+  };
+
   const handleAddPodToOrder = () => {
     if (!newPodModel.trim()) return;
 
@@ -475,7 +513,7 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
       id: newItemId,
       brand: newPodBrand.trim() || "Pod",
       model: newPodModel.trim(),
-      qty: Math.max(1, parseInt(newPodQty) || 1),
+      qty: 0,
       unitCost: parseFloat(newPodCost) || 65,
       unitSell: parseFloat(newPodSell) || 89.90,
       flavors: "",
@@ -487,7 +525,6 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
     // Reset Form
     setNewPodBrand("");
     setNewPodModel("");
-    setNewPodQty("1");
     setNewPodCost("65");
     setNewPodSell("89.90");
     setSelectedStockModel(null);
@@ -495,8 +532,8 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
     setShowModelDropdown(false);
     setShowBrandDropdown(false);
 
-    // Expande os sabores do novo item para seleção imediata
-    setExpandedItemId(newItemId);
+    // Abre o modal de sabores do novo item para seleção imediata
+    setActiveFlavorModalItemId(newItemId);
   };
 
   // Obter sabores cadastrados no catálogo/estoque para um modelo específico
@@ -509,7 +546,7 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
     return match ? match.flavors : [];
   };
 
-  // Adicionar sabor à lista do item
+  // Adicionar sabor à lista do item (Quantidade do produto = soma dos sabores)
   const handleAddFlavorToItem = (itemId: string, flavorName: string) => {
     const cleanName = flavorName.trim();
     if (!cleanName) return;
@@ -534,12 +571,20 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
       ];
     }
 
+    const newTotalQty = updatedList.reduce((acc, f) => acc + f.qty, 0);
     const newFlavorsStr = formatFlavorsList(updatedList);
-    handleUpdateItemField(itemId, "flavors", newFlavorsStr);
+
+    const updated = orderItems.map((it) => {
+      if (it.id === itemId) {
+        return { ...it, flavors: newFlavorsStr, qty: newTotalQty };
+      }
+      return it;
+    });
+    saveOrderItemsToStorage(updated);
     setFlavorSearchQuery("");
   };
 
-  // Alterar quantidade de um sabor (+ ou -)
+  // Alterar quantidade de um sabor (+ ou -) (Quantidade do produto = soma dos sabores)
   const handleUpdateFlavorQty = (itemId: string, flavorName: string, delta: number) => {
     const item = orderItems.find((it) => it.id === itemId);
     if (!item) return;
@@ -555,11 +600,19 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
       })
       .filter(Boolean) as { flavor: string; qty: number }[];
 
+    const newTotalQty = updatedList.reduce((acc, f) => acc + f.qty, 0);
     const newFlavorsStr = formatFlavorsList(updatedList);
-    handleUpdateItemField(itemId, "flavors", newFlavorsStr);
+
+    const updated = orderItems.map((it) => {
+      if (it.id === itemId) {
+        return { ...it, flavors: newFlavorsStr, qty: newTotalQty };
+      }
+      return it;
+    });
+    saveOrderItemsToStorage(updated);
   };
 
-  // Remover sabor da lista
+  // Remover sabor da lista (Quantidade do produto = soma dos sabores)
   const handleRemoveFlavorFromItem = (itemId: string, flavorName: string) => {
     const item = orderItems.find((it) => it.id === itemId);
     if (!item) return;
@@ -568,8 +621,16 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
     const updatedList = currentList.filter(
       (f) => f.flavor.toLowerCase() !== flavorName.toLowerCase()
     );
+    const newTotalQty = updatedList.reduce((acc, f) => acc + f.qty, 0);
     const newFlavorsStr = formatFlavorsList(updatedList);
-    handleUpdateItemField(itemId, "flavors", newFlavorsStr);
+
+    const updated = orderItems.map((it) => {
+      if (it.id === itemId) {
+        return { ...it, flavors: newFlavorsStr, qty: newTotalQty };
+      }
+      return it;
+    });
+    saveOrderItemsToStorage(updated);
   };
 
   const handleResetOrderToDefault = () => {
@@ -832,45 +893,90 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
           </button>
         </div>
 
-        {/* ─── BARRA DE TOPO DO PEDIDO ATIVO ─── */}
-        <div className="flex flex-wrap items-center justify-between border-b border-white/10 px-5 bg-[#0d0d0d] gap-2">
-          <div className="flex items-center gap-1">
-            <div className="flex items-center gap-2 py-3 px-3.5 text-xs font-semibold border-b-2 border-emerald-400 text-emerald-400">
+        {/* ─── BARRA DE TOPO DO PEDIDO ATIVO COM RESUMO FIXO ─── */}
+        <div className="flex flex-wrap items-center justify-between border-b border-white/10 px-5 py-3 bg-[#0d0d0d] gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
               <ShoppingCart className="size-3.5" />
-              <span>Pedido Ativo & WhatsApp</span>
+              <span>Pedido Ativo:</span>
+            </div>
+            <div className="text-xs text-zinc-300 font-medium flex items-center gap-2 flex-wrap">
+              <span className="text-white font-bold">{orderItems.length} {orderItems.length === 1 ? "modelo" : "modelos"}</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-emerald-400 font-bold">{totalUnitsInOrder} {totalUnitsInOrder === 1 ? "unidade" : "unidades"}</span>
+              <span className="text-muted-foreground">·</span>
+              <span>Custo total: <strong className="text-white">R$ {totalCostOfOrder.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
             </div>
           </div>
 
           {/* Ação de Topo para Adicionar Produto ao Pedido */}
-          <div className="py-2 flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setShowAddPodForm(!showAddPodForm)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-sm shadow-emerald-500/20"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-sm shadow-emerald-500/20"
             >
               <Plus className="size-3.5 text-black" />
-              <span>Adicionar Pod ao Pedido</span>
+              <span>{showAddPodForm ? "Fechar Formulário" : "Adicionar Pod"}</span>
             </button>
           </div>
         </div>
 
+        {/* ─── LINHA HORIZONTAL FINA DE ATALHOS RÁPIDOS ─── */}
+        {stockSuggestions.length > 0 && (
+          <div className="px-5 py-2 border-b border-white/5 bg-[#101012] flex items-center gap-2 overflow-x-auto custom-scrollbar">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1 shrink-0">
+              <Zap className="size-3 text-emerald-400" /> Atalhos:
+            </span>
+            <div className="flex items-center gap-1.5 flex-nowrap shrink-0">
+              {stockSuggestions.slice(0, 12).map((sug) => {
+                const inOrder = orderItems.find(
+                  (it) => it.model.toLowerCase() === sug.model.toLowerCase() && it.brand.toLowerCase() === sug.brand.toLowerCase()
+                );
+                return (
+                  <button
+                    key={sug.key}
+                    type="button"
+                    onClick={() => handleQuickAddSuggestion(sug)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer active:scale-95 ${
+                      inOrder
+                        ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300 font-semibold"
+                        : "bg-white/5 border-white/10 text-zinc-300 hover:bg-white/10 hover:border-emerald-500/40 hover:text-white"
+                    }`}
+                    title={`Clique para abrir sabores de ${sug.brand} ${sug.model}`}
+                  >
+                    <span className="text-[9px] uppercase font-bold text-muted-foreground">{sug.brand}</span>
+                    <span className="font-semibold text-white">{sug.model}</span>
+                    <span className="text-[10px] text-emerald-400 font-semibold">R$ {sug.costPrice.toFixed(0)}</span>
+                    {inOrder && inOrder.qty > 0 && (
+                      <span className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+                        {inOrder.qty}x
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ─── CONTEÚDO PRINCIPAL (SCROLLÁVEL) ─── */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 custom-scrollbar">
 
           {/* ════════════════════════════════════════════════════════════
-              PEDIDO ATIVO & WHATSAPP (ESTRUTURA HORIZONTAL LIMPA)
+              PEDIDO ATIVO & WHATSAPP
           ════════════════════════════════════════════════════════════ */}
-          <div className="space-y-4">
+          <div className="space-y-3.5">
 
-              {/* Formulário Retrátil Inteligente para Adicionar Novo Pod ao Pedido */}
+              {/* Formulário Retrátil para Adicionar Novo Pod ao Pedido */}
               {showAddPodForm && (
-                <div className="bg-[#141414] border border-emerald-500/30 rounded-xl p-4 space-y-3.5 animate-in slide-in-from-top-2 shadow-2xl">
+                <div className="bg-[#141414] border border-emerald-500/30 rounded-xl p-4 space-y-3 animate-in slide-in-from-top-2 shadow-2xl">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="size-6 rounded-lg bg-emerald-500/20 text-emerald-400 grid place-items-center">
                         <Plus className="size-3.5" />
                       </div>
-                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Adicionar Pod ao Pedido</h4>
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Adicionar Modelo ao Pedido</h4>
                     </div>
                     <button
                       type="button"
@@ -881,39 +987,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                     </button>
                   </div>
 
-                  {/* Pílulas de Sugestão Rápida do Estoque */}
-                  {stockSuggestions.length > 0 && (
-                    <div className="space-y-1.5 pb-2.5 border-b border-white/5">
-                      <span className="text-[10px] font-bold uppercase text-emerald-400 flex items-center gap-1">
-                        <Zap className="size-3" /> Modelos Frequentes do Estoque:
-                      </span>
-                      <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
-                        {stockSuggestions.slice(0, 10).map((sug) => {
-                          const isSelected =
-                            newPodModel.trim().toLowerCase() === sug.model.toLowerCase() &&
-                            (!newPodBrand || newPodBrand.trim().toLowerCase() === sug.brand.toLowerCase());
-                          return (
-                            <button
-                              key={sug.key}
-                              type="button"
-                              onClick={() => handleSelectSuggestion(sug)}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer active:scale-95 ${
-                                isSelected
-                                  ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-sm shadow-emerald-500/30"
-                                  : "bg-white/5 border-white/10 text-zinc-300 hover:bg-white/10 hover:border-emerald-500/40 hover:text-white"
-                              }`}
-                            >
-                              <span className="text-[9px] font-bold text-muted-foreground uppercase">{sug.brand}</span>
-                              <span className="font-semibold">{sug.model}</span>
-                              <span className="text-[10px] text-emerald-400 font-bold ml-0.5">R$ {sug.sellPrice.toFixed(2)}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 items-start">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-start">
                     {/* Marca com Autocomplete */}
                     <div className="space-y-1 relative">
                       <label className="text-[10px] font-semibold uppercase text-muted-foreground flex items-center justify-between">
@@ -954,7 +1028,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                       )}
                     </div>
 
-                    {/* Modelo do Pod com Autocomplete Inteligente */}
+                    {/* Modelo do Pod com Autocomplete */}
                     <div className="space-y-1 relative">
                       <label className="text-[10px] font-semibold uppercase text-muted-foreground flex items-center justify-between">
                         <span>Modelo do Pod *</span>
@@ -1012,18 +1086,6 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                       )}
                     </div>
 
-                    {/* Quantidade */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-semibold uppercase text-muted-foreground">Quantidade</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={newPodQty}
-                        onChange={(e) => setNewPodQty(e.target.value)}
-                        className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400 transition-colors"
-                      />
-                    </div>
-
                     {/* Custo Unitário */}
                     <div className="space-y-1">
                       <label className="text-[10px] font-semibold uppercase text-muted-foreground flex items-center justify-between">
@@ -1059,7 +1121,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                     </div>
                   </div>
 
-                  {/* Rodapé do Formulário: Margem Estimada Compacta + Botões */}
+                  {/* Rodapé do Formulário */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-white/5">
                     <div className="text-[11px] text-zinc-400">
                       {parseFloat(newPodSell) > 0 && parseFloat(newPodCost) > 0 ? (
@@ -1072,7 +1134,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                         </span>
                       ) : (
                         <span className="text-muted-foreground/60 text-[10px]">
-                          Informe custo e venda para calcular margem
+                          Após inserir o modelo, você definirá os sabores e suas quantidades
                         </span>
                       )}
                     </div>
@@ -1091,345 +1153,116 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                         disabled={!newPodModel.trim()}
                         className="px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-md shadow-emerald-500/20 active:scale-95"
                       >
-                        Inserir no Pedido
+                        Inserir Modelo e Escolher Sabores
                       </button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Lista Principal de Produtos (Design Minimalista, Compacto e Escaneável) */}
-              <div className="space-y-3">
+              {/* Lista Principal de Produtos (Cards Compactos e Ergonômicos) */}
+              <div className="space-y-2.5">
                 {orderItems.map((item) => {
-                  const parsedFlavors = parseFlavorsString(item.flavors, item.qty);
-                  const allocatedCount = parsedFlavors.reduce((acc, f) => acc + f.qty, 0);
                   const flavorsSummary = formatFlavorsSummary(item.flavors, item.qty);
-                  const isExpanded = expandedItemId === item.id;
-                  const catalogFlavors = getCatalogFlavorsForItem(item.brand, item.model);
-                  const filteredCatalog = catalogFlavors.filter((cf) =>
-                    !flavorSearchQuery || cf.toLowerCase().includes(flavorSearchQuery.toLowerCase())
-                  );
 
                   return (
                     <div
                       key={item.id}
-                      className={`rounded-xl border transition-all ${
-                        isExpanded
-                          ? "bg-[#141416] border-emerald-500/40 shadow-xl shadow-black/50"
-                          : "bg-[#121214] border-white/10 hover:border-white/20"
-                      }`}
+                      className="rounded-xl border border-white/10 bg-[#121214] hover:border-white/20 p-3 sm:p-3.5 space-y-2 transition-all shadow-sm"
                     >
-                      {/* Bloco Principal do Produto */}
-                      <div className="p-3.5 sm:p-4 space-y-2.5">
-                        
-                        {/* Linha Superior: Nome do Modelo (Esquerda) e Stepper de Quantidade (Direita) */}
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-sm font-bold text-white tracking-wide uppercase truncate">
-                              {item.brand} {item.model}
-                            </span>
-                          </div>
-
-                          {/* Stepper de Quantidade do Produto */}
-                          <div className="flex items-center bg-black/60 border border-white/10 rounded-lg p-0.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateItemQty(item.id, -1)}
-                              className="size-6 rounded bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors active:scale-95"
-                              title="Diminuir quantidade"
-                            >
-                              <Minus className="size-3" />
-                            </button>
-                            <span className="w-9 text-center text-xs font-bold text-emerald-400">
-                              {item.qty}x
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateItemQty(item.id, 1)}
-                              className="size-6 rounded bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors active:scale-95"
-                              title="Aumentar quantidade"
-                            >
-                              <Plus className="size-3" />
-                            </button>
-                          </div>
+                      {/* Linha 1: Nome do Modelo (Esquerda) e Métricas Rápidas (Direita) */}
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs sm:text-sm font-bold text-white uppercase tracking-wide">
+                            {item.brand} {item.model}
+                          </span>
+                          <span className="text-muted-foreground text-xs">·</span>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                            item.qty > 0
+                              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                              : "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                          }`}>
+                            {item.qty} {item.qty === 1 ? "unidade" : "unidades"}
+                          </span>
                         </div>
 
-                        {/* Sub-linha: Resumo Legível dos Sabores */}
-                        <div className="text-xs">
-                          {flavorsSummary ? (
-                            <span className="text-zinc-300 font-medium">
-                              {flavorsSummary}
-                            </span>
-                          ) : (
-                            <span className="text-amber-400/80 italic text-[11px] flex items-center gap-1">
-                              <AlertCircle className="size-3" /> Nenhum sabor distribuído (clique em Sabores para definir)
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Linha Inferior: Métricas Financeiras & Ações */}
-                        <div className="pt-2 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                          {/* Métricas Financeiras */}
-                          <div className="flex items-center gap-3 sm:gap-4 text-xs text-zinc-400 flex-wrap">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] text-muted-foreground uppercase">Custo unitário:</span>
-                              <div className="flex items-center gap-0.5">
-                                <span className="text-[11px] text-muted-foreground">R$</span>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={item.unitCost}
-                                  onChange={(e) => handleUpdateItemField(item.id, "unitCost", parseFloat(e.target.value) || 0)}
-                                  className="w-16 bg-black/50 border border-white/10 hover:border-emerald-500/40 focus:border-emerald-400 rounded px-1.5 py-0.5 text-xs font-bold text-white text-right focus:outline-none transition-colors"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] text-muted-foreground uppercase">Custo total:</span>
-                              <span className="font-bold text-white">
-                                R$ {(item.qty * item.unitCost).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] text-muted-foreground uppercase">Venda estimada:</span>
-                              <span className="font-semibold text-emerald-400">
-                                R$ {item.unitSell.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Ações: [Sabores ▾] e [🗑] */}
-                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFlavorSearchQuery("");
-                                setExpandedItemId(isExpanded ? null : item.id);
-                              }}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
-                                isExpanded
-                                  ? "bg-emerald-500 text-black shadow-sm"
-                                  : allocatedCount === item.qty && allocatedCount > 0
-                                  ? "bg-white/5 hover:bg-white/10 text-emerald-400 border border-emerald-500/30"
-                                  : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                              }`}
-                            >
-                              <span>Sabores</span>
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                                isExpanded
-                                  ? "bg-black/20 text-black"
-                                  : allocatedCount === item.qty && allocatedCount > 0
-                                  ? "bg-emerald-500/20 text-emerald-300"
-                                  : "bg-amber-500/20 text-amber-300"
-                              }`}>
-                                {allocatedCount}/{item.qty}
-                              </span>
-                              <ChevronDown className={`size-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItem(item.id)}
-                              className="size-7 rounded-lg hover:bg-red-500/15 text-muted-foreground hover:text-red-400 grid place-items-center cursor-pointer transition-colors"
-                              title="Remover produto da lista"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </button>
-                          </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-300 flex-wrap">
+                          <span className="text-muted-foreground">
+                            R$ {item.unitCost.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} custo/un.
+                          </span>
+                          <span className="text-muted-foreground">·</span>
+                          <span className="font-bold text-white">
+                            R$ {(item.qty * item.unitCost).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total
+                          </span>
                         </div>
                       </div>
 
-                      {/* Inline Accordion de Sabores */}
-                      {isExpanded && (
-                        <div className="border-t border-white/10 bg-[#0d0d0f] p-3 sm:p-4 space-y-3.5 rounded-b-xl animate-in fade-in duration-150">
-                          {/* Topo do Accordion: Título + Contador Claro + Botão Fechar */}
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-white/5">
-                            <div className="flex items-center gap-2.5 flex-wrap">
-                              <span className="text-xs font-bold uppercase tracking-wider text-white">
-                                SABORES — {item.brand} {item.model}
-                              </span>
-
-                              {/* Contador de unidades com apresentação clara */}
-                              <span
-                                className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
-                                  allocatedCount === item.qty
-                                    ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
-                                    : allocatedCount > item.qty
-                                    ? "bg-red-500/15 border-red-500/30 text-red-400"
-                                    : "bg-amber-500/15 border-amber-500/30 text-amber-300"
-                                }`}
-                              >
-                                {allocatedCount}/{item.qty} unidades distribuídas
-                                {allocatedCount < item.qty && ` (faltam ${item.qty - allocatedCount})`}
-                                {allocatedCount > item.qty && ` (excesso de ${allocatedCount - item.qty})`}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2 self-end sm:self-auto">
-                              {allocatedCount !== item.qty && allocatedCount > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateItemField(item.id, "qty", allocatedCount)}
-                                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition-colors cursor-pointer"
-                                  title="Ajustar a quantidade do pod para coincidir com os sabores distribuídos"
-                                >
-                                  Ajustar Pod para {allocatedCount} un
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => setExpandedItemId(null)}
-                                className="size-6 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white grid place-items-center cursor-pointer transition-colors"
-                                title="Fechar painel de sabores"
-                              >
-                                <X className="size-3.5" />
-                              </button>
-                            </div>
+                      {/* Linha 2: Resumo dos Sabores */}
+                      <div className="text-xs">
+                        {flavorsSummary ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-zinc-300 font-medium">{flavorsSummary}</span>
                           </div>
+                        ) : (
+                          <span className="text-amber-400/80 italic text-[11px] flex items-center gap-1">
+                            <AlertCircle className="size-3" /> Nenhum sabor definido (clique em Editar Sabores para adicionar)
+                          </span>
+                        )}
+                      </div>
 
-                          {/* Barra de Busca / Adicionar Sabor */}
-                          <div className="flex items-center gap-2">
-                            <div className="relative flex-1">
-                              <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      {/* Linha 3: Ajuste de Custo + Ações (Editar Sabores e Excluir) */}
+                      <div className="pt-2 border-t border-white/5 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-3 text-zinc-400">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] text-muted-foreground uppercase">Custo:</span>
+                            <div className="flex items-center gap-0.5">
+                              <span className="text-[11px] text-muted-foreground">R$</span>
                               <input
-                                type="text"
-                                placeholder="Pesquisar sabor ou digitar novo..."
-                                value={flavorSearchQuery}
-                                onChange={(e) => setFlavorSearchQuery(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" && flavorSearchQuery.trim()) {
-                                    e.preventDefault();
-                                    handleAddFlavorToItem(item.id, flavorSearchQuery);
-                                  }
-                                }}
-                                className="w-full bg-black/60 border border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-emerald-400 transition-colors"
+                                type="number"
+                                step="0.01"
+                                value={item.unitCost}
+                                onChange={(e) => handleUpdateItemField(item.id, "unitCost", parseFloat(e.target.value) || 0)}
+                                className="w-16 bg-black/50 border border-white/10 hover:border-emerald-500/40 focus:border-emerald-400 rounded px-1.5 py-0.5 text-xs font-bold text-white text-right focus:outline-none transition-colors"
                               />
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => handleAddFlavorToItem(item.id, flavorSearchQuery)}
-                              disabled={!flavorSearchQuery.trim()}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-black text-xs font-bold transition-all cursor-pointer shrink-0 active:scale-95"
-                            >
-                              + Adicionar
-                            </button>
                           </div>
 
-                          {/* SEÇÃO 1: SABORES DISPONÍVEIS */}
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              <span>SABORES DISPONÍVEIS ({filteredCatalog.length})</span>
-                              <span className="text-[9px] text-zinc-500 font-normal">Clique para incluir no pedido</span>
-                            </div>
-
-                            {filteredCatalog.length > 0 ? (
-                              <div className="flex items-center gap-1.5 flex-wrap max-h-28 overflow-y-auto custom-scrollbar p-0.5">
-                                {filteredCatalog.map((flv) => {
-                                  const inList = parsedFlavors.find(
-                                    (f) => f.flavor.toLowerCase() === flv.toLowerCase()
-                                  );
-                                  return (
-                                    <button
-                                      key={flv}
-                                      type="button"
-                                      onClick={() => handleAddFlavorToItem(item.id, flv)}
-                                      className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 ${
-                                        inList
-                                          ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300 font-semibold"
-                                          : "bg-white/5 border-white/10 text-zinc-300 hover:border-emerald-500/40 hover:text-white hover:bg-white/10"
-                                      }`}
-                                    >
-                                      <span>{inList ? "✓" : "+"}</span>
-                                      <span>{flv}</span>
-                                      {inList && (
-                                        <span className="text-[10px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">
-                                          {inList.qty}x
-                                        </span>
-                                      )}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <p className="text-[11px] text-zinc-500 italic py-0.5">
-                                {flavorSearchQuery.trim()
-                                  ? `Nenhum sabor cadastrado encontrado para "${flavorSearchQuery}". Clique em "+ Adicionar" acima para incluir.`
-                                  : "Nenhum sabor cadastrado no estoque para este modelo. Digite o sabor acima para adicionar."}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* SEÇÃO 2: SABORES SELECIONADOS */}
-                          <div className="space-y-2 pt-1 border-t border-white/5">
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              SABORES SELECIONADOS ({parsedFlavors.length})
-                            </div>
-
-                            {parsedFlavors.length === 0 ? (
-                              <div className="p-3 rounded-lg bg-black/30 border border-dashed border-white/10 text-center text-xs text-muted-foreground">
-                                Nenhum sabor adicionado ainda. Escolha um dos sabores disponíveis acima ou digite no campo de busca.
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto custom-scrollbar p-0.5">
-                                {parsedFlavors.map((flv, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="flex items-center justify-between p-2 px-2.5 rounded-lg bg-black/40 border border-white/10 gap-2"
-                                  >
-                                    <span className="text-xs font-semibold text-white truncate min-w-0 flex-1">
-                                      {flv.flavor}
-                                    </span>
-                                    <div className="flex items-center gap-1.5 shrink-0">
-                                      <div className="flex items-center bg-black/60 border border-white/10 rounded-md p-0.5">
-                                        <button
-                                          type="button"
-                                          onClick={() => handleUpdateFlavorQty(item.id, flv.flavor, -1)}
-                                          className="size-5 rounded bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors active:scale-95"
-                                          title="Diminuir quantidade"
-                                        >
-                                          <Minus className="size-3" />
-                                        </button>
-                                        <span className="w-6 text-center text-xs font-bold text-emerald-400">
-                                          {flv.qty}
-                                        </span>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleUpdateFlavorQty(item.id, flv.flavor, 1)}
-                                          className="size-5 rounded bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors active:scale-95"
-                                          title="Aumentar quantidade"
-                                        >
-                                          <Plus className="size-3" />
-                                        </button>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleRemoveFlavorFromItem(item.id, flv.flavor)}
-                                        className="size-6 rounded hover:bg-red-500/15 text-muted-foreground hover:text-red-400 grid place-items-center cursor-pointer transition-colors"
-                                        title="Remover sabor"
-                                      >
-                                        <Trash2 className="size-3" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Footer do Accordion */}
-                          <div className="flex justify-end pt-1">
-                            <button
-                              type="button"
-                              onClick={() => setExpandedItemId(null)}
-                              className="px-3.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition-colors cursor-pointer"
-                            >
-                              Concluir Sabores
-                            </button>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] text-muted-foreground uppercase">Venda prev.:</span>
+                            <span className="text-emerald-400 font-semibold">
+                              R$ {item.unitSell.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
                           </div>
                         </div>
-                      )}
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFlavorSearchQuery("");
+                              setActiveFlavorModalItemId(item.id);
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer active:scale-95"
+                          >
+                            <Sparkles className="size-3.5" />
+                            <span>Editar Sabores</span>
+                            {item.qty > 0 && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+                                {item.qty} un.
+                              </span>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(item.id)}
+                            className="size-7 rounded-lg hover:bg-red-500/15 text-muted-foreground hover:text-red-400 grid place-items-center cursor-pointer transition-colors"
+                            title="Remover produto da lista"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
@@ -1561,6 +1394,209 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
             Fechar
           </button>
         </div>
+
+        {/* ─── MODAL PEQUENO DE SABORES (FOCADO, ERGONÔMICO E RÁPIDO) ─── */}
+        {activeFlavorModalItemId && (() => {
+          const activeItem = orderItems.find((it) => it.id === activeFlavorModalItemId);
+          if (!activeItem) return null;
+
+          const parsedActiveFlavors = parseFlavorsString(activeItem.flavors, activeItem.qty);
+          const catalogFlavors = getCatalogFlavorsForItem(activeItem.brand, activeItem.model);
+          const filteredCatalog = catalogFlavors.filter((cf) =>
+            !flavorSearchQuery || cf.toLowerCase().includes(flavorSearchQuery.toLowerCase())
+          );
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
+              <div className="bg-[#121214] border border-white/15 rounded-2xl w-full max-w-md flex flex-col shadow-2xl overflow-hidden max-h-[85vh]">
+                {/* Header */}
+                <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between bg-[#161618]">
+                  <div className="flex items-center gap-2.5">
+                    <div className="size-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 grid place-items-center">
+                      <Sparkles className="size-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white tracking-tight">
+                        Sabores — {activeItem.brand} {activeItem.model}
+                      </h4>
+                      <p className="text-[10px] text-muted-foreground">
+                        A quantidade é calculada pela soma dos sabores
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveFlavorModalItemId(null);
+                      setFlavorSearchQuery("");
+                    }}
+                    className="size-7 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white grid place-items-center cursor-pointer transition-colors"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+
+                {/* Conteúdo */}
+                <div className="p-4 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                  {/* Campo de Pesquisa / Novo Sabor */}
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Pesquisar sabor ou digitar novo..."
+                        value={flavorSearchQuery}
+                        onChange={(e) => setFlavorSearchQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && flavorSearchQuery.trim()) {
+                            e.preventDefault();
+                            handleAddFlavorToItem(activeItem.id, flavorSearchQuery);
+                            setFlavorSearchQuery("");
+                          }
+                        }}
+                        className="w-full bg-black/60 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-emerald-400 transition-colors"
+                      />
+                    </div>
+                    {flavorSearchQuery.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleAddFlavorToItem(activeItem.id, flavorSearchQuery);
+                          setFlavorSearchQuery("");
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer shrink-0"
+                      >
+                        + Adicionar
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Seção 1: Sabores Escolhidos */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      <span>Sabores escolhidos ({parsedActiveFlavors.length})</span>
+                      <span className="text-emerald-400 font-bold">{activeItem.qty} un. no total</span>
+                    </div>
+
+                    {parsedActiveFlavors.length === 0 ? (
+                      <div className="p-3.5 rounded-xl bg-black/30 border border-dashed border-white/10 text-center text-xs text-muted-foreground">
+                        Nenhum sabor adicionado ainda. Escolha abaixo ou digite no campo de pesquisa.
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
+                        {parsedActiveFlavors.map((flv, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between p-2 px-3 rounded-lg bg-black/40 border border-white/10 gap-2"
+                          >
+                            <span className="text-xs font-semibold text-white truncate min-w-0 flex-1">
+                              {flv.flavor}
+                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <div className="flex items-center bg-black/60 border border-white/10 rounded-md p-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateFlavorQty(activeItem.id, flv.flavor, -1)}
+                                  className="size-5 rounded bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors active:scale-95"
+                                  title="Diminuir quantidade"
+                                >
+                                  <Minus className="size-3" />
+                                </button>
+                                <span className="w-6 text-center text-xs font-bold text-emerald-400">
+                                  {flv.qty}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateFlavorQty(activeItem.id, flv.flavor, 1)}
+                                  className="size-5 rounded bg-white/5 hover:bg-white/10 text-white grid place-items-center cursor-pointer transition-colors active:scale-95"
+                                  title="Aumentar quantidade"
+                                >
+                                  <Plus className="size-3" />
+                                </button>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFlavorFromItem(activeItem.id, flv.flavor)}
+                                className="size-6 rounded hover:bg-red-500/15 text-muted-foreground hover:text-red-400 grid place-items-center cursor-pointer transition-colors"
+                                title="Remover sabor"
+                              >
+                                <Trash2 className="size-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Seção 2: Adicionar sabor (Catálogo) */}
+                  <div className="space-y-2 pt-2 border-t border-white/5">
+                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      <span>Adicionar sabor</span>
+                      <span className="text-[9px] text-zinc-500 lowercase">clique para somar +1</span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+                      {filteredCatalog.map((flv) => {
+                        const inList = parsedActiveFlavors.find(
+                          (f) => f.flavor.toLowerCase() === flv.toLowerCase()
+                        );
+                        return (
+                          <button
+                            key={flv}
+                            type="button"
+                            onClick={() => handleAddFlavorToItem(activeItem.id, flv)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 ${
+                              inList
+                                ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300 font-semibold"
+                                : "bg-white/5 border-white/10 text-zinc-300 hover:border-emerald-500/40 hover:text-white hover:bg-white/10"
+                            }`}
+                          >
+                            <span>{inList ? "✓" : "+"}</span>
+                            <span>{flv}</span>
+                            {inList && (
+                              <span className="text-[10px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+                                {inList.qty}x
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+
+                      {filteredCatalog.length === 0 && (
+                        <p className="text-[11px] text-zinc-500 italic py-1">
+                          {flavorSearchQuery.trim()
+                            ? `Nenhum sabor cadastrado correspondente. Pressione Enter ou clique em "+ Adicionar" acima para adicionar "${flavorSearchQuery}".`
+                            : "Nenhum sabor cadastrado no estoque para este modelo. Digite o sabor acima para adicionar."}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer do Modal Pequeno */}
+                <div className="px-4 py-3 border-t border-white/10 bg-[#161618] flex items-center justify-between">
+                  <div className="text-xs">
+                    <span className="text-muted-foreground">Total: </span>
+                    <strong className="text-emerald-400 font-bold text-sm">
+                      {activeItem.qty} {activeItem.qty === 1 ? "unidade" : "unidades"}
+                    </strong>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveFlavorModalItemId(null);
+                      setFlavorSearchQuery("");
+                    }}
+                    className="px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-md shadow-emerald-500/20"
+                  >
+                    Concluir
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ─── MODAL DE CONFIRMAÇÃO DE ENTRADA NO ESTOQUE ─── */}
         {showConfirmStockEntryModal && (
