@@ -10,6 +10,7 @@ import { useAuth } from"../contexts/AuthContext";
 import { getBackendUrl } from"@/lib/backend";
 import { ManualSaleModal } from"./ManualSaleModal";
 import { MobilePushSetupModal } from"./MobilePushSetupModal";
+import { MobileOrdersLogisticsView } from "./orders/MobileOrdersLogisticsView";
 import { deleteOrderWithStockRestoration } from"@/lib/orders";
 // stockSync: centralizada em deleteOrderWithStockRestoration
 
@@ -384,8 +385,24 @@ export default function KanbanBoard() {
  );
  }
 
- return (
- <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#050505] relative">
+  return (
+    <>
+      {/* 📱 Modo Celular Dedicado (< 768px) */}
+      <div className="block md:hidden h-full w-full overflow-hidden">
+        <MobileOrdersLogisticsView
+          orders={orders}
+          loading={loading}
+          onUpdateStatus={updateStatus}
+          onDeleteOrder={handleDeleteOrder}
+          onGrantDiscount={handleGrantDiscount}
+          onOpenWhatsAppDiscount={handleOpenWhatsAppDiscount}
+          onOpenManualSale={() => setIsManualSaleOpen(true)}
+          onOpenPushModal={() => setIsPushModalOpen(true)}
+        />
+      </div>
+
+      {/* 💻 Modo Desktop Intacto (>= 768px) */}
+      <div className="hidden md:flex flex-1 flex-col h-full overflow-hidden bg-[#050505] relative">
  <header className="py-3 px-4 sm:px-6 sm:h-16 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-white/5 shrink-0 bg-[#070707]">
  <div className="flex items-center justify-between sm:block">
  <div>
@@ -939,8 +956,9 @@ export default function KanbanBoard() {
  </div>
  );
  })()}
- </div>
- );
+      </div>
+    </>
+  );
 }
 
 function getRelativeTime(dateString: string): string {
