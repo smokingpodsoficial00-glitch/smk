@@ -4,7 +4,7 @@ import {
   AlertTriangle, RefreshCw, MessageSquare, Play, Pause, ExternalLink,
   Flame, Lock, Copy, Check, Plus, Trash2, Edit3, ArrowRight, CheckSquare,
   Square, Calendar, Layers, ShieldCheck, HelpCircle, ChevronRight,
-  ToggleLeft, ToggleRight, Zap, Smartphone, FlaskConical
+  ToggleLeft, ToggleRight, Zap, Smartphone
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -114,8 +114,8 @@ function sanitizeBroadcastLists(lists: BroadcastList[]): { lists: BroadcastList[
 export default function MarketingModule() {
   const { company } = useAuth();
   
-  // Abas do Módulo: 'hub' | 'campaigns' | 'broadcast_lists' | 'groups'
-  const [activeTab, setActiveTab] = useState<'hub' | 'campaigns' | 'broadcast_lists' | 'groups'>('campaigns');
+  // Abas do Módulo: 'campaigns' | 'broadcast_lists'
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'broadcast_lists'>('campaigns');
   
   // Base Global de Contatos e Grupos do WhatsApp
   const [allContacts, setAllContacts] = useState<ContactItem[]>([]);
@@ -142,7 +142,7 @@ export default function MarketingModule() {
   const [contactSearchQuery, setContactSearchQuery] = useState('');
   const [contactsVisibleCount, setContactsVisibleCount] = useState(50);
 
-  // Formulário de Criação de Campanha
+  // Formulário de Criação de Campanha (Enxuto e Intuitivo)
   const [campaignFormName, setCampaignFormName] = useState('');
   const [campaignFormMessage, setCampaignFormMessage] = useState(OFFICIAL_TEMPLATES[0].text);
   const [campaignFormVariations, setCampaignFormVariations] = useState<string[]>([]);
@@ -156,112 +156,23 @@ export default function MarketingModule() {
   const [campaignFormStartDate, setCampaignFormStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [campaignFormBatchSize, setCampaignFormBatchSize] = useState<number>(5);
   const [campaignFormInterval, setCampaignFormInterval] = useState<number>(35);
-  const [cardapioUrl, setCardapioUrl] = useState('https://smoking-pods.vercel.app');
-  const [grupoVipUrl, setGrupoVipUrl] = useState('');
+  const [cardapioUrl] = useState('https://smoking-pods.vercel.app');
+  const [grupoVipUrl] = useState('');
 
   // Execução de Disparo & Controle de Pausa Real
   const [executingCampaignId, setExecutingCampaignId] = useState<string | null>(null);
   const [dispatchProgress, setDispatchProgress] = useState<{ current: number; total: number; status: string } | null>(null);
   const isAbortingRef = React.useRef(false);
 
-
-  // 🧪 Laboratório de Teste & Armadilha de Diagnóstico em Tempo Real
-  const [isTestLabOpen, setIsTestLabOpen] = useState<boolean>(false);
-  const [labPhone, setLabPhone] = useState<string>(() => {
-    return localStorage.getItem('SP_LAB_TEST_PHONE') || '11948420071';
-  });
-  const [labName, setLabName] = useState<string>('Leo');
-  const [labMessage, setLabMessage] = useState<string>('Fala parceiro! 💨 Teste de entrega oficial da Smoking Pods via WhatsApp.');
-  const [labExecuting, setLabExecuting] = useState<boolean>(false);
-  const [labResult, setLabResult] = useState<any>(null);
-  const [labError, setLabError] = useState<string | null>(null);
-
-  const handleRunLabTest = async () => {
-    setLabExecuting(true);
-    setLabResult(null);
-    setLabError(null);
-    localStorage.setItem('SP_LAB_TEST_PHONE', labPhone);
-
-    try {
-      const res = await fetch(`${getBackendUrl()}/api/marketing/test-lab-dispatch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: labPhone,
-          name: labName,
-          text: labMessage,
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setLabError(data.message || data.error || 'Falha ao entregar a mensagem.');
-      }
-      setLabResult(data);
-    } catch (err: any) {
-      setLabError(err.message || 'Erro de conexão com o servidor local.');
-    } finally {
-      setLabExecuting(false);
-    }
-  };
-
-  const handleOpenTestLabForCampaign = (camp: Campaign) => {
-    setLabMessage(camp.message);
-    setLabName('Leo');
-    setLabResult(null);
-    setLabError(null);
-    setIsTestLabOpen(true);
-  };
-
-  const [loadingScan, setLoadingScan] = useState(false);
   const [loadingSanitize, setLoadingSanitize] = useState(false);
-  const [diagnosticData, setDiagnosticData] = useState<{
-    totalContactsRaw: number;
-    totalUnique: number;
-    duplicateCount: number;
-    alreadySentCount: number;
-    virginCount: number;
-    listsCount: number;
-    globalSentTotal: number;
-  } | null>(null);
-
-  const fetchDiagnostic = async () => {
-    try {
-      const res = await fetch(`${getBackendUrl()}/api/marketing/lists-diagnostic`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          setDiagnosticData(data);
-        }
-      }
-    } catch (e) {}
-  };
 
   const handleStopCampaign = () => {
     isAbortingRef.current = true;
     setDispatchProgress(prev => prev ? { ...prev, status: 'Interrompendo disparos... aguarde o contato atual.' } : null);
   };
 
-  const handleScanWhatsAppHistory = async () => {
-    if (!confirm('Iniciar Varredura e Blindagem no WhatsApp?\n\nO sistema vai escanear o histórico de conversas para identificar todos os contatos que já receberam mensagens e garantir que NUNCA MAIS sejam repetidos.')) return;
-    setLoadingScan(true);
-    try {
-      const res = await fetch(`${getBackendUrl()}/api/marketing/scan-chats`, { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        await fetchDiagnostic();
-        alert(`✅ Varredura Concluída com Sucesso!\n\nNovos contatos identificados: ${data.identifiedCount}\nTotal de contatos blindados no sistema: ${data.totalTracked}\n\nEsses contatos nunca mais receberão mensagens repetidas.`);
-      } else {
-        alert(`⚠️ ${data.error || 'Não foi possível concluir a varredura. Certifique-se de que o WhatsApp está conectado.'}`);
-      }
-    } catch (err: any) {
-      alert(`❌ Erro ao conectar com o servidor backend: ${err.message}`);
-    } finally {
-      setLoadingScan(false);
-    }
-  };
-
   const handleCleanAndDeduplicateLists = async () => {
-    if (!confirm('⚡ Executar Higienização & Desduplicação Automática em 1 Clique?\n\nO sistema vai:\n1. Analisar todas as listas e remover 100% dos contatos duplicados cruzados.\n2. Criar a "⭐ BASE VIRGEM" com contatos únicos prontos para disparo.\n3. Criar a "🛡️ BASE BLINDADA" para contatos já contactados.\n4. Ajustar as campanhas ativas para apontar apenas para a base limpa.\n\nDeseja continuar?')) return;
+    if (!confirm('⚡ Executar Higienização & Desduplicação Automática?\n\nO sistema vai:\n1. Analisar todas as listas e remover contatos duplicados cruzados.\n2. Preservar contatos únicos sem repetição.\n3. Proteger a base para disparos seguros.\n\nDeseja continuar?')) return;
 
     setLoadingSanitize(true);
     try {
@@ -270,7 +181,6 @@ export default function MarketingModule() {
       if (data.success) {
         setBroadcastLists(data.lists);
         localStorage.setItem(LOCAL_STORAGE_LISTS, JSON.stringify(data.lists));
-        await fetchDiagnostic();
         // Recarrega campanhas atualizadas
         try {
           const campRes = await fetch(`${getBackendUrl()}/api/marketing/campaigns`);
@@ -281,21 +191,19 @@ export default function MarketingModule() {
           }
         } catch (e) {}
 
-        alert(`✨ Higienização e Desduplicação Concluída com Sucesso!\n\n👥 Total de contatos analisados: ${data.totalOriginal}\n⚡ Contatos Únicos Reais: ${data.totalUnique}\n🗑️ Duplicatas Eliminadas: ${data.duplicatesRemoved}\n⭐ Base Virgem (Prontos p/ Disparo): ${data.virginCount} contatos\n🛡️ Base Blindada (Já Abordados): ${data.alreadySentCount} contatos\n\nAgora a sua base está 100% protegida contra mensagens duplicadas!`);
+        alert(`✨ Higienização Concluída com Sucesso!\n\n👥 Total analisado: ${data.totalOriginal}\n⚡ Contatos Únicos: ${data.totalUnique}\n🗑️ Duplicatas Eliminadas: ${data.duplicatesRemoved}\n\nSuas listas estão limpas e protegidas contra repetições!`);
       } else {
         alert(`⚠️ ${data.error || 'Erro ao higienizar listas.'}`);
       }
     } catch (err: any) {
-      alert(`❌ Erro ao conectar com o servidor backend: ${err.message}`);
+      alert(`❌ Erro ao conectar com o servidor: ${err.message}`);
     } finally {
       setLoadingSanitize(false);
     }
   };
 
-  // Carrega Listas e Campanhas canônicas do Supabase (Fonte Única de Verdade)
+  // Carrega Listas e Campanhas canônicas do Supabase
   useEffect(() => {
-    fetchDiagnostic();
-
     if (!company?.id) return;
 
     let isMounted = true;
@@ -344,7 +252,7 @@ export default function MarketingModule() {
           }).catch(() => {});
         }
       } catch (e: any) {
-        console.warn('[MarketingModule] Erro ao carregar dados canônicos do Supabase:', e?.message || e);
+        console.warn('[MarketingModule] Erro ao carregar dados do Supabase:', e?.message || e);
       }
     };
 
@@ -360,7 +268,6 @@ export default function MarketingModule() {
     setLoadingSync(true);
     setSyncStatus('Lendo agenda do WhatsApp e grupos conectados...');
     try {
-      // 1. Tenta puxar do WhatsApp real no backend
       let fetchedContacts: ContactItem[] = [];
       let fetchedGroups: WhatsAppGroup[] = [];
 
@@ -385,7 +292,7 @@ export default function MarketingModule() {
         console.info('Backend local indisponível, buscando do CRM Supabase...');
       }
 
-      // 2. Se WhatsApp offline ou vazio, faz fallback inteligente para o CRM de Clientes da loja
+      // Se WhatsApp offline ou vazio, faz fallback inteligente para o CRM de Clientes da loja
       if (fetchedContacts.length === 0) {
         const crmClients = await fetchLiveClients(company?.id);
         fetchedContacts = crmClients.map(c => ({
@@ -406,9 +313,6 @@ export default function MarketingModule() {
       } catch (storeErr) {}
 
       setSyncStatus(`Sincronizado com sucesso! ${fetchedContacts.length} contatos e ${fetchedGroups.length} grupos carregados.`);
-      
-      // NÃO auto-preenche listas - o usuário deve selecionar manualmente os contatos
-
       setTimeout(() => setSyncStatus(null), 4000);
     } catch (err: any) {
       console.error('Erro na sincronização:', err);
@@ -418,7 +322,7 @@ export default function MarketingModule() {
     }
   };
 
-  // Carrega contatos e grupos do localStorage ao iniciar
+  // Carrega contatos e grupos do cache ao iniciar
   useEffect(() => {
     try {
       const savedContacts = localStorage.getItem('SP_MARKETING_CONTACTS');
@@ -445,12 +349,12 @@ export default function MarketingModule() {
       setEditingList(null);
       setListFormName('');
       setListFormDesc('');
-      setListFormSelectedContacts(new Set(allContacts.map(c => c.id))); // Seleciona todos por padrão
+      setListFormSelectedContacts(new Set(allContacts.map(c => c.id)));
     }
     setIsListModalOpen(true);
   };
 
-  // Salva Lista no Supabase (com diffing cirúrgico e compensação segura)
+  // Salva Lista no Supabase
   const handleSaveList = async () => {
     if (!company?.id) {
       alert('Sessão inválida: nenhuma empresa selecionada.');
@@ -482,7 +386,7 @@ export default function MarketingModule() {
       }
       setIsListModalOpen(false);
     } catch (err: any) {
-      alert(`Erro ao salvar lista no Supabase: ${err?.message || err}`);
+      alert(`Erro ao salvar lista: ${err?.message || err}`);
     }
   };
 
@@ -493,7 +397,7 @@ export default function MarketingModule() {
         await deleteMarketingList(company.id, id);
         setBroadcastLists(prev => prev.filter(l => l.id !== id));
       } catch (err: any) {
-        alert(`Erro ao excluir lista no Supabase: ${err?.message || err}`);
+        alert(`Erro ao excluir lista: ${err?.message || err}`);
       }
     }
   };
@@ -535,7 +439,7 @@ export default function MarketingModule() {
     setIsCampaignModalOpen(true);
   };
 
-  // Salva Campanha no Supabase (com Optimistic Locking mandatório e compensação segura)
+  // Salva Campanha no Supabase
   const handleSaveCampaign = async () => {
     if (!company?.id) {
       alert('Sessão inválida: nenhuma empresa selecionada.');
@@ -550,7 +454,6 @@ export default function MarketingModule() {
       return;
     }
 
-    // Calcula total de destinatários únicos combinando as listas selecionadas
     let totalCount = 0;
     if (campaignFormTargetType === 'lists') {
       const uniqueContactPhones = new Set<string>();
@@ -570,8 +473,8 @@ export default function MarketingModule() {
         ...editingCampaign,
         name: campaignFormName.trim(),
         message: campaignFormMessage,
-        variations: campaignFormVariations.filter(v => v.trim().length > 0),
-        useVariations: campaignFormUseVariations,
+        variations: editingCampaign.variations || [],
+        useVariations: editingCampaign.useVariations || false,
         targetType: campaignFormTargetType,
         selectedListIds: Array.from(campaignFormSelectedLists),
         targetGroupId: campaignFormTargetGroup,
@@ -580,17 +483,15 @@ export default function MarketingModule() {
         scheduledWeekday: Number(campaignFormFrequency) === 7 ? campaignFormWeekday : undefined,
         scheduledTime: campaignFormTime,
         startDate: campaignFormStartDate,
-        batchSize: campaignFormBatchSize,
-        batchIntervalMinutes: campaignFormInterval,
+        batchSize: campaignFormBatchSize || 5,
+        batchIntervalMinutes: campaignFormInterval || 35,
         totalRecipients: totalCount,
         updatedAt: new Date().toISOString()
       };
 
-      // 1. Atualização Instantânea no Estado da Tela
       setCampaigns(prev => prev.map(c => c.id === updatedCamp.id ? updatedCamp : c));
       setIsCampaignModalOpen(false);
 
-      // 2. Persistência Imediata no localStorage
       try {
         const raw = localStorage.getItem(LOCAL_STORAGE_CAMPAIGNS);
         const stored = raw ? JSON.parse(raw) : [];
@@ -599,7 +500,6 @@ export default function MarketingModule() {
           : [...stored, updatedCamp];
         localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(newStored));
 
-        // 3. Sincronização via API Backend
         fetch(`${getBackendUrl()}/api/marketing/campaigns`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -607,20 +507,19 @@ export default function MarketingModule() {
         }).catch(() => {});
       } catch (e) {}
 
-      // 4. Sincronização Supabase em background
       updateMarketingCampaign(
         company.id,
         editingCampaign.id,
         updatedCamp,
         editingCampaign.updatedAt || editingCampaign.createdAt
-      ).catch(e => console.warn('[Marketing] Erro na sincronização Supabase:', e));
+      ).catch(e => console.warn('[Marketing] Erro ao sincronizar campanha:', e));
     } else {
       const newCamp: Campaign = {
         id: `camp_${Date.now()}`,
         name: campaignFormName.trim(),
         message: campaignFormMessage,
-        variations: campaignFormVariations.filter(v => v.trim().length > 0),
-        useVariations: campaignFormUseVariations,
+        variations: [],
+        useVariations: false,
         targetType: campaignFormTargetType,
         selectedListIds: Array.from(campaignFormSelectedLists),
         targetGroupId: campaignFormTargetGroup,
@@ -629,26 +528,23 @@ export default function MarketingModule() {
         scheduledWeekday: Number(campaignFormFrequency) === 7 ? campaignFormWeekday : undefined,
         scheduledTime: campaignFormTime,
         startDate: campaignFormStartDate,
-        batchSize: campaignFormBatchSize,
-        batchIntervalMinutes: campaignFormInterval,
+        batchSize: 5,
+        batchIntervalMinutes: 35,
         status: 'active',
         totalRecipients: totalCount,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      // 1. Atualização Instantânea no Estado da Tela
       setCampaigns(prev => [...prev, newCamp]);
       setIsCampaignModalOpen(false);
 
-      // 2. Persistência Imediata no localStorage
       try {
         const raw = localStorage.getItem(LOCAL_STORAGE_CAMPAIGNS);
         const stored = raw ? JSON.parse(raw) : [];
         const newStored = [...stored, newCamp];
         localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(newStored));
 
-        // 3. Sincronização via API Backend
         fetch(`${getBackendUrl()}/api/marketing/campaigns`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -656,7 +552,6 @@ export default function MarketingModule() {
         }).catch(() => {});
       } catch (e) {}
 
-      // 4. Sincronização Supabase em background
       createMarketingCampaign(company.id, newCamp).catch(e => console.warn('[Marketing] Erro ao criar Supabase:', e));
     }
   };
@@ -668,7 +563,7 @@ export default function MarketingModule() {
         await deleteMarketingCampaign(company.id, id);
         setCampaigns(prev => prev.filter(c => c.id !== id));
       } catch (err: any) {
-        alert(`Erro ao excluir campanha no Supabase: ${err?.message || err}`);
+        alert(`Erro ao excluir campanha: ${err?.message || err}`);
       }
     }
   };
@@ -686,9 +581,8 @@ export default function MarketingModule() {
     }
   };
 
-  // Disparar Campanha Agora
+  // Disparar Campanha
   const handleExecuteCampaign = async (camp: Campaign) => {
-    // 1. Reúne a lista de contatos destinatários
     let targetContacts: ContactItem[] = [];
 
     if (camp.targetType === 'lists') {
@@ -705,7 +599,7 @@ export default function MarketingModule() {
     }
 
     const confirmText = camp.targetType === 'lists' 
-      ? `Iniciar disparo da campanha "${camp.name}" para ${targetContacts.length} contatos em lotes de ${camp.batchSize} a cada ${camp.batchIntervalMinutes} min?`
+      ? `Iniciar disparo da campanha "${camp.name}" para ${targetContacts.length} contatos com cadência segura anti-ban (5 envios a cada 35 min)?`
       : `Disparar mensagem da campanha "${camp.name}" diretamente no grupo "${camp.targetGroupName || 'Grupo VIP'}"?`;
 
     if (!confirm(confirmText)) return;
@@ -713,14 +607,12 @@ export default function MarketingModule() {
     isAbortingRef.current = false;
     setExecutingCampaignId(camp.id);
 
-    // Histórico de contatos já enviados para evitar repetição acidental (Retomada Inteligente)
     const sentHistoryKey = `SP_SENT_CAMPAIGN_${camp.id}`;
     let alreadySentPhones: string[] = [];
     try {
       alreadySentPhones = JSON.parse(localStorage.getItem(sentHistoryKey) || '[]');
     } catch {}
 
-    // Sincroniza e herda a blindagem central do servidor
     try {
       const resp = await fetch(`${getBackendUrl()}/api/marketing/sent-history`);
       if (resp.ok) {
@@ -733,7 +625,6 @@ export default function MarketingModule() {
       }
     } catch {}
 
-    // Verifica se os contatos já constam como enviados (blindagem)
     let forceSend = false;
     if (camp.targetType === 'lists') {
       const pendingContacts = targetContacts.filter(c => {
@@ -745,8 +636,7 @@ export default function MarketingModule() {
 
       if (pendingContacts.length === 0 && targetContacts.length > 0) {
         const wantForce = confirm(
-          `⚠️ ATENÇÃO: Todos os ${targetContacts.length} contatos desta lista já constam como enviados no histórico de segurança (blindagem anti-duplicação).\n\n` +
-          `Deseja FORÇAR o envio mesmo assim (Modo Teste / Reenvio)?`
+          `⚠️ Atenção: Todos os ${targetContacts.length} contatos desta lista já receberam esta mensagem anteriormente.\n\nDeseja reenviar mesmo assim?`
         );
         if (!wantForce) {
           setExecutingCampaignId(null);
@@ -760,10 +650,10 @@ export default function MarketingModule() {
       current: forceSend ? 0 : alreadySentPhones.length, 
       total: targetContacts.length || 1, 
       status: forceSend 
-        ? '🚀 Modo Forçado / Teste ativado: disparando para a lista selecionada...' 
+        ? '🚀 Iniciando disparo para a lista selecionada...' 
         : (alreadySentPhones.length > 0 
-          ? `Retomando disparos... (${alreadySentPhones.length} já enviados e blindados)` 
-          : 'Iniciando disparos com cadência Anti-Ban...') 
+          ? `Retomando disparos... (${alreadySentPhones.length} já enviados)` 
+          : 'Iniciando disparos com cadência segura Anti-Ban...') 
     });
 
     let sentInThisSession = 0;
@@ -777,25 +667,20 @@ export default function MarketingModule() {
         const effectiveBatchIntervalMinutes = (camp.batchIntervalMinutes && camp.batchIntervalMinutes >= 35) ? camp.batchIntervalMinutes : 35;
 
         for (let i = 0; i < targetContacts.length; i++) {
-          // Trava 1: Checa se o usuário clicou em Parar ANTES de qualquer ação
           if (isAbortingRef.current) {
-            alert(`🛑 Disparo interrompido instantaneamente. Foram enviados ${sentInThisSession} contatos nesta sessão.`);
+            alert(`🛑 Disparo interrompido. Foram enviados ${sentInThisSession} contatos nesta sessão.`);
             break;
           }
 
           const contact = targetContacts[i];
           const rawPhone = contact.cleanPhone || contact.phone;
-
-          // Normaliza telefone com DDI 55
           const cleanDigits = String(rawPhone).replace(/\D/g, '');
           const normalizedPhone = cleanDigits.startsWith('55') ? cleanDigits : `55${cleanDigits}`;
 
-          // Pula contatos que já receberam esta campanha anteriormente (a não ser em modo force/teste)
           if (!forceSend && (alreadySentPhones.includes(normalizedPhone) || alreadySentPhones.includes(rawPhone))) {
             continue;
           }
 
-          // Trava 2: Seleciona a variação na ordem sequencial exata (1 a 5)
           let chosenText = camp.message;
           if (camp.useVariations && camp.variations && camp.variations.length > 0) {
             const allAvailableTexts = [camp.message, ...camp.variations.filter(v => v.trim().length > 0)];
@@ -807,7 +692,6 @@ export default function MarketingModule() {
             .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, cardapioUrl)
             .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, grupoVipUrl || '[Link do Grupo]');
 
-          // Trava 3: Checa abort imediatamente antes do POST
           if (isAbortingRef.current) break;
 
           try {
@@ -827,12 +711,11 @@ export default function MarketingModule() {
             
             if (!res.ok || !resData.success) {
               const reason = resData.message || resData.error || 'Erro de entrega';
-              console.warn(`❌ [Armadilha] Falha no disparo para ${contact.name} (${normalizedPhone}):`, reason);
               failedContacts.push({ name: contact.name || normalizedPhone, reason });
               setDispatchProgress({
                 current: alreadySentPhones.length,
                 total: targetContacts.length,
-                status: `⚠️ Barrado: ${contact.name || normalizedPhone} (${reason}). Avançando para o próximo...`
+                status: `⚠️ Erro no envio para ${contact.name || normalizedPhone}. Avançando...`
               });
               alreadySentPhones.push(normalizedPhone);
               localStorage.setItem(sentHistoryKey, JSON.stringify(alreadySentPhones));
@@ -841,11 +724,10 @@ export default function MarketingModule() {
 
             if (resData.skipped) {
               skippedCount++;
-              console.log(`⏩ Contato ${normalizedPhone} pulado por trava anti-duplicação.`);
               setDispatchProgress({
                 current: alreadySentPhones.length,
                 total: targetContacts.length,
-                status: `⏩ Pulado: ${contact.name || normalizedPhone} já recebeu esta campanha. Avançando...`
+                status: `⏩ ${contact.name || normalizedPhone} já recebeu anteriormente. Pulando...`
               });
             } else {
               sentInThisSession++;
@@ -855,39 +737,38 @@ export default function MarketingModule() {
               setDispatchProgress({
                 current: alreadySentPhones.length,
                 total: targetContacts.length,
-                status: `✅ Entregue (${sentInThisSession}/${targetContacts.length}) para ${contact.name || normalizedPhone} (ID: ${resData.messageId || 'OK'}). Aguardando cadência anti-ban...`
+                status: `✅ Entregue (${sentInThisSession}/${targetContacts.length}) para ${contact.name || normalizedPhone}. Aguardando intervalo de segurança...`
               });
             }
           } catch (e: any) {
-            console.error('Erro de conexão no disparo:', e);
             setDispatchProgress({
               current: alreadySentPhones.length,
               total: targetContacts.length,
-              status: `⚠️ Erro de conexão com o servidor para ${contact.name}. Avançando...`
+              status: `⚠️ Erro de conexão para ${contact.name}. Avançando...`
             });
             continue;
           }
 
           batchCounter++;
 
-          // Trava 4: Intervalo de descanso individual entre contatos (20 a 35 segundos aleatórios) com cancelamento instantâneo
+          // Intervalo individual entre mensagens (20 a 35 segundos aleatórios)
           const randomDelay = Math.floor(Math.random() * 15000) + 20000;
           for (let elapsed = 0; elapsed < randomDelay; elapsed += 250) {
             if (isAbortingRef.current) break;
             const remainingDelaySec = Math.max(0, Math.ceil((randomDelay - elapsed) / 1000));
             setDispatchProgress(prev => prev ? {
               ...prev,
-              status: `⏳ Intervalo de segurança anti-ban: aguardando ${remainingDelaySec}s antes do próximo contato...`
+              status: `⏳ Intervalo de proteção anti-ban: aguardando ${remainingDelaySec}s antes do próximo contato...`
             } : null);
             await new Promise(r => setTimeout(r, 250));
           }
 
           if (isAbortingRef.current) {
-            alert(`🛑 Disparo interrompido instantaneamente. Foram enviados ${sentInThisSession} contatos nesta sessão.`);
+            alert(`🛑 Disparo interrompido. Foram enviados ${sentInThisSession} contatos.`);
             break;
           }
 
-          // Trava 5: TRAVA RÍGIDA DE LOTE (Exatamente 5 contatos) com Relógio Real do Sistema (Date.now)
+          // Pausa entre lotes (a cada 5 contatos pausa 35 min)
           const remainingContacts = targetContacts.filter(c => !alreadySentPhones.includes(c.cleanPhone || c.phone));
           if (batchCounter >= effectiveBatchSize && remainingContacts.length > 0) {
             batchCounter = 0;
@@ -904,7 +785,7 @@ export default function MarketingModule() {
               setDispatchProgress({
                 current: alreadySentPhones.length,
                 total: targetContacts.length,
-                status: `⏸️ Lote de ${effectiveBatchSize} concluído! Pausa de segurança anti-ban: ${mins}m ${secs < 10 ? '0' : ''}${secs}s restantes...`
+                status: `⏸️ Lote de ${effectiveBatchSize} enviado! Pausa anti-ban: ${mins}m ${secs < 10 ? '0' : ''}${secs}s restantes...`
               });
 
               await new Promise(r => setTimeout(r, 500));
@@ -917,7 +798,7 @@ export default function MarketingModule() {
           }
         }
       } else {
-        // Disparo para Grupo
+        // Disparo para Grupo VIP
         const formattedMsg = camp.message
           .replace(/\[Nome\]/gi, 'Pessoal')
           .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, cardapioUrl)
@@ -962,12 +843,10 @@ export default function MarketingModule() {
         if (camp.targetType === 'lists') {
           if (sentInThisSession > 0) {
             alert(`✅ Disparo finalizado com sucesso!\n\n${sentInThisSession} mensagem(ns) entregue(s) no WhatsApp.` + 
-              (failedContacts.length > 0 ? `\n\n⚠️ ${failedContacts.length} contato(s) foram barrados pela segurança anti-ban:\n${failedContacts.map(f => `• ${f.name}: ${f.reason}`).join('\n')}` : '') +
-              (skippedCount > 0 ? `\n\n⏩ ${skippedCount} contato(s) já haviam recebido esta mensagem e foram preservados pela blindagem.` : ''));
-          } else if (failedContacts.length > 0) {
-            alert(`🛑 Nenhum disparo pôde ser entregue!\n\nMotivo da segurança do sistema:\n${failedContacts.map(f => `• ${f.name}: ${f.reason}`).join('\n')}\n\nO número cadastrado na lista é inválido. A correção automática foi aplicada.`);
+              (failedContacts.length > 0 ? `\n\n⚠️ ${failedContacts.length} contato(s) não puderam ser entregues.` : '') +
+              (skippedCount > 0 ? `\n\n⏩ ${skippedCount} contato(s) já haviam recebido anteriormente.` : ''));
           } else if (skippedCount > 0) {
-            alert(`⏩ Nenhuma nova mensagem precisava ser enviada. Todos os contatos da lista já receberam esta campanha anteriormente.`);
+            alert(`⏩ Todos os contatos da lista já haviam recebido esta campanha.`);
           } else {
             alert('Disparo finalizado com sucesso!');
           }
@@ -995,28 +874,17 @@ export default function MarketingModule() {
                 <Megaphone className="size-5 sm:size-6 text-white shrink-0" />
                 <span>Módulo de Marketing & Disparos</span>
               </h2>
-              <span className="text-[10px] font-mono uppercase bg-white/10 text-white border border-white/20 px-2.5 py-0.5 rounded-full font-bold shadow-sm">
-                Exclusivo Smoking Pods
+              <span className="text-[10px] font-mono uppercase bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-bold shadow-sm">
+                Anti-Ban Ativo
               </span>
             </div>
             <p className="text-xs text-white/50 mt-1">
-              Campanhas automatizadas, Listas de Transmissão salvas e disparos para Grupos VIP com Anti-Ban.
+              Campanhas automatizadas, Listas de Transmissão e disparos no Grupo VIP com cadência segura.
             </p>
           </div>
 
           {/* Botões de Ação do Header */}
           <div className="flex flex-wrap items-center gap-3">
-
-            <button
-              onClick={handleScanWhatsAppHistory}
-              disabled={loadingScan}
-              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
-              title="Faz varredura profunda no WhatsApp para blindar e impedir que qualquer contato receba mensagens repetidas"
-            >
-              <ShieldCheck className={`size-3.5 text-white/80 ${loadingScan ? 'animate-spin' : ''}`} />
-              <span>{loadingScan ? 'Varrendo Histórico...' : '🔍 Varredura & Blindagem'}</span>
-            </button>
-
             <button
               onClick={syncWhatsAppContactsAndGroups}
               disabled={loadingSync}
@@ -1076,100 +944,6 @@ export default function MarketingModule() {
       <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
 
         {/* ============================================================ */}
-        {/* CARD CENTRAL DE AUDITORIA, BLINDAGEM & DESDUPLICAÇÃO RÁPIDA */}
-        {/* ============================================================ */}
-        <div className="bg-[#0b0c10] border border-white/10 hover:border-purple-500/30 rounded-2xl p-5 shadow-lg space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 mt-0.5">
-                <ShieldCheck className="size-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-white">
-                    Auditoria de Base & Blindagem Anti-Ban
-                  </h3>
-                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
-                    Proteção Ativa
-                  </span>
-                </div>
-                <p className="text-xs text-white/50 mt-0.5">
-                  Elimina contatos duplicados entre listas e impede que o mesmo número receba mensagens repetidas.
-                </p>
-              </div>
-            </div>
-
-            {/* Ações de Higienização & Varredura */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              <button
-                onClick={handleCleanAndDeduplicateLists}
-                disabled={loadingSanitize}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black text-xs font-black flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50"
-                title="Higieniza e desduplica todas as listas em 1 clique"
-              >
-                <Zap className={`size-3.5 fill-black ${loadingSanitize ? 'animate-spin' : ''}`} />
-                <span>{loadingSanitize ? 'Higienizando...' : '⚡ Higienizar & Desduplicar (1 Clique)'}</span>
-              </button>
-
-              <button
-                onClick={handleScanWhatsAppHistory}
-                disabled={loadingScan}
-                className="px-3.5 py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
-                title="Faz varredura profunda no WhatsApp para blindar contatos já abordados"
-              >
-                <ShieldCheck className={`size-3.5 text-purple-400 ${loadingScan ? 'animate-spin' : ''}`} />
-                <span>{loadingScan ? 'Varrendo...' : '🔍 Varrer Histórico'}</span>
-              </button>
-
-              <button
-                onClick={() => setIsTestLabOpen(true)}
-                className="px-3.5 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 text-xs font-bold flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)]"
-                title="Laboratório de Teste: Dispara para seu WhatsApp e rastreia o erro exato na entrega"
-              >
-                <FlaskConical className="size-3.5 text-cyan-400" />
-                <span>🧪 Laboratório de Teste & Armadilha</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Métricas Rápidas de Diagnóstico */}
-          {diagnosticData && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-white/5">
-              <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
-                <span className="text-[10px] text-white/40 uppercase font-bold block">Contatos Brutos</span>
-                <span className="text-base font-extrabold text-white font-mono">{diagnosticData.totalContactsRaw}</span>
-                <span className="text-[10px] text-white/30 block mt-0.5">Somatório de todas as listas</span>
-              </div>
-
-              <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-white/40 uppercase font-bold">Únicos Reais</span>
-                  {diagnosticData.duplicateCount > 0 && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono font-bold">
-                      -{diagnosticData.duplicateCount} dupes
-                    </span>
-                  )}
-                </div>
-                <span className="text-base font-extrabold text-purple-300 font-mono">{diagnosticData.totalUnique}</span>
-                <span className="text-[10px] text-white/30 block mt-0.5">Pessoas sem repetição</span>
-              </div>
-
-              <div className="p-3 bg-black/40 border border-emerald-500/20 rounded-xl">
-                <span className="text-[10px] text-emerald-400/80 uppercase font-bold block">⭐ Base Virgem</span>
-                <span className="text-base font-extrabold text-emerald-400 font-mono">{diagnosticData.virginCount}</span>
-                <span className="text-[10px] text-white/40 block mt-0.5">Prontos para primeiro envio</span>
-              </div>
-
-              <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
-                <span className="text-[10px] text-white/40 uppercase font-bold block">🛡️ Já Abordados / Blindados</span>
-                <span className="text-base font-extrabold text-white/70 font-mono">{diagnosticData.alreadySentCount || diagnosticData.globalSentTotal}</span>
-                <span className="text-[10px] text-white/30 block mt-0.5">Imunes a reenvio acidental</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ============================================================ */}
         {/* ABA 1: CAMPANHAS DE DISPARO */}
         {/* ============================================================ */}
         {activeTab === 'campaigns' && (
@@ -1202,13 +976,13 @@ export default function MarketingModule() {
               </div>
             )}
 
-            {/* Lista de Campanhas com Separação Visual por Tipo */}
+            {/* Lista de Campanhas */}
             {campaigns.length === 0 ? (
               <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-12 text-center text-white/40 space-y-3">
                 <Megaphone className="size-10 text-white/20 mx-auto" />
-                <p className="text-sm font-semibold text-white">Nenhuma campanha de marketing criada ainda.</p>
+                <p className="text-sm font-semibold text-white">Nenhuma campanha criada ainda.</p>
                 <p className="text-xs max-w-md mx-auto">
-                  Crie sua primeira campanha para disparar ofertas para suas Listas de Transmissão ou Grupos VIP.
+                  Crie sua primeira campanha para disparar ofertas para suas Listas de Transmissão ou Grupo VIP.
                 </p>
                 <button
                   onClick={() => handleOpenCampaignModal()}
@@ -1219,7 +993,7 @@ export default function MarketingModule() {
               </div>
             ) : (
               <div className="space-y-8">
-                {/* SEÇÃO 1: CAMPANHAS DE GRUPO VIP (AMARELO / DOURADO) */}
+                {/* SEÇÃO 1: CAMPANHAS DE GRUPO VIP */}
                 {(() => {
                   const groupCamps = campaigns.filter(c => c.targetType === 'group');
                   if (groupCamps.length === 0) return null;
@@ -1293,7 +1067,7 @@ export default function MarketingModule() {
 
                             {/* Ações da Campanha */}
                             <div className="flex flex-col gap-3 pt-3 border-t border-amber-500/10">
-                              {/* Switch Toggle de Automação Semanal */}
+                              {/* Switch Toggle */}
                               <div 
                                 className="flex items-center justify-between cursor-pointer group/toggle"
                                 onClick={() => toggleCampaignStatus(camp.id)}
@@ -1342,10 +1116,10 @@ export default function MarketingModule() {
                                 <button
                                   onClick={() => handleExecuteCampaign(camp)}
                                   disabled={executingCampaignId === camp.id}
-                                  className="px-3.5 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md disabled:opacity-50"
+                                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md disabled:opacity-50"
                                 >
-                                  <Zap className="size-3" />
-                                  <span>🧪 Testar Agora</span>
+                                  <Send className="size-3 stroke-[2.5]" />
+                                  <span>Disparar no Grupo</span>
                                 </button>
                               </div>
                             </div>
@@ -1356,7 +1130,7 @@ export default function MarketingModule() {
                   );
                 })()}
 
-                {/* SEÇÃO 2: CAMPANHAS DE LISTAS DE TRANSMISSÃO / 1 A 1 (ROXO) */}
+                {/* SEÇÃO 2: CAMPANHAS NO PRIVADO (1 A 1 / LISTAS DE TRANSMISSÃO) */}
                 {(() => {
                   const listCamps = campaigns.filter(c => c.targetType === 'lists');
                   if (listCamps.length === 0) return null;
@@ -1373,7 +1147,7 @@ export default function MarketingModule() {
                               {listCamps.length}
                             </span>
                           </h3>
-                          <p className="text-[11px] text-white/40">Disparos diretos para o WhatsApp pessoal de cada cliente</p>
+                          <p className="text-[11px] text-white/40">Disparos diretos para o WhatsApp de cada cliente com cadência segura</p>
                         </div>
                       </div>
 
@@ -1435,7 +1209,7 @@ export default function MarketingModule() {
 
                               {/* Ações da Campanha */}
                               <div className="flex flex-col gap-3 pt-3 border-t border-purple-500/10">
-                                {/* Switch Toggle Universal Liga/Desliga */}
+                                {/* Switch Toggle */}
                                 <div 
                                   className="flex items-center justify-between cursor-pointer group/toggle"
                                   onClick={() => toggleCampaignStatus(camp.id)}
@@ -1498,24 +1272,13 @@ export default function MarketingModule() {
                                       <span>🛑 Parar Disparos</span>
                                     </button>
                                   ) : (
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        onClick={() => handleOpenTestLabForCampaign(camp)}
-                                        className="px-3 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md"
-                                        title="Abrir Laboratório de Teste com Armadilha para esta campanha"
-                                      >
-                                        <FlaskConical className="size-3" />
-                                        <span>🧪 Testar Envio</span>
-                                      </button>
-                                      
-                                      <button
-                                        onClick={() => handleExecuteCampaign(camp)}
-                                        className="px-3.5 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md"
-                                      >
-                                        <Send className="size-3" />
-                                        <span>{camp.frequencyDays > 0 ? 'Disparar Lote' : 'Disparar Tudo'}</span>
-                                      </button>
-                                    </div>
+                                    <button
+                                      onClick={() => handleExecuteCampaign(camp)}
+                                      className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md shadow-purple-600/20"
+                                    >
+                                      <Send className="size-3" />
+                                      <span>{camp.frequencyDays > 0 ? 'Disparar Lote' : 'Disparar Tudo'}</span>
+                                    </button>
                                   )}
                                 </div>
                               </div>
@@ -1536,23 +1299,35 @@ export default function MarketingModule() {
         {/* ============================================================ */}
         {activeTab === 'broadcast_lists' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <Users className="size-5 text-purple-400" />
                   Listas de Transmissão Salvas
                 </h3>
                 <p className="text-xs text-white/50">
-                  Crie grupos de contatos reutilizáveis para usar em diferentes campanhas. Adicione pessoas a qualquer momento.
+                  Crie grupos de contatos segmentados para usar em diferentes disparos e campanhas.
                 </p>
               </div>
 
-              <button
-                onClick={() => handleOpenListModal()}
-                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-2 cursor-pointer transition-all"
-              >
-                <Plus className="size-4" /> Nova Lista de Transmissão
-              </button>
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={handleCleanAndDeduplicateLists}
+                  disabled={loadingSanitize}
+                  className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                  title="Higieniza e remove duplicatas entre listas"
+                >
+                  <Zap className={`size-3.5 text-emerald-400 ${loadingSanitize ? 'animate-spin' : ''}`} />
+                  <span>{loadingSanitize ? 'Higienizando...' : '⚡ Higienizar & Desduplicar'}</span>
+                </button>
+
+                <button
+                  onClick={() => handleOpenListModal()}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-2 cursor-pointer transition-all"
+                >
+                  <Plus className="size-4" /> Nova Lista de Transmissão
+                </button>
+              </div>
             </div>
 
             {/* Grid de Listas */}
@@ -1627,8 +1402,6 @@ export default function MarketingModule() {
           </div>
         )}
 
-
-
       </div>
 
       {/* ============================================================ */}
@@ -1662,7 +1435,7 @@ export default function MarketingModule() {
                 <label className="text-xs font-bold text-white/70 block mb-1">Nome da Lista</label>
                 <input
                   type="text"
-                  placeholder="Ex: Antigos Clientes SMK (~300)"
+                  placeholder="Ex: Clientes VIP SBC (~150)"
                   value={listFormName}
                   onChange={(e) => setListFormName(e.target.value)}
                   className="w-full bg-[#050505] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500/50"
@@ -1808,11 +1581,11 @@ export default function MarketingModule() {
       )}
 
       {/* ============================================================ */}
-      {/* MODAL: CRIAR / EDITAR CAMPANHA */}
+      {/* MODAL: CRIAR / EDITAR CAMPANHA (SIMPLIFICADO E INTUITIVO) */}
       {/* ============================================================ */}
       {isCampaignModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0e0e0e] border border-white/10 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+          <div className="bg-[#0e0e0e] border border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             {/* Header do Modal */}
             <div className="p-5 border-b border-white/10 flex items-center justify-between bg-[#0a0a0a]">
               <div>
@@ -1821,7 +1594,7 @@ export default function MarketingModule() {
                   {editingCampaign ? 'Configurar Campanha' : 'Nova Campanha de Disparo'}
                 </h3>
                 <p className="text-xs text-white/50 mt-0.5">
-                  Configure o destino, mensagem e a frequência de disparo
+                  Configure o destino, a mensagem e o agendamento do disparo.
                 </p>
               </div>
               <button 
@@ -1839,55 +1612,55 @@ export default function MarketingModule() {
                 <label className="text-xs font-bold text-white/70 block mb-1">Nome da Campanha</label>
                 <input
                   type="text"
-                  placeholder="Ex: Reativação Sexta FDS + Lotes Exclusivos"
+                  placeholder="Ex: Oferta Sextou VIP + Entrega Rápida"
                   value={campaignFormName}
                   onChange={(e) => setCampaignFormName(e.target.value)}
                   className="w-full bg-[#050505] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/50"
                 />
               </div>
 
-              {/* Escolha do Destino: Múltiplas Listas de Transmissão OU Grupo */}
+              {/* Escolha do Destino */}
               <div className="space-y-3">
-                <label className="text-xs font-bold text-white/70 block">Tipo de Destino do Disparo</label>
+                <label className="text-xs font-bold text-white/70 block">Onde deseja disparar?</label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setCampaignFormTargetType('lists')}
-                    className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                    className={`p-3.5 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
                       campaignFormTargetType === 'lists'
-                        ? 'bg-purple-500/15 border-purple-500/40 text-white'
+                        ? 'bg-purple-500/15 border-purple-500/40 text-white shadow-sm'
                         : 'bg-[#050505] border-white/10 text-white/50 hover:bg-white/5'
                     }`}
                   >
-                    <Users className="size-5 text-purple-400" />
+                    <Users className="size-5 text-purple-400 shrink-0" />
                     <div>
                       <span className="text-xs font-bold block text-white">Listas de Transmissão</span>
-                      <span className="text-[10px] text-white/40">Selecione 1 ou mais listas de contatos</span>
+                      <span className="text-[10px] text-white/40">Disparo no privado para cada contato</span>
                     </div>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setCampaignFormTargetType('group')}
-                    className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                    className={`p-3.5 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
                       campaignFormTargetType === 'group'
-                        ? 'bg-amber-500/15 border-amber-500/40 text-white'
+                        ? 'bg-amber-500/15 border-amber-500/40 text-white shadow-sm'
                         : 'bg-[#050505] border-white/10 text-white/50 hover:bg-white/5'
                     }`}
                   >
-                    <MessageSquare className="size-5 text-amber-400" />
+                    <MessageSquare className="size-5 text-amber-400 shrink-0" />
                     <div>
                       <span className="text-xs font-bold block text-white">Grupo de WhatsApp</span>
-                      <span className="text-[10px] text-white/40">Dispara em canal / grupo VIP</span>
+                      <span className="text-[10px] text-white/40">Dispara direto no canal/grupo VIP</span>
                     </div>
                   </button>
                 </div>
 
                 {/* Seleção de Múltiplas Listas */}
                 {campaignFormTargetType === 'lists' && (
-                  <div className="p-3.5 bg-[#050505] border border-white/10 rounded-xl space-y-2">
+                  <div className="p-3.5 bg-[#050505] border border-white/10 rounded-xl space-y-2.5">
                     <span className="text-xs font-bold text-white block">
-                      Selecione as Listas que esta Campanha vai abordar:
+                      Selecione o público desta campanha:
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {broadcastLists.map(list => {
@@ -1901,7 +1674,7 @@ export default function MarketingModule() {
                               else next.add(list.id);
                               setCampaignFormSelectedLists(next);
                             }}
-                            className={`p-2.5 rounded-lg border cursor-pointer flex items-center justify-between ${
+                            className={`p-2.5 rounded-lg border cursor-pointer flex items-center justify-between transition-all ${
                               isChecked ? 'bg-purple-500/20 border-purple-500/40' : 'bg-black/50 border-white/5 hover:border-white/10'
                             }`}
                           >
@@ -1924,17 +1697,14 @@ export default function MarketingModule() {
 
                 {/* Seleção do Grupo */}
                 {campaignFormTargetType === 'group' && (
-                  <div className="p-3.5 bg-[#050505] border border-white/10 rounded-xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-white block">Grupo de Destino do WhatsApp:</span>
-                      <span className="text-[10px] text-amber-400 font-mono">Editável a qualquer momento</span>
-                    </div>
+                  <div className="p-3.5 bg-[#050505] border border-white/10 rounded-xl space-y-2">
+                    <span className="text-xs font-bold text-white block">Grupo do WhatsApp:</span>
 
                     {whatsAppGroups.length > 0 ? (
                       <select
                         value={campaignFormTargetGroup}
                         onChange={(e) => setCampaignFormTargetGroup(e.target.value)}
-                        className="w-full bg-black border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500/50 font-sans"
+                        className="w-full bg-black border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500/50"
                       >
                         <option value="">-- Selecione o grupo sincronizado --</option>
                         {whatsAppGroups.map(g => (
@@ -1944,41 +1714,35 @@ export default function MarketingModule() {
                         ))}
                       </select>
                     ) : (
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          value={campaignFormTargetGroup || 'Grupo VIP Oficial (Conectar WhatsApp para vincular)'}
-                          onChange={(e) => setCampaignFormTargetGroup(e.target.value)}
-                          placeholder="Ex: Grupo VIP Oficial SBC"
-                          className="w-full bg-black border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-300 font-semibold focus:outline-none focus:border-amber-400"
-                        />
-                        <p className="text-[11px] text-white/50 leading-relaxed">
-                          💡 <strong>WhatsApp em repouso:</strong> Você pode salvar a campanha agora normalmente. Quando o WhatsApp for reconectado, basta clicar em <strong>Editar</strong> nesta campanha para selecionar o grupo oficial da lista!
-                        </p>
-                      </div>
+                      <input
+                        type="text"
+                        value={campaignFormTargetGroup}
+                        onChange={(e) => setCampaignFormTargetGroup(e.target.value)}
+                        placeholder="Ex: Grupo VIP Oficial"
+                        className="w-full bg-black border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-300 font-semibold focus:outline-none focus:border-amber-400"
+                      />
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Frequência do Disparo, Data de Início e Horário */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {/* Frequência do Disparo e Horário */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-white/70 block mb-1">Recorrência / Intervalo</label>
+                  <label className="text-xs font-bold text-white/70 block mb-1">Frequência</label>
                   <select
                     value={campaignFormFrequency}
                     onChange={(e) => setCampaignFormFrequency(Number(e.target.value))}
                     className="w-full bg-[#050505] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
                   >
-                    <option value={0}>Disparo Único (Sem repetição)</option>
-                    <option value={7}>Semanal (Escolher Dia da Semana)</option>
+                    <option value={0}>Disparo Único (Manual)</option>
+                    <option value={7}>Semanal (Toda Semana)</option>
                     <option value={14}>Quinzenal (A cada 14 dias)</option>
-                    <option value={21}>A cada 21 dias (3 semanas)</option>
                     <option value={30}>Mensal (A cada 30 dias)</option>
                   </select>
                 </div>
 
-                {campaignFormFrequency === 7 && (
+                {campaignFormFrequency === 7 ? (
                   <div>
                     <label className="text-xs font-bold text-white/70 block mb-1">Dia da Semana</label>
                     <select
@@ -1995,21 +1759,7 @@ export default function MarketingModule() {
                       <option value="DOMINGO">Todo Domingo</option>
                     </select>
                   </div>
-                )}
-
-                {campaignFormFrequency > 0 && (
-                  <div>
-                    <label className="text-xs font-bold text-white/70 block mb-1">📅 Data de Início</label>
-                    <input
-                      type="date"
-                      value={campaignFormStartDate}
-                      onChange={(e) => setCampaignFormStartDate(e.target.value)}
-                      className="w-full bg-[#050505] border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-400 cursor-pointer"
-                    />
-                  </div>
-                )}
-
-                {campaignFormFrequency > 0 && (
+                ) : campaignFormFrequency > 0 ? (
                   <div>
                     <label className="text-xs font-bold text-white/70 block mb-1">⏰ Horário do Disparo</label>
                     <input
@@ -2019,168 +1769,75 @@ export default function MarketingModule() {
                       className="w-full bg-[#050505] border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-400"
                     />
                   </div>
-                )}
+                ) : null}
 
+                {/* Selo Anti-Ban Automático */}
                 {campaignFormTargetType === 'lists' && (
-                  <div className="col-span-full bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                      <label className="text-xs font-black text-amber-300 flex items-center gap-2">
-                        <ShieldAlert className="size-4 text-amber-400" />
-                        <span>Cadência Anti-Ban Recomendada (Segurança do Chip)</span>
-                      </label>
-                      <span className="text-[11px] font-bold text-amber-400 font-mono bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 rounded-lg w-fit">
-                        Ideal: 5 disparos a cada 35 min
+                  <div className="col-span-full bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3.5 flex items-center gap-3">
+                    <div className="size-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                      <ShieldCheck className="size-4" />
+                    </div>
+                    <div className="text-xs">
+                      <span className="font-bold text-emerald-300 block">Cadência Anti-Ban Automática</span>
+                      <span className="text-white/60 text-[11px]">
+                        Disparos em lotes seguros de 5 contatos com intervalo inteligente para máxima proteção do seu WhatsApp.
                       </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <span className="text-[11px] text-white/70 block mb-1 font-semibold">Envios por lote (Contatos)</span>
-                        <input
-                          type="number"
-                          value={campaignFormBatchSize}
-                          onChange={(e) => setCampaignFormBatchSize(Number(e.target.value))}
-                          className="w-full bg-[#050505] border border-white/15 focus:border-amber-400 rounded-xl p-2.5 text-xs text-white font-mono"
-                          placeholder="Recomendado: 5"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[11px] text-white/70 block mb-1 font-semibold">Intervalo de Pausa (Minutos)</span>
-                        <input
-                          type="number"
-                          value={campaignFormInterval}
-                          onChange={(e) => setCampaignFormInterval(Number(e.target.value))}
-                          className="w-full bg-[#050505] border border-white/15 focus:border-amber-400 rounded-xl p-2.5 text-xs text-white font-mono"
-                          placeholder="Recomendado: 35"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-black/50 rounded-xl border border-amber-500/20 text-[11px] text-amber-200/90 leading-relaxed space-y-1">
-                      <p className="font-bold text-amber-300 flex items-center gap-1.5">
-                        <ShieldAlert className="size-3.5 text-amber-400 shrink-0" />
-                        <span>Aviso Importante: Não nos responsabilizamos por bloqueios do WhatsApp!</span>
-                      </p>
-                      <p className="text-white/70">
-                        Tome muito cuidado com a quantia de disparos. A cadência ideal e segura são <strong>5 disparos com pausa de 35 minutos</strong> entre cada lote para aquecer e blindar o número da sua loja contra banimentos da Meta.
-                      </p>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Modelos e Mensagem com Suporte a Variações Dinâmicas */}
-              <div className="space-y-4">
+              {/* Mensagem & Modelos */}
+              <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <label className="text-xs font-bold text-white">Mensagem</label>
                   <div className="flex items-center gap-2">
-                    <label className="text-xs font-bold text-white">Mensagem Principal</label>
-                    <span className="text-[10px] text-white/40 font-mono">Variável: [Nome]</span>
-                  </div>
-
-                  {campaignFormTargetType === 'lists' && (
                     <button
                       type="button"
-                      onClick={() => setCampaignFormUseVariations(!campaignFormUseVariations)}
-                      className={`px-3 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                        campaignFormUseVariations
-                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm'
-                          : 'bg-white/5 text-white/50 border-white/10 hover:text-white'
-                      }`}
+                      onClick={() => setCampaignFormMessage(prev => prev + ' [Nome]')}
+                      className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] text-white/70 font-mono cursor-pointer"
                     >
-                      <span>🔄 {campaignFormUseVariations ? 'Variações Anti-Ban Ativadas' : '+ Ativar Variações de Texto (Spintax)'}</span>
+                      + [Nome]
                     </button>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => setCampaignFormMessage(prev => prev + ' [LINK_DO_CARDAPIO_VERCEL]')}
+                      className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] text-white/70 font-mono cursor-pointer"
+                    >
+                      + [Cardápio]
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCampaignFormMessage(prev => prev + ' [LINK_DO_GRUPO_VIP_WHATSAPP]')}
+                      className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] text-white/70 font-mono cursor-pointer"
+                    >
+                      + [Grupo VIP]
+                    </button>
+                  </div>
                 </div>
 
                 {/* Modelos Prontos */}
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {OFFICIAL_TEMPLATES.map(t => (
                     <button
                       key={t.id}
                       type="button"
                       onClick={() => setCampaignFormMessage(t.text)}
-                      className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 text-[11px] text-white/70 font-semibold cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-white/70 hover:text-white transition-all cursor-pointer"
                     >
                       {t.title}
                     </button>
                   ))}
                 </div>
 
-                {/* Mensagem Base */}
+                {/* Caixa de Texto da Mensagem */}
                 <textarea
                   rows={6}
                   value={campaignFormMessage}
                   onChange={(e) => setCampaignFormMessage(e.target.value)}
                   className="w-full bg-[#050505] border border-white/10 rounded-xl p-3.5 text-xs text-white font-mono leading-relaxed focus:outline-none focus:border-emerald-500/50"
-                  placeholder="Escreva sua mensagem principal aqui..."
+                  placeholder="Escreva a mensagem aqui..."
                 />
-
-                {/* Bloco de Variações Dinâmicas (Spintax) */}
-                {campaignFormTargetType === 'lists' && campaignFormUseVariations && (
-                  <div className="p-4 bg-purple-950/20 border border-purple-500/30 rounded-2xl space-y-3 shadow-inner">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
-                          🔄 5 Variações Fixas Anti-Ban ({campaignFormVariations.length + 1} de 5 configuradas)
-                        </span>
-                        <p className="text-[10px] text-white/40 mt-0.5">
-                          Cada 1 dos 5 contatos do lote recebe uma mensagem exclusiva. Máximo estrito: 5 variações.
-                        </p>
-                      </div>
-                      {campaignFormVariations.length < 4 ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (campaignFormVariations.length < 4) {
-                              setCampaignFormVariations([...campaignFormVariations, '']);
-                            }
-                          }}
-                          className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1 cursor-pointer"
-                        >
-                          <Plus className="size-3" /> Adicionar Variação ({campaignFormVariations.length + 2}/5)
-                        </button>
-                      ) : (
-                        <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
-                          ✓ Limite Máximo de 5 Variações Atingido
-                        </span>
-                      )}
-                    </div>
-
-                    {campaignFormVariations.length === 0 ? (
-                      <div className="p-4 rounded-xl border border-dashed border-purple-500/20 text-center text-xs text-purple-300/40">
-                        Nenhuma variação adicionada ainda. Clique em <strong>+ Adicionar Variação</strong> acima para colocar textos alternativos com outras saudações e frases.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {campaignFormVariations.map((v, idx) => (
-                          <div key={idx} className="space-y-1.5 bg-black/40 p-3 rounded-xl border border-purple-500/20">
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="font-bold text-purple-400 font-mono">Variação #{idx + 2}</span>
-                              <button
-                                type="button"
-                                onClick={() => setCampaignFormVariations(campaignFormVariations.filter((_, i) => i !== idx))}
-                                className="text-red-400/70 hover:text-red-300 text-[10px] font-bold"
-                              >
-                                ✕ Remover
-                              </button>
-                            </div>
-                            <textarea
-                              rows={4}
-                              value={v}
-                              onChange={(e) => {
-                                const copy = [...campaignFormVariations];
-                                copy[idx] = e.target.value;
-                                setCampaignFormVariations(copy);
-                              }}
-                              className="w-full bg-[#050505] border border-white/10 rounded-lg p-2.5 text-xs text-white font-mono leading-relaxed focus:outline-none focus:border-purple-500/50"
-                              placeholder={`Texto da variação #${idx + 2}...`}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
 
@@ -2194,232 +1851,11 @@ export default function MarketingModule() {
               </button>
               <button
                 onClick={handleSaveCampaign}
-                className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold"
+                className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold shadow-sm active:scale-95"
               >
                 Salvar Campanha
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-
-
-      {/* ============================================================ */}
-      {/* 🧪 MODAL: LABORATÓRIO DE DISPARO & ARMADILHA DE DIAGNÓSTICO */}
-      {/* ============================================================ */}
-      {isTestLabOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-[#0e1017] border border-cyan-500/30 w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto custom-scrollbar">
-            
-            {/* Topo do Modal */}
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="size-10 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                  <FlaskConical className="size-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-white flex items-center gap-2">
-                    Laboratório de Disparo &amp; Armadilha de Diagnóstico
-                  </h3>
-                  <p className="text-xs text-white/50">
-                    Rastreie o percurso exato da mensagem e detecte qualquer falha de entrega em tempo real.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsTestLabOpen(false)}
-                className="size-8 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center transition-all cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Formulário de Envio de Teste */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-white/80">WhatsApp de Teste (com DDD)</label>
-                  <input
-                    type="text"
-                    value={labPhone}
-                    onChange={e => setLabPhone(e.target.value)}
-                    placeholder="Ex: 11948420071"
-                    className="w-full bg-black/60 border border-white/10 focus:border-cyan-500/50 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-white/30 outline-none font-mono"
-                  />
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setLabPhone('11948420071')}
-                      className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold underline cursor-pointer"
-                    >
-                      Preencher meu número (11 94842-0071)
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-white/80">Nome do Contato</label>
-                  <input
-                    type="text"
-                    value={labName}
-                    onChange={e => setLabName(e.target.value)}
-                    placeholder="Ex: Leo"
-                    className="w-full bg-black/60 border border-white/10 focus:border-cyan-500/50 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-white/30 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-white/80">Corpo da Mensagem</label>
-                <textarea
-                  rows={3}
-                  value={labMessage}
-                  onChange={e => setLabMessage(e.target.value)}
-                  placeholder="Escreva a mensagem de teste aqui..."
-                  className="w-full bg-black/60 border border-white/10 focus:border-cyan-500/50 rounded-xl p-3 text-xs text-white placeholder:text-white/30 outline-none leading-relaxed custom-scrollbar"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleRunLabTest}
-                disabled={labExecuting}
-                className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 active:scale-[0.99]"
-              >
-                {labExecuting ? (
-                  <>
-                    <RefreshCw className="size-4 animate-spin text-black" />
-                    <span>Executando Armadilha de Diagnóstico no WhatsApp...</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="size-4 fill-black text-black" />
-                    <span>⚡ Disparar e Rastrear com Armadilha</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Resultado e Telemetria em Tempo Real */}
-            {labExecuting && (
-              <div className="p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl flex items-center gap-3 text-cyan-300 text-xs animate-pulse">
-                <RefreshCw className="size-5 animate-spin shrink-0" />
-                <div>
-                  <p className="font-bold">Consultando a rede do WhatsApp...</p>
-                  <p className="text-[11px] text-cyan-300/70 mt-0.5">
-                    Validando formato, consultando registro ativo no servidor oficial e preparando envio com confirmação de entrega.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Painel do Erro Diagnosticado */}
-            {labError && !labExecuting && (
-              <div className="p-4 bg-red-500/15 border border-red-500/40 rounded-2xl space-y-2.5 animate-in fade-in">
-                <div className="flex items-start gap-3">
-                  <div className="size-8 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
-                    <ShieldAlert className="size-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-black text-red-300 uppercase tracking-wide">
-                      Armadilha Ativada: Falha Detectada na Entrega
-                    </h4>
-                    <p className="text-xs text-white/90 mt-1 font-medium leading-relaxed">
-                      {labError}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-black/40 border border-red-500/20 rounded-xl text-[11px] text-white/70 space-y-1">
-                  <span className="font-bold text-red-300 block">💡 Diagnóstico Técnico:</span>
-                  {labError.includes('LID') ? (
-                    <p>Este registro contém um identificador interno de dispositivo (LID com 14+ dígitos) e não um número telefônico com DDD. O WhatsApp rejeita envios diretos para LIDs.</p>
-                  ) : labError.includes('NÃO possui conta') || labError.includes('rejeitado') ? (
-                    <p>O servidor oficial do WhatsApp confirmou que este telefone não possui conta ativa. Pode ter sido digitado errado, ser um telefone fixo ou ter sido cancelado na operadora.</p>
-                  ) : labError.includes('offline') || labError.includes('desconectado') ? (
-                    <p>O WhatsApp Web não está conectado ao backend. Conecte pelo botão "Conectar WhatsApp" no topo da página.</p>
-                  ) : (
-                    <p>Verifique se o número possui DDD correto e se o aparelho que enviou está com internet ativa.</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Sucesso Confirmado com Recibo */}
-            {labResult?.success && !labExecuting && (
-              <div className="p-4 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl space-y-2.5 animate-in fade-in">
-                <div className="flex items-start gap-3">
-                  <div className="size-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                    <CheckCircle2 className="size-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-black text-emerald-300 uppercase tracking-wide">
-                      Mensagem Entregue e Confirmada pelo Servidor do WhatsApp!
-                    </h4>
-                    <p className="text-xs text-white/90 mt-1">
-                      O corpo da mensagem chegou ao destinatário e o servidor gerou o recibo oficial.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono bg-black/40 p-3 rounded-xl border border-white/5">
-                  <div>
-                    <span className="text-white/40 block">JID Canônico:</span>
-                    <span className="text-emerald-300 font-bold">{labResult.canonicalJid}</span>
-                  </div>
-                  <div>
-                    <span className="text-white/40 block">Message ID:</span>
-                    <span className="text-white font-bold">{labResult.messageId}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Linha do Tempo / Trace Passo a Passo */}
-            {labResult?.trace && Array.isArray(labResult.trace) && (
-              <div className="space-y-2 pt-2 border-t border-white/10">
-                <h5 className="text-[11px] font-mono text-white/50 uppercase tracking-wider">
-                  Trilha de Auditoria do Disparo:
-                </h5>
-                <div className="space-y-1.5 font-mono text-[11px]">
-                  {labResult.trace.map((item: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className={`p-2.5 rounded-xl border flex items-start justify-between gap-3 ${
-                        item.status === 'OK'
-                          ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-300'
-                          : item.status === 'ERROR'
-                          ? 'bg-red-500/10 border-red-500/30 text-red-300'
-                          : 'bg-white/5 border-white/10 text-white/70'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold">
-                          {item.status === 'OK' ? '✓' : item.status === 'ERROR' ? '✕' : '•'} Passo {item.step}:
-                        </span>
-                        <span>{item.title}</span>
-                      </div>
-                      <span className="text-[10px] text-right text-white/60">
-                        {item.message || (item.status === 'OK' ? 'Sucesso' : 'Pendente')}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="border-t border-white/10 pt-3 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsTestLabOpen(false)}
-                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold cursor-pointer transition-colors"
-              >
-                Fechar Laboratório
-              </button>
-            </div>
-
           </div>
         </div>
       )}
