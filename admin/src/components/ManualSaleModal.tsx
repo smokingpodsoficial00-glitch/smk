@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ensureBuyerInBroadcastList } from "@/lib/marketingLists";
 import { BRAZILIAN_STATES } from "@/lib/nationalSales";
 import { notifyMobileSale } from "@/lib/saleNotifications";
+import { MobileManualSaleFlow } from "./sale/MobileManualSaleFlow";
 import {
   ShoppingCart,
   User,
@@ -771,8 +772,23 @@ export function ManualSaleModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-[#111113] border border-white/15 rounded-3xl max-w-xl w-full p-5 sm:p-6 space-y-5 shadow-2xl my-auto text-white">
+    <>
+      {/* Visualização Mobile Dedicada (< 768px) */}
+      <div className="block md:hidden">
+        <MobileManualSaleFlow
+          isOpen={isOpen}
+          onClose={onClose}
+          onSaleSuccess={onSaleSuccess}
+          companyId={companyId}
+          preSelectedFlavorId={preSelectedFlavorId}
+          preSelectedGroup={preSelectedGroup}
+          defaultIsNational={defaultIsNational}
+        />
+      </div>
+
+      {/* Modal Desktop Intacto (>= 768px) */}
+      <div className="hidden md:flex fixed inset-0 z-50 bg-black/85 backdrop-blur-md items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200 overflow-y-auto">
+        <div className="bg-[#111113] border border-white/15 rounded-3xl max-w-xl w-full p-5 sm:p-6 space-y-5 shadow-2xl my-auto text-white">
         {/* Cabeçalho do Modal */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-3">
@@ -1539,5 +1555,6 @@ export function ManualSaleModal({
         </div>
       </div>
     </div>
+    </>
   );
 }
