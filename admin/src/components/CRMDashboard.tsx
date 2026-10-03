@@ -71,58 +71,56 @@ export default function CRMDashboard() {
 
   return (
     <CRMErrorBoundary>
-      <div className="flex-1 h-full overflow-y-auto overflow-x-hidden bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
-        {/* ━━━ VISÃO EXCLUSIVA MOBILE (< 768px): CRM SIMPLIFICADO (24H, 3 DIAS & ÚLTIMAS VENDAS) ━━━ */}
-        <div className="block md:hidden">
-          <MobileCRMView
-            companyId={company?.id}
-            refreshKey={refreshKey}
-            onOpenManualSale={() => setIsManualSaleModalOpen(true)}
-            onSelectClient={setSelectedClient}
-          />
+      {/* ━━━ VISÃO EXCLUSIVA MOBILE (< 768px): CRM NATIVO APP (FULL HEIGHT) ━━━ */}
+      <div className="block md:hidden h-full w-full overflow-hidden bg-[#070709] text-white">
+        <MobileCRMView
+          companyId={company?.id}
+          refreshKey={refreshKey}
+          onOpenManualSale={() => setIsManualSaleModalOpen(true)}
+          onSelectClient={setSelectedClient}
+        />
+      </div>
+
+      {/* ━━━ VISÃO COMPLETA COMPUTADOR (>= 768px) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div className="hidden md:block flex-1 h-full overflow-y-auto overflow-x-hidden bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
+        {/* ━━━ CABEÇALHO EXECUTIVO PADRONIZADO (DESIGN SYSTEM) ━━━━━━━━━━━ */}
+        <header className="border-b border-white/10 pb-4">
+          <div className="space-y-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+              <Users className="size-6 text-white shrink-0" />
+              <span>Gestão de Clientes & CRM</span>
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              Ranking de Fidelidade, Previsão de Recompra e Histórico Técnico de Vendas.
+            </p>
+          </div>
+        </header>
+
+        {/* ━━━ ABAS SUPERIORES (ALTURAS, PADDING E RADIUS UNIFORMES) ━━━━━ */}
+        <div data-tour="crm-tabs" className="flex flex-wrap items-center gap-2">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment' | 'sales_history')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none ${
+                activeSubTab === tab.id 
+                  ? 'bg-white/10 text-white font-extrabold border border-white/25 shadow-[0_0_15px_rgba(255,255,255,0.15)]' 
+                  : 'text-muted-foreground hover:text-white bg-[#0e0e10] border border-white/10 hover:border-white/20'
+              }`}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+            </button>
+          ))}
         </div>
 
-        {/* ━━━ VISÃO COMPLETA COMPUTADOR (>= 768px) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <div className="hidden md:block space-y-6">
-          {/* ━━━ CABEÇALHO EXECUTIVO PADRONIZADO (DESIGN SYSTEM) ━━━━━━━━━━━ */}
-          <header className="border-b border-white/10 pb-4">
-            <div className="space-y-1">
-              <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
-                <Users className="size-6 text-white shrink-0" />
-                <span>Gestão de Clientes & CRM</span>
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                Ranking de Fidelidade, Previsão de Recompra e Histórico Técnico de Vendas.
-              </p>
-            </div>
-          </header>
-
-          {/* ━━━ ABAS SUPERIORES (ALTURAS, PADDING E RADIUS UNIFORMES) ━━━━━ */}
-          <div data-tour="crm-tabs" className="flex flex-wrap items-center gap-2">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveSubTab(tab.id as 'rfm' | 'replenishment' | 'sales_history')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none ${
-                  activeSubTab === tab.id 
-                    ? 'bg-white/10 text-white font-extrabold border border-white/25 shadow-[0_0_15px_rgba(255,255,255,0.15)]' 
-                    : 'text-muted-foreground hover:text-white bg-[#0e0e10] border border-white/10 hover:border-white/20'
-                }`}
-              >
-                {tab.icon}
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* ━━━ CONTEÚDO DA ABA ATIVA ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-          <div className="space-y-6">
-            <CRMErrorBoundary>
-              {activeSubTab === 'rfm' && <RFMMatrix key={`rfm-${refreshKey}`} onSelectClient={setSelectedClient} />}
-              {activeSubTab === 'replenishment' && <PredictiveReplenishment key={`rep-${refreshKey}`} onSelectClient={setSelectedClient} />}
-              {activeSubTab === 'sales_history' && <SalesHistoryTab key={`sal-${refreshKey}`} />}
-            </CRMErrorBoundary>
-          </div>
+        {/* ━━━ CONTEÚDO DA ABA ATIVA ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <div className="space-y-6">
+          <CRMErrorBoundary>
+            {activeSubTab === 'rfm' && <RFMMatrix key={`rfm-${refreshKey}`} onSelectClient={setSelectedClient} />}
+            {activeSubTab === 'replenishment' && <PredictiveReplenishment key={`rep-${refreshKey}`} onSelectClient={setSelectedClient} />}
+            {activeSubTab === 'sales_history' && <SalesHistoryTab key={`sal-${refreshKey}`} />}
+          </CRMErrorBoundary>
         </div>
 
         {/* Modal de Registro de Venda Manual */}
