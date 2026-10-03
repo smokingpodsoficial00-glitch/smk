@@ -2375,6 +2375,22 @@ export default function FinanceDashboard() {
           nationalOrdersCount={nationalOrdersCount}
           persistedProductCosts={persistedProductCosts}
           allValidOrders={allValidOrders}
+          selectedMonthCycleId={selectedMonthCycleId}
+          onSelectMonthCycleId={setSelectedMonthCycleId}
+          selectedMonthlyMetric={selectedMonthlyMetric}
+          monthlyEvolution={monthlyEvolution}
+          selectedQuarterId={selectedQuarterId}
+          onSelectQuarterId={setSelectedQuarterId}
+          selectedQuarter={selectedQuarter}
+          quarterlyEvolution={quarterlyEvolution}
+          selectedSemesterId={selectedSemesterId}
+          onSelectSemesterId={setSelectedSemesterId}
+          selectedSemester={selectedSemester}
+          semiannualEvolution={semiannualEvolution}
+          selectedYearId={selectedYearId}
+          onSelectYearId={setSelectedYearId}
+          selectedYear={selectedYear}
+          annualEvolution={annualEvolution}
         />
       </div>
 
