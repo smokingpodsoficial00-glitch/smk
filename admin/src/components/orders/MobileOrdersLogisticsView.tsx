@@ -16,7 +16,6 @@ import {
   Trash2,
   RotateCcw,
   Package,
-  Plus,
   Bell,
   ArrowLeft,
   ExternalLink,
@@ -239,15 +238,6 @@ export function MobileOrdersLogisticsView({
             title="Alertas & Push"
           >
             <Bell className="size-4" />
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenManualSale}
-            className="h-9 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs flex items-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition-all cursor-pointer"
-          >
-            <Plus className="size-3.5 stroke-[3]" />
-            <span>Venda</span>
           </button>
         </div>
       </header>
@@ -799,8 +789,9 @@ export function MobileOrdersLogisticsView({
                 <button
                   type="button"
                   onClick={async () => {
+                    const orderIdToDelete = selectedOrderForDetails.realId;
                     setSelectedOrderForDetails(null);
-                    await onDeleteOrder(selectedOrderForDetails.realId);
+                    await onDeleteOrder(orderIdToDelete);
                   }}
                   className="w-full min-h-[44px] bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 text-rose-400 font-bold rounded-xl flex items-center justify-center gap-2"
                 >
