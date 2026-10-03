@@ -13,7 +13,6 @@ const KanbanBoard = lazy(() => import('./components/KanbanBoard'));
 const FinanceDashboard = lazy(() => import('./components/FinanceDashboard'));
 const SupplyChainDashboard = lazy(() => import('./components/SupplyChainDashboard'));
 const CRMDashboard = lazy(() => import('./components/CRMDashboard'));
-const ChatbotPage = lazy(() => import('./components/ChatbotPage'));
 const MarketingModule = lazy(() => import('./components/MarketingModule'));
 const PartnersDashboard = lazy(() => import('./components/PartnersDashboard'));
 const TasksDashboard = lazy(() => import('./components/TasksDashboard'));
@@ -132,10 +131,6 @@ export const router = createBrowserRouter([
       {
         path: 'clientes',
         element: <SuspenseWrap><CRMDashboard /></SuspenseWrap>,
-      },
-      {
-        path: 'chatbot',
-        element: <SuspenseWrap><ChatbotPage /></SuspenseWrap>,
       },
       {
         path: 'marketing',

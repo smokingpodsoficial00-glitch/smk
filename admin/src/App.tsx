@@ -1,7 +1,7 @@
 import { useState, lazy, Suspense } from "react";
 import {
   LayoutDashboard, PackageSearch, Users, Settings, CircleDollarSign,
-  MoreHorizontal, Store, ChevronRight, PanelLeftOpen, Bot, Megaphone, Scale, Loader2
+  MoreHorizontal, Store, ChevronRight, PanelLeftOpen, Megaphone, Scale, Loader2
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 
@@ -11,7 +11,6 @@ const FinanceDashboard = lazy(() => import("@/components/FinanceDashboard"));
 const SupplyChainDashboard = lazy(() => import("@/components/SupplyChainDashboard"));
 const CRMDashboard = lazy(() => import("@/components/CRMDashboard"));
 const SettingsPage = lazy(() => import("@/components/SettingsPage"));
-const ChatbotPage = lazy(() => import("@/components/ChatbotPage"));
 const MarketingModule = lazy(() => import("@/components/MarketingModule"));
 const PartnersDashboard = lazy(() => import("@/components/PartnersDashboard"));
 
@@ -158,32 +157,6 @@ export default function App() {
 
           <div className="h-px bg-white/5 my-2 w-[85%] mx-auto" />
 
-          {/* Nova Aba Chatbot */}
-          <button 
-            onClick={(e) => {
-              if (sidebarCollapsed) e.stopPropagation();
-              setActiveTab("chatbot");
-            }}
-            title={sidebarCollapsed ? "Chatbot IA" : undefined}
-            className={`flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
-              sidebarCollapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
-            } ${
-              activeTab === 'chatbot' 
-                ? 'bg-white/5 text-emerald-400 font-bold border-l-2 border-emerald-500 pl-3.5' 
-                : 'text-muted-foreground hover:bg-white/5 hover:text-white border-l-2 border-transparent pl-4'
-            }`}
-          >
-            <Bot className="size-4 shrink-0 text-emerald-400" />
-            {!sidebarCollapsed && (
-              <span className="truncate flex items-center gap-2">
-                Chatbot
-                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold">
-                  IA
-                </span>
-              </span>
-            )}
-          </button>
-
           {/* Aba Marketing */}
           <button 
             onClick={(e) => {
@@ -286,7 +259,6 @@ export default function App() {
           {activeTab === 'financeiro' && <FinanceDashboard />}
           {activeTab === 'estoque' && <SupplyChainDashboard />}
           {activeTab === 'clientes' && <CRMDashboard />}
-          {activeTab === 'chatbot' && <ChatbotPage />}
           {activeTab === 'marketing' && <MarketingModule />}
           {activeTab === 'socios' && <PartnersDashboard />}
           {activeTab === 'configuracoes' && <SettingsPage />}
