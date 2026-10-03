@@ -66,6 +66,63 @@ function getRelativeTime(dateString: string): string {
   }
 }
 
+interface TabDefinition {
+  id: MobileTab;
+  label: string;
+  activeColor: string;
+  dotColor: string;
+}
+
+const TABS: TabDefinition[] = [
+  {
+    id: "PREPARANDO",
+    label: "Preparando",
+    activeColor: "bg-amber-500/20 border-amber-500 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]",
+    dotColor: "bg-amber-500",
+  },
+  {
+    id: "EM_ROTA",
+    label: "Em Rota",
+    activeColor: "bg-blue-500/20 border-blue-500 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.25)]",
+    dotColor: "bg-blue-500",
+  },
+  {
+    id: "ENTREGUE",
+    label: "Entregues",
+    activeColor: "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.25)]",
+    dotColor: "bg-emerald-500",
+  },
+  {
+    id: "CONCLUIDO",
+    label: "Concluídos",
+    activeColor: "bg-purple-500/20 border-purple-500 text-purple-300 shadow-[0_0_12px_rgba(168,85,247,0.25)]",
+    dotColor: "bg-purple-400",
+  },
+  {
+    id: "AGUARDANDO_PAGAMENTO",
+    label: "Aguardando Pagamento",
+    activeColor: "bg-zinc-100/20 border-zinc-300 text-white shadow-[0_0_12px_rgba(255,255,255,0.25)]",
+    dotColor: "bg-zinc-400",
+  },
+];
+
+function getTabLabel(tab: MobileTab): string {
+  switch (tab) {
+    case "PREPARANDO":
+      return "Preparando";
+    case "EM_ROTA":
+      return "Em Rota";
+    case "ENTREGUE":
+      return "Entregues";
+    case "CONCLUIDO":
+      return "Concluídos";
+    case "AGUARDANDO_PAGAMENTO":
+      return "Aguardando Pagamento";
+    default:
+      return "";
+  }
+}
+
 export function MobileOrdersLogisticsView({
   orders,
   loading,
@@ -150,184 +207,157 @@ export function MobileOrdersLogisticsView({
       {/* ========================================================
           1. HEADER COMPACTO MOBILE COM STATUS REALTIME
          ======================================================== */}
-      <header className="shrink-0 bg-[#0d0d10] border-b border-white/10 px-4 pt-3 pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="size-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-              <Package className="size-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-bold tracking-tight text-white leading-tight">
-                  Pedidos & Logística
-                </h1>
-                <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                  <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[9px] text-emerald-400 font-extrabold uppercase tracking-wider">
-                    Ao Vivo
-                  </span>
-                </div>
+      <header className="shrink-0 bg-[#0c0c0f] border-b border-white/10 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="size-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+            <Package className="size-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-bold tracking-tight text-white leading-tight truncate">
+                Painel de Pedidos
+              </h1>
+              <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-full shrink-0">
+                <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[9px] text-emerald-400 font-extrabold uppercase tracking-wider">
+                  Ao Vivo
+                </span>
               </div>
-              <p className="text-[11px] text-zinc-400 font-medium leading-none mt-0.5">
-                {orders.length} pedido(s) no sistema
-              </p>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onOpenPushModal}
-              className="size-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white active:scale-95 transition-all"
-              aria-label="Notificações Push"
-            >
-              <Bell className="size-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={onOpenManualSale}
-              className="h-9 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs flex items-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition-all"
-            >
-              <Plus className="size-3.5 stroke-[3]" />
-              <span>Venda</span>
-            </button>
+            <p className="text-[11px] text-zinc-400 font-medium leading-none mt-0.5">
+              {orders.length} {orders.length === 1 ? "pedido" : "pedidos"} no sistema
+            </p>
           </div>
         </div>
 
-        {/* ========================================================
-            2. CAMPO DE BUSCA COMPACTO (>= 16px font-size)
-           ======================================================== */}
-        <div className="relative mt-3">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-400 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar por ID, cliente, sabor ou bairro..."
-            className="w-full bg-[#151518] border border-white/10 rounded-xl pl-9 pr-9 py-2.5 text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-all"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 size-5 rounded-full bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white"
-            >
-              <X className="size-3" />
-            </button>
-          )}
-        </div>
-
-        {/* ========================================================
-            3. PÍLULAS HORIZONTAIS DE NAVEGAÇÃO DE STATUS
-           ======================================================== */}
-        <div className="flex items-center gap-2 mt-3 overflow-x-auto pb-1 scrollbar-none">
-          {/* Aguardando Pagamento (Aparece se houver pedidos) */}
-          {counts.AGUARDANDO_PAGAMENTO > 0 && (
-            <button
-              type="button"
-              onClick={() => setActiveTab("AGUARDANDO_PAGAMENTO")}
-              className={`min-h-[44px] px-3.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 border transition-all active:scale-95 ${
-                activeTab === "AGUARDANDO_PAGAMENTO"
-                  ? "bg-white/15 border-white text-white shadow-[0_0_12px_rgba(255,255,255,0.2)]"
-                  : "bg-white/5 border-white/10 text-zinc-400 hover:text-white"
-              }`}
-            >
-              <span className="size-2 rounded-full bg-white/40" />
-              <span>Aguardando ({counts.AGUARDANDO_PAGAMENTO})</span>
-            </button>
-          )}
-
-          {/* 1. Preparando */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={() => setActiveTab("PREPARANDO")}
-            className={`min-h-[44px] px-3.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 border transition-all active:scale-95 ${
-              activeTab === "PREPARANDO"
-                ? "bg-amber-500/20 border-amber-500 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]"
-                : "bg-white/5 border-white/10 text-zinc-400 hover:text-white"
-            }`}
+            onClick={onOpenPushModal}
+            className="size-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white active:scale-95 transition-all cursor-pointer"
+            aria-label="Notificações Push"
+            title="Alertas & Push"
           >
-            <span className="size-2 rounded-full bg-amber-500" />
-            <span>Preparando ({counts.PREPARANDO})</span>
+            <Bell className="size-4" />
           </button>
 
-          {/* 2. Em Rota */}
           <button
             type="button"
-            onClick={() => setActiveTab("EM_ROTA")}
-            className={`min-h-[44px] px-3.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 border transition-all active:scale-95 ${
-              activeTab === "EM_ROTA"
-                ? "bg-blue-500/20 border-blue-500 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.25)]"
-                : "bg-white/5 border-white/10 text-zinc-400 hover:text-white"
-            }`}
+            onClick={onOpenManualSale}
+            className="h-9 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs flex items-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition-all cursor-pointer"
           >
-            <span className="size-2 rounded-full bg-blue-500" />
-            <span>Em Rota ({counts.EM_ROTA})</span>
-          </button>
-
-          {/* 3. Entregues */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("ENTREGUE")}
-            className={`min-h-[44px] px-3.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 border transition-all active:scale-95 ${
-              activeTab === "ENTREGUE"
-                ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.25)]"
-                : "bg-white/5 border-white/10 text-zinc-400 hover:text-white"
-            }`}
-          >
-            <span className="size-2 rounded-full bg-emerald-500" />
-            <span>Entregues ({counts.ENTREGUE})</span>
-          </button>
-
-          {/* 4. Concluídos */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("CONCLUIDO")}
-            className={`min-h-[44px] px-3.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 border transition-all active:scale-95 ${
-              activeTab === "CONCLUIDO"
-                ? "bg-purple-500/20 border-purple-500 text-purple-300 shadow-[0_0_12px_rgba(168,85,247,0.25)]"
-                : "bg-white/5 border-white/10 text-zinc-400 hover:text-white"
-            }`}
-          >
-            <CheckCircle2 className="size-3.5" />
-            <span>Concluídos ({counts.CONCLUIDO})</span>
+            <Plus className="size-3.5 stroke-[3]" />
+            <span>Venda</span>
           </button>
         </div>
       </header>
 
       {/* ========================================================
-          4. LISTAGEM DE CARDS COMPACTOS MOBILE
+          2. CAMPO DE BUSCA COMPACTO (>= 16px font-size)
          ======================================================== */}
-      <main className="flex-1 overflow-y-auto px-4 py-3 space-y-3 custom-scrollbar">
+      <div className="shrink-0 bg-[#09090c] px-4 pt-3 pb-2.5 border-b border-white/5">
+        <div className="relative w-full">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-zinc-400 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar pedido por cliente, ID, sabor ou modelo..."
+            className="w-full bg-[#141418] border border-white/10 focus:border-emerald-500/50 rounded-xl pl-10 pr-9 py-2.5 text-base text-white placeholder:text-zinc-500 focus:outline-none transition-all shadow-inner"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 size-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              aria-label="Limpar busca"
+            >
+              <X className="size-3" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ========================================================
+          3. PÍLULAS HORIZONTAIS DE NAVEGAÇÃO DE STATUS
+         ======================================================== */}
+      <div className="shrink-0 bg-[#0a0a0d] border-b border-white/10 py-2.5 select-none">
+        <div className="flex items-center gap-2 overflow-x-auto px-4 scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden touch-pan-x">
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            const count = counts[tab.id] ?? 0;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`min-h-[42px] px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 flex items-center gap-1.5 border transition-all active:scale-95 cursor-pointer ${
+                  isActive
+                    ? tab.activeColor
+                    : "bg-[#151519] border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <span className={`size-2 rounded-full ${tab.dotColor} ${isActive ? "animate-pulse" : ""}`} />
+                <span>{tab.label}</span>
+                <span
+                  className={`text-[11px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                    isActive ? "bg-white/20 text-white" : "bg-white/5 text-zinc-400"
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+          {/* Espaçador para swipe lateral suave até a última pílula */}
+          <div className="w-2 shrink-0" aria-hidden="true" />
+        </div>
+      </div>
+
+      {/* ========================================================
+          4. ÁREA DE PEDIDOS OCUPANDO O ESPAÇO RESTANTE
+         ======================================================== */}
+      <main className="flex-1 min-h-0 flex flex-col overflow-y-auto px-4 py-3 custom-scrollbar">
         {loading ? (
-          <div className="py-20 text-center space-y-3">
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-3">
             <Loader2 className="size-8 animate-spin text-emerald-400 mx-auto" />
             <p className="text-xs text-zinc-400">Carregando pedidos...</p>
           </div>
         ) : filteredOrders.length === 0 ? (
-          <div className="bg-[#121215] border border-dashed border-white/10 rounded-2xl py-16 px-4 text-center space-y-3 mt-4">
-            <Package className="size-8 text-zinc-600 mx-auto" />
-            <div>
-              <p className="text-sm font-bold text-zinc-300">Nenhum pedido nesta fase</p>
-              <p className="text-xs text-zinc-500 mt-1">
-                {searchQuery
-                  ? `Nenhum resultado para "${searchQuery}"`
-                  : `Não há pedidos em "${activeTab.toLowerCase().replace("_", " ")}"`}
-              </p>
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+            <div className="w-full max-w-sm bg-[#121215] border border-dashed border-white/10 rounded-2xl p-6 text-center space-y-3 shadow-lg">
+              <Package className="size-9 text-zinc-600 mx-auto" />
+              <div>
+                <p className="text-sm font-bold text-zinc-200">Nenhum pedido nesta fase</p>
+                <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  {searchQuery
+                    ? `Nenhum resultado para "${searchQuery}"`
+                    : `Não há pedidos em "${getTabLabel(activeTab)}"`}
+                </p>
+              </div>
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="text-xs text-emerald-400 font-bold hover:underline cursor-pointer"
+                >
+                  Limpar busca
+                </button>
+              ) : activeTab !== "PREPARANDO" && counts.PREPARANDO > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("PREPARANDO")}
+                  className="px-3.5 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold active:scale-95 transition-all cursor-pointer inline-flex items-center gap-1.5 mx-auto"
+                >
+                  <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span>Ver Preparando ({counts.PREPARANDO})</span>
+                </button>
+              ) : null}
             </div>
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="text-xs text-emerald-400 font-semibold underline"
-              >
-                Limpar busca
-              </button>
-            )}
           </div>
         ) : (
-          filteredOrders.map((order) => {
+          <div className="space-y-3 pb-8">
+            {filteredOrders.map((order) => {
             const isNational = isOrderNational(order);
             const nationalInfo = isNational ? extractNationalInfo(order) : null;
             const podsCount = order.items.reduce((acc, i) => acc + (i.quantity || 1), 0);
@@ -479,7 +509,8 @@ export function MobileOrdersLogisticsView({
                 </div>
               </div>
             );
-          })
+          })}
+          </div>
         )}
       </main>
 
