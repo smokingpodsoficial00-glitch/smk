@@ -116,39 +116,42 @@ export async function deleteOrderWithStockRestoration(
             cachedCompanyProducts = prods || [];
           }
 
-          if (cachedCompanyProducts.length > 0) {
-            // Match exato por sabor e modelo
-            const match = cachedCompanyProducts.find((p) => {
+          if (cachedCompanyProducts.length > 0 && targetFlavor && targetName) {
+            // Busca apenas candidatos com correspondência de modelo E sabor
+            const matchingCandidates = cachedCompanyProducts.filter((p) => {
               const pFlavor = (p.flavor || '').trim().toLowerCase();
               const pName = (p.name || '').trim().toLowerCase();
               const pBrand = (p.brand || '').trim().toLowerCase();
 
               const flavorMatch =
                 pFlavor === targetFlavor ||
-                (targetFlavor && pFlavor.includes(targetFlavor)) ||
-                (targetFlavor && targetFlavor.includes(pFlavor));
+                pFlavor.includes(targetFlavor) ||
+                targetFlavor.includes(pFlavor);
 
               const modelMatch =
-                !targetName ||
                 pName.includes(targetName) ||
                 pBrand.includes(targetName) ||
                 targetName.includes(pName) ||
                 targetName.includes(pBrand);
 
-              return flavorMatch && modelMatch;
+              return Boolean(flavorMatch && modelMatch);
             });
 
-            // Match secundário por sabor
-            const resolved = match || (targetFlavor ? cachedCompanyProducts.find(p => (p.flavor || '').trim().toLowerCase() === targetFlavor) : null);
-
-            if (resolved) {
+            if (matchingCandidates.length === 1) {
+              const resolved = matchingCandidates[0];
               targetProductId = resolved.id;
               currentStock = typeof resolved.stock === 'number'
                 ? resolved.stock
                 : parseInt(String(resolved.stock || '0'), 10);
               resolvedProductName = resolved.name || resolvedProductName;
               resolvedProductFlavor = resolved.flavor || resolvedProductFlavor;
-              console.log(`[deleteOrder] Produto localizado por fallback (sabor/modelo): ${resolvedProductName} - ${resolvedProductFlavor} (${resolved.id})`);
+              console.log(`[deleteOrder] Produto localizado por fallback unívoco (modelo + sabor): ${resolvedProductName} - ${resolvedProductFlavor} (${resolved.id})`);
+            } else if (matchingCandidates.length > 1) {
+              console.error(`[deleteOrder] Ambiguidade: ${matchingCandidates.length} produtos encontrados para "${targetName} - ${targetFlavor}".`);
+              return {
+                success: false,
+                error: `Identificação ambígua: foram encontrados ${matchingCandidates.length} produtos compatíveis com "${resolvedProductName} (${resolvedProductFlavor})". Restauração cancelada para impedir devolução no produto errado.`
+              };
             }
           }
         }
