@@ -14,6 +14,7 @@ import { fetchProductCostsMap, updateProductCost } from "../lib/productCosts";
 import { ManualSaleModal } from "./ManualSaleModal";
 import { ReplenishmentPlannerModal, loadSavedGoals, type FinancialGoals } from "./ReplenishmentPlannerModal";
 import { StagnantStockSection } from "./StagnantStockSection";
+import { MobileSupplyChainView } from "./stock/MobileSupplyChainView";
 
 // ─── Donut chart colors ───────────────────────────────────
 const DONUT_COLORS = ["#34d399", "#60a5fa", "#a78bfa", "#fbbf24", "#f87171", "#f472b6", "#38bdf8"];
@@ -845,6 +846,62 @@ export default function SupplyChainDashboard() {
     }
   };
 
+  const handleAddFlavorDirect = async (group: any, flavorName: string, initialStock: number): Promise<boolean> => {
+    if (!group || !flavorName.trim()) {
+      alert("Por favor, informe o nome do sabor.");
+      return false;
+    }
+    const addedName = flavorName.trim();
+    try {
+      let insertPayload: any = {
+        name: group.name,
+        brand: group.brand,
+        flavor: addedName,
+        price: group.price,
+        cost_price: group.cost_price || 0,
+        stock: initialStock,
+        puffs: group.puffs || 5000,
+        image_url: group.image_url || "",
+        is_active: true,
+        company_id: company?.id || null,
+      };
+      let { data, error } = await supabase.from("smoking_products").insert(insertPayload).select();
+      if (error && (error.message?.includes("cost_price") || error.code === "PGRST204")) {
+        delete insertPayload.cost_price;
+        const fallbackRes = await supabase.from("smoking_products").insert(insertPayload).select();
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+      }
+
+      const createdFlavor = (data && data[0]) ? data[0] : {
+        id: `flavor-${Date.now()}`,
+        name: group.name,
+        brand: group.brand,
+        flavor: addedName,
+        price: group.price,
+        cost_price: group.cost_price || 0,
+        stock: initialStock,
+        puffs: group.puffs || 5000,
+        image_url: group.image_url || "",
+        is_active: true,
+        company_id: company?.id || null,
+        created_at: new Date().toISOString()
+      };
+
+      if (createdFlavor.id && group.image_url) {
+        productImageCacheRef.current[createdFlavor.id] = group.image_url;
+      }
+
+      setProducts(prev => [createdFlavor, ...prev]);
+      await fetchData(true);
+      return true;
+    } catch (err: any) {
+      console.error(err);
+      alert("Erro ao adicionar sabor: " + err.message);
+      return false;
+    }
+  };
+
   const handleUpdateStock = (id: string, newStock: number) => {
     if (newStock < 0) return;
     const updated = { ...pendingStockChangesRef.current, [id]: newStock };
@@ -1124,6 +1181,89 @@ export default function SupplyChainDashboard() {
       await fetchData(false);
     } finally {
       setIsSavingFullProduct(false);
+    }
+  };
+
+  const handleSaveFullProductEditDirect = async (payload: {
+    group: any;
+    brand: string;
+    name: string;
+    puffs: number;
+    price: number;
+    cost_price: number | null;
+    imageFile: File | null;
+  }): Promise<boolean> => {
+    const { group, brand: newBrand, name: newName, puffs: newPuffs, price: newPrice, cost_price: newCost, imageFile } = payload;
+    const ids = group.flavors.map((f: any) => f.id);
+    if (!ids || ids.length === 0) {
+      alert("Não foi possível identificar os produtos deste modelo.");
+      return false;
+    }
+
+    try {
+      let finalImageUrl = group.image_url || "";
+      if (imageFile) {
+        finalImageUrl = await uploadProductImage(imageFile);
+      }
+
+      const newBrandName = newBrand.trim() || "Genérico";
+      const newModelName = newName.trim();
+      const newPuffsVal = newPuffs || 5000;
+
+      // 1. Atualização Otimista estrita no estado local
+      setProducts(prev => prev.map(p => ids.includes(p.id) ? {
+        ...p,
+        brand: newBrandName,
+        name: newModelName,
+        puffs: newPuffsVal,
+        price: newPrice,
+        ...(newCost !== null ? { cost_price: newCost } : {}),
+        image_url: finalImageUrl
+      } : p));
+
+      const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+      const newGroupKey = `${newBrandName.toLowerCase()}__${newModelName.toLowerCase()}`;
+
+      if (newCost !== null && newCost > 0) {
+        await updateProductCost({
+          modelKey: newGroupKey,
+          productIds: ids,
+          costPrice: newCost,
+          companyId: targetCompanyId
+        });
+      }
+
+      let updatePayload: any = {
+        brand: newBrandName,
+        name: newModelName,
+        puffs: newPuffsVal,
+        price: newPrice,
+        image_url: finalImageUrl
+      };
+      if (newCost !== null) {
+        updatePayload.cost_price = newCost;
+      }
+
+      ids.forEach((id: string) => {
+        productImageCacheRef.current[id] = finalImageUrl;
+      });
+
+      let query = supabase.from("smoking_products").update(updatePayload).in("id", ids);
+      if (company?.id) query = query.eq("company_id", company.id);
+      const { error } = await query;
+      if (error) {
+        console.error("Erro do Supabase ao atualizar produto:", error);
+        alert("Não foi possível salvar as alterações no banco de dados. Tente novamente.");
+        await fetchData(false);
+        return false;
+      }
+
+      await fetchData(true);
+      return true;
+    } catch (err: any) {
+      console.error("Erro ao salvar produto:", err);
+      alert("Não foi possível salvar as alterações do produto: " + (err.message || "Erro desconhecido"));
+      return false;
     }
   };
 
@@ -1610,8 +1750,10 @@ export default function SupplyChainDashboard() {
   return (
     <div className="flex-1 overflow-y-auto overflow-x-hidden bg-background custom-scrollbar relative">
 
-      {/* ━━━ HEADER COM AÇÕES PRINCIPAIS HIERARQUIZADAS (Sticky apenas no PC) ━━━━━━━━━━━━━━ */}
-      <div className="md:sticky md:top-0 z-30 bg-background/95 backdrop-blur-md border-b border-white/10">
+      {/* ━━━ DESKTOP VIEW (100% PRESERVADO E INTACTO) ━━━━━━━━━━━━━━━━ */}
+      <div className="hidden md:block">
+        {/* ━━━ HEADER COM AÇÕES PRINCIPAIS HIERARQUIZADAS (Sticky apenas no PC) ━━━━━━━━━━━━━━ */}
+        <div className="md:sticky md:top-0 z-30 bg-background/95 backdrop-blur-md border-b border-white/10">
         <div className="px-4 md:px-6 lg:px-8 py-3 sm:py-3.5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 flex-wrap">
@@ -2389,6 +2531,47 @@ export default function SupplyChainDashboard() {
         </div>
       </div>
       )}
+      </div>
+
+      {/* ━━━ MOBILE VIEW DEDICADO (< 768px) ━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div className="block md:hidden">
+        <MobileSupplyChainView
+          products={products}
+          skuGroups={skuGroups}
+          totalProducts={totalProducts}
+          totalStockUnits={totalStockUnits}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          filterTab={filterTab}
+          setFilterTab={setFilterTab}
+          activeMainView={activeMainView}
+          setActiveMainView={setActiveMainView}
+          onOpenReplenishmentPlanner={() => setShowReplenishmentModal(true)}
+          onCopyAvailableStock={handleCopyAvailableStock}
+          copiedStockFeedback={copiedStockFeedback}
+          onUpdateStock={handleUpdateStock}
+          onSaveAllStockChanges={handleSaveAllStockChanges}
+          onDiscardStockChanges={handleDiscardStockChanges}
+          pendingStockChanges={pendingStockChanges}
+          isSavingStock={isSavingStock}
+          onAddFlavorSubmit={handleAddFlavorDirect}
+          onSaveFullProductEdit={handleSaveFullProductEditDirect}
+          onDeleteGroup={handleDeleteGroup}
+          onDeleteProduct={handleDeleteProduct}
+          onOpenNewProductModal={() => {
+            setNewModelVariants([{ id: '1', name: '', stock: '' }]);
+            setShowNewProductModal(true);
+          }}
+          stagnantComponent={
+            <StagnantStockSection
+              products={products}
+              orders={rawOrdersList}
+              companyId={company?.id}
+              onStockUpdated={fetchData}
+            />
+          }
+        />
+      </div>
 
       {/* ━━━ MODAL CARD DEDICADO DE GESTÃO DE SABORES POR MODELO ━━━━━━━━━━━━━━ */}
       {viewingFlavorsGroup && (() => {
@@ -2600,12 +2783,13 @@ export default function SupplyChainDashboard() {
 
       {/* ━━━ MODAL FLUTUANTE CENTRALIZADO ("BOLHA"): NOVO PRODUTO ━━━━━━━━ */}
       {showNewProductModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div 
             className="absolute inset-0" 
             onClick={handleCloseNewProductModal} 
           />
-          <div className="relative bg-[#121212] border border-border rounded-3xl w-full max-w-lg shadow-2xl p-5 sm:p-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
+          <div className="relative bg-[#121212] border border-border rounded-t-3xl sm:rounded-3xl w-full max-w-lg shadow-2xl p-4 sm:p-6 overflow-hidden animate-in fade-in slide-in-from-bottom sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200 max-h-[92vh] flex flex-col pb-safe">
+            <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-3 shrink-0 sm:hidden" />
             <div className="flex items-center justify-between border-b border-border pb-3 sm:pb-4 shrink-0">
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
@@ -2632,7 +2816,7 @@ export default function SupplyChainDashboard() {
                   <input 
                     type="text" value={brand} onChange={(e) => setBrand(e.target.value)}
                     placeholder="Ex.: Ignite, Elf Bar"
-                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
                   />
                 </div>
 
@@ -2642,7 +2826,7 @@ export default function SupplyChainDashboard() {
                     type="text" value={name} onChange={(e) => setName(e.target.value)}
                     placeholder="Ex.: V50, BC5000"
                     required
-                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
                   />
                 </div>
               </div>
@@ -2652,7 +2836,7 @@ export default function SupplyChainDashboard() {
                 <input 
                   type="number" value={puffs} onChange={(e) => setPuffs(e.target.value)}
                   placeholder="Ex.: 5000"
-                  className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium"
+                  className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium"
                 />
               </div>
 
@@ -2667,7 +2851,7 @@ export default function SupplyChainDashboard() {
                     placeholder="Ex.: 104,90 ou 104.90" 
                     required
                     disabled={submitting}
-                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium disabled:opacity-50"
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium disabled:opacity-50"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -2679,7 +2863,7 @@ export default function SupplyChainDashboard() {
                     onChange={(e) => setCostPrice(e.target.value)}
                     placeholder="Ex.: 35,00 ou 35.00"
                     disabled={submitting}
-                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium disabled:opacity-50"
+                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium disabled:opacity-50"
                   />
                 </div>
               </div>
@@ -2760,7 +2944,7 @@ export default function SupplyChainDashboard() {
                             }
                           }}
                           placeholder="Nome do sabor (ex.: Watermelon Ice)"
-                          className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 transition-all disabled:opacity-50"
+                          className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 transition-all disabled:opacity-50"
                         />
                         <input
                           type="number"
@@ -2769,7 +2953,7 @@ export default function SupplyChainDashboard() {
                           disabled={submitting}
                           onChange={(e) => handleUpdateVariantRow(index, 'stock', e.target.value)}
                           placeholder="Estoque (0)"
-                          className="w-24 bg-[#0a0a0a] border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 transition-all font-medium text-center disabled:opacity-50"
+                          className="w-24 bg-[#0a0a0a] border border-white/10 rounded-xl px-2.5 py-2 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 transition-all font-medium text-center disabled:opacity-50"
                         />
                         <button
                           type="button"
