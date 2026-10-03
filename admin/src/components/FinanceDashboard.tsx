@@ -50,6 +50,7 @@ import { formatBRL } from "@/lib/cart";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchProductCostsMap } from "../lib/productCosts";
+import { MobileFinanceView } from "./finance/MobileFinanceView";
 import { NationalSalesModal } from "./NationalSalesModal";
 import { ManualSaleModal } from "./ManualSaleModal";
 import { WeeklyGoalsModal } from "./WeeklyGoalsModal";
@@ -2338,7 +2339,47 @@ export default function FinanceDashboard() {
 
   // Estado B (com dados) e Estado C (dados legítimos vazios)
   return (
-    <div className="flex-1 h-full overflow-y-auto overflow-x-hidden bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
+    <>
+      {/* ━━━ VISÃO EXCLUSIVA MOBILE (< 768px): FINANCEIRO APP NATIVO ━━━ */}
+      <div className="block md:hidden h-full w-full overflow-hidden bg-[#070709] text-white">
+        <MobileFinanceView
+          company={company}
+          loading={loading}
+          currentCycle={currentCycle}
+          grossRevenue={grossRevenue}
+          cmv={cmv}
+          companyExpenses={companyExpenses}
+          logisticsFee={logisticsFee}
+          netProfit={netProfit}
+          profitMargin={profitMargin}
+          totalOrders={totalOrders}
+          totalPodsSold={totalPodsSold}
+          brandSales={brandSales}
+          realCash={realCash}
+          totalStockPurchases={totalStockPurchases}
+          totalFreightRepurchases={totalFreightRepurchases}
+          stockAssetCost={stockAssetCost}
+          stockAssetRetail={stockAssetRetail}
+          allTimeMetrics={allTimeMetrics}
+          monthlyCycles={monthlyCycles}
+          quarterlyPeriods={quarterlyPeriods}
+          semiannualPeriods={semiannualPeriods}
+          annualPeriods={annualPeriods}
+          weeklyGoalsConfig={weeklyGoalsConfig}
+          weeklyPerformances={weeklyPerformances}
+          monthlyTrajectory={monthlyTrajectory}
+          repurchases={repurchases}
+          marketingSpent={marketingSpent}
+          onRefresh={() => fetchFinanceData(false)}
+          onOpenNationalModal={() => setIsNationalModalOpen(true)}
+          nationalOrdersCount={nationalOrdersCount}
+          persistedProductCosts={persistedProductCosts}
+          allValidOrders={allValidOrders}
+        />
+      </div>
+
+      {/* ━━━ VISÃO COMPLETA COMPUTADOR (>= 768px): PAINEL EXECUTIVO INTACTO ━━━ */}
+      <div className="hidden md:block flex-1 h-full overflow-y-auto overflow-x-hidden bg-background p-4 sm:p-6 lg:p-8 space-y-6 text-white custom-scrollbar">
       {/* Cabeçalho */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div>
@@ -4510,6 +4551,7 @@ export default function FinanceDashboard() {
           defaultType="DESPESA_OPERACIONAL"
         />
       )}
-    </div>
+      </div>
+    </>
   );
 }
