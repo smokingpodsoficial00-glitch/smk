@@ -225,7 +225,7 @@ export interface MobileFinanceViewProps {
   annualEvolution: GroupedPeriodEvolution;
 }
 
-export function MobileFinanceView({
+function MobileFinanceViewComponent({
   company,
   loading,
   currentCycle,
@@ -314,8 +314,9 @@ export function MobileFinanceView({
   const [isSavingExpense, setIsSavingExpense] = useState(false);
   const [expenseFormError, setExpenseFormError] = useState<string | null>(null);
 
-  // ── Cálculo dos Pontos Diários do Ciclo Vigente (Modo Dia a Dia) ──
+  // ── Cálculo dos Pontos Diários do Ciclo Vigente (Modo Dia a Dia - calculado apenas quando aba Evolução ativa) ──
   const dailyEvolutionPoints = useMemo<EvolutionPoint[]>(() => {
+    if (activeTab !== "evolucao" || evolutionMode !== "diario") return [];
     if (!currentCycle) return [];
     const [startD, startM, startY] = currentCycle.startDateStr.split("/").map(Number);
     const [endD, endM, endY] = currentCycle.endDateStr.split("/").map(Number);
@@ -390,10 +391,11 @@ export function MobileFinanceView({
     }
 
     return points;
-  }, [currentCycle, allValidOrders, persistedProductCosts]);
+  }, [activeTab, evolutionMode, currentCycle, allValidOrders, persistedProductCosts]);
 
-  // ── Cálculo dos Pontos Anuais (12 Meses) ──
+  // ── Cálculo dos Pontos Anuais (12 Meses - calculado apenas quando aba Evolução ativa) ──
   const annualEvolutionPoints = useMemo<EvolutionPoint[]>(() => {
+    if (activeTab !== "evolucao" || evolutionMode !== "anual") return [];
     const currentYear = currentCycle.year || 2026;
     const SHORT_MONTHS = ["", "Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -425,7 +427,7 @@ export function MobileFinanceView({
     }
 
     return annualPoints;
-  }, [currentCycle, monthlyCycles]);
+  }, [activeTab, evolutionMode, currentCycle, monthlyCycles]);
 
   const activeChartData = evolutionMode === "diario" ? dailyEvolutionPoints : annualEvolutionPoints;
 
@@ -2312,3 +2314,4 @@ export function MobileFinanceView({
     </div>
   );
 }
+export const MobileFinanceView = React.memo(MobileFinanceViewComponent);

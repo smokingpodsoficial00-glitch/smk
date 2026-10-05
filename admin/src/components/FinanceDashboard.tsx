@@ -1085,6 +1085,26 @@ function MonthComparisonChart({
   );
 }
 
+// Cache em memória para dados brutos do Financeiro (evita re-fetch em navegações rápidas entre páginas)
+interface FinanceDataCache {
+  companyId: string;
+  timestamp: number;
+  data: {
+    persistedCosts: Record<string, number>;
+    rawOrders: any[];
+    productsData: any[];
+    repurchases: StockRepurchase[];
+    partnerTxs: any[];
+    partners: any[];
+  };
+}
+let financeSessionCache: FinanceDataCache | null = null;
+const FINANCE_CACHE_TTL_MS = 30 * 1000; // 30 segundos
+
+export const invalidateFinanceCache = () => {
+  financeSessionCache = null;
+};
+
 export default function FinanceDashboard() {
   const { user, company, companyUser, loading: authLoading, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -1188,7 +1208,7 @@ export default function FinanceDashboard() {
     } catch (e) {}
   };
 
-  const fetchFinanceData = async (isRetry = false) => {
+  const fetchFinanceData = async (isRetry = false, forceRefresh = false) => {
     if (authLoading) return;
 
     if (!user || !company?.id || !companyUser) {
@@ -1202,110 +1222,152 @@ export default function FinanceDashboard() {
 
     const targetCompanyId = company.id;
     try {
-      setLoading(true);
+      const now = Date.now();
+      const hasFreshCache =
+        !forceRefresh &&
+        financeSessionCache &&
+        financeSessionCache.companyId === targetCompanyId &&
+        now - financeSessionCache.timestamp < FINANCE_CACHE_TTL_MS;
+
+      if (!hasFreshCache) {
+        setLoading(true);
+      }
       setFinanceError(null);
 
-      // Executa todas as consultas financeiras em paralelo para carregamento ultrarrápido
-      const [persistedCostsRes, ordersRes, productsRes, repurchasesRes, partnerTxRes, partnersRes] = await Promise.all([
-        fetchProductCostsMap(targetCompanyId).catch(() => ({})),
-        supabase
-          .from("smoking_orders")
-          .select("*")
-          .eq("company_id", targetCompanyId)
-          .neq("delivery_status", "CANCELADO"),
-        supabase
-          .from("smoking_products")
-          .select("*")
-          .eq("company_id", targetCompanyId)
-          .eq("is_active", true),
-        supabase
-          .from("smoking_stock_repurchases")
-          .select("*")
-          .eq("company_id", targetCompanyId)
-          .order("purchase_date", { ascending: false }),
-        supabase
-          .from("smoking_partner_transactions")
-          .select("*")
-          .eq("company_id", targetCompanyId),
-        supabase
-          .from("smoking_partners")
-          .select("*")
-          .eq("company_id", targetCompanyId)
-      ]);
+      let persistedCosts: Record<string, number> = {};
+      let rawOrders: any[] = [];
+      let productsData: any[] = [];
+      let loadedRepurchases: StockRepurchase[] = [];
+      let loadedPartnerTxs: any[] = [];
+      let loadedPartners: any[] = [];
 
-      // Inspecionar explicitamente se smoking_orders retornou erro
-      if (ordersRes.error) {
-        console.error("[FinanceDashboard] Erro ao consultar smoking_orders:", ordersRes.error.message);
-        const isAuth = ordersRes.error.code === "42501" ||
-          ordersRes.error.message?.includes("permission denied") ||
-          ordersRes.error.message?.includes("JWT") ||
-          ordersRes.error.message?.includes("token");
+      if (hasFreshCache && financeSessionCache) {
+        persistedCosts = financeSessionCache.data.persistedCosts;
+        rawOrders = financeSessionCache.data.rawOrders;
+        productsData = financeSessionCache.data.productsData;
+        loadedRepurchases = financeSessionCache.data.repurchases;
+        loadedPartnerTxs = financeSessionCache.data.partnerTxs;
+        loadedPartners = financeSessionCache.data.partners;
+      } else {
+        // Executa todas as consultas financeiras em paralelo com projeção leve (sem Base64 de imagens)
+        const [persistedCostsRes, ordersRes, productsRes, repurchasesRes, partnerTxRes, partnersRes] = await Promise.all([
+          fetchProductCostsMap(targetCompanyId).catch(() => ({})),
+          supabase
+            .from("smoking_orders")
+            .select("*")
+            .eq("company_id", targetCompanyId)
+            .neq("delivery_status", "CANCELADO"),
+          supabase
+            .from("smoking_products")
+            .select("id, brand, name, stock, price, cost_price")
+            .eq("company_id", targetCompanyId)
+            .eq("is_active", true),
+          supabase
+            .from("smoking_stock_repurchases")
+            .select("*")
+            .eq("company_id", targetCompanyId)
+            .order("purchase_date", { ascending: false }),
+          supabase
+            .from("smoking_partner_transactions")
+            .select("*")
+            .eq("company_id", targetCompanyId),
+          supabase
+            .from("smoking_partners")
+            .select("*")
+            .eq("company_id", targetCompanyId),
+        ]);
 
-        // Tentativa de recuperação única se for erro de permissão/token
-        if (isAuth && !isRetry) {
-          const { data: sessionData } = await supabase.auth.getSession();
-          if (sessionData?.session?.user) {
-            console.log("[FinanceDashboard] Sessão Supabase confirmada. Executando retry único...");
-            return fetchFinanceData(true);
+        // Inspecionar explicitamente se smoking_orders retornou erro
+        if (ordersRes.error) {
+          console.error("[FinanceDashboard] Erro ao consultar smoking_orders:", ordersRes.error.message);
+          const isAuth =
+            ordersRes.error.code === "42501" ||
+            ordersRes.error.message?.includes("permission denied") ||
+            ordersRes.error.message?.includes("JWT") ||
+            ordersRes.error.message?.includes("token");
+
+          // Tentativa de recuperação única se for erro de permissão/token
+          if (isAuth && !isRetry) {
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (sessionData?.session?.user) {
+              console.log("[FinanceDashboard] Sessão Supabase confirmada. Executando retry único...");
+              return fetchFinanceData(true, true);
+            }
           }
+
+          setFinanceError({
+            message: isAuth
+              ? "Não foi possível carregar os dados financeiros. Sua sessão pode ter expirado ou houve um problema de permissão no acesso aos pedidos."
+              : `Erro ao carregar pedidos: ${ordersRes.error.message}`,
+            code: ordersRes.error.code,
+            isAuthError: isAuth,
+          });
+          setLoading(false);
+          return;
         }
 
-        setFinanceError({
-          message: isAuth
-            ? "Não foi possível carregar os dados financeiros. Sua sessão pode ter expirado ou houve um problema de permissão no acesso aos pedidos."
-            : `Erro ao carregar pedidos: ${ordersRes.error.message}`,
-          code: ordersRes.error.code,
-          isAuthError: isAuth,
-        });
-        setLoading(false);
-        return; // NUNCA transforma erro em array vazio nem calcula zero!
+        // Inspecionar explicitamente se smoking_products retornou erro
+        if (productsRes.error) {
+          console.error("[FinanceDashboard] Erro ao consultar smoking_products:", productsRes.error.message);
+          setFinanceError({
+            message: `Erro ao carregar catálogo de produtos: ${productsRes.error.message}`,
+            code: productsRes.error.code,
+          });
+          setLoading(false);
+          return;
+        }
+
+        persistedCosts = persistedCostsRes || {};
+        rawOrders = ordersRes.data;
+        productsData = productsRes.data;
+
+        if (!rawOrders) {
+          setFinanceError({
+            message: "Resposta do banco de dados não retornou lista de pedidos válida.",
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Mapear recompras oficiais da empresa
+        if (Array.isArray(repurchasesRes.data)) {
+          loadedRepurchases = repurchasesRes.data.map((row: any) => ({
+            id: row.id,
+            company_id: row.company_id || targetCompanyId,
+            stock_purchase_amount: Number(row.stock_purchase_amount) || 0,
+            freight_amount: Number(row.freight_amount) || 0,
+            total_repurchase_amount:
+              Number(row.total_repurchase_amount) ||
+              (Number(row.stock_purchase_amount) || 0) + (Number(row.freight_amount) || 0),
+            purchase_date: row.purchase_date || new Date().toISOString().split("T")[0],
+            notes: row.notes || "",
+            created_at: row.created_at || new Date().toISOString(),
+          }));
+        }
+
+        loadedPartnerTxs = partnerTxRes?.data || [];
+        loadedPartners = partnersRes?.data || [];
+
+        // Salvar no cache em memória
+        financeSessionCache = {
+          companyId: targetCompanyId,
+          timestamp: Date.now(),
+          data: {
+            persistedCosts,
+            rawOrders,
+            productsData,
+            repurchases: loadedRepurchases,
+            partnerTxs: loadedPartnerTxs,
+            partners: loadedPartners,
+          },
+        };
       }
 
-      // Inspecionar explicitamente se smoking_products retornou erro
-      if (productsRes.error) {
-        console.error("[FinanceDashboard] Erro ao consultar smoking_products:", productsRes.error.message);
-        setFinanceError({
-          message: `Erro ao carregar catálogo de produtos: ${productsRes.error.message}`,
-          code: productsRes.error.code,
-        });
-        setLoading(false);
-        return;
-      }
-
-      const persistedCosts = persistedCostsRes || {};
-      const rawOrders = ordersRes.data;
-      const productsData = productsRes.data;
-
-      if (!rawOrders) {
-        setFinanceError({
-          message: "Resposta do banco de dados não retornou lista de pedidos válida.",
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Mapear recompras oficiais da empresa
-      let loadedRepurchases: StockRepurchase[] = [];
-      if (Array.isArray(repurchasesRes.data)) {
-        loadedRepurchases = repurchasesRes.data.map((row: any) => ({
-          id: row.id,
-          company_id: row.company_id || targetCompanyId,
-          stock_purchase_amount: Number(row.stock_purchase_amount) || 0,
-          freight_amount: Number(row.freight_amount) || 0,
-          total_repurchase_amount: Number(row.total_repurchase_amount) || (Number(row.stock_purchase_amount) || 0) + (Number(row.freight_amount) || 0),
-          purchase_date: row.purchase_date || new Date().toISOString().split("T")[0],
-          notes: row.notes || "",
-          created_at: row.created_at || new Date().toISOString(),
-        }));
-        setRepurchases(loadedRepurchases);
-      }
-
+      setRepurchases(loadedRepurchases);
       const validOrders = filterValidOrders(rawOrders);
       setAllValidOrders(validOrders);
       setPersistedProductCosts(persistedCosts);
-      
-      const loadedPartnerTxs = partnerTxRes?.data || [];
-      const loadedPartners = partnersRes?.data || [];
+
       setPartnerTransactions(loadedPartnerTxs);
       setPartnersList(loadedPartners);
 
@@ -1487,39 +1549,41 @@ export default function FinanceDashboard() {
       return;
     }
 
-    const targetCompanyId = company.id;
+    // Busca consolidada inicial (já busca ordens, produtos leves, recompras, sócios e custos em paralelo)
     fetchFinanceData();
-    loadRepurchasesData(targetCompanyId);
+
+    // Debounce de 300ms para listeners Realtime evitando rajadas concorrentes de queries
+    let debounceTimer: any = null;
+    const handleRealtimeChange = () => {
+      invalidateFinanceCache();
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchFinanceData(false, true);
+      }, 300);
+    };
 
     const subOrders = supabase
       .channel("finance_orders_changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, () => {
-        fetchFinanceData();
-        loadRepurchasesData(targetCompanyId);
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, handleRealtimeChange)
       .subscribe();
 
     const subProducts = supabase
       .channel("finance_products_changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => fetchFinanceData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, handleRealtimeChange)
       .subscribe();
 
     const subRepurchases = supabase
       .channel("finance_stock_repurchases_changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_stock_repurchases" }, () => {
-        loadRepurchasesData(targetCompanyId);
-        fetchFinanceData();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_stock_repurchases" }, handleRealtimeChange)
       .subscribe();
 
     const subPartnerTx = supabase
       .channel("finance_partner_tx_changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partner_transactions" }, () => {
-        fetchFinanceData();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partner_transactions" }, handleRealtimeChange)
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(subOrders);
       supabase.removeChannel(subProducts);
       supabase.removeChannel(subRepurchases);
@@ -1670,8 +1734,9 @@ export default function FinanceDashboard() {
     return monthlyCycles[0] || null;
   }, [monthlyCycles, selectedEvolutionCycleId]);
 
-  // Dias do Ciclo Selecionado (Visão de 30 dias contínuos 14 -> 13 dia a dia)
+  // Dias do Ciclo Selecionado (Visão de 30 dias contínuos 14 -> 13 dia a dia - processado apenas se aba Evolução estiver ativa)
   const monthlyCycleDailyPoints = useMemo<EvolutionPoint[]>(() => {
+    if (longTermTab !== "evolucao") return [];
     if (!activeEvolutionCycle) return [];
 
     const cycleDef = activeEvolutionCycle.cycle;
@@ -1773,10 +1838,11 @@ export default function FinanceDashboard() {
     }
 
     return points;
-  }, [activeEvolutionCycle, allValidOrders, persistedProductCosts]);
+  }, [longTermTab, activeEvolutionCycle, allValidOrders, persistedProductCosts]);
 
-  // Dados Reais da Aba Evolução (Curva de Faturamento ao Longo dos Períodos)
+  // Dados Reais da Aba Evolução (Curva de Faturamento ao Longo dos Períodos - calculada somente na aba ativa)
   const evolutionData = useMemo<EvolutionPoint[]>(() => {
+    if (longTermTab !== "evolucao") return [];
     if (evolutionTab === "mensal") {
       return monthlyCycleDailyPoints;
     }
@@ -1899,6 +1965,7 @@ export default function FinanceDashboard() {
 
     return annualPoints;
   }, [
+    longTermTab,
     evolutionTab,
     monthlyCycleDailyPoints,
     quarterlyPeriods,
@@ -2054,8 +2121,9 @@ export default function FinanceDashboard() {
     return monthlyCycles.find((m) => m.cycle.id !== compBaseCycle?.cycle.id) || null;
   }, [monthlyCycles, compTargetCycleId, compBaseCycle]);
 
-  // Registros Diários Comparativos Pareados
+  // Registros Diários Comparativos Pareados (processados apenas se aba Comparativo estiver ativa)
   const comparisonRecords = useMemo<ComparisonDayRecord[]>(() => {
+    if (longTermTab !== "comparativo") return [];
     if (!compBaseCycle || !compTargetCycle) return [];
 
     const baseDays = getCycleDailyRecords(compBaseCycle, allValidOrders, persistedProductCosts);
@@ -2123,10 +2191,11 @@ export default function FinanceDashboard() {
     }
 
     return records;
-  }, [compBaseCycle, compTargetCycle, allValidOrders, persistedProductCosts]);
+  }, [longTermTab, compBaseCycle, compTargetCycle, allValidOrders, persistedProductCosts]);
 
-  // Cálculos de Resumo Head-to-Head
+  // Cálculos de Resumo Head-to-Head (processados apenas se aba Comparativo estiver ativa)
   const compMetrics = useMemo(() => {
+    if (longTermTab !== "comparativo") return null;
     if (!compBaseCycle || !compTargetCycle) return null;
 
     const revDiff = compBaseCycle.grossRevenue - compTargetCycle.grossRevenue;
@@ -2166,7 +2235,7 @@ export default function FinanceDashboard() {
       projectedDiff,
       projectedDiffPerc,
     };
-  }, [compBaseCycle, compTargetCycle, comparisonRecords]);
+  }, [longTermTab, compBaseCycle, compTargetCycle, comparisonRecords]);
 
   // Contagem de Vendas Nacionais no histórico
   const nationalOrdersCount = useMemo(() => {
