@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Clock, Send, Loader2, Sparkles, MessageCircle, AlertTriangle, Flame, CheckCircle2, Calendar } from "lucide-react";
-import { fetchLiveClients, recordReplenishmentAlert, type RealClient } from "@/lib/crm";
+import { Clock, Send, Loader2, Sparkles, MessageCircle, AlertTriangle, Flame, CheckCircle2, Calendar, Search, X } from "lucide-react";
+import { fetchLiveClients, recordReplenishmentAlert, matchesVisualSearch, type RealClient } from "@/lib/crm";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -21,6 +21,7 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
   const [clients, setClients] = useState<RealClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [urgencyFilter, setUrgencyFilter] = useState<'all' | 'urgent' | 'warning' | 'ok'>('all');
+  const [searchQuery, setSearchQuery] = useState("");
   const [submittingAlerts, setSubmittingAlerts] = useState<Set<string>>(new Set());
   const [alertErrors, setAlertErrors] = useState<Record<string, string | null>>({});
 
@@ -105,9 +106,16 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
   const okClients = clients.filter(c => c && c.urgencyLevel === 'ok');
   const alertedClients = clients.filter(c => c && Boolean(c.lastReplenishmentAlertAt));
 
-  const filteredClients = urgencyFilter === 'all'
-    ? clients
-    : clients.filter(c => c && c.urgencyLevel === urgencyFilter);
+  const filteredClients = clients.filter((c) => {
+    if (!c) return false;
+    if (urgencyFilter !== 'all' && c.urgencyLevel !== urgencyFilter) {
+      return false;
+    }
+    if (searchQuery.trim()) {
+      return matchesVisualSearch(c.name, searchQuery);
+    }
+    return true;
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -147,57 +155,99 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
         </div>
       </div>
 
-      {/* Seletor de Abas de Criticidade */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setUrgencyFilter('all')}
-          className={`px-4 py-2 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer ${
-            urgencyFilter === 'all'
-              ? 'bg-[#141414] text-white border border-white/10'
-              : 'text-muted-foreground hover:bg-white/5 border border-transparent'
-          }`}
-        >
-          Todos ({clients.length})
-        </button>
+      {/* Seletor de Abas de Criticidade & Barra de Pesquisa de Clientes */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Filtros de Criticidade */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setUrgencyFilter('all')}
+            className={`px-4 py-2 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer ${
+              urgencyFilter === 'all'
+                ? 'bg-[#141414] text-white border border-white/10'
+                : 'text-muted-foreground hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            Todos ({clients.length})
+          </button>
 
-        <button
-          onClick={() => setUrgencyFilter('urgent')}
-          className={`px-4 py-2 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-            urgencyFilter === 'urgent'
-              ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-              : 'text-muted-foreground hover:bg-white/5 border border-transparent'
-          }`}
-        >
-          <span className="size-1.5 rounded-full bg-red-500 animate-pulse" />
-          Disparo Urgente ({urgentClients.length})
-        </button>
+          <button
+            type="button"
+            onClick={() => setUrgencyFilter('urgent')}
+            className={`px-4 py-2 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              urgencyFilter === 'urgent'
+                ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                : 'text-muted-foreground hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            <span className="size-1.5 rounded-full bg-red-500 animate-pulse" />
+            Disparo Urgente ({urgentClients.length})
+          </button>
 
-        <button
-          onClick={() => setUrgencyFilter('warning')}
-          className={`px-4 py-2 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-            urgencyFilter === 'warning'
-              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-              : 'text-muted-foreground hover:bg-white/5 border border-transparent'
-          }`}
-        >
-          Fim Próximo ({warningClients.length})
-        </button>
+          <button
+            type="button"
+            onClick={() => setUrgencyFilter('warning')}
+            className={`px-4 py-2 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              urgencyFilter === 'warning'
+                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                : 'text-muted-foreground hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            Fim Próximo ({warningClients.length})
+          </button>
 
-        <button
-          onClick={() => setUrgencyFilter('ok')}
-          className={`px-4 py-2 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer ${
-            urgencyFilter === 'ok'
-              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-              : 'text-muted-foreground hover:bg-white/5 border border-transparent'
-          }`}
-        >
-          Pod em Uso ({okClients.length})
-        </button>
+          <button
+            type="button"
+            onClick={() => setUrgencyFilter('ok')}
+            className={`px-4 py-2 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              urgencyFilter === 'ok'
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                : 'text-muted-foreground hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            Pod em Uso ({okClients.length})
+          </button>
+        </div>
+
+        {/* Campo de Pesquisa de Clientes */}
+        <div className="relative w-full sm:w-72 shrink-0">
+          <Search className="size-4 text-white/40 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Pesquisar cliente..."
+            className="w-full bg-[#141414] border border-white/10 rounded-xl pl-10 pr-9 py-2 text-base sm:text-xs text-white placeholder:text-white/40 focus:outline-none focus:border-emerald-500/60 transition-colors"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors cursor-pointer p-0.5"
+              title="Limpar pesquisa"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {filteredClients.length === 0 ? (
         <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl p-12 text-center text-muted-foreground">
-          <p className="text-sm">Nenhum cliente com compras nessa categoria de urgência.</p>
+          <p className="text-sm">
+            {searchQuery.trim()
+              ? "Nenhum cliente encontrado."
+              : "Nenhum cliente com compras nessa categoria de urgência."}
+          </p>
+          {searchQuery.trim() && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="mt-3 text-xs text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
+            >
+              Limpar pesquisa
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid gap-4">
