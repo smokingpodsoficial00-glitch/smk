@@ -58,8 +58,9 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
       }, 300);
     };
 
+    const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
     const channel = supabase
-      .channel('rfm_orders_changes')
+      .channel(`rfm_orders_${targetCompanyId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_orders' }, handleRealtime)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_clients' }, handleRealtime)
       .subscribe();

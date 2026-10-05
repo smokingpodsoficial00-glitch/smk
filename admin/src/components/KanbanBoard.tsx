@@ -160,7 +160,7 @@ export default function KanbanBoard() {
 
  // Inscrição em tempo real com debounce para evitar queries concorrentes em rajadas
  const subscription = supabase
- .channel('public:smoking_orders_kanban')
+ .channel(`smoking_orders_kanban_${company?.id || 'default'}`)
  .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_orders' }, handleRealtimeChange)
  .subscribe();
 

@@ -47,8 +47,10 @@ export function FollowUpsTab() {
   useEffect(() => {
     loadData();
 
+    const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+    let debounceTimer: any = null;
     const channel = supabase
-      .channel('crm_follow_ups_changes')
+      .channel(`crm_follow_ups_${targetCompanyId}`)
       .on(
         'postgres_changes', 
         { 
@@ -57,12 +59,16 @@ export function FollowUpsTab() {
           table: 'smoking_crm_follow_ups' 
         }, 
         () => {
-          loadData();
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            loadData();
+          }, 300);
         }
       )
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [company?.id]);

@@ -113,9 +113,9 @@ export function MobileCRMView({
       }, 300);
     };
 
-    // Inscrição Realtime unificada com debounce
+    const targetCompanyId = companyId || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
     const channel = supabase
-      .channel("mobile_crm_unified_realtime")
+      .channel(`mobile_crm_${targetCompanyId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, handleRealtimeChange)
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_clients" }, handleRealtimeChange)
       .subscribe();

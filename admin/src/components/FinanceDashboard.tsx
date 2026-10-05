@@ -1562,32 +1562,18 @@ export default function FinanceDashboard() {
       }, 300);
     };
 
-    const subOrders = supabase
-      .channel("finance_orders_changes")
+    const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+    const financeChannel = supabase
+      .channel(`finance_realtime_${targetCompanyId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, handleRealtimeChange)
-      .subscribe();
-
-    const subProducts = supabase
-      .channel("finance_products_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, handleRealtimeChange)
-      .subscribe();
-
-    const subRepurchases = supabase
-      .channel("finance_stock_repurchases_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_stock_repurchases" }, handleRealtimeChange)
-      .subscribe();
-
-    const subPartnerTx = supabase
-      .channel("finance_partner_tx_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partner_transactions" }, handleRealtimeChange)
       .subscribe();
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
-      supabase.removeChannel(subOrders);
-      supabase.removeChannel(subProducts);
-      supabase.removeChannel(subRepurchases);
-      supabase.removeChannel(subPartnerTx);
+      supabase.removeChannel(financeChannel);
     };
   }, [user, company?.id, companyUser, authLoading]);
 

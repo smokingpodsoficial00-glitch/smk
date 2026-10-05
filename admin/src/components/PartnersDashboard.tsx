@@ -165,28 +165,12 @@ export default function PartnersDashboard() {
       }, 500);
     };
 
-    const subOrders = supabase
-      .channel(`partners_orders_${targetCompanyId}`)
+    const partnersChannel = supabase
+      .channel(`partners_realtime_${targetCompanyId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, () => debouncedReload())
-      .subscribe();
-
-    const subProducts = supabase
-      .channel(`partners_products_${targetCompanyId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => debouncedReload())
-      .subscribe();
-
-    const subPartners = supabase
-      .channel(`partners_partners_${targetCompanyId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partners" }, () => debouncedReload())
-      .subscribe();
-
-    const subTx = supabase
-      .channel(`partners_tx_${targetCompanyId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partner_transactions" }, () => debouncedReload())
-      .subscribe();
-
-    const subRepurchases = supabase
-      .channel(`partners_repurchases_${targetCompanyId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_stock_repurchases" }, () => debouncedReload())
       .subscribe();
 
@@ -194,11 +178,7 @@ export default function PartnersDashboard() {
       if (realtimeDebounceTimerRef.current) {
         clearTimeout(realtimeDebounceTimerRef.current);
       }
-      supabase.removeChannel(subOrders);
-      supabase.removeChannel(subProducts);
-      supabase.removeChannel(subPartners);
-      supabase.removeChannel(subTx);
-      supabase.removeChannel(subRepurchases);
+      supabase.removeChannel(partnersChannel);
     };
   }, [targetCompanyId]);
 
