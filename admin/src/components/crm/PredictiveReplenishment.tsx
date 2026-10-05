@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Clock, Send, Loader2, Sparkles, MessageCircle, AlertTriangle, Flame, CheckCircle2, Calendar, Search, X } from "lucide-react";
-import { fetchLiveClients, recordReplenishmentAlert, matchesVisualSearch, type RealClient } from "@/lib/crm";
+import { fetchLiveClients, invalidateLiveClientsCache, recordReplenishmentAlert, matchesVisualSearch, type RealClient } from "@/lib/crm";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -24,6 +24,7 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
   const [searchQuery, setSearchQuery] = useState("");
   const [submittingAlerts, setSubmittingAlerts] = useState<Set<string>>(new Set());
   const [alertErrors, setAlertErrors] = useState<Record<string, string | null>>({});
+  const realtimeDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const loadClients = async () => {
     try {
@@ -81,13 +82,26 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
   useEffect(() => {
     loadClients();
 
+    const handleRealtime = () => {
+      invalidateLiveClientsCache(company?.id);
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
+      realtimeDebounceTimerRef.current = setTimeout(() => {
+        loadClients();
+      }, 300);
+    };
+
     const channel = supabase
       .channel('replenishment_orders_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_orders' }, loadClients)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_clients' }, loadClients)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_orders' }, handleRealtime)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_clients' }, handleRealtime)
       .subscribe();
 
     return () => {
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
       supabase.removeChannel(channel);
     };
   }, [company?.id]);

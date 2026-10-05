@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Users,
   Search,
@@ -25,9 +25,10 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
-import { fetchSalesHistory, type DetailedSale } from "@/lib/salesHistory";
+import { fetchSalesHistory, invalidateSalesHistoryCache, type DetailedSale } from "@/lib/salesHistory";
 import {
   fetchLiveClients,
+  invalidateLiveClientsCache,
   updateBasicClientData,
   recordReplenishmentAlert,
   matchesVisualSearch,
@@ -74,9 +75,15 @@ export function MobileCRMView({
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
 
-  // Carregamento de dados com tratamento resiliente
+  // Carregamento de dados com tratamento resiliente e cache inteligente
+  const realtimeDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const loadCRMData = async (showRefreshSpinner = false) => {
-    if (showRefreshSpinner) setIsRefreshing(true);
+    if (showRefreshSpinner) {
+      setIsRefreshing(true);
+      invalidateLiveClientsCache(companyId);
+      invalidateSalesHistoryCache(companyId);
+    }
     try {
       const [liveClients, salesData] = await Promise.all([
         fetchLiveClients(companyId),
@@ -95,14 +102,28 @@ export function MobileCRMView({
   useEffect(() => {
     loadCRMData();
 
-    // Inscrição Realtime unificada
+    const handleRealtimeChange = () => {
+      invalidateLiveClientsCache(companyId);
+      invalidateSalesHistoryCache(companyId);
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
+      realtimeDebounceTimerRef.current = setTimeout(() => {
+        loadCRMData();
+      }, 300);
+    };
+
+    // Inscrição Realtime unificada com debounce
     const channel = supabase
       .channel("mobile_crm_unified_realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, () => loadCRMData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_clients" }, () => loadCRMData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, handleRealtimeChange)
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_clients" }, handleRealtimeChange)
       .subscribe();
 
     return () => {
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
       supabase.removeChannel(channel);
     };
   }, [companyId, refreshKey]);

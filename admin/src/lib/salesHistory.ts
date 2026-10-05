@@ -62,8 +62,43 @@ export interface SalesMacroMetrics {
   topPuffs: { puffs: string; count: number }[];
 }
 
+interface SalesHistoryCacheEntry {
+  timestamp: number;
+  data: { sales: DetailedSale[]; metrics: SalesMacroMetrics };
+  promise?: Promise<{ sales: DetailedSale[]; metrics: SalesMacroMetrics }>;
+}
+
+const salesHistoryCache = new Map<string, SalesHistoryCacheEntry>();
+const SALES_HISTORY_CACHE_TTL_MS = 30_000; // 30 segundos de retenção em memória
+
+/**
+ * Invalida o cache em memória do histórico de vendas.
+ */
+export function invalidateSalesHistoryCache(companyId?: string) {
+  if (companyId) {
+    salesHistoryCache.delete(companyId);
+  } else {
+    salesHistoryCache.clear();
+  }
+}
+
 export async function fetchSalesHistory(companyId?: string): Promise<{ sales: DetailedSale[]; metrics: SalesMacroMetrics }> {
-  try {
+  const cacheKey = companyId || 'default';
+  const nowMs = Date.now();
+  const cached = salesHistoryCache.get(cacheKey);
+
+  // 1. Single-Flight: se já existe uma busca em andamento para este tenant, reutiliza a Promise
+  if (cached?.promise) {
+    return cached.promise;
+  }
+
+  // 2. Cache hit: se os dados ainda forem frescos (< 30s) e não houver invalidação
+  if (cached?.data && cached.data.sales.length > 0 && nowMs - cached.timestamp < SALES_HISTORY_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const fetchPromise = (async () => {
+    try {
     // 1. Buscar Todas as Transações / Pedidos com suporte a company_id e orders legadas (company_id is null)
     let query = supabase
       .from('smoking_orders')
@@ -315,55 +350,78 @@ export async function fetchSalesHistory(companyId?: string): Promise<{ sales: De
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    return {
-      sales,
-      metrics: {
-        totalRevenue,
-        totalOrders,
-        averageTicket,
-        uniqueClientsCount,
-        repurchaseRate,
-        revenueAnnual,
-        ordersAnnual,
-        ltvAnnual,
-        revenueSemiannual,
-        ordersSemiannual,
-        ltvSemiannual,
-        revenueQuarterly,
-        ordersQuarterly,
-        ltvQuarterly,
-        revenueMonthly,
-        ordersMonthly,
-        topFlavors,
-        topProducts,
-        topPuffs,
-      }
-    };
-  } catch (error) {
-    console.error("Erro geral em fetchSalesHistory:", error);
-    return {
-      sales: [],
-      metrics: {
-        totalRevenue: 0,
-        totalOrders: 0,
-        averageTicket: 0,
-        uniqueClientsCount: 0,
-        repurchaseRate: 0,
-        revenueAnnual: 0,
-        ordersAnnual: 0,
-        ltvAnnual: 0,
-        revenueSemiannual: 0,
-        ordersSemiannual: 0,
-        ltvSemiannual: 0,
-        revenueQuarterly: 0,
-        ordersQuarterly: 0,
-        ltvQuarterly: 0,
-        revenueMonthly: 0,
-        ordersMonthly: 0,
-        topFlavors: [],
-        topProducts: [],
-        topPuffs: [],
-      }
-    };
+      const result = {
+        sales,
+        metrics: {
+          totalRevenue,
+          totalOrders,
+          averageTicket,
+          uniqueClientsCount,
+          repurchaseRate,
+          revenueAnnual,
+          ordersAnnual,
+          ltvAnnual,
+          revenueSemiannual,
+          ordersSemiannual,
+          ltvSemiannual,
+          revenueQuarterly,
+          ordersQuarterly,
+          ltvQuarterly,
+          revenueMonthly,
+          ordersMonthly,
+          topFlavors,
+          topProducts,
+          topPuffs,
+        }
+      };
+
+      salesHistoryCache.set(cacheKey, {
+        timestamp: Date.now(),
+        data: result,
+      });
+
+      return result;
+    } catch (error) {
+      console.error("Erro geral em fetchSalesHistory:", error);
+      const entry = salesHistoryCache.get(cacheKey);
+      if (entry) entry.promise = undefined;
+      return {
+        sales: [],
+        metrics: {
+          totalRevenue: 0,
+          totalOrders: 0,
+          averageTicket: 0,
+          uniqueClientsCount: 0,
+          repurchaseRate: 0,
+          revenueAnnual: 0,
+          ordersAnnual: 0,
+          ltvAnnual: 0,
+          revenueSemiannual: 0,
+          ordersSemiannual: 0,
+          ltvSemiannual: 0,
+          revenueQuarterly: 0,
+          ordersQuarterly: 0,
+          ltvQuarterly: 0,
+          revenueMonthly: 0,
+          ordersMonthly: 0,
+          topFlavors: [],
+          topProducts: [],
+          topPuffs: [],
+        }
+      };
+    }
+  })();
+
+  const existing = salesHistoryCache.get(cacheKey);
+  if (existing) {
+    existing.promise = fetchPromise;
+  } else {
+    salesHistoryCache.set(cacheKey, {
+      timestamp: 0,
+      data: { sales: [], metrics: {} as any },
+      promise: fetchPromise,
+    });
   }
+
+  return fetchPromise;
 }

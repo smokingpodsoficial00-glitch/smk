@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Calendar, Eye, Phone, MapPin, 
   Download, Receipt, CreditCard, Trash2 
 } from 'lucide-react';
 import { formatBRL } from '@/lib/cart';
-import { fetchSalesHistory, type DetailedSale } from '@/lib/salesHistory';
+import { fetchSalesHistory, invalidateSalesHistoryCache, type DetailedSale } from '@/lib/salesHistory';
 import { useAuth } from '@/contexts/AuthContext';
 import { SaleDetailModal } from './SaleDetailModal';
 import { supabase } from '@/lib/supabase';
@@ -14,6 +14,7 @@ export function SalesHistoryTab() {
   const { company } = useAuth();
   const [sales, setSales] = useState<DetailedSale[]>([]);
   const [loading, setLoading] = useState(true);
+  const realtimeDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Filtros
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,6 +29,7 @@ export function SalesHistoryTab() {
       try {
         const res = await deleteOrderWithStockRestoration(sale.id, { restoreStock: true });
         if (res.success) {
+          invalidateSalesHistoryCache(company?.id);
           alert('✅ Venda excluída com sucesso e estoque devolvido.');
           loadData();
         } else {
@@ -58,12 +60,25 @@ export function SalesHistoryTab() {
   useEffect(() => {
     loadData();
 
+    const handleRealtime = () => {
+      invalidateSalesHistoryCache(company?.id);
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
+      realtimeDebounceTimerRef.current = setTimeout(() => {
+        loadData();
+      }, 300);
+    };
+
     const channel = supabase
       .channel('sales_history_realtime_trans')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_orders' }, loadData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_orders' }, handleRealtime)
       .subscribe();
 
     return () => {
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
       supabase.removeChannel(channel);
     };
   }, [company?.id]);

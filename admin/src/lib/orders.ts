@@ -1,4 +1,6 @@
 import { supabase } from './supabase';
+import { invalidateLiveClientsCache } from './crm';
+import { invalidateSalesHistoryCache } from './salesHistory';
 
 export interface DeleteOrderResult {
   success: boolean;
@@ -230,6 +232,10 @@ export async function deleteOrderWithStockRestoration(
       }
     }
 
+    const targetTenant = order?.company_id || options?.companyId;
+    invalidateLiveClientsCache(targetTenant);
+    invalidateSalesHistoryCache(targetTenant);
+
     return {
       success: true,
       restoredItemsCount: restoredCount
@@ -269,6 +275,8 @@ export async function deleteClientRecord(
     if (error) {
       return { success: false, error: error.message };
     }
+
+    invalidateLiveClientsCache(companyId);
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Erro ao remover cliente.' };

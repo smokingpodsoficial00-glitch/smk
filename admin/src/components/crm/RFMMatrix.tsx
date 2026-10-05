@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   UserCheck, Crown, ShieldAlert, Phone, Loader2, MessageSquare, 
   Megaphone, CheckSquare, Square, Search, 
   CheckCircle2, Users, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
-import { fetchLiveClients, matchesVisualSearch, type RealClient } from "@/lib/crm";
+import { fetchLiveClients, invalidateLiveClientsCache, matchesVisualSearch, type RealClient } from "@/lib/crm";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -13,6 +13,7 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
   const { company } = useAuth();
   const [clients, setClients] = useState<RealClient[]>([]);
   const [loading, setLoading] = useState(true);
+  const realtimeDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Filtros
   const [filterSegment, setFilterSegment] = useState<string>('all');
@@ -47,13 +48,26 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
   useEffect(() => {
     loadClients();
 
+    const handleRealtime = () => {
+      invalidateLiveClientsCache(company?.id);
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
+      realtimeDebounceTimerRef.current = setTimeout(() => {
+        loadClients();
+      }, 300);
+    };
+
     const channel = supabase
       .channel('rfm_orders_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_orders' }, loadClients)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_clients' }, loadClients)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_orders' }, handleRealtime)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_clients' }, handleRealtime)
       .subscribe();
 
     return () => {
+      if (realtimeDebounceTimerRef.current) {
+        clearTimeout(realtimeDebounceTimerRef.current);
+      }
       supabase.removeChannel(channel);
     };
   }, [company?.id]);

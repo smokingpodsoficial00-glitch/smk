@@ -1,4 +1,4 @@
-import { useState, useEffect } from"react";
+import { useState, useEffect, useRef } from "react";
 import { formatBRL } from"@/lib/cart"; 
 import { 
  Clock, MapPin, ReceiptText, CheckCircle2, Truck, Bike, X, Loader2, 
@@ -64,7 +64,18 @@ export default function KanbanBoard() {
  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
  const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
 
+ // Controle de concorrência e debounce para evitar queries simultâneas e rajadas Realtime
+ const isFetchingRef = useRef(false);
+ const hasPendingFetchRef = useRef(false);
+ const realtimeDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
  const fetchOrders = async () => {
+ if (isFetchingRef.current) {
+ hasPendingFetchRef.current = true;
+ return;
+ }
+ isFetchingRef.current = true;
+
  const safetyTimer = setTimeout(() => {
  setLoading(false);
  }, 4000);
@@ -86,23 +97,9 @@ export default function KanbanBoard() {
  }
  }
 
- let { data, error } = await query;
- if (error && company?.id) {
- console.warn("Erro na busca com company_id, buscando fallback:", error);
- let fallbackQuery = supabase
- .from('smoking_orders')
- .select('*')
- .neq('client_phone', '__SYSTEM_SMK_BEST_SELLERS__')
- .order('created_at', { ascending: false });
-
- if (isOfficialStore) {
- fallbackQuery = fallbackQuery.or(`company_id.eq.${company.id},company_id.is.null`);
- } else {
- fallbackQuery = fallbackQuery.eq('company_id', company.id);
- }
-
- const fallbackRes = await fallbackQuery;
- data = fallbackRes.data;
+ const { data, error } = await query;
+ if (error) {
+ console.error("Erro na busca de pedidos no Kanban:", error);
  }
 
  if (data) {
@@ -141,21 +138,36 @@ export default function KanbanBoard() {
  } finally {
  clearTimeout(safetyTimer);
  setLoading(false);
+ isFetchingRef.current = false;
+ if (hasPendingFetchRef.current) {
+ hasPendingFetchRef.current = false;
+ fetchOrders();
+ }
  }
  };
 
  useEffect(() => {
  fetchOrders();
 
- // Inscrição em tempo real para atualizações no Supabase
+ const handleRealtimeChange = () => {
+ if (realtimeDebounceTimerRef.current) {
+ clearTimeout(realtimeDebounceTimerRef.current);
+ }
+ realtimeDebounceTimerRef.current = setTimeout(() => {
+ fetchOrders();
+ }, 300);
+ };
+
+ // Inscrição em tempo real com debounce para evitar queries concorrentes em rajadas
  const subscription = supabase
  .channel('public:smoking_orders_kanban')
- .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_orders' }, () => {
- fetchOrders();
- })
+ .on('postgres_changes', { event: '*', schema: 'public', table: 'smoking_orders' }, handleRealtimeChange)
  .subscribe();
 
  return () => {
+ if (realtimeDebounceTimerRef.current) {
+ clearTimeout(realtimeDebounceTimerRef.current);
+ }
  supabase.removeChannel(subscription);
  };
  }, [company?.id]);

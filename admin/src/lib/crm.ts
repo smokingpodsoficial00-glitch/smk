@@ -289,6 +289,8 @@ export async function updateBasicClientData({
       return { success: false, error: error.message || 'Erro ao atualizar dados do cliente.' };
     }
 
+    invalidateLiveClientsCache(companyId);
+
     return { 
       success: true, 
       savedName: trimmedName, 
@@ -300,10 +302,44 @@ export async function updateBasicClientData({
   }
 }
 
+interface LiveClientsCacheEntry {
+  timestamp: number;
+  data: RealClient[];
+  promise?: Promise<RealClient[]>;
+}
+
+const liveClientsCache = new Map<string, LiveClientsCacheEntry>();
+const CRM_CACHE_TTL_MS = 30_000; // 30 segundos de retenção em memória
+
+/**
+ * Invalida o cache em memória do CRM para um tenant específico ou para todos.
+ */
+export function invalidateLiveClientsCache(companyId?: string) {
+  if (companyId) {
+    liveClientsCache.delete(companyId);
+  } else {
+    liveClientsCache.clear();
+  }
+}
 
 export async function fetchLiveClients(companyId?: string): Promise<RealClient[]> {
   if (!companyId) return [];
-  try {
+
+  const now = Date.now();
+  const cached = liveClientsCache.get(companyId);
+
+  // 1. Single-Flight: se já existe uma busca em andamento para este tenant, reutiliza a Promise
+  if (cached?.promise) {
+    return cached.promise;
+  }
+
+  // 2. Cache hit: se os dados ainda forem frescos (< 30s) e não houver invalidação
+  if (cached?.data && cached.data.length > 0 && now - cached.timestamp < CRM_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const fetchPromise = (async () => {
+    try {
     const isOfficialStore = companyId === 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
 
     let ordersQuery = supabase
@@ -748,11 +784,34 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       return (a.name || '').localeCompare(b.name || '');
     });
 
-    return result;
-  } catch (err) {
-    console.error("Erro ao buscar clientes do Supabase:", err);
-    return [];
+      liveClientsCache.set(companyId, {
+        timestamp: Date.now(),
+        data: result,
+      });
+
+      return result;
+    } catch (err) {
+      console.error("Erro ao buscar clientes do Supabase:", err);
+      const entry = liveClientsCache.get(companyId);
+      if (entry) {
+        entry.promise = undefined;
+      }
+      return [];
+    }
+  })();
+
+  const existing = liveClientsCache.get(companyId);
+  if (existing) {
+    existing.promise = fetchPromise;
+  } else {
+    liveClientsCache.set(companyId, {
+      timestamp: 0,
+      data: [],
+      promise: fetchPromise,
+    });
   }
+
+  return fetchPromise;
 }
 
 /**
@@ -974,6 +1033,8 @@ export async function recordReplenishmentAlert({
         console.warn('Aviso ao registrar histórico append-only em smoking_replenishment_alerts:', auditErr);
       }
     }
+
+    invalidateLiveClientsCache(companyId);
 
     return {
       success: true,
