@@ -510,11 +510,7 @@ export default function KanbanBoard() {
  key={order.realId} 
  order={order} 
  onUpdate={(realId, newStatus) => updateStatus(realId, newStatus)} 
- onDispatchClick={() => {
- setSelectedOrderForDispatch(order.realId);
- setNotifyCustomerOnDispatch(false);
- setIsDispatching(false);
- }}
+ onDispatchClick={() => updateStatus(order.realId, 'EM_ROTA')}
  onDelete={handleDeleteOrder}
  onGrantDiscount={handleGrantDiscount}
  onOpenWhatsAppDiscount={handleOpenWhatsAppDiscount}
@@ -1196,7 +1192,7 @@ function OrderCard({
  ← Voltar
  </button>
  <button 
- onClick={onDispatchClick}
+ onClick={() => onUpdate(order.realId, 'EM_ROTA')}
  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(16,185,129,0.15)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
  >
  Despachar →

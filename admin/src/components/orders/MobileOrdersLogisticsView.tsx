@@ -442,10 +442,7 @@ export function MobileOrdersLogisticsView({
                   {order.status === "PREPARANDO" && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedOrderForDispatch(order);
-                        setNotifyWhatsAppOnDispatch(false);
-                      }}
+                      onClick={() => onUpdateStatus(order.realId, "EM_ROTA")}
                       className="w-full min-h-[48px] bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-98 transition-all"
                     >
                       <Truck className="size-4" />
