@@ -15,28 +15,33 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requiredPermission,
   requireSuperAdmin,
 }) => {
-  const { user, company, companyUser, loading, isSuperAdmin, signOut } = useAuth();
+  const { user, company, companyUser, loading, authState, isSuperAdmin, signOut } = useAuth();
   const { canAccess } = usePermissions();
   const location = useLocation();
 
-  if (loading) {
+  // 1. CARREGAMENTO INICIAL OU CARREGAMENTO DE PERFIL
+  // "AINDA CARREGANDO" JAMAIS DEVE MOSTRAR "ACESSO NEGADO"
+  if (loading || authState === 'AUTH_LOADING' || authState === 'AUTHENTICATED_LOADING_PROFILE') {
     return (
       <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center gap-4 text-white">
         <div className="size-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center animate-pulse">
           <Loader2 className="size-6 text-emerald-400 animate-spin" />
         </div>
-        <p className="text-xs font-mono text-white/50 tracking-wider uppercase">Carregando sistema...</p>
+        <p className="text-xs font-mono text-white/50 tracking-wider uppercase">
+          {authState === 'AUTHENTICATED_LOADING_PROFILE' ? 'Carregando perfil e permissões...' : 'Carregando sistema...'}
+        </p>
       </div>
     );
   }
 
-  // Se não estiver autenticado no Supabase Auth, vai para o login
-  if (!user) {
+  // 2. Se não estiver autenticado no Supabase Auth, vai para o login
+  if (authState === 'UNAUTHENTICATED' || !user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Se estiver autenticado no Supabase Auth mas NÃO possuir vínculo válido/ativo em company_users
-  if (!companyUser || !company || !companyUser.is_active) {
+  // 3. Se autenticado no Supabase Auth mas comprovadamente NÃO possui vínculo ativo em company_users
+  // Esta tela só deve ser renderizada quando o carregamento estiver 100% finalizado e a consulta ao banco comprovar 0 vínculos.
+  if (authState === 'AUTHENTICATED_UNAUTHORIZED' || (!companyUser && !company) || (companyUser && companyUser.is_active === false)) {
     return (
       <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-6 text-white text-center">
         <div className="max-w-md w-full bg-[#111111] border border-red-500/30 rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4">

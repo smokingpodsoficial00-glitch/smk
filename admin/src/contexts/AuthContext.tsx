@@ -5,6 +5,13 @@ import { resetStoreConfigCache } from '../lib/useStoreConfig';
 
 export type UserRole = 'admin' | 'gerente' | 'atendente' | 'financeiro' | 'estoquista';
 
+export type AuthState = 
+  | 'AUTH_LOADING'
+  | 'AUTHENTICATED_LOADING_PROFILE'
+  | 'AUTHENTICATED_AUTHORIZED'
+  | 'AUTHENTICATED_UNAUTHORIZED'
+  | 'UNAUTHENTICATED';
+
 export interface Company {
   id: string;
   name: string;
@@ -51,6 +58,7 @@ interface AuthContextType {
   role: UserRole;
   isSuperAdmin: boolean;
   loading: boolean;
+  authState: AuthState;
   signIn: (email: string, pass: string) => Promise<{ error: Error | null }>;
   signUp: (data: RegisterData) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -87,18 +95,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [companyUser, setCompanyUser] = useState<CompanyUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [authState, setAuthState] = useState<AuthState>('AUTH_LOADING');
+
+  // loading derivado diretamente da máquina de estados:
+  // Verdadeiro estritamente enquanto a autenticação inicial ou o perfil estiverem carregando.
+  const loading = authState === 'AUTH_LOADING' || authState === 'AUTHENTICATED_LOADING_PROFILE';
 
   // Guardas de ciclo de vida e single-flight para evitar concorrência e fugas de memória
   const isMountedRef = useRef(true);
   const inFlightFetchRef = useRef<Promise<void> | null>(null);
 
-  // Auxiliar para limpar completamente o estado e o cache local com garantia de finalização do loading
+  // Auxiliar para limpar completamente o estado e o cache local com garantia de transição de estado
   const clearSession = () => {
     if (isMountedRef.current) {
       setUser(null);
       setCompany(null);
       setCompanyUser(null);
+      setAuthState('UNAUTHENTICATED');
     }
     try {
       localStorage.removeItem(LOCAL_SESSION_KEY);
@@ -108,10 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('[AuthBoot] Erro ao remover sessão local:', e);
     }
     resetStoreConfigCache();
-    if (isMountedRef.current) {
-      setLoading(false);
-      console.info('[AuthBoot] Sessão encerrada/inexistente. Boot concluído: loading = false');
-    }
+    console.info('[AuthBoot] Sessão encerrada/inexistente. AuthState = UNAUTHENTICATED');
   };
 
   // Auxiliar para persistir cache local secundário
@@ -136,59 +146,116 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const fetchPromise = (async () => {
       const startTime = performance.now();
-      console.info('[AuthBoot] Iniciando fetchUserData...');
+      console.info('[AuthBoot] Iniciando fetchUserData para:', authUser.email);
+      let cachedValid = false;
+
+      // ⚡ Otimização SWR: Se já temos sessão persistida válida para este mesmo usuário,
+      // reidrata o estado imediatamente para liberar a interface em 0ms sem bloquear o usuário
       try {
-        // ⚡ Otimização SWR: Se já temos sessão persistida válida para este mesmo usuário,
-        // reidrata o estado imediatamente para liberar a interface em 0ms sem bloquear o usuário
-        try {
-          const raw = localStorage.getItem(LOCAL_SESSION_KEY);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (parsed?.user?.id === authUser.id && parsed?.company && parsed?.companyUser) {
-              if (isMountedRef.current) {
-                setUser(authUser);
-                setCompany(parsed.company as Company);
-                setCompanyUser(parsed.companyUser as CompanyUser);
-                setLoading(false);
-              }
+        const raw = localStorage.getItem(LOCAL_SESSION_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const matchesUser = 
+            parsed?.user?.id === authUser.id || 
+            (authUser.email && parsed?.user?.email?.toLowerCase() === authUser.email.toLowerCase());
+
+          if (matchesUser && parsed?.company && parsed?.companyUser) {
+            cachedValid = true;
+            if (isMountedRef.current) {
+              setUser(authUser);
+              setCompany(parsed.company as Company);
+              setCompanyUser(parsed.companyUser as CompanyUser);
+              setAuthState('AUTHENTICATED_AUTHORIZED');
+              console.info('[AuthBoot] SWR: Sessão reidratada instantaneamente do cache local (0ms)');
             }
           }
-        } catch (cacheErr) {
-          console.warn('[AuthContext] Erro ao ler cache de sessão local:', cacheErr);
+        }
+      } catch (cacheErr) {
+        console.warn('[AuthContext] Erro ao ler cache de sessão local:', cacheErr);
+      }
+
+      // Se não havia cache válido, garante que a máquina de estados está em carregamento de perfil
+      if (!cachedValid && isMountedRef.current) {
+        setAuthState('AUTHENTICATED_LOADING_PROFILE');
+      }
+
+      try {
+        // 1. Busca dados do usuário em company_users com timeout controlado
+        // 1.1 Primeiro por auth_user_id
+        let compUsers: any[] | null = null;
+        let queryNetworkError = false;
+
+        try {
+          const res = await withTimeout(
+            supabase
+              .from('company_users')
+              .select('*')
+              .eq('auth_user_id', authUser.id)
+              .eq('is_active', true)
+              .order('created_at', { ascending: false }),
+            QUERY_TIMEOUT_MS,
+            'company_users by auth_user_id (fetchUserData)'
+          );
+          if (res.error) {
+            console.warn('[AuthContext] Erro retornado ao consultar company_users por ID:', res.error.message);
+            queryNetworkError = true;
+          } else {
+            compUsers = res.data;
+          }
+        } catch (err: any) {
+          console.warn('[AuthContext] Timeout ou erro ao consultar company_users por ID:', err?.message || err);
+          queryNetworkError = true;
         }
 
-        // 1. Busca dados do usuário em company_users com timeout controlado
-        const { data: compUsers, error: compUserError } = await withTimeout(
-          supabase
-            .from('company_users')
-            .select('*')
-            .eq('auth_user_id', authUser.id)
-            .eq('is_active', true)
-            .order('created_at', { ascending: false }),
-          QUERY_TIMEOUT_MS,
-          'company_users (fetchUserData)'
-        );
-
-        if (compUserError) {
-          console.warn('[AuthContext] Erro ao consultar company_users:', compUserError.message);
+        // 1.2 Fallback seguro por e-mail autenticado caso não encontre por auth_user_id
+        if ((!compUsers || compUsers.length === 0) && authUser.email) {
+          console.info('[AuthBoot] Não encontrado por auth_user_id, tentando fallback seguro por e-mail:', authUser.email);
+          try {
+            const resEmail = await withTimeout(
+              supabase
+                .from('company_users')
+                .select('*')
+                .ilike('email', authUser.email.trim())
+                .eq('is_active', true)
+                .order('created_at', { ascending: false }),
+              QUERY_TIMEOUT_MS,
+              'company_users by email (fetchUserData)'
+            );
+            if (!resEmail.error && resEmail.data && resEmail.data.length > 0) {
+              compUsers = resEmail.data;
+              queryNetworkError = false;
+              console.info('[AuthBoot] Vínculo localizado com sucesso via fallback por e-mail');
+            }
+          } catch (err: any) {
+            console.warn('[AuthContext] Timeout ou erro no fallback por e-mail:', err?.message || err);
+          }
         }
 
         const compUserData = compUsers && compUsers.length > 0 ? compUsers[0] : null;
 
         if (compUserData && compUserData.company_id) {
           // 2. Busca dados da empresa com timeout controlado
-          const { data: companyData, error: companyError } = await withTimeout(
-            supabase
-              .from('companies')
-              .select('*')
-              .eq('id', compUserData.company_id)
-              .maybeSingle(),
-            QUERY_TIMEOUT_MS,
-            'companies (fetchUserData)'
-          );
+          let companyData: any = null;
 
-          if (companyError) {
-            console.warn('[AuthContext] Erro ao consultar companies:', companyError.message);
+          try {
+            const compRes = await withTimeout(
+              supabase
+                .from('companies')
+                .select('*')
+                .eq('id', compUserData.company_id)
+                .maybeSingle(),
+              QUERY_TIMEOUT_MS,
+              'companies (fetchUserData)'
+            );
+            if (!compRes.error && compRes.data) {
+              companyData = compRes.data;
+            } else if (compRes.error) {
+              console.warn('[AuthContext] Erro ao consultar companies:', compRes.error.message);
+              queryNetworkError = true;
+            }
+          } catch (err: any) {
+            console.warn('[AuthContext] Timeout ou falha ao consultar companies:', err?.message || err);
+            queryNetworkError = true;
           }
 
           if (companyData && isMountedRef.current) {
@@ -196,33 +263,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setCompany(companyData as Company);
             setCompanyUser(compUserData as CompanyUser);
             saveLocalSession(authUser, companyData as Company, compUserData as CompanyUser);
-            setLoading(false);
+            setAuthState('AUTHENTICATED_AUTHORIZED');
             const duration = Math.round(performance.now() - startTime);
-            console.info(`[AuthBoot] Finalizando fetchUserData: empresa validada com sucesso (${duration}ms). loading = false`);
+            console.info(`[AuthBoot] Finalizando fetchUserData: empresa validada com sucesso (${duration}ms).`);
             return;
           }
         }
 
-        // Acesso Negado: Usuário autenticado no Supabase Auth mas sem vínculo ativo em company_users
+        // Se a query falhou por erro de rede/timeout mas temos cache SWR válido:
+        if (cachedValid) {
+          console.warn('[AuthBoot] Rede instável, mas sessão local SWR é válida. Preservando acesso autorizado.');
+          if (isMountedRef.current) {
+            setAuthState('AUTHENTICATED_AUTHORIZED');
+          }
+          return;
+        }
+
+        // Se houve erro de rede explícito e não temos cache, tenta restaurar contingência antes de qualquer decisão
+        if (queryNetworkError) {
+          const fallbackRestored = await tryRestoreFallbackSession();
+          if (fallbackRestored) {
+            return;
+          }
+          console.warn('[AuthBoot] Erro de rede no carregamento e sem sessão local.');
+        }
+
+        // Apenas quando a busca de rede retornou normalmente (sem falhas de conexão)
+        // e ficou 100% comprovado que não existe registro ativo nem por auth_user_id nem por email:
         console.warn('[AuthBoot] Acesso administrativo negado: Usuário autenticado não possui vínculo ativo em company_users.');
         if (isMountedRef.current) {
           setUser(authUser);
           setCompany(null);
           setCompanyUser(null);
+          setAuthState('AUTHENTICATED_UNAUTHORIZED');
           try {
             localStorage.removeItem(LOCAL_SESSION_KEY);
           } catch (e) {}
         }
       } catch (err: any) {
-        console.error('[AuthBoot] Falha no carregamento dos dados do usuário:', err?.message || err);
-        if (isMountedRef.current) {
-          clearSession();
+        console.error('[AuthBoot] Falha transitória no carregamento dos dados do usuário:', err?.message || err);
+        if (cachedValid && isMountedRef.current) {
+          setAuthState('AUTHENTICATED_AUTHORIZED');
+        } else {
+          const fallbackRestored = await tryRestoreFallbackSession();
+          if (!fallbackRestored && isMountedRef.current) {
+            setAuthState('AUTHENTICATED_UNAUTHORIZED');
+          }
         }
       } finally {
-        if (isMountedRef.current) {
-          setLoading(false);
-          console.info('[AuthBoot] Fim do loading do ciclo de autenticação: loading = false');
-        }
         inFlightFetchRef.current = null;
       }
     })();
@@ -270,7 +358,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCompany(compData as Company);
         setCompanyUser(compUser as CompanyUser);
         saveLocalSession(parsed.user as User, compData as Company, compUser as CompanyUser);
-        setLoading(false);
+        setAuthState('AUTHENTICATED_AUTHORIZED');
       }
       return true;
     } catch (e: any) {
@@ -283,12 +371,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isMountedRef.current = true;
     console.info('[AuthBoot] Iniciando checagem de sessão...');
 
-    // Gerenciador centralizado de sessão: previne buscas duplicadas e garante finalização do loading
+    let handledInitialSession = false;
+
+    // Gerenciador centralizado de sessão: previne buscas duplicadas e garante integridade do boot
     const handleAuthSession = async (session: any, source: string) => {
       if (!isMountedRef.current) return;
 
       if (!session || !session.user) {
         console.info(`[AuthBoot] Nenhuma sessão ativa via ${source}.`);
+        if (handledInitialSession) return;
+
         const restored = await tryRestoreFallbackSession();
         if (!restored && isMountedRef.current) {
           clearSession();
@@ -296,6 +388,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
+      handledInitialSession = true;
       console.info(`[AuthBoot] Sessão ativa detectada via ${source}.`);
       setUser(session.user);
       await fetchUserData(session.user);
@@ -307,15 +400,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!isMountedRef.current) return;
         if (error) {
           console.warn('[AuthBoot] Erro ao obter getSession():', error.message);
-          const restored = await tryRestoreFallbackSession();
-          if (!restored && isMountedRef.current) clearSession();
+          if (!handledInitialSession) {
+            const restored = await tryRestoreFallbackSession();
+            if (!restored && isMountedRef.current) clearSession();
+          }
           return;
         }
         await handleAuthSession(session, 'getSession');
       })
       .catch(async (err: any) => {
         console.warn('[AuthBoot] Falha ou timeout em getSession():', err?.message || err);
-        if (isMountedRef.current) {
+        if (!handledInitialSession && isMountedRef.current) {
           const restored = await tryRestoreFallbackSession();
           if (!restored && isMountedRef.current) clearSession();
         }
@@ -388,6 +483,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // LOGIN (Funciona em QUALQUER DISPOSITIVO / NAVEGADOR)
   const signIn = async (email: string, pass: string) => {
     const cleanEmail = email.trim().toLowerCase();
+    setAuthState('AUTHENTICATED_LOADING_PROFILE');
 
     // 1. Autenticação nativa no Supabase Auth Cloud
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -437,7 +533,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCompany(compData as Company);
           setCompanyUser(compUser as CompanyUser);
           saveLocalSession(fallbackUser, compData as Company, compUser as CompanyUser);
-          setLoading(false);
+          setAuthState('AUTHENTICATED_AUTHORIZED');
           return { error: null };
         }
       }
@@ -445,6 +541,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('[AuthContext] Erro ao verificar login de contingência:', fallbackErr);
     }
 
+    setAuthState('UNAUTHENTICATED');
     return { 
       error: new Error(
         authError?.message?.includes('Invalid login credentials')
@@ -576,6 +673,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCompany(finalCompany);
       setCompanyUser(finalCompUser);
       saveLocalSession(activeAuthUser, finalCompany, finalCompUser);
+      setAuthState('AUTHENTICATED_AUTHORIZED');
 
       return { error: null };
     } catch (err: any) {
@@ -612,6 +710,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           user?.email?.toLowerCase() === 'smokingpodsoficial00@gmail.com'
         ),
         loading,
+        authState,
         signIn,
         signUp,
         signOut,
