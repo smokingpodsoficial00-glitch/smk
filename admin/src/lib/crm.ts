@@ -640,15 +640,8 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
           ? (flavorProfile === 'ice' ? 'Mentolado / Ice' : flavorProfile === 'tobacco' ? 'Atabacado / Intenso' : flavorProfile === 'dessert' ? 'Sobremesa / Doce' : 'Frutado / Doce')
           : detectedFlavor.label;
 
-        let expectedCycleDays = 5;
-        if (lastPuffs > 50000) expectedCycleDays = 30;
-        else if (lastPuffs >= 30000) expectedCycleDays = 27;
-        else if (lastPuffs >= 25000) expectedCycleDays = 23;
-        else if (lastPuffs >= 20000) expectedCycleDays = 20;
-        else if (lastPuffs >= 15000) expectedCycleDays = 17;
-        else if (lastPuffs >= 10000) expectedCycleDays = 10;
-        else if (lastPuffs >= 6000) expectedCycleDays = 7;
-        else expectedCycleDays = 5;
+        // Regra Nova e Definitiva: Ciclo de recompra fixo em 14 dias para qualquer produto
+        const expectedCycleDays = 14;
 
         const estimatedDaysLeft = Math.max(0, expectedCycleDays - daysSinceLastOrder);
         const isEndingSoon = estimatedDaysLeft <= 4 || daysSinceLastOrder >= expectedCycleDays;
@@ -746,8 +739,8 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
           lastProduct: 'Nenhum pod ainda',
           lastFlavor: 'Não especificado',
           lastPuffs: 0,
-          expectedCycleDays: 20,
-          estimatedDaysLeft: 20,
+          expectedCycleDays: 14,
+          estimatedDaysLeft: 14,
           isEndingSoon: false,
           whatsappMessage,
           whatsappUrl,
