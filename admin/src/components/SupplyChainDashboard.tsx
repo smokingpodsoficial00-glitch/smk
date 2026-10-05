@@ -46,7 +46,6 @@ export default function SupplyChainDashboard() {
   const [showReplenishmentModal, setShowReplenishmentModal] = useState(false);
   const [financialGoals, setFinancialGoals] = useState<FinancialGoals>(loadSavedGoals);
   const [copiedStockFeedback, setCopiedStockFeedback] = useState(false);
-  const [copiedPricesFeedback, setCopiedPricesFeedback] = useState(false);
 
   // ─── Modal Flutuante Centralizado de Novo Produto ──────
   const [showNewProductModal, setShowNewProductModal] = useState(false);
@@ -218,10 +217,13 @@ export default function SupplyChainDashboard() {
     return `${b} ${n}`;
   };
 
-  // ─── Copiar Tabela de Estoque Disponível Formatada para WhatsApp ───
+  // ─── Copiar Tabela de Estoque Formatada para WhatsApp (Modelo + Preço + Sabores) ───
   const generateAvailableStockText = (): string => {
     const groupsMap = new Map<string, {
+      brand: string;
+      name: string;
       modelTitle: string;
+      price: number;
       flavors: Set<string>;
     }>();
 
@@ -247,27 +249,36 @@ export default function SupplyChainDashboard() {
 
       const groupKey = `${brand.toLowerCase()}__${name.toLowerCase()}`;
       const modelTitle = getGroupDisplayName(brand, name).toUpperCase();
+      const productPrice = typeof p.price === "number" ? p.price : parseFloat(String(p.price || 0));
 
       if (!groupsMap.has(groupKey)) {
         groupsMap.set(groupKey, {
+          brand,
+          name,
           modelTitle,
+          price: productPrice > 0 ? productPrice : 0,
           flavors: new Set<string>()
         });
+      } else {
+        const existingGroup = groupsMap.get(groupKey)!;
+        if (existingGroup.price <= 0 && productPrice > 0) {
+          existingGroup.price = productPrice;
+        }
       }
 
       groupsMap.get(groupKey)!.flavors.add(rawFlavor);
     });
 
     if (groupsMap.size === 0) {
-      return "*TABELA DISPONÍVEL*\n\nNenhum produto disponível no momento.";
+      return "Nenhum produto disponível no momento.";
     }
 
-    // Ordenação alfabética dos modelos
+    // Ordenação alfabética dos modelos (marca e nome)
     const sortedGroups = Array.from(groupsMap.values()).sort((a, b) =>
-      a.modelTitle.localeCompare(b.modelTitle, "pt-BR")
+      a.brand.localeCompare(b.brand, "pt-BR") || a.name.localeCompare(b.name, "pt-BR")
     );
 
-    const sections: string[] = ["*TABELA DISPONÍVEL*"];
+    const sections: string[] = [];
 
     sortedGroups.forEach((group) => {
       // Ordenação alfabética dos sabores
@@ -277,9 +288,17 @@ export default function SupplyChainDashboard() {
 
       if (sortedFlavors.length === 0) return;
 
-      const lines: string[] = [`*${group.modelTitle}*`];
+      const formattedPrice = group.price > 0
+        ? `R$ ${group.price.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : "";
+
+      const header = formattedPrice
+        ? `*${group.modelTitle} — ${formattedPrice}*`
+        : `*${group.modelTitle}*`;
+
+      const lines: string[] = [header];
       sortedFlavors.forEach((flavor) => {
-        lines.push(`- ${flavor}`);
+        lines.push(`• ${flavor}`);
       });
 
       sections.push(lines.join("\n"));
@@ -321,126 +340,6 @@ export default function SupplyChainDashboard() {
     setCopiedStockFeedback(true);
     setTimeout(() => {
       setCopiedStockFeedback(false);
-    }, 2500);
-  };
-
-  // ─── Copiar Tabela de Preços e Sabores Formatada para WhatsApp ───
-  const generatePricesText = (): string => {
-    const groupsMap = new Map<string, {
-      brand: string;
-      name: string;
-      modelTitle: string;
-      price: number;
-      flavors: string[];
-    }>();
-
-    (products || []).forEach((p: any) => {
-      // 1. Somente produtos ativos
-      if (p.is_active === false) return;
-
-      // 2. Somente sabores válidos e reais (sem placeholders artificiais)
-      const rawFlavor = (p.flavor || "").trim();
-      if (!rawFlavor) return;
-      const lowerFlavor = rawFlavor.toLowerCase();
-      if (lowerFlavor === "padrão" || lowerFlavor === "padrao" || lowerFlavor === "sem sabor") return;
-
-      // 3. Marca e modelo válidos
-      const brand = (p.brand || "").trim();
-      if (brand === "__STORE_CONFIG__") return;
-      const name = (p.name || "").trim();
-      if (!name && !brand) return;
-
-      const groupKey = `${brand.toLowerCase()}__${name.toLowerCase()}`;
-      const modelTitle = getGroupDisplayName(brand, name).toUpperCase();
-      const productPrice = typeof p.price === "number" ? p.price : parseFloat(String(p.price || 0));
-
-      if (!groupsMap.has(groupKey)) {
-        groupsMap.set(groupKey, {
-          brand,
-          name,
-          modelTitle,
-          price: productPrice > 0 ? productPrice : 0,
-          flavors: []
-        });
-      } else {
-        const existingGroup = groupsMap.get(groupKey)!;
-        if (existingGroup.price <= 0 && productPrice > 0) {
-          existingGroup.price = productPrice;
-        }
-      }
-
-      const group = groupsMap.get(groupKey)!;
-      if (!group.flavors.includes(rawFlavor)) {
-        group.flavors.push(rawFlavor);
-      }
-    });
-
-    if (groupsMap.size === 0) {
-      return "*TABELA DE PREÇOS*\n\nNenhum produto cadastrado no momento.";
-    }
-
-    // Ordenação idêntica à área de estoque: marca e modelo
-    const sortedGroups = Array.from(groupsMap.values()).sort((a, b) =>
-      a.brand.localeCompare(b.brand, "pt-BR") || a.name.localeCompare(b.name, "pt-BR")
-    );
-
-    const sections: string[] = [];
-
-    sortedGroups.forEach((group) => {
-      if (group.flavors.length === 0) return;
-
-      const formattedPrice = group.price > 0
-        ? `R$ ${group.price.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-        : "";
-
-      const header = formattedPrice
-        ? `*${group.modelTitle} — ${formattedPrice}*`
-        : `*${group.modelTitle}*`;
-
-      const lines: string[] = [header];
-      group.flavors.forEach((flavor) => {
-        lines.push(`• ${flavor}`);
-      });
-
-      sections.push(lines.join("\n"));
-    });
-
-    return sections.join("\n\n");
-  };
-
-  const handleCopyPrices = async () => {
-    const text = generatePricesText();
-    let copied = false;
-
-    if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
-      try {
-        await navigator.clipboard.writeText(text);
-        copied = true;
-      } catch (e) {
-        console.warn("navigator.clipboard falhou, tentando fallback textarea:", e);
-      }
-    }
-
-    if (!copied) {
-      try {
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-999999px";
-        textArea.style.top = "-999999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        copied = document.execCommand("copy");
-        document.body.removeChild(textArea);
-      } catch (err) {
-        console.error("Erro no fallback de cópia:", err);
-      }
-    }
-
-    setCopiedPricesFeedback(true);
-    setTimeout(() => {
-      setCopiedPricesFeedback(false);
     }, 2500);
   };
 
@@ -1943,30 +1842,6 @@ export default function SupplyChainDashboard() {
                 )}
               </button>
 
-              {/* Botão Copiar Preços (Modelos, Preços e Sabores para WhatsApp) */}
-              <button
-                type="button"
-                onClick={handleCopyPrices}
-                className={`inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-semibold border transition-all cursor-pointer active:scale-[0.97] flex-1 sm:flex-initial ${
-                  copiedPricesFeedback
-                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm shadow-emerald-500/20"
-                    : "bg-[#1c1c1c] hover:bg-white/10 text-white border-white/20"
-                }`}
-                title="Copiar lista de modelos e preços com sabores para WhatsApp"
-              >
-                {copiedPricesFeedback ? (
-                  <>
-                    <Check className="size-3.5 text-emerald-400 shrink-0" />
-                    <span className="truncate">Preços copiados!</span>
-                  </>
-                ) : (
-                  <>
-                    <Tag className="size-3.5 text-white shrink-0" />
-                    <span className="truncate">Copiar Preços</span>
-                  </>
-                )}
-              </button>
-
               {/* Botão Neutro Escuro com Borda Clara */}
               <button
                 type="button"
@@ -2694,8 +2569,6 @@ export default function SupplyChainDashboard() {
           onOpenReplenishmentPlanner={() => setShowReplenishmentModal(true)}
           onCopyAvailableStock={handleCopyAvailableStock}
           copiedStockFeedback={copiedStockFeedback}
-          onCopyPrices={handleCopyPrices}
-          copiedPricesFeedback={copiedPricesFeedback}
           onUpdateStock={handleUpdateStock}
           onSaveAllStockChanges={handleSaveAllStockChanges}
           onDiscardStockChanges={handleDiscardStockChanges}

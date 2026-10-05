@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef } from "react";
 import {
   PackageSearch, Plus, Minus, Search, Copy, Edit3, Check, X,
   Boxes, MoreVertical, Trash2, AlertCircle, Clock, Upload,
-  ImagePlus, Loader2, Sparkles, Tag, ChevronDown, CheckCircle2
+  ImagePlus, Loader2, Sparkles, ChevronDown, CheckCircle2
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 
@@ -36,8 +36,6 @@ interface MobileSupplyChainViewProps {
   onOpenReplenishmentPlanner: () => void;
   onCopyAvailableStock: () => void;
   copiedStockFeedback: boolean;
-  onCopyPrices: () => void;
-  copiedPricesFeedback: boolean;
   onUpdateStock: (id: string, newStock: number) => void;
   onSaveAllStockChanges: () => Promise<boolean>;
   onDiscardStockChanges: () => Promise<void>;
@@ -77,8 +75,6 @@ export function MobileSupplyChainView({
   onOpenReplenishmentPlanner,
   onCopyAvailableStock,
   copiedStockFeedback,
-  onCopyPrices,
-  copiedPricesFeedback,
   onUpdateStock,
   onSaveAllStockChanges,
   onDiscardStockChanges,
@@ -309,65 +305,39 @@ export function MobileSupplyChainView({
             </button>
 
             {/* Linha de Ações Secundárias Compactas */}
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                {/* Botão Copiar Estoque com Feedback Refinado */}
-                <button
-                  type="button"
-                  onClick={onCopyAvailableStock}
-                  className={`h-9 px-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98] ${
-                    copiedStockFeedback
-                      ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
-                      : "bg-white/5 hover:bg-white/10 border-white/10 text-white/90"
-                  }`}
-                  title="Copiar lista de estoque disponível"
-                >
-                  {copiedStockFeedback ? (
-                    <>
-                      <Check className="size-3.5 text-emerald-400 shrink-0" />
-                      <span className="font-bold truncate">Estoque copiado</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="size-3.5 text-muted-foreground shrink-0" />
-                      <span className="truncate">Copiar Estoque</span>
-                    </>
-                  )}
-                </button>
-
-                {/* Botão Copiar Preços com Feedback Refinado */}
-                <button
-                  type="button"
-                  onClick={onCopyPrices}
-                  className={`h-9 px-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98] ${
-                    copiedPricesFeedback
-                      ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
-                      : "bg-white/5 hover:bg-white/10 border-white/10 text-white/90"
-                  }`}
-                  title="Copiar lista de preços e sabores para WhatsApp"
-                >
-                  {copiedPricesFeedback ? (
-                    <>
-                      <Check className="size-3.5 text-emerald-400 shrink-0" />
-                      <span className="font-bold truncate">Preços copiados</span>
-                    </>
-                  ) : (
-                    <>
-                      <Tag className="size-3.5 text-muted-foreground shrink-0" />
-                      <span className="truncate">Copiar Preços</span>
-                    </>
-                  )}
-                </button>
-              </div>
+            <div className="grid grid-cols-2 gap-2">
+              {/* Botão Copiar Estoque com Feedback Refinado */}
+              <button
+                type="button"
+                onClick={onCopyAvailableStock}
+                className={`h-9 px-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98] ${
+                  copiedStockFeedback
+                    ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
+                    : "bg-white/5 hover:bg-white/10 border-white/10 text-white/90"
+                }`}
+                title="Copiar lista de estoque disponível"
+              >
+                {copiedStockFeedback ? (
+                  <>
+                    <Check className="size-3.5 text-emerald-400 shrink-0" />
+                    <span className="font-bold truncate">Estoque copiado</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="size-3.5 text-muted-foreground shrink-0" />
+                    <span className="truncate">Copiar Estoque</span>
+                  </>
+                )}
+              </button>
 
               {/* Botão Planejador de Recompra */}
               <button
                 type="button"
                 onClick={onOpenReplenishmentPlanner}
-                className="w-full h-9 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/90 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98]"
+                className="h-9 px-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/90 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98]"
               >
                 <PackageSearch className="size-3.5 text-muted-foreground shrink-0" />
-                <span>Planejador de Recompra</span>
+                <span className="truncate">Recompra</span>
               </button>
             </div>
           </div>
