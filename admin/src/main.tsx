@@ -5,10 +5,6 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { router } from './router';
 import './index.css';
-import './lib/storageTester';
-import './lib/partnersTester';
-import './lib/followUpsTester';
-import './lib/stockEntryTester';
 
 // Auto-reload se um chunk lazy falhar após novo deploy no Vercel
 window.addEventListener('vite:preloadError', () => {
