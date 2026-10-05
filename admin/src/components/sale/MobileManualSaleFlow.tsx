@@ -57,6 +57,8 @@ const formatDisplayPhone = (rawPhone: string) => {
   return rawPhone;
 };
 
+export const SALE_PRODUCTS_SELECT = "id, brand, name, flavor, price, cost_price, stock, puffs, is_active, company_id";
+
 export interface MobileManualSaleFlowProps {
   isOpen: boolean;
   onClose: () => void;
@@ -65,6 +67,9 @@ export interface MobileManualSaleFlowProps {
   preSelectedFlavorId?: string | null;
   preSelectedGroup?: any;
   defaultIsNational?: boolean;
+  initialProducts?: any[];
+  initialClients?: any[];
+  isLoadingData?: boolean;
 }
 
 type SaleStep = "CLIENT" | "PRODUCTS" | "PAYMENT" | "SUCCESS";
@@ -76,6 +81,9 @@ export function MobileManualSaleFlow({
   companyId: propCompanyId,
   preSelectedFlavorId,
   defaultIsNational = false,
+  initialProducts,
+  initialClients,
+  isLoadingData,
 }: MobileManualSaleFlowProps) {
   const { company } = useAuth();
   const companyId = propCompanyId || company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
@@ -83,10 +91,26 @@ export function MobileManualSaleFlow({
   // Fluxo em Etapas Progressivas
   const [currentStep, setCurrentStep] = useState<SaleStep>("CLIENT");
 
-  // Dados do Catálogo e Clientes
-  const [loadingInitialData, setLoadingInitialData] = useState(true);
-  const [productsList, setProductsList] = useState<any[]>([]);
-  const [clientsList, setClientsList] = useState<any[]>([]);
+  // Dados do Catálogo e Clientes (inicializados com os dados do modal pai se disponíveis)
+  const [loadingInitialData, setLoadingInitialData] = useState<boolean>(() => {
+    return initialProducts && initialProducts.length > 0 ? Boolean(isLoadingData) : true;
+  });
+  const [productsList, setProductsList] = useState<any[]>(initialProducts || []);
+  const [clientsList, setClientsList] = useState<any[]>(initialClients || []);
+
+  // Sincronizar dados quando o pai terminar ou atualizar o carregamento
+  useEffect(() => {
+    if (initialProducts && initialProducts.length > 0) {
+      setProductsList(initialProducts);
+      setLoadingInitialData(Boolean(isLoadingData));
+    }
+  }, [initialProducts, isLoadingData]);
+
+  useEffect(() => {
+    if (initialClients && initialClients.length > 0) {
+      setClientsList(initialClients);
+    }
+  }, [initialClients]);
 
   // ETAPA 1: CLIENTE
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -143,9 +167,16 @@ export function MobileManualSaleFlow({
     paymentMethod: string;
   } | null>(null);
 
-  // Carregar produtos e clientes do Supabase
+  // Carregar produtos e clientes do Supabase (apenas como fallback se não fornecidos pelo modal pai)
   useEffect(() => {
     if (!isOpen) return;
+
+    // Se o modal pai já forneceu ou está carregando os dados, evita requisições redundantes
+    if (initialProducts && initialProducts.length > 0) {
+      setProductsList(initialProducts);
+      setLoadingInitialData(Boolean(isLoadingData));
+      return;
+    }
 
     const loadData = async () => {
       setLoadingInitialData(true);
@@ -155,7 +186,7 @@ export function MobileManualSaleFlow({
 
         let prodsQuery = supabase
           .from("smoking_products")
-          .select("*")
+          .select(SALE_PRODUCTS_SELECT)
           .eq("is_active", true)
           .order("brand", { ascending: true });
 
@@ -202,7 +233,7 @@ export function MobileManualSaleFlow({
     };
 
     loadData();
-  }, [isOpen, companyId]);
+  }, [isOpen, companyId, initialProducts, isLoadingData]);
 
   // Se houver sabor pré-selecionado (ex: vindo de um card do Estoque Mobile)
   useEffect(() => {

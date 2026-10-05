@@ -58,6 +58,24 @@ interface ManualSaleModalProps {
   defaultIsNational?: boolean;
 }
 
+export const SALE_PRODUCTS_SELECT = "id, brand, name, flavor, price, cost_price, stock, puffs, is_active, company_id";
+
+interface SaleCatalogCacheItem {
+  products: any[];
+  clients: any[];
+  timestamp: number;
+}
+const saleCatalogCache: Record<string, SaleCatalogCacheItem> = {};
+const CACHE_TTL_MS = 60 * 1000;
+
+export const invalidateSaleCatalogCache = (companyId?: string) => {
+  if (companyId) {
+    delete saleCatalogCache[companyId];
+  } else {
+    Object.keys(saleCatalogCache).forEach((k) => delete saleCatalogCache[k]);
+  }
+};
+
 export function ManualSaleModal({
   isOpen,
   onClose,
@@ -147,21 +165,31 @@ export function ManualSaleModal({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Carregar produtos e clientes limpos do Supabase
+  // Carregar produtos e clientes limpos do Supabase com cache em memória e colunas leves
   useEffect(() => {
     if (!isOpen) return;
 
     const loadInitialData = async () => {
-      setLoadingProducts(true);
+      const isOfficialStore = !companyId || companyId === "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+      const cacheKey = companyId || "default";
+      const cached = saleCatalogCache[cacheKey];
+
+      // Se temos cache em memória recente, reidratamos imediatamente (0ms de espera visual)
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        setProductsList(cached.products);
+        setClientsList(cached.clients);
+        setLoadingProducts(false);
+      } else {
+        setLoadingProducts(true);
+      }
+
       setErrorMessage("");
       setSuccessMessage("");
       try {
-        const isOfficialStore = !companyId || companyId === "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
-
-        // 1. Buscar Produtos Ativos
+        // 1. Buscar Produtos Ativos (apenas colunas necessárias, eliminando payload de Base64)
         let prodsQuery = supabase
           .from("smoking_products")
-          .select("*")
+          .select(SALE_PRODUCTS_SELECT)
           .eq("is_active", true)
           .order("brand", { ascending: true });
 
@@ -188,19 +216,31 @@ export function ManualSaleModal({
           clientsQuery,
         ]);
 
+        let validProds = prods || [];
+        let validClients: any[] = [];
+
         if (!pErr && prods) {
           setProductsList(prods);
         }
 
         if (!cErr && dbClients) {
           // Filtrar registros de sistema e manter clientes reais com ID
-          const validClients = dbClients.filter((c: any) => {
+          validClients = dbClients.filter((c: any) => {
             if (!c || !c.id || !c.name) return false;
             const p = (c.phone || "").trim();
             const n = (c.name || "").trim().toLowerCase();
             return !p.startsWith("__SYSTEM_") && !n.includes("system") && !n.includes("config");
           });
           setClientsList(validClients);
+        }
+
+        // Armazenar no cache em memória
+        if (!pErr && !cErr) {
+          saleCatalogCache[cacheKey] = {
+            products: validProds,
+            clients: validClients,
+            timestamp: Date.now(),
+          };
         }
       } catch (err) {
         console.error("Erro ao carregar catálogo para venda manual:", err);
@@ -742,6 +782,7 @@ export function ManualSaleModal({
       }
 
       setTimeout(() => {
+        invalidateSaleCatalogCache(companyId);
         onSaleSuccess();
         onClose();
         // Limpar formulário
@@ -778,11 +819,17 @@ export function ManualSaleModal({
         <MobileManualSaleFlow
           isOpen={isOpen}
           onClose={onClose}
-          onSaleSuccess={onSaleSuccess}
+          onSaleSuccess={() => {
+            invalidateSaleCatalogCache(companyId);
+            onSaleSuccess();
+          }}
           companyId={companyId}
           preSelectedFlavorId={preSelectedFlavorId}
           preSelectedGroup={preSelectedGroup}
           defaultIsNational={defaultIsNational}
+          initialProducts={productsList}
+          initialClients={clientsList}
+          isLoadingData={loadingProducts}
         />
       </div>
 
