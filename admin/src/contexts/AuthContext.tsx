@@ -104,6 +104,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Guardas de ciclo de vida e single-flight para evitar concorrência e fugas de memória
   const isMountedRef = useRef(true);
   const inFlightFetchRef = useRef<Promise<void> | null>(null);
+  // Contador de novas tentativas do perfil em caso de falha transitória (limite de segurança anti-loop)
+  const profileRetryRef = useRef(0);
+  const MAX_PROFILE_RETRIES = 2;
+  const PROFILE_RETRY_DELAY_MS = 2500;
+
+  // Agenda nova tentativa de carregar o perfil. Retorna false se o limite foi atingido.
+  const scheduleProfileRetry = (authUser: User): boolean => {
+    if (profileRetryRef.current >= MAX_PROFILE_RETRIES || !isMountedRef.current) return false;
+    profileRetryRef.current += 1;
+    console.info(`[AuthBoot] Falha transitória no perfil. Nova tentativa ${profileRetryRef.current}/${MAX_PROFILE_RETRIES} em ${PROFILE_RETRY_DELAY_MS}ms.`);
+    setTimeout(() => {
+      if (isMountedRef.current) fetchUserData(authUser);
+    }, PROFILE_RETRY_DELAY_MS);
+    return true;
+  };
 
   // Auxiliar para limpar completamente o estado e o cache local com garantia de transição de estado
   const clearSession = () => {
@@ -264,6 +279,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setCompanyUser(compUserData as CompanyUser);
             saveLocalSession(authUser, companyData as Company, compUserData as CompanyUser);
             setAuthState('AUTHENTICATED_AUTHORIZED');
+            profileRetryRef.current = 0;
             const duration = Math.round(performance.now() - startTime);
             console.info(`[AuthBoot] Finalizando fetchUserData: empresa validada com sucesso (${duration}ms).`);
             return;
@@ -283,9 +299,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (queryNetworkError) {
           const fallbackRestored = await tryRestoreFallbackSession();
           if (fallbackRestored) {
+            profileRetryRef.current = 0;
             return;
           }
-          console.warn('[AuthBoot] Erro de rede no carregamento e sem sessão local.');
+          // Erro transitório: NÃO é prova de ausência de vínculo. Não apagar cache nem negar acesso de imediato.
+          if (scheduleProfileRetry(authUser)) return;
+          console.warn('[AuthBoot] Erro de rede persistente no carregamento do perfil. Cache local preservado.');
+          if (isMountedRef.current) {
+            setUser(authUser);
+            setAuthState('AUTHENTICATED_UNAUTHORIZED');
+          }
+          return;
         }
 
         // Apenas quando a busca de rede retornou normalmente (sem falhas de conexão)
@@ -306,7 +330,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setAuthState('AUTHENTICATED_AUTHORIZED');
         } else {
           const fallbackRestored = await tryRestoreFallbackSession();
-          if (!fallbackRestored && isMountedRef.current) {
+          if (!fallbackRestored && isMountedRef.current && !scheduleProfileRetry(authUser)) {
             setAuthState('AUTHENTICATED_UNAUTHORIZED');
           }
         }
@@ -327,20 +351,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const parsed = JSON.parse(raw);
       if (!parsed?.user?.id || !parsed?.company?.id) return false;
 
-      const { data: compUsers } = await withTimeout(
+      // 1. Tenta localizar vínculo ativo por auth_user_id
+      let compUser: any = null;
+      const byId = await withTimeout(
         supabase
           .from('company_users')
           .select('*')
           .eq('auth_user_id', parsed.user.id)
           .eq('is_active', true)
+          .order('created_at', { ascending: false })
           .limit(1),
         QUERY_TIMEOUT_MS,
-        'company_users (tryRestoreFallbackSession)'
+        'company_users by auth_user_id (tryRestoreFallbackSession)'
       );
+      if (!byId.error && byId.data && byId.data.length > 0) {
+        compUser = byId.data[0];
+      }
 
-      const compUser = compUsers && compUsers.length > 0 ? compUsers[0] : null;
-      if (!compUser) return false;
+      // 2. Mesma estratégia do fetchUserData: fallback por e-mail (somente leitura, sem merge/criação)
+      const cachedEmail: string | undefined = parsed?.user?.email;
+      if (!compUser && cachedEmail) {
+        const byEmail = await withTimeout(
+          supabase
+            .from('company_users')
+            .select('*')
+            .ilike('email', cachedEmail.trim())
+            .eq('is_active', true)
+            .order('created_at', { ascending: false })
+            .limit(1),
+          QUERY_TIMEOUT_MS,
+          'company_users by email (tryRestoreFallbackSession)'
+        );
+        if (!byEmail.error && byEmail.data && byEmail.data.length > 0) {
+          compUser = byEmail.data[0];
+        }
+      }
 
+      if (!compUser || !compUser.company_id) return false;
+
+      // 3. Recupera a empresa correspondente ao vínculo existente
       const { data: compData } = await withTimeout(
         supabase
           .from('companies')
@@ -353,6 +402,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (!compData || compData.is_active === false) return false;
 
+      // 4. Restaura estado e atualiza o cache
       if (isMountedRef.current) {
         setUser(parsed.user as User);
         setCompany(compData as Company);
@@ -362,6 +412,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return true;
     } catch (e: any) {
+      // Falha transitória: apenas informa que não restaurou. NÃO apaga o cache.
       console.warn('[AuthContext] Falha ao verificar sessão de contingência:', e?.message || e);
       return false;
     }
@@ -371,62 +422,165 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isMountedRef.current = true;
     console.info('[AuthBoot] Iniciando checagem de sessão...');
 
-    let handledInitialSession = false;
+    // Estado local do boot
+    let sessionHandled = false;    // sessão oficial válida recebida
+    let finalized = false;         // decisão definitiva de "sem sessão" já tomada
+    let fallbackActive = false;    // interface liberada temporariamente via cache validado
+    let getSessionNull = false;    // getSession() confirmou ausência
+    let initialEventNull = false;  // INITIAL_SESSION confirmou ausência
+    let getSessionAttempts = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // Gerenciador centralizado de sessão: previne buscas duplicadas e garante integridade do boot
-    const handleAuthSession = async (session: any, source: string) => {
-      if (!isMountedRef.current) return;
+    const MAX_GETSESSION_ATTEMPTS = 3;
+    const GETSESSION_RETRY_DELAY_MS = 1500;
+    const BOOT_SAFETY_MS = 20000; // limite de segurança: nunca loading infinito
 
-      if (!session || !session.user) {
-        console.info(`[AuthBoot] Nenhuma sessão ativa via ${source}.`);
-        if (handledInitialSession) return;
+    const clearTimers = () => {
+      if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+      clearTimeout(safetyTimer);
+    };
 
-        const restored = await tryRestoreFallbackSession();
-        if (!restored && isMountedRef.current) {
-          clearSession();
+    // Existe token do Supabase gravado? Indica "sessão ainda sendo recuperada" (refresh em andamento)
+    const hasStoredSupabaseToken = (): boolean => {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('sb-') && k.endsWith('-auth-token')) return true;
         }
-        return;
-      }
+      } catch (e) {}
+      return false;
+    };
 
-      handledInitialSession = true;
+    const handleValidSession = async (session: any, source: string) => {
+      if (!isMountedRef.current) return;
+      sessionHandled = true;
+      finalized = false;
+      fallbackActive = false;
+      clearTimers();
       console.info(`[AuthBoot] Sessão ativa detectada via ${source}.`);
       setUser(session.user);
       await fetchUserData(session.user);
     };
 
-    // 1. Obter sessão inicial via getSession() com timeout e tratamento seguro
-    withTimeout(supabase.auth.getSession(), QUERY_TIMEOUT_MS, 'supabase.auth.getSession()')
-      .then(async ({ data: { session }, error }: any) => {
-        if (!isMountedRef.current) return;
-        if (error) {
-          console.warn('[AuthBoot] Erro ao obter getSession():', error.message);
-          if (!handledInitialSession) {
-            const restored = await tryRestoreFallbackSession();
-            if (!restored && isMountedRef.current) clearSession();
-          }
+    // Decisão definitiva: só aqui o boot pode transformar a ausência de sessão em UNAUTHENTICATED
+    const finalizeNoSession = async (reason: string) => {
+      if (finalized || sessionHandled || !isMountedRef.current) return;
+      finalized = true;
+      clearTimers();
+
+      // Última verificação na fonte oficial antes de qualquer limpeza
+      let confirmedNull = false;
+      try {
+        const { data: { session }, error }: any = await withTimeout(
+          supabase.auth.getSession(), QUERY_TIMEOUT_MS, 'supabase.auth.getSession() (final)'
+        );
+        if (session?.user) {
+          finalized = false;
+          await handleValidSession(session, 'getSession(final)');
           return;
         }
-        await handleAuthSession(session, 'getSession');
-      })
-      .catch(async (err: any) => {
-        console.warn('[AuthBoot] Falha ou timeout em getSession():', err?.message || err);
-        if (!handledInitialSession && isMountedRef.current) {
-          const restored = await tryRestoreFallbackSession();
-          if (!restored && isMountedRef.current) clearSession();
-        }
-      });
+        confirmedNull = !error;
+      } catch (e) {
+        confirmedNull = false;
+      }
+      if (sessionHandled || !isMountedRef.current) return;
+
+      // Supabase indisponível (erro/timeout), mas cache já foi revalidado no banco: mantém contingência
+      if (!confirmedNull && fallbackActive) {
+        console.warn('[AuthBoot] Supabase indisponível; mantendo sessão de contingência validada.');
+        return;
+      }
+
+      console.info(`[AuthBoot] Ausência de sessão confirmada (${reason}).`);
+      clearSession();
+    };
+
+    // Ambas as fontes oficiais confirmaram null: decide entre "recuperando" e "não existe"
+    const evaluateNullSession = () => {
+      if (sessionHandled || finalized) return;
+      if (!(getSessionNull && initialEventNull)) return; // aguarda resolução unificada
+      if (hasStoredSupabaseToken() && getSessionAttempts < MAX_GETSESSION_ATTEMPTS) {
+        console.info('[AuthBoot] Token do Supabase presente; aguardando recuperação da sessão...');
+        scheduleGetSession();
+        return;
+      }
+      finalizeNoSession('getSession + INITIAL_SESSION sem sessão');
+    };
+
+    // Erro/timeout transitório: tenta contingência (sem apagar cache) e reagenda
+    const handleTransientError = async (msg: string) => {
+      if (sessionHandled || finalized || !isMountedRef.current) return;
+      console.warn('[AuthBoot] Falha transitória ao recuperar sessão:', msg);
+      if (!fallbackActive) {
+        fallbackActive = await tryRestoreFallbackSession();
+        if (sessionHandled || finalized) return;
+      }
+      if (getSessionAttempts < MAX_GETSESSION_ATTEMPTS) {
+        scheduleGetSession();
+      } else {
+        finalizeNoSession('falhas transitórias esgotadas');
+      }
+    };
+
+    const runGetSession = () => {
+      if (sessionHandled || finalized || !isMountedRef.current) return;
+      getSessionAttempts += 1;
+      withTimeout(supabase.auth.getSession(), QUERY_TIMEOUT_MS, 'supabase.auth.getSession()')
+        .then(async ({ data: { session }, error }: any) => {
+          if (!isMountedRef.current) return;
+          if (error) {
+            await handleTransientError(error.message);
+            return;
+          }
+          if (session?.user) {
+            if (!sessionHandled) await handleValidSession(session, 'getSession');
+            return;
+          }
+          console.info('[AuthBoot] getSession() sem sessão (ainda não definitivo).');
+          getSessionNull = true;
+          evaluateNullSession();
+        })
+        .catch(async (err: any) => {
+          await handleTransientError(err?.message || String(err));
+        });
+    };
+
+    const scheduleGetSession = () => {
+      if (retryTimer) return;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        runGetSession();
+      }, GETSESSION_RETRY_DELAY_MS);
+    };
+
+    // Limite de segurança global do boot
+    const safetyTimer = setTimeout(() => {
+      if (!sessionHandled && !finalized) finalizeNoSession('limite de segurança do boot');
+    }, BOOT_SAFETY_MS);
+
+    // 1. Obter sessão inicial via getSession()
+    runGetSession();
 
     // 2. Listener de mudanças de estado de autenticação nativo do Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMountedRef.current) return;
 
+      // Logout real
       if (event === 'SIGNED_OUT' || (event as string) === 'USER_DELETED') {
+        finalized = true;
+        sessionHandled = false;
+        fallbackActive = false;
+        clearTimers();
         clearSession();
         return;
       }
 
       if (event === 'TOKEN_REFRESHED') {
         if (session?.user) {
+          if (!sessionHandled) {
+            await handleValidSession(session, event);
+            return;
+          }
           setUser(session.user);
           if (!company || !companyUser) {
             await fetchUserData(session.user);
@@ -438,11 +592,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // INITIAL_SESSION ou SIGNED_IN
-      await handleAuthSession(session, event);
+      if (session?.user) {
+        if (!sessionHandled || event === 'SIGNED_IN') {
+          await handleValidSession(session, event);
+        }
+        return;
+      }
+
+      if (event === 'INITIAL_SESSION') {
+        console.info('[AuthBoot] INITIAL_SESSION sem sessão (ainda não definitivo).');
+        initialEventNull = true;
+        evaluateNullSession();
+      }
     });
 
     return () => {
       isMountedRef.current = false;
+      clearTimers();
       subscription.unsubscribe();
     };
   }, []);

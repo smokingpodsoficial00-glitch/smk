@@ -15,6 +15,7 @@ import { ManualSaleModal } from "./ManualSaleModal";
 import { ReplenishmentPlannerModal, loadSavedGoals, type FinancialGoals } from "./ReplenishmentPlannerModal";
 import { StagnantStockSection } from "./StagnantStockSection";
 import { MobileSupplyChainView } from "./stock/MobileSupplyChainView";
+import { SmartAutocomplete, normalizeForMatch, type SmartOption } from "./ui/SmartAutocomplete";
 
 // ─── Donut chart colors ───────────────────────────────────
 const DONUT_COLORS = ["#34d399", "#60a5fa", "#a78bfa", "#fbbf24", "#f87171", "#f472b6", "#38bdf8"];
@@ -86,6 +87,88 @@ export default function SupplyChainDashboard() {
   const [newModelVariants, setNewModelVariants] = useState<{ id: string; name: string; stock: string }[]>([
     { id: '1', name: '', stock: '' }
   ]);
+
+  // ─── Pesquisa inteligente do cadastro: derivada do catálogo JÁ carregado (sem consultas extras) ──
+  // Restrita estritamente ao company_id da empresa atual (multi-tenant).
+  const catalogForSuggestions = useMemo(
+    () => (company?.id ? products.filter((p: any) => p.company_id === company.id) : []),
+    [products, company?.id]
+  );
+
+  const brandSuggestionOptions = useMemo<SmartOption[]>(() => {
+    const counts = new Map<string, { value: string; count: number }>();
+    for (const p of catalogForSuggestions) {
+      const b = (p.brand || "").trim();
+      if (!b) continue;
+      const k = normalizeForMatch(b);
+      const cur = counts.get(k);
+      if (cur) cur.count++; else counts.set(k, { value: b, count: 1 });
+    }
+    return Array.from(counts.values()).map(c => ({ value: c.value, priority: c.count }));
+  }, [catalogForSuggestions]);
+
+  const productSuggestionOptions = useMemo<SmartOption[]>(() => {
+    const selBrand = normalizeForMatch(brand);
+    const map = new Map<string, SmartOption & { count: number; sameBrand: boolean }>();
+    for (const p of catalogForSuggestions) {
+      const n = (p.name || "").trim();
+      if (!n) continue;
+      const k = normalizeForMatch(n);
+      const sameBrand = !!selBrand && normalizeForMatch(p.brand || "") === selBrand;
+      const cur = map.get(k);
+      if (cur) {
+        cur.count++;
+        if (sameBrand) cur.sameBrand = true;
+      } else {
+        map.set(k, { value: n, hint: (p.brand || "").trim() || undefined, count: 1, sameBrand });
+      }
+    }
+    return Array.from(map.values()).map(o => ({
+      value: o.value,
+      hint: o.hint,
+      priority: (o.sameBrand ? 100000 : 0) + o.count,
+    }));
+  }, [catalogForSuggestions, brand]);
+
+  const puffsSuggestionOptions = useMemo<SmartOption[]>(() => {
+    const selBrand = normalizeForMatch(brand);
+    const selName = normalizeForMatch(name);
+    const map = new Map<number, { count: number; ctx: number }>();
+    for (const p of catalogForSuggestions) {
+      const v = Number(p.puffs);
+      if (!v || v <= 0) continue;
+      const ctx = (selName && normalizeForMatch(p.name || "") === selName ? 2 : 0) +
+                  (selBrand && normalizeForMatch(p.brand || "") === selBrand ? 1 : 0);
+      const cur = map.get(v);
+      if (cur) { cur.count++; cur.ctx = Math.max(cur.ctx, ctx); } else map.set(v, { count: 1, ctx });
+    }
+    return Array.from(map.entries()).map(([v, m]) => ({
+      value: String(v),
+      label: v.toLocaleString("pt-BR"),
+      priority: m.ctx * 100000,
+    }));
+  }, [catalogForSuggestions, brand, name]);
+
+  const variantSuggestionOptions = useMemo<SmartOption[]>(() => {
+    const selBrand = normalizeForMatch(brand);
+    const selName = normalizeForMatch(name);
+    const map = new Map<string, { value: string; count: number; ctx: number }>();
+    for (const p of catalogForSuggestions) {
+      const f = (p.flavor || "").trim();
+      if (!f) continue;
+      const sameName = !!selName && normalizeForMatch(p.name || "") === selName;
+      const sameBrand = !!selBrand && normalizeForMatch(p.brand || "") === selBrand;
+      const ctx = sameName && sameBrand ? 2 : sameName || sameBrand ? 1 : 0;
+      const k = normalizeForMatch(f);
+      const cur = map.get(k);
+      if (cur) { cur.count++; cur.ctx = Math.max(cur.ctx, ctx); } else map.set(k, { value: f, count: 1, ctx });
+    }
+    return Array.from(map.values()).map(o => ({
+      value: o.value,
+      hint: o.ctx === 2 ? "neste produto" : o.ctx === 1 ? "relacionada" : undefined,
+      priority: o.ctx * 100000 + o.count,
+    }));
+  }, [catalogForSuggestions, brand, name]);
 
   const handleAddVariantRow = () => {
     setNewModelVariants(prev => [
@@ -2908,9 +2991,9 @@ export default function SupplyChainDashboard() {
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                   <Plus className="size-5 text-emerald-400" />
-                  Cadastrar Novo Modelo
+                  Cadastrar Novo Produto
                 </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Preencha as informações do produto e seus sabores</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Preencha as informações do produto e suas variações</p>
               </div>
               <button 
                 type="button"
@@ -2927,30 +3010,47 @@ export default function SupplyChainDashboard() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Marca</label>
-                  <input 
-                    type="text" value={brand} onChange={(e) => setBrand(e.target.value)}
+                  <SmartAutocomplete
+                    value={brand}
+                    onChange={setBrand}
+                    options={brandSuggestionOptions}
+                    sectionTitle="Marcas encontradas"
+                    createLabel={(t) => `Criar nova marca "${t}"`}
                     placeholder="Ex.: Ignite, Elf Bar"
-                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                    ariaLabel="Marca"
+                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Modelo *</label>
-                  <input 
-                    type="text" value={name} onChange={(e) => setName(e.target.value)}
+                  <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Produto *</label>
+                  <SmartAutocomplete
+                    value={name}
+                    onChange={setName}
+                    options={productSuggestionOptions}
+                    sectionTitle="Produtos encontrados"
+                    createLabel={(t) => `Criar novo produto "${t}"`}
                     placeholder="Ex.: V50, BC5000"
                     required
-                    className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                    ariaLabel="Produto"
+                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
                   />
                 </div>
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Puffs (se aplicável)</label>
-                <input 
-                  type="number" value={puffs} onChange={(e) => setPuffs(e.target.value)}
+                <SmartAutocomplete
+                  value={puffs}
+                  onChange={setPuffs}
+                  options={puffsSuggestionOptions}
+                  sanitize={(raw) => raw.replace(/\D/g, "")}
+                  inputMode="numeric"
+                  sectionTitle="Valores já usados"
+                  createLabel={(t) => `Usar novo valor "${Number(t).toLocaleString("pt-BR")}"`}
                   placeholder="Ex.: 5000"
-                  className="bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium"
+                  ariaLabel="Puffs"
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all font-medium"
                 />
               </div>
 
@@ -3016,17 +3116,17 @@ export default function SupplyChainDashboard() {
                 </div>
               </div>
 
-                {/* Sabores / Variantes */}
+                {/* Variações */}
                 <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
                   <div className="flex items-center justify-between">
                     <div>
                       <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">
-                        Sabores / Variantes
+                        Variações
                       </label>
                       <span className="text-[10px] text-muted-foreground block">
                         {newModelVariants.filter(v => v.name.trim()).length > 0
-                          ? `${newModelVariants.filter(v => v.name.trim()).length} sabor(es) preenchido(s)`
-                          : "Adicione os sabores e estoque inicial deste modelo"}
+                          ? `${newModelVariants.filter(v => v.name.trim()).length} variação(ões) preenchida(s)`
+                          : "Adicione as variações e o estoque inicial deste produto"}
                       </span>
                     </div>
                     <button
@@ -3036,7 +3136,7 @@ export default function SupplyChainDashboard() {
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
                     >
                       <Plus className="size-3.5" />
-                      Adicionar Sabor
+                      Adicionar Variação
                     </button>
                   </div>
 
@@ -3046,19 +3146,17 @@ export default function SupplyChainDashboard() {
                         <span className="text-xs text-muted-foreground/60 w-4 text-right shrink-0">
                           {index + 1}.
                         </span>
-                        <input
-                          type="text"
+                        <SmartAutocomplete
                           value={variant.name}
                           disabled={submitting}
-                          onChange={(e) => handleUpdateVariantRow(index, 'name', e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAddVariantRow();
-                            }
-                          }}
-                          placeholder="Nome do sabor (ex.: Watermelon Ice)"
-                          className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 transition-all disabled:opacity-50"
+                          onChange={(v) => handleUpdateVariantRow(index, 'name', v)}
+                          onEnterWithoutSelection={handleAddVariantRow}
+                          options={variantSuggestionOptions}
+                          sectionTitle="Variações encontradas"
+                          createLabel={(t) => `Criar nova variação "${t}"`}
+                          placeholder="Nome da variação (ex.: Watermelon Ice)"
+                          ariaLabel={`Variação ${index + 1}`}
+                          className="flex-1 min-w-0 bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2 text-base sm:text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-500/50 transition-all disabled:opacity-50"
                         />
                         <input
                           type="number"
@@ -3074,7 +3172,7 @@ export default function SupplyChainDashboard() {
                           disabled={submitting}
                           onClick={() => handleRemoveVariantRow(index)}
                           className="p-1.5 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer shrink-0 disabled:opacity-50"
-                          title="Remover sabor"
+                          title="Remover variação"
                         >
                           <Trash2 className="size-3.5" />
                         </button>
@@ -3083,7 +3181,7 @@ export default function SupplyChainDashboard() {
 
                     {newModelVariants.length === 0 && (
                       <div className="text-center py-2 text-xs text-amber-400/80">
-                        Adicione pelo menos um sabor para cadastrar este modelo.
+                        Adicione pelo menos uma variação para cadastrar este produto.
                       </div>
                     )}
                   </div>
@@ -3110,7 +3208,7 @@ export default function SupplyChainDashboard() {
                       Cadastrando...
                     </>
                   ) : (
-                    "Cadastrar Modelo"
+                    "Cadastrar Produto"
                   )}
                 </button>
               </div>
