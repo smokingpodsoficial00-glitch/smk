@@ -1043,7 +1043,7 @@ export function SaasManagementDashboard() {
                   type="text"
                   value={pixStoreName}
                   onChange={(e) => setPixStoreName(e.target.value)}
-                  placeholder="Ex: Prime Vape Lounge"
+                  placeholder="Ex: Loja Central Store"
                   className="w-full bg-[#141414] border border-white/10 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-amber-500/60"
                 />
               </div>

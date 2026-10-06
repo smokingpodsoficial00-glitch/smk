@@ -690,7 +690,7 @@ export function LandingPage() {
                   <div className="size-3 rounded-full bg-red-500/80" />
                   <div className="size-3 rounded-full bg-yellow-500/80" />
                   <div className="size-3 rounded-full bg-emerald-500/80" />
-                  <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">catalogo.sua-loja.com</span>
+                  <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">smoking-pods-catalogo.vercel.app</span>
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                   <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -745,7 +745,7 @@ export function LandingPage() {
               </div>
               <h3 className="text-base font-bold text-white">Controle de Múltiplos Pedidos Sem Erro</h3>
               <p className="text-xs text-white/60 leading-relaxed">
-                Chegaram 4 pedidos no mesmo minuto? Você visualiza tudo na coluna de <strong>Novos Pedidos</strong>. Ao separar o sabor na gaveta, arrasta para <strong>Separando</strong>. Ninguém confunde sabor, ninguém esquece pedido na bancada.
+                Chegaram 4 pedidos no mesmo minuto? Você visualiza tudo na coluna de <strong>Novos Pedidos</strong>. Ao separar os itens do pedido, arrasta para <strong>Separando</strong>. Ninguém confunde produto, ninguém esquece pedido na bancada.
               </p>
             </div>
 
@@ -781,7 +781,7 @@ export function LandingPage() {
                 <div className="size-3 rounded-full bg-red-500/80" />
                 <div className="size-3 rounded-full bg-yellow-500/80" />
                 <div className="size-3 rounded-full bg-emerald-500/80" />
-                <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">app.sua-loja.com/pedidos</span>
+                <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">smoking-pods-admin.vercel.app/pedidos</span>
               </div>
               <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                 <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -818,7 +818,7 @@ export function LandingPage() {
                       {/* Coluna 2 */}
                       <div className="bg-[#141414] border border-[#222] rounded-xl p-3 space-y-2">
                         <div className="text-xs font-bold text-white flex justify-between">
-                          <span>2. Separando Sabor</span>
+                          <span>2. Separando Itens</span>
                           <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-white">1</span>
                         </div>
                         <div className="bg-[#1c1c1c] p-2.5 rounded-lg text-xs space-y-1">
@@ -919,7 +919,7 @@ export function LandingPage() {
                 <div className="size-3 rounded-full bg-red-500/80" />
                 <div className="size-3 rounded-full bg-yellow-500/80" />
                 <div className="size-3 rounded-full bg-emerald-500/80" />
-                <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">app.sua-loja.com/clientes</span>
+                <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">smoking-pods-admin.vercel.app/clientes</span>
               </div>
               <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                 <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -1145,7 +1145,7 @@ export function LandingPage() {
             </div>
             <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-5 rounded-2xl">
               <div className="text-2xl sm:text-4xl font-extrabold text-white">0 minutos</div>
-              <div className="text-[11px] text-white/50 mt-1">Digitando sabores no WhatsApp</div>
+              <div className="text-[11px] text-white/50 mt-1">Digitando listas de produtos no WhatsApp</div>
             </div>
             <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-5 rounded-2xl">
               <div className="text-2xl sm:text-4xl font-extrabold text-emerald-400">25.3%</div>
@@ -1223,7 +1223,7 @@ export function LandingPage() {
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
-                    <span>Controle de marcas, modelos e sabores com baixa automática</span>
+                    <span>Controle de produtos, marcas e variações com baixa automática</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
@@ -1294,7 +1294,7 @@ export function LandingPage() {
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
-                    <span>Estoque e sabores sincronizados em tempo real</span>
+                    <span>Estoque e variações sincronizados em tempo real</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
@@ -1306,7 +1306,7 @@ export function LandingPage() {
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
-                    <span>Nunca mais digite lista de sabores no WhatsApp</span>
+                    <span>Nunca mais digite lista de produtos no WhatsApp</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
@@ -1367,7 +1367,7 @@ export function LandingPage() {
               },
               {
                 q: "Como funciona o Catálogo Digital na Bio?",
-                a: "Você recebe um link exclusivo da sua loja para fixar na Bio do seu Instagram ou enviar no WhatsApp. O cliente clica, escolhe os sabores disponíveis com fotos oficiais e clica em pedir. O pedido chega montado no seu WhatsApp com endereço e valores calculados."
+                a: "Você recebe um link exclusivo da sua loja para fixar na Bio do seu Instagram ou enviar no WhatsApp. O cliente clica, escolhe os produtos disponíveis com fotos oficiais e clica em pedir. O pedido chega montado no seu WhatsApp com endereço e valores calculados."
               },
               {
                 q: "Como o catálogo atualiza quando um produto vende?",
