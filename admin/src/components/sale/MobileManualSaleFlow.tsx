@@ -533,7 +533,7 @@ export function MobileManualSaleFlow({
       if (currentSelectedFlavorProd) {
         handleAddItemToCart();
       } else {
-        setErrorMessage("Adicione pelo menos 1 pod ao pedido para prosseguir.");
+        setErrorMessage("Adicione pelo menos 1 produto ao pedido para prosseguir.");
         return;
       }
     }
@@ -545,7 +545,7 @@ export function MobileManualSaleFlow({
     setErrorMessage("");
 
     if (items.length === 0) {
-      setErrorMessage("Por favor, adicione ao menos um pod ao pedido.");
+      setErrorMessage("Por favor, adicione ao menos um produto ao pedido.");
       return;
     }
 
@@ -822,13 +822,13 @@ export function MobileManualSaleFlow({
             <div>
               <h1 className="text-sm font-bold tracking-tight text-white leading-tight">
                 {currentStep === "CLIENT" && "Registrar Venda • Cliente"}
-                {currentStep === "PRODUCTS" && "Registrar Venda • Pods"}
+                {currentStep === "PRODUCTS" && "Registrar Venda • Produtos"}
                 {currentStep === "PAYMENT" && "Registrar Venda • Pagamento"}
                 {currentStep === "SUCCESS" && "Venda Concluída"}
               </h1>
               <p className="text-[11px] text-zinc-400 font-medium leading-none mt-0.5">
                 {currentStep === "CLIENT" && "Passo 1 de 3"}
-                {currentStep === "PRODUCTS" && `Passo 2 de 3 • ${totalPodsCount} pod(s)`}
+                {currentStep === "PRODUCTS" && `Passo 2 de 3 • ${totalPodsCount} item(ns)`}
                 {currentStep === "PAYMENT" && `Passo 3 de 3 • R$ ${grandTotal.toFixed(2)}`}
                 {currentStep === "SUCCESS" && "Estoque e CRM atualizados"}
               </p>
@@ -1156,7 +1156,7 @@ export function MobileManualSaleFlow({
               <div className="flex items-center justify-between">
                 <span className="text-xs uppercase font-extrabold tracking-wider text-zinc-400 flex items-center gap-2">
                   <Package className="size-3.5 text-emerald-400" />
-                  1. Modelo do Pod
+                  1. Selecionar Produto
                 </span>
                 {selectedModelKey && (
                   <button
@@ -1359,7 +1359,7 @@ export function MobileManualSaleFlow({
                       className="w-full h-12 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-2 active:scale-98 transition-all"
                     >
                       <Plus className="size-4 text-emerald-400" />
-                      <span>Adicionar Pod ao Pedido</span>
+                      <span>Adicionar ao Pedido</span>
                     </button>
                   </div>
                 )}
@@ -1372,7 +1372,7 @@ export function MobileManualSaleFlow({
                 <div className="flex items-center justify-between">
                   <span className="text-xs uppercase font-extrabold tracking-wider text-emerald-400 flex items-center gap-1.5">
                     <ShoppingCart className="size-3.5" />
-                    Carrinho ({totalPodsCount} pods)
+                    Carrinho ({totalPodsCount} un)
                   </span>
                   <span className="text-xs font-black text-white">
                     Subtotal: R$ {subtotal.toFixed(2)}
@@ -1698,7 +1698,7 @@ export function MobileManualSaleFlow({
               <div className="flex justify-between text-xs">
                 <span className="text-zinc-400">Quantidade</span>
                 <span className="font-bold text-white">
-                  {successInfo.itemsCount} pod(s)
+                  {successInfo.itemsCount} item(ns)
                 </span>
               </div>
               <div className="flex justify-between text-xs">
@@ -1753,7 +1753,7 @@ export function MobileManualSaleFlow({
               disabled={!clientName.trim()}
               className="w-full h-12 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:pointer-events-none text-black font-extrabold text-sm rounded-xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] active:scale-98 transition-all"
             >
-              <span>Avançar para Pods</span>
+              <span>Avançar para Produtos</span>
               <ChevronRight className="size-4" />
             </button>
           )}
@@ -1769,7 +1769,7 @@ export function MobileManualSaleFlow({
                 <span>
                   {items.length > 0
                     ? `Ir para Pagamento (R$ ${subtotal.toFixed(2)})`
-                    : "Adicionar Pod e Prosseguir"}
+                    : "Adicionar Item e Prosseguir"}
                 </span>
                 <ChevronRight className="size-4" />
               </button>

@@ -48,10 +48,10 @@ export function SaleDetailModal({ sale, onClose, onDeleteSale }: SaleDetailModal
 
   const copyOrderSummary = () => {
     const itemsText = sale.items
-      .map(i => `- ${i.quantity}x ${i.name || 'Pod'} ${i.flavor || ''} (${formatBRL(i.price * i.quantity)})`)
+      .map(i => `- ${i.quantity}x ${i.name || 'Produto'} ${i.flavor || ''} (${formatBRL(i.price * i.quantity)})`)
       .join('\n');
 
-    const text = `*Resumo do Pedido - Smoking Pods*\n` +
+    const text = `*Resumo do Pedido*\n` +
       `📅 Data: ${orderDate} às ${orderTime}\n` +
       `👤 Cliente: ${sale.client_name}\n` +
       `📱 Telefone: ${sale.client_phone}\n` +
@@ -176,7 +176,7 @@ export function SaleDetailModal({ sale, onClose, onDeleteSale }: SaleDetailModal
                       </span>
                       <div>
                         <div className="text-xs font-bold text-white flex items-center gap-2">
-                          <span>{item.name || 'Pod Descartável'}</span>
+                          <span>{item.name || 'Produto'}</span>
                           {item.puffs && (
                             <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                               {item.puffs} puffs

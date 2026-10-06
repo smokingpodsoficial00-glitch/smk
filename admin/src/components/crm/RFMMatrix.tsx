@@ -238,7 +238,7 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
           </div>
           <div>
             <div className="text-2xl font-bold text-white tracking-tight">{loyals.length}</div>
-            <p className="text-[10px] text-muted-foreground mt-1">Compram pods com padrão estável de 15 a 35 dias.</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Compram produtos com padrão estável de 15 a 35 dias.</p>
           </div>
         </div>
 
@@ -367,7 +367,7 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
                   <th className="px-5 py-3 text-muted-foreground font-semibold">Cliente & Telefone</th>
                   <th className="px-5 py-3 text-muted-foreground font-semibold">Grupo VIP</th>
                   <th className="px-5 py-3 text-muted-foreground font-semibold">LTV (Total Gasto)</th>
-                  <th className="px-5 py-3 text-muted-foreground font-semibold">Último Pod / Puffs</th>
+                  <th className="px-5 py-3 text-muted-foreground font-semibold">Último Produto</th>
                   <th className="px-5 py-3 text-muted-foreground font-semibold text-right">Ação WhatsApp</th>
                 </tr>
               </thead>
@@ -376,7 +376,7 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
                   if (!client) return null;
                   const isSelected = selectedClientIds.has(client.id);
                   const phoneClean = client.cleanPhone || (client.phone || '').replace(/\D/g, '');
-                  const waUrl = client.whatsappUrl || `https://wa.me/${phoneClean}?text=${encodeURIComponent(`Olá ${client.name || 'Cliente'}, tudo bem? Aqui é da Smoking Pods!`)}`;
+                  const waUrl = client.whatsappUrl || `https://wa.me/${phoneClean}?text=${encodeURIComponent(`Olá ${client.name || 'Cliente'}, tudo bem? Entrando em contato da loja!`)}`;
 
                   return (
                     <tr 
@@ -431,9 +431,9 @@ export function RFMMatrix({ onSelectClient }: { onSelectClient: (client: RealCli
                       </td>
 
                       <td className="px-5 py-4 text-xs" onClick={() => onSelectClient(client)}>
-                        <div className="font-semibold text-white truncate max-w-[180px]">{client.lastProduct || 'Ignite V50'}</div>
+                        <div className="font-semibold text-white truncate max-w-[180px]">{client.lastProduct || 'Produto'}</div>
                         <div className="text-[11px] text-muted-foreground mt-0.5">
-                          {client.daysSinceLastOrder === 0 ? 'Hoje' : `há ${client.daysSinceLastOrder} dias`} ({client.lastPuffs} puffs)
+                          {client.daysSinceLastOrder === 0 ? 'Hoje' : `há ${client.daysSinceLastOrder} dias`}{client.lastPuffs && client.lastPuffs > 0 ? ` (${client.lastPuffs} puffs)` : ''}
                         </div>
                       </td>
 

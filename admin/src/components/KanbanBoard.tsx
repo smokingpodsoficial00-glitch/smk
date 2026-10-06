@@ -562,9 +562,9 @@ export default function KanbanBoard() {
  </div>
 
  <div className="bg-card border border-border rounded-2xl p-4 flex flex-col justify-between">
- <span className="text-xs uppercase text-muted-foreground font-semibold tracking-wider">Pods Vendidos & Ticket Médio</span>
+ <span className="text-xs uppercase text-muted-foreground font-semibold tracking-wider">Itens Vendidos & Ticket Médio</span>
  <div className="text-xl font-bold text-silver mt-1 flex items-baseline justify-between">
- <span>{totalCompletedItems24h} <span className="text-xs text-muted-foreground">pods</span></span>
+ <span>{totalCompletedItems24h} <span className="text-xs text-muted-foreground">un</span></span>
  <span className="text-sm text-emerald-400 font-semibold">TM: {formatBRL(avgTicket24h)}</span>
  </div>
  </div>
@@ -674,7 +674,7 @@ export default function KanbanBoard() {
  {/* Itens Resumidos */}
  <div className="flex-1 min-w-0 truncate text-muted-foreground">
  <span className="text-silver font-medium">
- {order.items.length} {order.items.length === 1 ? 'item' : 'itens'} ({itemCount} pods)
+ {order.items.length} {order.items.length === 1 ? 'item' : 'itens'} ({itemCount} un)
  </span>
  <span className="text-[11px] ml-2 text-muted-foreground/80 truncate">
  — {order.items.map(i => `${i.quantity}x ${i.flavor}`).join(', ')}

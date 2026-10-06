@@ -215,7 +215,7 @@ export default function SupplyChainDashboard() {
   };
 
   const handleShareWhatsAppCatalog = () => {
-    const text = `Confira nosso catálogo oficial de pods atualizado e faça seu pedido online:\n${catalogUrl}`;
+    const text = `Confira nosso catálogo oficial de produtos atualizado e faça seu pedido online:\n${catalogUrl}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -2004,11 +2004,11 @@ export default function SupplyChainDashboard() {
             </div>
             <div>
               <div className="text-lg sm:text-2xl font-bold text-white leading-tight">{formatBRL(totalStockValue)}</div>
-              <span className="text-[10px] text-muted-foreground block mt-0.5 truncate">bruto ({totalStockUnits} pods)</span>
+              <span className="text-[10px] text-muted-foreground block mt-0.5 truncate">bruto ({totalStockUnits} un)</span>
             </div>
           </div>
 
-          {/* 3. Custo dos Pods em Estoque (Neutro) */}
+          {/* 3. Custo dos Produtos em Estoque (Neutro) */}
           <div className="bg-[#141414] border border-white/10 rounded-xl p-3 sm:p-4 flex flex-col justify-between space-y-1.5 sm:space-y-2">
             <div className="flex items-center justify-between gap-1.5">
               <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider truncate">Custo do Estoque</span>
@@ -2018,7 +2018,7 @@ export default function SupplyChainDashboard() {
             </div>
             <div>
               <div className="text-lg sm:text-2xl font-bold text-white leading-tight">{formatBRL(totalStockCost)}</div>
-              <span className="text-[10px] text-muted-foreground block mt-0.5 truncate">pago ({totalStockUnits} pods)</span>
+              <span className="text-[10px] text-muted-foreground block mt-0.5 truncate">pago ({totalStockUnits} un)</span>
             </div>
           </div>
 
@@ -2033,7 +2033,7 @@ export default function SupplyChainDashboard() {
             <div>
               <div className="text-lg sm:text-2xl font-bold text-emerald-400 leading-tight">{formatBRL(estimatedProfit)}</div>
               <span className="text-[10px] text-emerald-400/80 block mt-0.5 truncate">
-                {profitMarginPct}% margem ({totalStockUnits} pods)
+                {profitMarginPct}% margem ({totalStockUnits} un)
               </span>
             </div>
           </div>
@@ -2946,7 +2946,7 @@ export default function SupplyChainDashboard() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Puffs</label>
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Puffs (se aplicável)</label>
                 <input 
                   type="number" value={puffs} onChange={(e) => setPuffs(e.target.value)}
                   placeholder="Ex.: 5000"
@@ -2983,7 +2983,7 @@ export default function SupplyChainDashboard() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Foto do Pod</label>
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Foto do Produto</label>
                 <div 
                   onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                   onDragLeave={() => setIsDragging(false)}
@@ -3212,9 +3212,9 @@ export default function SupplyChainDashboard() {
             </div>
 
             <form onSubmit={handleSaveFullProductEdit} className="space-y-4">
-              {/* Foto do Pod */}
+              {/* Foto do Produto */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Foto do Pod</label>
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Foto do Produto</label>
                 <div className="flex items-center gap-3">
                   <div className="relative size-16 rounded-xl overflow-hidden border border-white/10 bg-black/40 shrink-0">
                     {editImagePreview ? (
@@ -3283,7 +3283,7 @@ export default function SupplyChainDashboard() {
 
               {/* Puffs */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Puffs</label>
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider">Puffs (se aplicável)</label>
                 <input 
                   type="number" 
                   value={editPuffs} 
@@ -3760,7 +3760,7 @@ export default function SupplyChainDashboard() {
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2">
                 <Star className="size-5 text-amber-400 fill-amber-400" />
-                <h3 className="font-bold text-base text-white">Fixar Pod nos Mais Vendidos</h3>
+                <h3 className="font-bold text-base text-white">Fixar Produto nos Mais Vendidos</h3>
               </div>
               <button
                 type="button"
@@ -3826,10 +3826,10 @@ export default function SupplyChainDashboard() {
                 value={selectedDisplayOrder}
                 onChange={(e) => setSelectedDisplayOrder(e.target.value)}
                 className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400/50"
-                placeholder="Ex: 1 (menor número = primeiro pod do topo)"
+                placeholder="Ex: 1 (menor número = primeiro produto do topo)"
               />
               <p className="text-[10px] text-muted-foreground">
-                Pods fixados com posição 1, 2, 3 e 4 aparecem nos primeiros 4 slots do topo do catálogo.
+                Produtos fixados com posição 1, 2, 3 e 4 aparecem nos primeiros 4 slots do topo do catálogo.
               </p>
             </div>
 

@@ -51,7 +51,7 @@ const TOUR_STEPS: TourStep[] = [
     title: "🔄 Registrar Recompra de Estoque",
     targetSelector: '[data-tour="btn-registrar-recompra"]',
     pointerText: "👉 CLIQUE AQUI: REGISTRAR RECOMPRA 👈",
-    description: "Atenção máxima a este botão: sempre que pagar mercadorias para o seu fornecedor, clique em 'Registrar Recompra'. Aqui você informa a data, os valores e anota os pods comprados. O sistema atualiza o estoque e abate do caixa instantaneamente!",
+    description: "Atenção máxima a este botão: sempre que pagar mercadorias para o seu fornecedor, clique em 'Registrar Recompra'. Aqui você informa a data, os valores e anota os produtos comprados. O sistema atualiza o estoque e abate do caixa instantaneamente!",
     tips: ["Clique sempre que fizer reposição com fornecedor", "Mantém seu Caixa Real 100% conciliado"],
     icon: <RefreshCw className="size-6 text-indigo-400" />
   },
@@ -84,18 +84,18 @@ const TOUR_STEPS: TourStep[] = [
     title: "➕ Cadastrar Novo Produto na Prateleira",
     targetSelector: '[data-tour="btn-novo-produto"]',
     pointerText: "👉 CLIQUE AQUI: + NOVO PRODUTO 👈",
-    description: "Cadastrar novos pods é muito simples: basta clicar no botão '+ Novo Produto' no topo. Você preenche a marca, modelo, quantidade de pods, preço de custo, preço de venda e coloca a foto. Assim que salvar, o pod entra imediatamente na sua prateleira e no catálogo universal.",
+    description: "Cadastrar novos produtos é muito simples: basta clicar no botão '+ Novo Produto' no topo. Você preenche a marca, modelo, quantidade de unidades, preço de custo, preço de venda e coloca a foto. Assim que salvar, o produto entra imediatamente na sua prateleira e no catálogo universal.",
     tips: ["Preencha o custo e venda para cálculo automático de margem", "Fotos limpas aumentam a conversão do catálogo"],
     icon: <PlusCircle className="size-6 text-white" />
   },
   {
     id: "estoque_sabores",
-    badge: "Etapa 7 de 12 • Variações & Sabores",
+    badge: "Etapa 7 de 12 • Variações & Opções",
     route: "/estoque",
-    title: "🏷️ Prateleira & Gestão Rápida de Sabores",
+    title: "🏷️ Prateleira & Gestão Rápida de Variações",
     targetSelector: '[data-tour="btn-ver-sabores"]',
-    pointerText: "👉 CLIQUE AQUI: VER SABORES 👈",
-    description: "Aqui você gerencia suas marcas. Clicando no botão 'Ver Sabores' em qualquer pod, você abre a gaveta de sabores onde pode ativar, pausar estoque zerado ou cadastrar novos sabores em segundos. O catálogo dos seus clientes atualiza em tempo real sem precisar recarregar a página.",
+    pointerText: "👉 CLIQUE AQUI: VER OPÇÕES 👈",
+    description: "Aqui você gerencia seus produtos e marcas. Clicando no botão de variações ou sabores em qualquer produto, você abre a gaveta onde pode ativar, pausar estoque zerado ou cadastrar novas opções em segundos. O catálogo dos seus clientes atualiza em tempo real sem precisar recarregar a página.",
     tips: ["Clique em 'Ver Sabores' para pausar ou adicionar opções", "Sincronização instantânea com a tabela dos clientes"],
     icon: <Layers className="size-6 text-purple-400" />
   },
@@ -114,11 +114,11 @@ const TOUR_STEPS: TourStep[] = [
     id: "crm_clientes",
     badge: "Etapa 9 de 12 • LTV & Retenção",
     route: "/clientes",
-    title: "👥 CRM & Gestão de Clientes por Puffs",
+    title: "👥 CRM & Retenção de Clientes",
     targetSelector: '[data-tour="crm-tabs"]',
     pointerText: "👇 NAVEGUE PELAS ABAS DO CRM 👇",
-    description: "O cérebro de retenção da sua loja! Na aba 'Ranking & Fidelidade', você monitora quem compra a cada 15 dias e quem está sumindo (Risco de Churn). Na aba 'Aviso de Fim de Pod & Recompra', o sistema calcula os puffs consumidos e te avisa a data exata de chamar o cliente no WhatsApp antes do pod acabar!",
-    tips: ["Fidelize clientes com recompra a cada 15 dias", "Aborde preventivamente antes que o pod seque"],
+    description: "O cérebro de retenção da sua loja! Na aba 'Ranking & Fidelidade', você monitora a frequência de compras e quem está sumindo (Risco de Churn). No Radar Preditivo de Recompra, o sistema monitora o ciclo de reposição e te avisa a data exata de chamar o cliente no WhatsApp para antecipar a próxima compra!",
+    tips: ["Fidelize clientes com ciclos de recompra ativos", "Aborde preventivamente antes da concorrência"],
     icon: <Users className="size-6 text-cyan-400" />
   },
   {

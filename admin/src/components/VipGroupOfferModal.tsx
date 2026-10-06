@@ -31,9 +31,9 @@ export const VipGroupOfferModal: React.FC<VipGroupOfferModalProps> = ({
 
   // Gerar mensagem comercial formatada
   const message = generateVipOfferMessage({
-    brand: product.brand || "Pod",
-    name: product.name || "Descartável",
-    flavor: product.flavor || "Sabor Único",
+    brand: product.brand || "Produto",
+    name: product.name || "Item",
+    flavor: product.flavor || "Padrão",
     puffs: product.puffs,
     originalPrice,
     promoPrice,
@@ -171,7 +171,7 @@ export const VipGroupOfferModal: React.FC<VipGroupOfferModalProps> = ({
               />
             ) : (
               <div className="size-14 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-muted-foreground font-bold text-xs">
-                {product.brand?.substring(0, 2) || "POD"}
+                {product.brand?.substring(0, 2) || "PR"}
               </div>
             )}
             <div className="min-w-0 flex-1">

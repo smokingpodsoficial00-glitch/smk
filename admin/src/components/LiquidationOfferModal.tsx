@@ -153,7 +153,7 @@ export const LiquidationOfferModal: React.FC<LiquidationOfferModalProps> = ({
                 <img src={product.image_url} alt={product.name} className="size-12 rounded-lg object-contain bg-black/60 p-1 border border-white/10 shrink-0" />
               ) : (
                 <div className="size-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-muted-foreground font-bold text-xs">
-                  {product.brand?.substring(0, 2) || "POD"}
+                  {product.brand?.substring(0, 2) || "PR"}
                 </div>
               )}
               <div className="min-w-0 flex-1">

@@ -406,14 +406,14 @@ export function MobileCRMView({
     const itemsText = (sale.items || [])
       .map(
         (i) =>
-          `• ${i.quantity}x ${i.name || "Pod"} ${i.flavor || ""} (${formatBRL(
+          `• ${i.quantity}x ${i.name || "Produto"} ${i.flavor || ""} (${formatBRL(
             (i.price || 0) * (i.quantity || 1)
           )})`
       )
       .join("\n");
 
     const text =
-      `*Resumo do Pedido - Smoking Pods*\n` +
+      `*Resumo do Pedido*\n` +
       `📅 Data: ${formatFriendlyDate(sale.created_at)}\n` +
       `👤 Cliente: ${sale.client_name}\n` +
       `📱 Telefone: ${sale.client_phone}\n` +
@@ -481,8 +481,8 @@ export function MobileCRMView({
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={
               activeFilter === "vendas"
-                ? "Buscar venda por cliente, sabor ou fone..."
-                : "Buscar por nome, telefone, sabor ou pod..."
+                ? "Buscar venda por cliente, produto ou fone..."
+                : "Buscar por nome, telefone ou produto..."
             }
             className="w-full h-11 pl-10 pr-9 rounded-xl bg-black/60 border border-white/10 text-white placeholder:text-zinc-500 text-base focus:outline-none focus:border-emerald-500/50 transition-colors"
           />
@@ -500,7 +500,7 @@ export function MobileCRMView({
 
       {/* ========================================================
           3. BARRA HORIZONTAL DESLIZANTE DE FILTROS (PILLS COM SCROLL X)
-         ======================================================== */}
+          ======================================================== */}
       <div className="shrink-0 bg-[#0c0c0f] border-b border-white/10 px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth">
         {/* Pill 1: Todos */}
         <button
@@ -523,7 +523,7 @@ export function MobileCRMView({
           </span>
         </button>
 
-        {/* Pill 2: Fim de Pod */}
+        {/* Pill 2: Recompra */}
         <button
           type="button"
           onClick={() => setActiveFilter("recompra")}
@@ -534,7 +534,7 @@ export function MobileCRMView({
           }`}
         >
           <Flame className="size-3.5 text-rose-400 shrink-0" />
-          <span>Fim de Pod</span>
+          <span>Recompra</span>
           <span
             className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
               activeFilter === "recompra" ? "bg-rose-500/30 text-rose-200" : "bg-white/10 text-zinc-300"
@@ -656,7 +656,7 @@ export function MobileCRMView({
                         )}
                         {isUrgent ? (
                           <span className="text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/35 px-1.5 py-0.5 rounded-full uppercase shrink-0 flex items-center gap-1">
-                            <Flame className="size-2.5" /> Pod Seco
+                            <Flame className="size-2.5" /> Recompra Urgente
                           </span>
                         ) : isWarning ? (
                           <span className="text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/35 px-1.5 py-0.5 rounded-full uppercase shrink-0">
@@ -669,7 +669,7 @@ export function MobileCRMView({
                         )}
                       </div>
                       <p className="text-[11px] text-zinc-400 mt-0.5 truncate">
-                        Último: <strong className="text-zinc-200">{client.lastProduct || "Pod"}</strong>
+                        Último: <strong className="text-zinc-200">{client.lastProduct || "Produto"}</strong>
                         {client.lastFlavor ? ` • ${client.lastFlavor}` : ""}
                       </p>
                     </div>
@@ -714,7 +714,7 @@ export function MobileCRMView({
                           {submittingAlerts.has(client.id)
                             ? "Enviando..."
                             : isUrgent
-                            ? "Aviso de Fim de Pod"
+                            ? "Aviso de Recompra"
                             : "WhatsApp"}
                         </span>
                       </button>
@@ -798,7 +798,7 @@ export function MobileCRMView({
                   </div>
                 </div>
 
-                {/* Linha 2: Pods Comprados */}
+                {/* Linha 2: Itens Comprados */}
                 <div className="flex flex-wrap gap-1.5">
                   {(sale.items || []).map((item, idx) => (
                     <span
@@ -806,7 +806,7 @@ export function MobileCRMView({
                       className="inline-flex items-center gap-1 bg-white/[0.04] border border-white/10 text-[11px] px-2.5 py-1 rounded-xl text-zinc-200 font-medium"
                     >
                       <strong className="text-emerald-400 font-mono">{item.quantity}x</strong>
-                      <span className="truncate max-w-[130px]">{item.name || "Pod"}</span>
+                      <span className="truncate max-w-[130px]">{item.name || "Produto"}</span>
                       {item.flavor && (
                         <span className="text-amber-300 font-semibold truncate max-w-[110px]">
                           • {item.flavor}
@@ -1082,7 +1082,7 @@ export function MobileCRMView({
                     <span>
                       {submittingAlerts.has(selectedClientForSheet.id)
                         ? "Registrando..."
-                        : "Aviso de Recompra (Fim de Pod)"}
+                        : "Aviso de Recompra"}
                     </span>
                   </button>
 
@@ -1096,8 +1096,8 @@ export function MobileCRMView({
                     const fullP = cleanP.startsWith("55") ? cleanP : `55${cleanP}`;
                     const fName = selectedClientForSheet.name.split(" ")[0];
 
-                    const copyLembrete = `E aí ${fName}! Tudo certo? 💨 Vi que já faz um tempinho desde o seu ${selectedClientForSheet.lastProduct}. Seu pod já tá nas últimas puxadas? Já quer ir garantindo o próximo?`;
-                    const copyGrupoVip = `Fala ${fName}! Tranquilo? Criamos o Grupo VIP Fechado no WhatsApp da Smoking Pods com lotes novos e descontos exclusivos. Se quiser entrar: [LINK_DO_GRUPO]`;
+                    const copyLembrete = `E aí ${fName}! Tudo certo? Vi que já faz um tempinho desde a sua última compra de ${selectedClientForSheet.lastProduct}. Já quer ir garantindo a reposição para não ficar sem?`;
+                    const copyGrupoVip = `Fala ${fName}! Tranquilo? Criamos o nosso Grupo VIP Fechado no WhatsApp com novidades e descontos exclusivos. Se quiser entrar: [LINK_DO_GRUPO]`;
 
                     return (
                       <div className="grid grid-cols-2 gap-2 pt-1">
@@ -1107,7 +1107,7 @@ export function MobileCRMView({
                           rel="noreferrer"
                           className="min-h-[44px] px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-bold text-zinc-300 flex items-center justify-center text-center transition-all"
                         >
-                          Lembrete de Puffs
+                          Lembrete de Recompra
                         </a>
 
                         <a
@@ -1168,8 +1168,8 @@ export function MobileCRMView({
 
                         <div className="text-xs text-zinc-200">
                           {items
-                            .map((i) => `${i.quantity || 1}x ${i.name || "Pod"} ${i.flavor || ""}`)
-                            .join(", ") || "1x Pod Descartável"}
+                            .map((i) => `${i.quantity || 1}x ${i.name || "Produto"} ${i.flavor || ""}`)
+                            .join(", ") || "1x Produto"}
                         </div>
 
                         <div className="flex items-center justify-between text-xs pt-1.5 border-t border-white/5 font-mono">
@@ -1292,7 +1292,7 @@ export function MobileCRMView({
                     >
                       <div className="min-w-0 flex-1">
                         <div className="font-bold text-white truncate">
-                          {item.quantity}x {item.name || "Pod"}
+                          {item.quantity}x {item.name || "Produto"}
                         </div>
                         {item.flavor && (
                           <div className="text-amber-300 text-[11px] font-medium truncate">

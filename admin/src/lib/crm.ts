@@ -597,11 +597,11 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
         const lastOrderTimestamp = latestOrder.created_at ? new Date(latestOrder.created_at).getTime() : now;
         const daysSinceLastOrder = Math.max(0, Math.floor((now - lastOrderTimestamp) / (1000 * 60 * 60 * 24)));
 
-        // Extrair último pod, modelo, sabor e marca
+        // Extrair último produto, modelo, sabor e marca
         const itemsList = Array.isArray(latestOrder.items) ? latestOrder.items : [];
         const firstItem = itemsList.length > 0 ? itemsList[0] : null;
 
-        let lastProduct = firstItem ? `${firstItem.name || 'Pod'} ${firstItem.flavor || ''}` : 'Ignite V50';
+        let lastProduct = firstItem ? `${firstItem.name || 'Produto'} ${firstItem.flavor || ''}` : 'Produto';
         let lastFlavor = firstItem?.flavor || 'Frutado';
         let lastPuffs = Number(firstItem?.puffs) || 5000;
         let favoriteBrand = client.favorite_brand || firstItem?.brand || 'Ignite';
@@ -678,7 +678,7 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
           prospectingStatus === 'contatado' ? 'Em Negociação' : 'Base Antiga';
 
         const waNumber = phoneClean.startsWith('55') ? phoneClean : '55' + phoneClean;
-        const whatsappMessage = `E aí ${name}! Tudo certo? 💨 Vi que já faz um tempinho desde o seu ${lastProduct}. Seu pod já tá nas últimas tragadas? Já quer garantir o próximo sabor pra não ficar na mão no fds? Me dá um toque por aqui!`;
+        const whatsappMessage = `E aí ${name}! Tudo certo? Vi que já faz um tempinho desde a sua compra de ${lastProduct}. Já quer ir garantindo a reposição para não ficar na mão? Me dá um toque por aqui!`;
         const whatsappUrl = phoneClean ? `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}` : '';
 
         result.push({
@@ -723,7 +723,7 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
           : 'Não especificado';
 
         const waNumber = phoneClean.startsWith('55') ? phoneClean : '55' + phoneClean;
-        const whatsappMessage = `Oii ${name}! Tudo bem? Seja bem-vindo à Smoking Pods! 💨 Como posso te ajudar a escolher o pod ideal hoje?`;
+        const whatsappMessage = `Oii ${name}! Tudo bem? Seja muito bem-vindo! Como posso te ajudar a escolher o produto ideal hoje?`;
         const whatsappUrl = phoneClean ? `https://wa.me/${waNumber}?text=${encodeURIComponent(whatsappMessage)}` : '';
 
         result.push({
@@ -736,7 +736,7 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
           ordersCount: 0,
           lastOrderDate: 'Nunca comprou',
           daysSinceLastOrder: 0,
-          lastProduct: 'Nenhum pod ainda',
+          lastProduct: 'Nenhum produto ainda',
           lastFlavor: 'Não especificado',
           lastPuffs: 0,
           expectedCycleDays: 14,

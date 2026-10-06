@@ -167,7 +167,7 @@ export function TaskModal({
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: Corrigir erro no cálculo de frete ou Planejar compra de pods..."
+              placeholder="Ex: Corrigir erro no cálculo de frete ou Planejar compra de produtos..."
               className="w-full bg-[#161618] border border-white/10 focus:border-emerald-500/50 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none transition-all"
             />
           </div>

@@ -148,7 +148,7 @@ export function OnboardingPage() {
                   required
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Ex: Vape Lounge SBC"
+                  placeholder="Ex: Loja Central, Moda Express..."
                   className="w-full bg-[#161616] border border-[#2c2c2c] focus:border-white/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none transition-all font-semibold"
                 />
               </div>

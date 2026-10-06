@@ -558,7 +558,7 @@ export function ManualSaleModal({
     setSuccessMessage("");
 
     if (effectiveItems.length === 0) {
-      setErrorMessage("Por favor, selecione um modelo e sabor de pod para a venda.");
+      setErrorMessage("Por favor, selecione pelo menos um produto para a venda.");
       return;
     }
 
@@ -1212,10 +1212,10 @@ export function ManualSaleModal({
               </span>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Combobox Inteligente: Modelo do Pod */}
+                {/* Combobox Inteligente: Produto / Modelo */}
                 <div ref={modelPickerRef} className="relative">
                   <div className="flex items-center justify-between h-5 mb-1.5">
-                    <label className="text-[11px] text-silver font-medium">Modelo do Pod *</label>
+                    <label className="text-[11px] text-silver font-medium">Produto / Modelo *</label>
                   </div>
                   <div className="relative">
                     <input
@@ -1422,16 +1422,16 @@ export function ManualSaleModal({
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-white text-xs font-bold transition-all border border-emerald-500/30 hover:border-emerald-500/50 cursor-pointer shadow-sm self-end mb-0.5"
                   >
                     <CheckCircle2 className="size-3.5 text-emerald-400" />
-                    <span>Confirmar Pod</span>
+                    <span>Adicionar ao Pedido</span>
                   </button>
                 </div>
               )}
 
-              {/* Lista de Itens no Pedido (para pedidos com múltiplos pods) */}
+              {/* Lista de Itens no Pedido (para pedidos com múltiplos produtos) */}
               {items.length > 0 && (
                 <div className="space-y-2 pt-2 border-t border-white/10">
                   <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider block">
-                    Pods Adicionados no Pedido ({items.length}):
+                    Produtos Adicionados no Pedido ({items.length}):
                   </span>
                   <div className="space-y-1.5">
                     {items.map((item, idx) => (
@@ -1538,7 +1538,7 @@ export function ManualSaleModal({
             {/* RESUMO DO PEDIDO E MARGEM DE LUCRO */}
             <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-silver">Subtotal dos Pods:</span>
+                <span className="text-silver">Subtotal dos Produtos:</span>
                 <span className="font-bold text-white">R$ {subtotal.toFixed(2).replace(".", ",")}</span>
               </div>
               {numericShippingFee > 0 && (

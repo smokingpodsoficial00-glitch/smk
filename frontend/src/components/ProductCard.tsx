@@ -28,9 +28,11 @@ export function ProductCard({ model, onClick }: { model: PodModel; onClick: () =
             <span className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Esgotado</span>
           </div>
         )}
-        <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 glass px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-silver">
-          {model.puffs.toLocaleString("pt-BR")} puffs
-        </div>
+        {model.puffs && model.puffs > 0 ? (
+          <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 glass px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-silver">
+            {model.puffs.toLocaleString("pt-BR")} puffs
+          </div>
+        ) : null}
         {model.is_promotional && (
           <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 bg-red-500 text-white font-bold px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] tracking-wider shadow-lg shadow-red-500/40 uppercase flex items-center gap-1 animate-in fade-in">
             <span>🔥 OFERTA {model.discount_pct ? `-${model.discount_pct}%` : ""}</span>

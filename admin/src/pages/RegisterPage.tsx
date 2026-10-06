@@ -84,7 +84,7 @@ export function RegisterPage() {
                 required
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="Ex: Vape King Lounge"
+                placeholder="Ex: Loja Modelo, Distribuidora Central..."
                 className="w-full bg-[#141414] border border-[#262626] focus:border-white/60 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-white/60 transition-all font-medium"
               />
             </div>

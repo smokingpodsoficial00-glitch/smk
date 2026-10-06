@@ -88,7 +88,7 @@ export function LandingPage() {
   });
 
   useEffect(() => {
-    document.title = 'SMK System | A Ferramenta que Domina a Venda de Pods';
+    document.title = 'SMK System | Gestão Completa, Catálogo Digital & Vendas';
   }, []);
 
   useEffect(() => {
@@ -325,12 +325,12 @@ export function LandingPage() {
           {/* Niche Pill Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold shadow-[0_0_20px_rgba(255,255,255,0.15)]">
             <Zap className="size-3.5 fill-white text-white" />
-            <span>O 1º Sistema de Gestão & Catálogo Feito Sob Medida para Lojas de Pods</span>
+            <span>O 1º Sistema de Gestão & Catálogo Feito Sob Medida para Vendas Rápidas e Delivery</span>
           </div>
 
           {/* Main Giant Glowing Headline */}
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.12] max-w-4xl mx-auto">
-            A ferramenta que separa quem brinca de vender pod{' '}
+            A ferramenta que separa quem improvisa nas vendas{' '}
             <span className="bg-gradient-to-r from-white via-slate-200 to-gray-400 bg-clip-text text-transparent underline decoration-white/30 decoration-2 underline-offset-8">
               de quem domina
             </span>{' '}
@@ -339,7 +339,7 @@ export function LandingPage() {
 
           {/* Sub-headline Densa */}
           <p className="text-sm sm:text-base lg:text-lg text-white/70 max-w-3xl mx-auto leading-relaxed font-normal">
-            Quem compra pod quer rapidez, confiança e atendimento impecável. Troque as mensagens amadoras por uma vitrine interativa na sua bio, sistema de despacho organizado e uma operação que venda mais com menos esforço!
+            Seu cliente quer rapidez, confiança e atendimento impecável. Troque as mensagens amadoras por uma vitrine interativa na sua bio, sistema de despacho organizado e uma operação que venda mais com menos esforço!
           </p>
 
           {/* Hero CTAs */}
@@ -421,7 +421,7 @@ export function LandingPage() {
       </section>
 
       {/* ==================================================================== */}
-      {/* 4. AS 4 DORES DO LOJISTA DE PODS (DIAGNÓSTICO BRUTAL)                */}
+      {/* 4. AS 4 DORES DO LOJISTA (DIAGNÓSTICO BRUTAL)                       */}
       {/* ==================================================================== */}
       <section id="dores" className="py-24 px-4 sm:px-6 border-t border-[#161616] bg-[#070707]">
         <div className="max-w-6xl mx-auto space-y-12">
@@ -431,7 +431,7 @@ export function LandingPage() {
               O Custo Oculto do Amadorismo
             </span>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-              As 4 dores que travam o crescimento de qualquer loja de pods
+              As 4 dores que travam o crescimento de qualquer loja e delivery
             </h2>
             <p className="text-xs sm:text-sm text-white/60">
               Se você se identificar com pelo menos duas dessas situações, você não precisa trabalhar mais horas. Você só precisa de uma ferramenta feita para a sua realidade.
@@ -446,9 +446,9 @@ export function LandingPage() {
                 <MessageSquare className="size-6 text-white" />
               </div>
               <span className="text-xs font-mono text-white/40 block">DOR #01</span>
-              <h3 className="text-lg font-bold text-white">O Inferno de Digitar Listas de Sabores Todo Santo Dia</h3>
+              <h3 className="text-lg font-bold text-white">O Inferno de Digitar Listas de Produtos Todo Santo Dia</h3>
               <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-                Você acorda, abre o WhatsApp e tem que ir lá escrever pod por pod, sabor por sabor manualmente. Encaminha a lista para 10 clientes. Quando um deles compra, você tem que voltar na mensagem e apagar o sabor na mão. Se esquecer de apagar, o próximo cliente pede o mesmo pod, você tem que avisar que acabou e ele desiste irritado da compra.
+                Você acorda, abre o WhatsApp e tem que ir lá escrever item por item, variação por variação manualmente. Encaminha a lista para 10 clientes. Quando um deles compra, você tem que voltar na mensagem e apagar o item na mão. Se esquecer de apagar, o próximo cliente pede o mesmo produto, você tem que avisar que acabou e ele desiste irritado da compra.
               </p>
             </div>
 
@@ -460,7 +460,7 @@ export function LandingPage() {
               <span className="text-xs font-mono text-white/40 block">DOR #02</span>
               <h3 className="text-lg font-bold text-white">O Caos de Despachar Múltiplos Pedidos no Horário de Pico</h3>
               <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-                Sua loja começa a vender 5, 8 ou 10 pods por dia. De repente caem 3 ou 4 clientes de uma vez na sexta à noite. Sem organização visual, você se perde: não sabe se o motoboy já saiu, se está em rota ou se já entregou. Esquece de despachar um pedido porque estava embalando outro, o cliente fica esperando, reclama, perde a paciência e cancela.
+                Sua loja começa a vender 5, 8 ou 10 pedidos por dia. De repente caem 3 ou 4 clientes de uma vez no horário de pico. Sem organização visual, você se perde: não sabe se o motoboy já saiu, se está em rota ou se já entregou. Esquece de despachar um pedido porque estava embalando outro, o cliente fica esperando, reclama, perde a paciência e cancela.
               </p>
             </div>
 
@@ -472,7 +472,7 @@ export function LandingPage() {
               <span className="text-xs font-mono text-white/40 block">DOR #03</span>
               <h3 className="text-lg font-bold text-white">Ficar Postando Stories e Deixar o Cliente Comprar de Outra Loja</h3>
               <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-                Pod é um produto de consumo diário. Quando começa a queimar, o cliente quer repor rápido. Mas você tem uma base com dezenas de clientes e fica apenas postando stories esperando o pedido cair do céu. Como você não sabe quando o pod dele vai acabar e não entra em contato, na hora que queima ele entra no Instagram da primeira loja que encontrar e compra lá.
+                Produtos de alto giro têm ciclo de recompra frequente. Quando o produto acaba, o cliente quer repor rápido. Mas você tem uma base com dezenas de clientes e fica apenas postando stories esperando o pedido cair do céu. Como você não sabe quando o ciclo dele vai fechar e não entra em contato proativamente, ele entra no perfil da primeira loja que encontrar e compra lá.
               </p>
             </div>
 
@@ -482,9 +482,9 @@ export function LandingPage() {
                 <Wallet className="size-6 text-white" />
               </div>
               <span className="text-xs font-mono text-white/40 block">DOR #04</span>
-              <h3 className="text-lg font-bold text-white">Dar Desconto no Pod Errado e Prender Dinheiro em Sabores Parados</h3>
+              <h3 className="text-lg font-bold text-white">Dar Desconto no Produto Errado e Prender Dinheiro em Itens Parados</h3>
               <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-                Quando quer vender mais, você comete o erro clássico: dá desconto em Ignite e Lost Mary que já venderiam com preço cheio e margem alta. Enquanto isso, aqueles sabores que não saem ficam tomando espaço na prateleira, mofando na gaveta com o dinheiro da loja totalmente preso e sem ninguém saber quais são.
+                Quando quer vender mais, você comete o erro clássico: dá desconto nos produtos que já venderiam com preço cheio e margem alta. Enquanto isso, aqueles itens que não saem ficam tomando espaço na prateleira, com o dinheiro da loja totalmente preso e sem ninguém saber quais são.
               </p>
             </div>
 
@@ -503,14 +503,14 @@ export function LandingPage() {
           <div className="text-center space-y-4 max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold font-mono">
               <Sparkles className="size-3.5 text-white" />
-              <span>O Maior Diferencial Para Donos de Loja de Pods</span>
+              <span>O Maior Diferencial Para Donos de Loja e Delivery</span>
             </div>
 
             {/* HEADLINE ÚNICA DO CATÁLOGO */}
             <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
               Sua Vitrine Online na Bio do Instagram:{' '}
               <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
-                Chega de digitar lista de sabores todo santo dia.
+                Chega de digitar lista de produtos todo santo dia.
               </span>
             </h2>
 
@@ -530,9 +530,9 @@ export function LandingPage() {
                   01
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-base font-bold text-white">Cadastrou os modelos uma única vez, tá pronto</h3>
+                  <h3 className="text-base font-bold text-white">Cadastrou os produtos uma única vez, tá pronto</h3>
                   <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-                    Você cadastra o modelo do aparelho uma única vez e todos os sabores ficam salvos no sistema. Quando chega um lote novo do fornecedor, você só clica em um botão para ativar o sabor de volta no ar. Sem retrabalho.
+                    Você cadastra o produto uma única vez e todas as variações ficam salvas no sistema. Quando chega um lote novo do fornecedor, você só clica em um botão para ativar a opção de volta no ar. Sem retrabalho.
                   </p>
                 </div>
               </div>
@@ -543,9 +543,9 @@ export function LandingPage() {
                   02
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-base font-bold text-white">Vendeu o último pod? Ele sai do ar sozinho</h3>
+                  <h3 className="text-base font-bold text-white">Vendeu a última unidade? Ela sai do ar sozinho</h3>
                   <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-                    Cada vez que você aceita um pedido no Kanban, o sistema dá baixa imediata no estoque. O sabor esgotado desaparece ou fica marcado como indisponível no catálogo. O cliente nunca mais vai pedir o que não tem.
+                    Cada vez que você aceita um pedido no Kanban, o sistema dá baixa imediata no estoque. O item esgotado desaparece ou fica marcado como indisponível no catálogo. O cliente nunca mais vai pedir o que não tem.
                   </p>
                 </div>
               </div>
@@ -558,7 +558,7 @@ export function LandingPage() {
                 <div className="space-y-1">
                   <h3 className="text-base font-bold text-white">Visual premium que passa respeito e autoridade</h3>
                   <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-                    Fotos oficiais em alta definição de Ignite (V50, V80, V150), Elfbar (BC15000, TE30000), Lost Mary e Oxbar. Seu cliente abre o link no celular e vê uma loja de verdade, e não fotos escuras tiradas em cima de uma mesa.
+                    Fotos oficiais e limpas em alta definição. Seu cliente abre o link no celular e vê uma vitrine profissional de verdade, com visual atraente e navegação fluida.
                   </p>
                 </div>
               </div>
@@ -571,7 +571,7 @@ export function LandingPage() {
                 <div className="space-y-1">
                   <h3 className="text-base font-bold text-white">O pedido cai mastigado e pronto no seu WhatsApp</h3>
                   <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-                    O cliente escolhe a marca, seleciona o sabor, define a quantidade e digita o endereço. Ao clicar em finalizar, o WhatsApp dele abre com a mensagem pré-formatada com todos os dados. Você só confere o Pix e despacha.
+                    O cliente escolhe o produto, seleciona a variação, define a quantidade e digita o endereço. Ao clicar em finalizar, o WhatsApp dele abre com a mensagem pré-formatada com todos os dados. Você só confere o Pix e despacha.
                   </p>
                 </div>
               </div>
@@ -591,7 +591,7 @@ export function LandingPage() {
                 <div className="rounded-[34px] overflow-hidden border border-white/10 relative bg-black shadow-inner">
                   <ScreenshotOrFallback
                     src="/prints/catalogo-mobile.png"
-                    alt="Catálogo Oficial Smoking Pods no Celular"
+                    alt="Catálogo Oficial no Celular"
                     className="w-full h-auto object-cover object-top block transition-transform duration-500 group-hover:scale-[1.02]"
                     fallback={
                       <div className="p-3 space-y-2">
@@ -600,8 +600,8 @@ export function LandingPage() {
                           <div className="inline-flex items-center gap-1 text-[9px] text-white bg-white/10 border border-white/15 px-2 py-0.5 rounded-full font-bold">
                             <span>⚡ Entrega Express em 25-35min</span>
                           </div>
-                          <div className="font-extrabold text-xs text-white">Smoking Pods • Catálogo Oficial</div>
-                          <div className="text-[9px] text-white/50">Toque no pod para ver os sabores disponíveis</div>
+                          <div className="font-extrabold text-xs text-white">Catálogo Oficial da Loja</div>
+                          <div className="text-[9px] text-white/50">Toque no produto para ver as opções disponíveis</div>
                         </div>
 
                         {/* Filter Pills */}
@@ -671,14 +671,14 @@ export function LandingPage() {
               </div>
 
               <h3 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight">
-                Enquanto você digita lista de sabores no WhatsApp,{' '}
+                Enquanto você digita listas no WhatsApp,{' '}
                 <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
                   seu cliente está fazendo Pix para o seu concorrente.
                 </span>
               </h3>
 
               <p className="text-sm sm:text-base text-white/70 max-w-3xl mx-auto leading-relaxed">
-                Venda de pod é vício e imediatismo. Se você demora 5 minutos para conferir estoque e atualizar sua lista de sabores, parabéns: você acabou de doar o seu cliente para a concorrência. Tanto no celular quanto no computador, seu cliente navega por fotos oficiais de cada modelo, escolhe o sabor em 10 segundos e fecha o pedido no piloto automático.
+                Venda rápida exige agilidade e imediatismo. Se você demora 5 minutos para conferir estoque e atualizar sua lista, você corre o risco de perder seu cliente para a concorrência. Tanto no celular quanto no computador, seu cliente navega por fotos oficiais, escolhe o produto em 10 segundos e fecha o pedido no piloto automático.
               </p>
             </div>
 
@@ -690,7 +690,7 @@ export function LandingPage() {
                   <div className="size-3 rounded-full bg-red-500/80" />
                   <div className="size-3 rounded-full bg-yellow-500/80" />
                   <div className="size-3 rounded-full bg-emerald-500/80" />
-                  <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">smoking-pods-catalogo.vercel.app</span>
+                  <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">catalogo.sua-loja.com</span>
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                   <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -702,7 +702,7 @@ export function LandingPage() {
               <div className="rounded-xl overflow-hidden border border-white/10 relative bg-black">
                 <ScreenshotOrFallback
                   src="/prints/catalogo-desktop.png"
-                  alt="Catálogo Oficial Smoking Pods no Computador"
+                  alt="Catálogo Oficial no Computador"
                   className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-[1.01]"
                 />
               </div>
@@ -767,7 +767,7 @@ export function LandingPage() {
               </div>
               <h3 className="text-base font-bold text-white">Mais Entregas Rápidas = Mais Faturamento</h3>
               <p className="text-xs text-white/60 leading-relaxed">
-                Com o endereço já formatado em 1 clique para colar no app da Uber, você despacha em 2 minutos. Cliente de pod valoriza entrega rápida: quanto mais ágil você for, mais ele compra toda semana.
+                Com o endereço já formatado em 1 clique para colar no app de entrega, você despacha em 2 minutos. Seu cliente valoriza agilidade: quanto mais rápido você for, mais ele compra com você.
               </p>
             </div>
 
@@ -781,7 +781,7 @@ export function LandingPage() {
                 <div className="size-3 rounded-full bg-red-500/80" />
                 <div className="size-3 rounded-full bg-yellow-500/80" />
                 <div className="size-3 rounded-full bg-emerald-500/80" />
-                <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">smoking-pods-admin.vercel.app/pedidos</span>
+                <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">app.sua-loja.com/pedidos</span>
               </div>
               <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                 <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -793,7 +793,7 @@ export function LandingPage() {
             <div className="rounded-xl overflow-hidden border border-white/10 relative bg-[#0a0a0c]">
               <ScreenshotOrFallback
                 src="/prints/kanban-desktop.png"
-                alt="Painel de Pedidos em Kanban Real da Smoking Pods"
+                alt="Painel de Pedidos em Kanban Real"
                 className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-[1.01]"
                 fallback={
                   <div className="bg-[#0f0f0f] border border-[#222] rounded-2xl p-4 sm:p-6 space-y-4">
@@ -863,14 +863,14 @@ export function LandingPage() {
 
             {/* HEADLINE PRINCIPAL DO CRM */}
             <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
-              Pare de atender como camelô.{' '}
+              Pare de atender como amador.{' '}
               <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
-                Transforme sua revenda de pods em um negócio profissional.
+                Transforme sua operação em um negócio profissional e escalável.
               </span>
             </h2>
 
             <p className="text-sm sm:text-base text-white/70 max-w-3xl mx-auto leading-relaxed">
-              Vender pods não é ser feirante esperando cliente cair do céu ou disputando preço como na feirinha de São Paulo. Você sabe quanto cada cliente gasta com você por mês? Qual o tempo de vida dele? E o principal: <strong>quanto tempo falta para o pod dele acabar?</strong> O CRM do SMK System rastreia o ciclo de consumo de cada cliente para você entrar em contato na hora exata e vender de novo antes que ele compre em outra loja.
+              Gerir vendas não é ficar esperando cliente cair do céu ou disputando preço centavo a centavo. Você sabe quanto cada cliente gasta com você por mês? Qual o tempo de vida dele? E o principal: <strong>quanto tempo falta para a próxima recompra dele?</strong> O CRM do SMK System rastreia o ciclo de consumo de cada cliente para você entrar em contato na hora exata e vender de novo antes que ele compre em outra loja.
             </p>
           </div>
 
@@ -881,9 +881,9 @@ export function LandingPage() {
               <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
                 <Store className="size-5 text-white" />
               </div>
-              <h3 className="text-base font-bold text-white">Chega de Vender como Feirante</h3>
+              <h3 className="text-base font-bold text-white">Atendimento Estruturado e Ágil</h3>
               <p className="text-xs text-white/60 leading-relaxed">
-                Quem atende no WhatsApp como feirante perde vendas por esquecimento e disputa centavos com concorrentes amadores. No SMK System, você tem a lista organizada de todos os seus clientes com histórico de compras e ticket médio.
+                Quem atende sem organização perde vendas por esquecimento e disputa clientes com concorrentes amadores. No SMK System, você tem a lista organizada de todos os seus clientes com histórico de compras e ticket médio.
               </p>
             </div>
 
@@ -892,9 +892,9 @@ export function LandingPage() {
               <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
                 <Clock className="size-5 text-white" />
               </div>
-              <h3 className="text-base font-bold text-white">Radar do Ciclo de Vida do Pod</h3>
+              <h3 className="text-base font-bold text-white">Radar Preditivo de Recompra</h3>
               <p className="text-xs text-white/60 leading-relaxed">
-                O sistema calcula o tempo médio de uso baseado no modelo e puffs (5k, 15k ou 30k). Quando faltam 4 ou 5 dias para o pod queimar, o radar acende o alerta de recompra na sua tela com a porcentagem exata do ciclo.
+                O sistema monitora o ciclo de reposição e o tempo de uso de cada cliente. Quando a janela ideal se aproxima, o radar acende o alerta de recompra na sua tela com a contagem regressiva e o timing perfeito para abordar.
               </p>
             </div>
 
@@ -905,7 +905,7 @@ export function LandingPage() {
               </div>
               <h3 className="text-base font-bold text-white">Aborde Antes da Concorrência</h3>
               <p className="text-xs text-white/60 leading-relaxed">
-                Com 1 clique no botão verde de "Recompra", você abre o WhatsApp do cliente na hora exata com o sabor favorito dele pronto. Antes mesmo do pod queimar e dele pensar em procurar outra loja no Instagram, o Pix já tá fechado.
+                Com 1 clique no botão verde de "Recompra", você abre o WhatsApp do cliente na hora exata com a mensagem personalizada pronta. Antes mesmo dele pensar em procurar outra loja, seu atendimento proativo fecha a venda.
               </p>
             </div>
 
@@ -919,7 +919,7 @@ export function LandingPage() {
                 <div className="size-3 rounded-full bg-red-500/80" />
                 <div className="size-3 rounded-full bg-yellow-500/80" />
                 <div className="size-3 rounded-full bg-emerald-500/80" />
-                <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">smoking-pods-admin.vercel.app/clientes</span>
+                <span className="ml-2 text-[11px] text-white/40 hidden sm:inline-block">app.sua-loja.com/clientes</span>
               </div>
               <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                 <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -931,7 +931,7 @@ export function LandingPage() {
             <div className="rounded-xl overflow-hidden border border-white/10 relative bg-[#0a0a0c]">
               <ScreenshotOrFallback
                 src="/prints/crm-recompra.png"
-                alt="Gestão de Clientes e CRM Preditivo Smoking Pods"
+                alt="Gestão de Clientes e CRM Preditivo"
                 className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-[1.01]"
               />
             </div>
@@ -955,12 +955,12 @@ export function LandingPage() {
             <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
               Radar de Estoque Parado:{' '}
               <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
-                Dê descontos inteligentes sem queimar o lucro dos pods que mais vendem.
+                Dê descontos inteligentes sem queimar o lucro dos produtos que mais vendem.
               </span>
             </h2>
 
             <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              O maior erro dos lojistas é dar desconto em produtos que já vendem a preço cheio. O SMK System aponta o dedo exatamente para os sabores que estão encalhados na prateleira para você fazer caixa rápido.
+              O maior erro dos lojistas é dar desconto em produtos que já vendem a preço cheio. O SMK System aponta o dedo exatamente para os itens que estão encalhados na prateleira para você fazer caixa rápido.
             </p>
           </div>
 
@@ -970,9 +970,9 @@ export function LandingPage() {
               <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold font-mono">
                 01
               </div>
-              <h3 className="text-base font-bold text-white">Proteja os Pods Mais Vendidos</h3>
+              <h3 className="text-base font-bold text-white">Proteja os Produtos Mais Vendidos</h3>
               <p className="text-xs text-white/60 leading-relaxed">
-                Ignite V50 Watermelon Ice ou Lost Mary Miami Mint saem todos os dias com margem cheia. O sistema te impede de cometer o erro de queimar margem nesses modelos à toa.
+                Seus campeões de venda saem todos os dias com margem cheia. O sistema te impede de cometer o erro de queimar margem nesses produtos à toa.
               </p>
             </div>
 
@@ -982,7 +982,7 @@ export function LandingPage() {
               </div>
               <h3 className="text-base font-bold text-white">Localize o Dinheiro Encalhado</h3>
               <p className="text-xs text-white/60 leading-relaxed">
-                O painel lista os sabores que estão há mais de 15 ou 20 dias ocupando espaço na prateleira. Você não precisa conferir gaveta por gaveta: o sistema mostra o valor total travado.
+                O painel lista os itens que estão há mais de 15 ou 20 dias ocupando espaço na prateleira. Você não precisa conferir item por item: o sistema mostra o valor total travado.
               </p>
             </div>
 
@@ -992,7 +992,7 @@ export function LandingPage() {
               </div>
               <h3 className="text-base font-bold text-white">Liquidação Cirúrgica e Caixa Destravado</h3>
               <p className="text-xs text-white/60 leading-relaxed">
-                Crie combos e queimas de estoque exclusivamente para girar os produtos parados. Você recupera seu custo rápido e reinveste em novas marcas e sabores que a galera tá pedindo.
+                Crie combos e queimas de estoque exclusivamente para girar os produtos parados. Você recupera seu custo rápido e reinveste nos produtos que seus clientes estão pedindo.
               </p>
             </div>
 
@@ -1028,7 +1028,7 @@ export function LandingPage() {
             </h2>
 
             <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              Muitos amigos abrem loja de pod juntos e brigam achando que um tirou mais dinheiro que o outro. O SMK System mostra com números limpos o patrimônio real da loja, quanto tem em estoque e a fatia exata de cada um.
+              Muitos amigos abrem um negócio juntos e brigam achando que um tirou mais dinheiro que o outro. O SMK System mostra com números limpos o patrimônio real da loja, quanto tem em estoque e a fatia exata de cada um.
             </p>
           </div>
 
@@ -1048,7 +1048,7 @@ export function LandingPage() {
                 <CheckCircle2 className="size-5 text-white shrink-0 mt-0.5" />
                 <div>
                   <strong className="text-white block text-sm">Patrimônio Real na Prateleira</strong>
-                  Quem investe quer saber onde o dinheiro está. O sistema calcula a soma do caixa líquido com todos os pods físicos em estoque a preço de custo. Fica tudo visível e registrado.
+                  Quem investe quer saber onde o dinheiro está. O sistema calcula a soma do caixa líquido com todos os produtos físicos em estoque a preço de custo. Fica tudo visível e registrado.
                 </div>
               </div>
 
@@ -1079,7 +1079,7 @@ export function LandingPage() {
                       <span className="text-base font-extrabold text-emerald-400">R$ 18.545,00</span>
                     </div>
                     <div className="bg-[#141414] p-3 rounded-xl border border-white/5">
-                      <span className="text-[10px] text-white/40 block">Estoque em Pods</span>
+                      <span className="text-[10px] text-white/40 block">Estoque em Produtos</span>
                       <span className="text-base font-extrabold text-white">R$ 22.310,00</span>
                     </div>
                   </div>
@@ -1135,7 +1135,7 @@ export function LandingPage() {
           </h2>
 
           <p className="text-xs sm:text-sm text-white/70 max-w-2xl mx-auto leading-relaxed">
-            O SMK System não foi desenhado por quem nunca pegou uma caixa de pod na mão. Ele nasceu e foi lapidado dentro da nossa própria operação real, resolvendo os problemas diários de entregadores, estoque e clientes exigentes.
+            O SMK System não foi desenhado por quem nunca pegou uma caixa de mercadoria na mão. Ele nasceu e foi lapidado dentro da nossa própria operação real, resolvendo os problemas diários de entregadores, estoque e clientes exigentes.
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6">
@@ -1184,7 +1184,7 @@ export function LandingPage() {
 
             {/* HEADLINE ÚNICA DOS PLANOS */}
             <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-              Escolha o plano ideal para a sua loja de pods
+              Escolha o plano ideal para a sua loja
             </h2>
 
             <p className="text-xs sm:text-sm text-white/60">
@@ -1199,7 +1199,7 @@ export function LandingPage() {
               <div className="space-y-6">
                 <div>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold text-white">SMK Gestão de Pods</h3>
+                    <h3 className="text-xl font-bold text-white">SMK Gestão</h3>
                     <Store className="size-5 text-white/40" />
                   </div>
                   <p className="text-xs text-white/50 mt-1">Para organizar pedidos, entregas e divisão de sócios.</p>
@@ -1227,7 +1227,7 @@ export function LandingPage() {
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
-                    <span>Alerta de Pod Acabando (aviso no WhatsApp antes de queimar)</span>
+                    <span>Alerta de Recompra (aviso no WhatsApp no momento certo)</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
@@ -1286,7 +1286,7 @@ export function LandingPage() {
                 <div className="space-y-3 pt-4 border-t border-white/10 text-xs sm:text-sm text-white/90">
                   <div className="flex items-center gap-2.5 font-semibold text-white">
                     <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
-                    <span>TUDO incluso no Plano Gestão de Pods</span>
+                    <span>TUDO incluso no Plano Gestão</span>
                   </div>
                   <div className="flex items-center gap-2.5 font-semibold text-white">
                     <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
@@ -1370,12 +1370,12 @@ export function LandingPage() {
                 a: "Você recebe um link exclusivo da sua loja para fixar na Bio do seu Instagram ou enviar no WhatsApp. O cliente clica, escolhe os sabores disponíveis com fotos oficiais e clica em pedir. O pedido chega montado no seu WhatsApp com endereço e valores calculados."
               },
               {
-                q: "Como o catálogo atualiza quando um pod vende?",
-                a: "Automaticamente! Ao aceitar o pedido no Kanban ou registrar uma venda manual, o sistema dá baixa no sabor vendido. O cliente nunca verá um sabor disponível se ele já tiver acabado na sua prateleira."
+                q: "Como o catálogo atualiza quando um produto vende?",
+                a: "Automaticamente! Ao aceitar o pedido no Kanban ou registrar uma venda manual, o sistema dá baixa no item vendido. O cliente nunca verá um item disponível se ele já tiver acabado na sua prateleira."
               },
               {
-                q: "Como funciona o Alerta de Pod Acabando?",
-                a: "O sistema calcula a duração média dos pods conforme a quantidade de puffs (5.000, 15.000, 35.000) e o histórico do cliente. Quando a estimativa indica que o aparelho está terminando, um alerta surge na sua tela para você enviar uma mensagem no WhatsApp antes que ele compre de outra loja."
+                q: "Como funciona o Alerta de Recompra?",
+                a: "O sistema acompanha a data da última compra de cada cliente e aplica um ciclo de recompra de 14 dias. Quando o cliente entra na janela de recompra, um alerta surge na sua tela para você enviar uma mensagem no WhatsApp antes que ele compre de outra loja."
               },
               {
                 q: "Posso cadastrar mais de um sócio?",

@@ -715,7 +715,7 @@ function MobileFinanceViewComponent({
               </div>
               <div className="flex items-center justify-between pt-1 border-t border-white/5 text-[10px] text-white/50">
                 <span>Volume:</span>
-                <span className="text-white font-medium">{activePoint.orders} ped · {activePoint.pods} pods</span>
+                <span className="text-white font-medium">{activePoint.orders} ped · {activePoint.pods} un</span>
               </div>
             </>
           ) : (
@@ -827,7 +827,7 @@ function MobileFinanceViewComponent({
                   {formatBRL(grossRevenue)}
                 </div>
                 <p className="text-xs text-white/50 mt-0.5">
-                  {totalOrders} {totalOrders === 1 ? "pedido validado" : "pedidos validados"} · {totalPodsSold} pods
+                  {totalOrders} {totalOrders === 1 ? "pedido validado" : "pedidos validados"} · {totalPodsSold} un
                 </p>
               </div>
 
@@ -1375,7 +1375,7 @@ function MobileFinanceViewComponent({
                         </div>
                         <EvolutionBadge evolution={monthlyEvolution?.grossRevenue} />
                         <p className="text-[10px] text-white/50 truncate">
-                          {selectedMonthlyMetric.totalOrders} ped ({selectedMonthlyMetric.totalPodsSold} pods)
+                          {selectedMonthlyMetric.totalOrders} ped ({selectedMonthlyMetric.totalPodsSold} un)
                         </p>
                       </div>
 
@@ -1444,7 +1444,7 @@ function MobileFinanceViewComponent({
                         <span className="text-white font-extrabold text-sm">{formatBRL(selectedMonthlyMetric.averageTicket)}</span>
                       </div>
                       <div>
-                        <span className="text-white/40 block text-[9.5px] uppercase font-semibold">Preço Médio / Pod</span>
+                        <span className="text-white/40 block text-[9.5px] uppercase font-semibold">Preço Médio / Unidade</span>
                         <span className="text-white font-extrabold text-sm">{formatBRL(selectedMonthlyMetric.averagePricePerPod)}</span>
                       </div>
                       <div>
@@ -1519,7 +1519,7 @@ function MobileFinanceViewComponent({
                               </div>
 
                               <div className="flex items-center justify-between text-[10px] text-white/50 pt-1 border-t border-white/5">
-                                <span>{m.totalOrders} ped · {m.totalPodsSold} pods · CMV: {formatBRL(m.cmv)}</span>
+                                <span>{m.totalOrders} ped · {m.totalPodsSold} un · CMV: {formatBRL(m.cmv)}</span>
                                 <span className="font-bold text-emerald-400/90">Saldo: {formatBRL(m.realCash)}</span>
                               </div>
                             </div>
@@ -1576,7 +1576,7 @@ function MobileFinanceViewComponent({
                         </div>
                         <EvolutionBadge evolution={quarterlyEvolution?.grossRevenue} />
                         <p className="text-[10px] text-white/50 truncate">
-                          {selectedQuarter.totalOrders} ped ({selectedQuarter.totalPodsSold} pods)
+                          {selectedQuarter.totalOrders} ped ({selectedQuarter.totalPodsSold} un)
                         </p>
                       </div>
 
@@ -1626,7 +1626,7 @@ function MobileFinanceViewComponent({
                         <span className="text-white font-extrabold text-sm">{formatBRL(selectedQuarter.averageTicket)}</span>
                       </div>
                       <div>
-                        <span className="text-white/40 block text-[9.5px] uppercase font-semibold">Preço Médio / Pod</span>
+                        <span className="text-white/40 block text-[9.5px] uppercase font-semibold">Preço Médio / Unidade</span>
                         <span className="text-white font-extrabold text-sm">{formatBRL(selectedQuarter.averagePricePerPod)}</span>
                       </div>
                       <div>
@@ -1780,7 +1780,7 @@ function MobileFinanceViewComponent({
                         <span className="text-white font-extrabold text-sm">{formatBRL(selectedSemester.averageTicket)}</span>
                       </div>
                       <div>
-                        <span className="text-white/40 block text-[9.5px] uppercase font-semibold">Preço Médio / Pod</span>
+                        <span className="text-white/40 block text-[9.5px] uppercase font-semibold">Preço Médio / Unidade</span>
                         <span className="text-white font-extrabold text-sm">{formatBRL(selectedSemester.averagePricePerPod)}</span>
                       </div>
                       <div>
@@ -2072,7 +2072,7 @@ function MobileFinanceViewComponent({
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Ex: 50x Pods Ignite / Fornecedor Central"
+                  placeholder="Ex: 50x Produtos / Fornecedor Central"
                   value={repurchaseNotesInput}
                   onChange={(e) => setRepurchaseNotesInput(e.target.value)}
                   className="w-full bg-[#070709] border border-white/15 rounded-xl px-3.5 py-2.5 text-base text-white focus:outline-none focus:border-emerald-500"

@@ -352,7 +352,7 @@ export function MobileOrdersLogisticsView({
             const nationalInfo = isNational ? extractNationalInfo(order) : null;
             const podsCount = order.items.reduce((acc, i) => acc + (i.quantity || 1), 0);
             const itemsSummary = order.items
-              .map((i) => `${i.quantity || 1}x ${i.flavor || i.model || "Pod"}`)
+              .map((i) => `${i.quantity || 1}x ${i.flavor || i.model || "Produto"}`)
               .join(", ");
 
             return (
@@ -394,7 +394,7 @@ export function MobileOrdersLogisticsView({
 
                   {/* Resumo dos Itens */}
                   <p className="text-xs text-zinc-300 line-clamp-1 leading-snug">
-                    <span className="text-emerald-400 font-bold">{podsCount} pod(s):</span>{" "}
+                    <span className="text-emerald-400 font-bold">{podsCount} item(ns):</span>{" "}
                     {itemsSummary}
                   </p>
 

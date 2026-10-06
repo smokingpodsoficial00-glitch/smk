@@ -111,7 +111,7 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
     return (
       <div className="flex flex-col items-center justify-center p-12">
         <Loader2 className="size-8 text-emerald-400 animate-spin mb-2" />
-        <p className="text-sm text-muted-foreground">Calculando estimativa de término de pods e datas de recompra...</p>
+        <p className="text-sm text-muted-foreground">Calculando estimativa de consumo e datas de recompra...</p>
       </div>
     );
   }
@@ -149,17 +149,17 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
               </span>
             </h3>
             <p className="text-xs text-muted-foreground mt-1 max-w-2xl leading-relaxed">
-              Monitora a capacidade do pod e estima a data de esgotamento. Dispare antes que o cliente compre na concorrência.
+              Monitora o ciclo de consumo do produto e estima a data de recompra. Dispare antes que o cliente compre na concorrência.
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <span className="px-3 py-1.5 rounded-xl bg-[#141414] border border-red-500/20 text-red-400 text-[11px] font-bold uppercase tracking-wider">
-            {urgentClients.length} Pods Secos
+            {urgentClients.length} Recompra Urgente
           </span>
           <span className="px-3 py-1.5 rounded-xl bg-[#141414] border border-amber-500/20 text-amber-400 text-[11px] font-bold uppercase tracking-wider">
-            {warningClients.length} Secando
+            {warningClients.length} Ciclo Próximo
           </span>
           {alertedClients.length > 0 && (
             <span className="px-3 py-1.5 rounded-xl bg-[#141414] border border-emerald-500/20 text-emerald-400 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
@@ -220,7 +220,7 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
                 : 'text-muted-foreground hover:bg-white/5 border border-transparent'
             }`}
           >
-            Pod em Uso ({okClients.length})
+            Ciclo Ativo ({okClients.length})
           </button>
         </div>
 
@@ -275,7 +275,7 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
             const errorMsg = alertErrors[item.id];
 
             const phoneClean = item.cleanPhone || item.phone.replace(/\D/g, '');
-            const msg = `E aí ${item.name}! Tudo certo? 💨 Vi que já faz um tempinho desde a sua última compra do ${item.lastProduct}. Seu pod já tá na final? Já quer ir garantindo o próximo para não ficar na mão no rolê? Me avisa aqui!`;
+            const msg = `E aí ${item.name}! Tudo certo? Vi que já faz um tempinho desde a sua última compra do ${item.lastProduct}. Já quer ir garantindo a sua reposição para não ficar na mão? Me avisa aqui!`;
             const waUrl = item.whatsappUrl || `https://wa.me/${phoneClean.startsWith('55') ? phoneClean : '55' + phoneClean}?text=${encodeURIComponent(msg)}`;
 
             return (
@@ -301,7 +301,7 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
                       {item.name}
                       {isOverdue ? (
                         <span className="text-[9px] bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded uppercase font-bold tracking-wider">
-                          Pod Secou
+                          Ciclo Expirado
                         </span>
                       ) : isNearEnd ? (
                         <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded uppercase font-bold tracking-wider">
@@ -309,7 +309,7 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
                         </span>
                       ) : (
                         <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded uppercase font-bold tracking-wider">
-                          Pod Novo
+                          Compra Recente
                         </span>
                       )}
 
@@ -321,7 +321,7 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
                       )}
                     </h4>
                     <div className="text-[11px] text-muted-foreground mt-1 flex flex-wrap items-center gap-1.5">
-                      <span>Último: <strong className="text-white/80 font-medium">{item.lastProduct}</strong> ({item.lastPuffs} puffs)</span>
+                      <span>Último: <strong className="text-white/80 font-medium">{item.lastProduct}</strong>{item.lastPuffs && item.lastPuffs > 0 ? ` (${item.lastPuffs} puffs)` : ''}</span>
                       <span>•</span>
                       <span className="text-white/50">compra em {item.lastOrderDate}</span>
                     </div>

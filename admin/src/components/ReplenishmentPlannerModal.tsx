@@ -723,7 +723,7 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
 
   // Gerador de Texto para WhatsApp do Fornecedor Baseado na Lista Real do Usuário
   const generatedWhatsAppMessage = useMemo(() => {
-    return `*PEDIDO DE REPOSIÇÃO — SMOKING PODS*
+    return `*PEDIDO DE REPOSIÇÃO DE ESTOQUE*
 *Origem:* São Bernardo do Campo / SP
 *Lote Total:* R$ ${totalSpentWithShipping.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
 
@@ -731,7 +731,7 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
 ${orderItems.map(item => `• ${item.qty}x ${item.brand} ${item.model} (${item.flavors || "Sabores a definir"})`).join("\n")}
 
 *Total de Peças:* ${totalUnitsInOrder} unidades
-*Frete Estimado:* R$ ${supplierShippingFee.toFixed(2)} (Diluído: R$ ${dilutedShippingPerPod}/pod)
+*Frete Estimado:* R$ ${supplierShippingFee.toFixed(2)} (Diluído: R$ ${dilutedShippingPerPod}/un)
 
 Por favor, me confirme a disponibilidade destes sabores e a chave Pix para faturarmos o pedido!`;
   }, [orderItems, totalUnitsInOrder, totalSpentWithShipping, supplierShippingFee, dilutedShippingPerPod]);
@@ -818,7 +818,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
         purchaseDate: new Date().toISOString().split("T")[0],
         stockPurchaseAmount: totalCostOfOrder,
         freightAmount: supplierShippingFee,
-        notes: `Entrada via Planejador de Reposição — ${totalUnitsInOrder} pods (${orderItems.length} modelos)`,
+        notes: `Entrada via Planejador de Reposição — ${totalUnitsInOrder} un (${orderItems.length} modelos)`,
         items: rpcItems
       });
 
@@ -917,7 +917,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-sm shadow-emerald-500/20"
             >
               <Plus className="size-3.5 text-black" />
-              <span>{showAddPodForm ? "Fechar Formulário" : "Adicionar Pod"}</span>
+              <span>{showAddPodForm ? "Fechar Formulário" : "Adicionar Produto"}</span>
             </button>
           </div>
         </div>
@@ -993,7 +993,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                     {/* Modelo do Pod com Autocomplete */}
                     <div className="space-y-1 relative">
                       <label className="text-[10px] font-semibold uppercase text-muted-foreground flex items-center justify-between">
-                        <span>Modelo do Pod *</span>
+                        <span>Produto / Modelo *</span>
                         {selectedStockModel && (
                           <span className="text-emerald-400 text-[9px] font-normal">
                             Preços sincronizados
@@ -1212,7 +1212,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                 {orderItems.length === 0 && (
                   <div className="p-8 text-center text-muted-foreground space-y-2 bg-[#141414] border border-white/10 rounded-xl">
                     <Package className="size-6 mx-auto text-muted-foreground/40" />
-                    <p className="text-xs">Nenhum pod adicionado ao pedido.</p>
+                    <p className="text-xs">Nenhum produto adicionado ao pedido.</p>
                     <button
                       type="button"
                       onClick={handleResetOrderToDefault}
@@ -1242,7 +1242,7 @@ Por favor, me confirme a disponibilidade destes sabores e a chave Pix para fatur
                       className="w-16 bg-black/50 border border-white/15 rounded px-2 py-0.5 text-xs font-bold text-white text-right focus:outline-none focus:border-emerald-400"
                     />
                     <span className="text-[11px] text-muted-foreground">
-                      (Diluído: <strong className="text-emerald-400">R$ {dilutedShippingPerPod}/pod</strong>)
+                      (Diluído: <strong className="text-emerald-400">R$ {dilutedShippingPerPod}/un</strong>)
                     </span>
                   </div>
                 </div>

@@ -68,7 +68,10 @@ export function CartSheet({ open, onClose }: { open: boolean; onClose: () => voi
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{item.product.brand}</p>
                         <p className="text-sm font-semibold truncate">{item.product.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{item.product.flavor} · {item.product.puffs.toLocaleString("pt-BR")} puffs</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {item.product.flavor}
+                          {item.product.puffs && item.product.puffs > 0 ? ` · ${item.product.puffs.toLocaleString("pt-BR")} puffs` : ""}
+                        </p>
                       </div>
                       <div className="flex flex-col items-end gap-2 shrink-0">
                         <span className="text-sm font-semibold tracking-tight">{formatBRL(item.product.price * item.quantity)}</span>

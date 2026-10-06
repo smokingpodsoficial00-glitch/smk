@@ -905,7 +905,7 @@ export default function PartnersDashboard() {
                         Equivalência Econômica
                       </span>
                       <span className="text-[10px] text-blue-300/90 font-mono block mt-0.5">
-                        ≈ {pm.stockPodUnitsEquivalent.toFixed(2)} pods
+                        ≈ {pm.stockPodUnitsEquivalent.toFixed(2)} un
                       </span>
                     </div>
                   </div>

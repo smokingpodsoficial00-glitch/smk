@@ -69,11 +69,11 @@ export function ClientProfileModal({
   const waNumber = phoneClean ? (phoneClean.startsWith('55') ? phoneClean : `55${phoneClean}`) : '';
 
   // Templates Rápidos de Mensagem 1-a-1
-  const copyRetornoSbc = `Oii ${client.name}, tudo bem? 💨\nPassando pra te avisar que a *Smoking Pods tá de volta oficialmente à ativa em SBC!*\n\nAs entregas pro final de semana já estão rolando a todo vapor pra você *garantir o seu pod a tempo e não ficar na mão no rolê*. Reabrimos com estoque 100% renovado, produtos originais e o delivery rápido de sempre de *30 a 40 min* pelo Uber Direct.\n\n📦 *Cardápio Digital:* https://smoking-pods.vercel.app\n\nQual modelo e sabor posso separar pra você já garantir pro fds?`;
+  const copyRetornoSbc = `Oii ${client.name}, tudo bem?\nPassando pra te avisar que a nossa loja tá de volta com tudo!\n\nAs entregas pro final de semana já estão rolando a todo vapor pra você *garantir os seus produtos a tempo e não ficar na mão*. Reabrimos com estoque 100% renovado, produtos originais e atendimento ágil.\n\nQual item posso separar pra você já garantir pro fds?`;
   
-  const copyRecompra = `E aí ${client.name}! Tudo certo? 💨 Vi que já faz um tempinho desde o seu ${client.lastProduct}. Seu pod já tá nas últimas puxadas? Já quer ir garantindo o próximo pra não ficar na mão no rolê? Me avisa aqui!`;
+  const copyRecompra = `E aí ${client.name}! Tudo certo? Vi que já faz um tempinho desde a sua última compra de ${client.lastProduct}. Já quer ir garantindo a sua reposição pra não ficar na mão? Me avisa aqui!`;
   
-  const copyGrupoVip = `Fala ${client.name}! Tranquilo? Criamos o *Grupo VIP Fechado no WhatsApp* da Smoking Pods onde soltamos os lotes novos e frete promocional antes de todo mundo.\n\nÉ 100% silencioso (só avisos importantes). Se quiser entrar: [LINK_DO_GRUPO_VIP]`;
+  const copyGrupoVip = `Fala ${client.name}! Tranquilo? Criamos o *Grupo VIP Fechado no WhatsApp* da nossa loja onde soltamos novidades, lotes novos e condições exclusivas antes de todo mundo.\n\nÉ 100% silencioso (só avisos importantes). Se quiser entrar: [LINK_DO_GRUPO_VIP]`;
 
   const handleSaveBasicClient = async () => {
     const trimmedName = editName.trim();
@@ -351,10 +351,10 @@ export function ClientProfileModal({
                 className="p-3 bg-[#141414] hover:bg-white/5 border border-white/5 rounded-xl text-left transition-colors group cursor-pointer"
               >
                 <div className="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors uppercase tracking-wider">
-                  Retorno SBC
+                  Aviso Geral
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-1 line-clamp-2">
-                  Copy para garantir o pod no final de semana.
+                  Copy para antecipar compras do final de semana.
                 </div>
               </a>
 
@@ -365,7 +365,7 @@ export function ClientProfileModal({
                 className="p-3 bg-[#141414] hover:bg-white/5 border border-white/5 rounded-xl text-left transition-colors group cursor-pointer"
               >
                 <div className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors uppercase tracking-wider">
-                  Lembrete de Puffs
+                  Lembrete de Recompra
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-1 line-clamp-2">
                   Aviso citando o último {client.lastProduct}.
@@ -423,7 +423,7 @@ export function ClientProfileModal({
                     </div>
 
                     <div className="text-[11px] font-medium text-white/90">
-                      {items.map(i => `${i.quantity || 1}x ${i.name || 'Pod'} ${i.flavor || ''}`).join(', ') || 'Ignite V50'}
+                      {items.map(i => `${i.quantity || 1}x ${i.name || 'Produto'} ${i.flavor || ''}`).join(', ') || 'Produto'}
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-2 border-t border-white/5">

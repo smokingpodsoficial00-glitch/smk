@@ -454,7 +454,7 @@ export function MobileSupplyChainView({
                           />
                         ) : (
                           <div className="size-11 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-muted-foreground font-bold text-[11px]">
-                            {group.brand?.substring(0, 2).toUpperCase() || "POD"}
+                            {group.brand?.substring(0, 2).toUpperCase() || "PR"}
                           </div>
                         )}
 
@@ -464,7 +464,7 @@ export function MobileSupplyChainView({
                             <span className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-wider">
                               {group.brand}
                             </span>
-                            {group.puffs ? (
+                            {group.puffs && group.puffs > 0 ? (
                               <span className="text-[10px] text-white/40">· {group.puffs} puffs</span>
                             ) : null}
                           </div>
@@ -965,7 +965,7 @@ export function MobileSupplyChainView({
               {/* Puffs */}
               <div>
                 <label className="text-xs font-bold text-white/90 block mb-1">
-                  Puffs
+                  Puffs (se aplicável)
                 </label>
                 <input
                   type="number"

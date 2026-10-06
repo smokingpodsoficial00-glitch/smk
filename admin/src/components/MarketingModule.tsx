@@ -38,45 +38,45 @@ interface WhatsAppGroup {
 const OFFICIAL_TEMPLATES = [
   {
     id: 'weekend_vip',
-    title: 'Final de Semana + Grupo VIP (Oficial SBC)',
+    title: 'Final de Semana + Grupo VIP',
     badge: 'Mais Convertida',
-    text: `Oii, tudo bem? 💨\nPassando pra te avisar que a *Smoking Pods tá de volta oficialmente à ativa em SBC!*\n\nAs entregas pro final de semana já estão rolando a todo vapor pra você *garantir o seu pod a tempo e não ficar na mão no rolê*. Reabrimos com estoque 100% renovado, produtos originais e o delivery rápido de sempre de *30 a 40 min* pelo Uber Direct.\n\n📦 *Dá uma olhada nos modelos disponíveis no Cardápio Digital:*\n🔗 [LINK_DO_CARDAPIO_VERCEL]\n\n💬 *Também ativamos o Grupo VIP no WhatsApp pra soltar lotes exclusivos e frete promocional pro fds:*\n🔗 [LINK_DO_GRUPO_VIP_WHATSAPP]\n\nQual modelo e sabor posso separar pra você já garantir pro fds?`,
+    text: `Oii, tudo bem? ✨\nPassando pra te avisar que nosso estoque pro final de semana já está abastecido!\n\nAs entregas já estão rolando a todo vapor pra você *garantir seus produtos a tempo e não ficar na mão*. Reabrimos com estoque 100% renovado, produtos originais e o delivery rápido de sempre de *30 a 40 min*.\n\n📦 *Dá uma olhada nas opções disponíveis no Cardápio Digital:*\n🔗 [LINK_DO_CARDAPIO_VERCEL]\n\n💬 *Também ativamos o Grupo VIP no WhatsApp pra soltar lotes exclusivos e frete promocional pro fds:*\n🔗 [LINK_DO_GRUPO_VIP_WHATSAPP]\n\nQual item posso separar pra você já garantir pro fds?`,
   },
   {
     id: 'antigos_clientes',
     title: 'Clientes das Antigas (Tom Pessoal)',
     badge: 'Alta Resposta',
-    text: `Opa [Nome], quanto tempo! De boa? 🔥\nSei que fazia um tempinho que estávamos parados, mas organizamos a casa e *voltamos com tudo!*\n\nComo você é da nossa base das antigas, tô te mandando o *Cardápio Digital atualizado* pra você dar uma olhada nos pods que chegaram:\n🔗 [LINK_DO_CARDAPIO_VERCEL]\n\n⚡ *Hoje tamo com prioridade máxima de entrega rápida no ABC (30-40 min via Uber Direct).*\n\n🔒 *Se quiser receber ofertas relâmpago e condições exclusivas antes de todo mundo, entra no nosso Grupo VIP:*\n🔗 [LINK_DO_GRUPO_VIP_WHATSAPP]\n\nTô por aqui se precisar de algo, só chamar!`,
+    text: `Opa [Nome], quanto tempo! De boa? 🔥\nSei que fazia um tempinho que estávamos sem nos falar, mas organizamos a casa e *voltamos com tudo!*\n\nComo você é da nossa base das antigas, tô te mandando o *Catálogo Digital atualizado* pra você dar uma olhada nas novidades e produtos que chegaram:\n🔗 [LINK_DO_CARDAPIO_VERCEL]\n\n⚡ *Hoje tamo com prioridade máxima de entrega rápida (30-40 min via Uber Direct).*\n\n🔒 *Se quiser receber ofertas relâmpago e condições exclusivas antes de todo mundo, entra no nosso Grupo VIP:*\n🔗 [LINK_DO_GRUPO_VIP_WHATSAPP]\n\nTô por aqui se precisar de algo, só chamar!`,
   },
   {
     id: 'reposicao_ativa',
-    title: 'Aviso de Fim de Pod (Recompra)',
+    title: 'Aviso de Recompra (Reposição)',
     badge: 'Timing de Uso',
-    text: `E aí [Nome]! Tudo certo? 💨\nPelo meu controle aqui, seu último pod já deve estar nas últimas puxadas hahaha!\n\nPra você não ficar na mão no meio da semana, quer que eu já separe um sabor novo pra você?\n\n📦 Cardápio completo no ar: [LINK_DO_CARDAPIO_VERCEL]\nMe avisa aqui qual sabor posso agilizar pro seu delivery!`,
+    text: `E aí [Nome]! Tudo certo? ✨\nPelo meu controle aqui, seu último produto já deve estar no final ou precisando de reposição!\n\nPra você não ficar na mão no meio da semana, quer que eu já separe uma novidade pra você?\n\n📦 Cardápio completo no ar: [LINK_DO_CARDAPIO_VERCEL]\nMe avisa aqui qual produto posso agilizar pro seu delivery!`,
   },
   {
     id: 'insta_grupo_vip',
     title: 'Instagram & Bastidores (Grupo VIP)',
     badge: 'Comunidade & Prova Social',
-    text: `📸 *BASTIDORES & COMUNICADOS OFICIAIS — SMOKING PODS* 🚀\n\nSalve turma do VIP! Passando um recado rápido pra quem ainda não acompanha nosso perfil oficial no Instagram:\n\nÉ por lá que a gente posta em tempo real:\n• 🛵 Saída dos motoboys e rotina de entregas no ABC;\n• 🎬 Vídeos e unboxing dos novos pods que chegam;\n• 📢 Avisos de horários de funcionamento e novidades da loja.\n\n📲 *Clica no link e segue a gente lá pra acompanhar tudo:*\n🔗 [LINK_DO_INSTAGRAM]\n\n*Tamo junto!*`,
+    text: `📸 *BASTIDORES & COMUNICADOS OFICIAIS* 🚀\n\nSalve turma do VIP! Passando um recado rápido pra quem ainda não acompanha nosso perfil oficial no Instagram:\n\nÉ por lá que a gente posta em tempo real:\n• 🛵 Saída dos motoboys e rotina de entregas;\n• 🎬 Vídeos e unboxing das novidades e produtos que chegam;\n• 📢 Avisos de horários de funcionamento e novidades da loja.\n\n📲 *Clica no link e segue a gente lá pra acompanhar tudo:*\n🔗 [LINK_DO_INSTAGRAM]\n\n*Tamo junto!*`,
   },
   {
     id: 'salvar_contato_vip',
     title: 'Salvar Contato na Agenda (Status VIP)',
     badge: 'Alcance Orgânico & Status',
-    text: `📲 *AVISO VIP: SALVE NOSSO CONTATO NA SUA AGENDA!* ⚡\n\nFala pessoal do VIP! Passando um recado importante pra vocês:\n\nQuem tem o nosso número salvo nos contatos do celular consegue acompanhar nossos *Status diários no WhatsApp*!\n\nÉ por lá que a gente posta:\n• 💨 Ofertas relâmpago de última hora com desconto;\n• 📦 Chegada de modelos raros antes de irem pro cardápio;\n• 🛵 Avisos rápidos de saídas do motoboy no dia a dia.\n\n👉 *Salva aí no seu celular:* Smoking Pods Oficial\n\n*Assim você não perde nenhuma oportunidade da semana!* 🥇`,
+    text: `📲 *AVISO VIP: SALVE NOSSO CONTATO NA SUA AGENDA!* ⚡\n\nFala pessoal do VIP! Passando um recado importante pra vocês:\n\nQuem tem o nosso número salvo nos contatos do celular consegue acompanhar nossos *Status diários no WhatsApp*!\n\nÉ por lá que a gente posta:\n• ✨ Ofertas relâmpago de última hora com desconto;\n• 📦 Chegada de novidades e itens exclusivos antes de irem pro cardápio;\n• 🛵 Avisos rápidos de saídas do motoboy no dia a dia.\n\n👉 *Salva aí no seu celular:* Contato Oficial da Loja\n\n*Assim você não perde nenhuma oportunidade da semana!* 🥇`,
   },
   {
     id: 'lembrete_pre_fds_vip',
     title: 'Lembrete Pré-FDS / Reserva Semanal (Quarta 18:30)',
     badge: 'Antecipação & Sem Fila',
-    text: `⏳ *LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!* 💨\n\nSalve galera do VIP! Passando pra avisar quem gosta de se planejar com calma:\n\nSexta e sábado a fila de despacho do Uber Direct costuma ser bem cheia. Se você já quiser garantir seu pod agora no meio da semana, seu pedido sai na hora e sem correria!\n\n📦 *Cardápio 100% atualizado com os novos lotes:*\n🔗 [LINK_DO_CARDAPIO_VERCEL]\n\n⚡ *Entregas em 25 a 35 min em SBC e região!*\n\n*Garanta seu sabor favorito antes da correria do fds!* 🥇`,
+    text: `⏳ *LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!* ✨\n\nSalve galera do VIP! Passando pra avisar quem gosta de se planejar com calma:\n\nSexta e sábado a fila de despacho do delivery costuma ser bem cheia. Se você já quiser garantir seus produtos agora no meio da semana, seu pedido sai na hora e sem correria!\n\n📦 *Cardápio 100% atualizado com os novos lotes:*\n🔗 [LINK_DO_CARDAPIO_VERCEL]\n\n⚡ *Entregas rápidas de 25 a 35 min!*\n\n*Garanta seus itens favoritos antes da correria do fds!* 🥇`,
   },
   {
     id: 'mgm_indique_ganhe',
-    title: 'Programa Indique & Ganhe (1 Pod Grátis)',
+    title: 'Programa Indique & Ganhe (1 Produto Grátis)',
     badge: 'Multiplicação de Base',
-    text: `🎁 *GANHE 1 POD 100% GRÁTIS — PROGRAMA VIP SMOKING PODS!* 👑\n\nFala [Nome], beleza? Quer garantir seu próximo pod na faixa?\n\nComo funciona nosso programa de indicação:\n1️⃣ Indique *5 amigos* do rolê, da faculdade ou do trampo que comprem na Smoking Pods.\n2️⃣ Ao fazerem o pedido no WhatsApp, eles só precisam avisar: *"Fui indicado pelo [Nome]"*.\n3️⃣ Assim que os 5 pedidos forem confirmados, *você ganha 1 POD 100% GRÁTIS* (você só paga o frete do motoboy)!\n\n📲 *Manda o link do nosso Cardápio pra galera:*\n🔗 [LINK_DO_CARDAPIO_VERCEL]\n\n*Já avisa os parceiros e garante o seu pod na faixa!* 🚀`,
+    text: `🎁 *GANHE 1 PRODUTO 100% GRÁTIS — PROGRAMA VIP!* 👑\n\nFala [Nome], beleza? Quer garantir seu próximo pedido com item na faixa?\n\nComo funciona nosso programa de indicação:\n1️⃣ Indique *5 amigos* que comprem na loja.\n2️⃣ Ao fazerem o pedido no WhatsApp, eles só precisam avisar: *"Fui indicado pelo [Nome]"*.\n3️⃣ Assim que os 5 pedidos forem confirmados, *você ganha 1 PRODUTO 100% GRÁTIS* (você só paga o frete do motoboy)!\n\n📲 *Manda o link do nosso Cardápio pra galera:*\n🔗 [LINK_DO_CARDAPIO_VERCEL]\n\n*Já avisa os parceiros e garante seu produto na faixa!* 🚀`,
   },
 ];
 

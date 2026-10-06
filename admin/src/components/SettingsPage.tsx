@@ -259,7 +259,7 @@ export default function SettingsPage() {
                 type="text"
                 value={storeName}
                 onChange={(e) => setStoreName(e.target.value)}
-                placeholder="Ex: Smoking Pods, Vape House..."
+                placeholder="Ex: Minha Loja, Central Store, Distribuidora..."
                 className="w-full bg-[#121214] border border-white/15 rounded-2xl px-4 py-3.5 text-base text-white placeholder:text-white/30 focus:outline-none focus:border-white focus:ring-1 focus:ring-white/20 transition-all font-semibold shadow-inner"
               />
             </div>
@@ -376,7 +376,7 @@ export default function SettingsPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-white/40 pt-0.5">
                     <span className="flex items-center gap-1.5">
                       <span className="size-1.5 rounded-full bg-emerald-400" />
-                      <span>Link Neutro: identificador <strong>(?loja={currentSlug})</strong> sem menção a Smoking Pods.</span>
+                      <span>Link Neutro: identificador <strong>(?loja={currentSlug})</strong> sem menção a outras marcas.</span>
                     </span>
                     <a
                       href={`https://smoking-pods-catalogo.vercel.app/?loja=${currentSlug}`}

@@ -380,7 +380,7 @@ export function FollowUpsTab() {
 
                     {item.target_product && (
                       <div className="text-[11px] text-emerald-400 font-mono pt-1 border-t border-white/5">
-                        🎯 Pod de Interesse: {item.target_product}
+                        🎯 Produto de Interesse: {item.target_product}
                       </div>
                     )}
                   </div>

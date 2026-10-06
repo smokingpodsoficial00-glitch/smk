@@ -268,7 +268,7 @@ export function SalesHistoryTab() {
                         className="inline-flex items-center gap-1.5 bg-[#18181c] border border-white/10 text-xs px-3 py-1 rounded-xl text-white font-medium shadow-sm"
                       >
                         <strong className="text-emerald-400 font-mono">{item.quantity}x</strong>
-                        <span>{item.name || 'Pod'}</span>
+                        <span>{item.name || 'Produto'}</span>
                         {item.flavor && (
                           <span className="text-amber-300 font-semibold text-[11px]">
                             • {item.flavor}

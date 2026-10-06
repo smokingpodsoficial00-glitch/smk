@@ -179,7 +179,7 @@ export function NationalSalesModal({
               {nationalMetrics.totalOrders} {nationalMetrics.totalOrders === 1 ? "envio" : "envios"}
             </div>
             <p className="text-[10px] text-white/40">
-              {nationalMetrics.totalPodsSold} pods entregues
+              {nationalMetrics.totalPodsSold} unidades entregues
             </p>
           </div>
 
@@ -361,7 +361,7 @@ export function NationalSalesModal({
                           </div>
                           {shippingMargin !== 0 && (
                             <div className="text-[9px] text-white/40 font-medium">
-                              (Pods: +{formatBRL(productProfit)} · Frete: +{formatBRL(shippingMargin)})
+                              (Produtos: +{formatBRL(productProfit)} · Frete: +{formatBRL(shippingMargin)})
                             </div>
                           )}
                         </div>

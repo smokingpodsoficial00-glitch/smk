@@ -2346,7 +2346,7 @@ export default function FinanceDashboard() {
               <span>Inteligência Financeira & Estratégia de Vendas</span>
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Métricas de Vendas, Tesouraria, Campeões de Lucro por Pod e DRE Executivo.
+              Métricas de Vendas, Tesouraria, Campeões de Lucro por Produto e DRE Executivo.
             </p>
           </div>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/30 self-start sm:self-auto">
@@ -2501,7 +2501,7 @@ export default function FinanceDashboard() {
             Ciclo Atual ({currentCycle.startDateStr.slice(0, 5)} → {currentCycle.endDateStr.slice(0, 5)})
           </span>
           <span className="text-xs font-semibold text-emerald-400 sm:text-white/40 bg-emerald-500/10 sm:bg-transparent px-2.5 py-0.5 sm:p-0 rounded-full border border-emerald-500/20 sm:border-0">
-            {totalOrders} {totalOrders === 1 ? "pedido" : "pedidos"} · {totalPodsSold} pods
+            {totalOrders} {totalOrders === 1 ? "pedido" : "pedidos"} · {totalPodsSold} produtos
           </span>
         </div>
 
@@ -2742,7 +2742,7 @@ export default function FinanceDashboard() {
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-white/40 font-medium">
                     <span>
-                      {wp.podsSold} {wp.podsSold === 1 ? "pod vendido" : "pods vendidos"}
+                      {wp.podsSold} {wp.podsSold === 1 ? "un vendida" : "un vendidas"}
                     </span>
                     <span>
                       {wp.ordersCount} {wp.ordersCount === 1 ? "pedido" : "pedidos"}
@@ -3152,20 +3152,20 @@ export default function FinanceDashboard() {
             </div>
           </div>
 
-          {/* Card 4: Preço Médio por Pod */}
+          {/* Card 4: Preço Médio por Unidade */}
           <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
             <span className="text-[10px] sm:text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
               <Box className="size-3.5 sm:size-4 text-white/70 shrink-0" />
-              <span className="truncate">Preço / Pod</span>
+              <span className="truncate">Preço / Unidade</span>
             </span>
             <div className="text-xl sm:text-3xl font-extrabold text-white">
               {formatBRL(averagePricePerPod)}
             </div>
             <p className="text-[11px] sm:text-xs text-white/50">
-              Preço médio por pod
+              Preço médio por unidade
             </p>
             <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
-              Fat. ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalPodsSold} pods
+              Fat. ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalPodsSold} un
             </div>
           </div>
         </div>
@@ -3195,7 +3195,7 @@ export default function FinanceDashboard() {
               {formatBRL(stockAssetCost)}
             </div>
             <p className="text-xs text-white/50">
-              {stockAssetUnits} pods no armazém.
+              {stockAssetUnits} unidades no armazém.
             </p>
           </div>
 
@@ -3208,7 +3208,7 @@ export default function FinanceDashboard() {
               {formatBRL(stockAssetRetail)}
             </div>
             <p className="text-xs text-white/50">
-              Valor bruto na venda dos {stockAssetUnits} pods.
+              Valor bruto na venda das {stockAssetUnits} unidades.
             </p>
           </div>
 
@@ -3454,7 +3454,7 @@ export default function FinanceDashboard() {
                     </div>
                     <EvolutionBadge evolution={monthlyEvolution.grossRevenue} />
                     <p className="text-[10px] sm:text-[11px] text-white/50">
-                      {selectedMonthlyMetric.totalOrders} ped ({selectedMonthlyMetric.totalPodsSold} pods)
+                      {selectedMonthlyMetric.totalOrders} ped ({selectedMonthlyMetric.totalPodsSold} un)
                     </p>
                   </div>
 
@@ -3508,7 +3508,7 @@ export default function FinanceDashboard() {
                     <span className="text-white font-extrabold text-sm">{formatBRL(selectedMonthlyMetric.averageTicket)}</span>
                   </div>
                   <div>
-                    <span className="text-white/50 block text-[10px] uppercase font-semibold">Preço Médio / Pod</span>
+                    <span className="text-white/50 block text-[10px] uppercase font-semibold">Preço Médio / Unidade</span>
                     <span className="text-white font-extrabold text-sm">{formatBRL(selectedMonthlyMetric.averagePricePerPod)}</span>
                   </div>
                   <div>
@@ -3546,7 +3546,7 @@ export default function FinanceDashboard() {
                       <th className="py-3 px-4 text-right">Lucro Líquido</th>
                       <th className="py-3 px-4 text-right">Margem</th>
                       <th className="py-3 px-4 text-center">Pedidos</th>
-                      <th className="py-3 px-4 text-center">Pods</th>
+                      <th className="py-3 px-4 text-center">Unidades</th>
                       <th className="py-3 px-4 text-right">Recompras</th>
                       <th className="py-3 px-4 text-right">Saldo do Ciclo</th>
                       <th className="py-3 px-4 text-center">Status</th>
@@ -3642,7 +3642,7 @@ export default function FinanceDashboard() {
                     </div>
                     <EvolutionBadge evolution={quarterlyEvolution.grossRevenue} />
                     <p className="text-[10px] sm:text-[11px] text-white/50">
-                      {selectedQuarter.totalOrders} ped ({selectedQuarter.totalPodsSold} pods)
+                      {selectedQuarter.totalOrders} ped ({selectedQuarter.totalPodsSold} un)
                     </p>
                   </div>
 
@@ -3772,7 +3772,7 @@ export default function FinanceDashboard() {
                     </div>
                     <EvolutionBadge evolution={semiannualEvolution.grossRevenue} />
                     <p className="text-[10px] sm:text-[11px] text-white/50">
-                      {selectedSemester.totalOrders} ped ({selectedSemester.totalPodsSold} pods)
+                      {selectedSemester.totalOrders} ped ({selectedSemester.totalPodsSold} un)
                     </p>
                   </div>
 
@@ -3902,7 +3902,7 @@ export default function FinanceDashboard() {
                     </div>
                     <EvolutionBadge evolution={annualEvolution.grossRevenue} />
                     <p className="text-[10px] sm:text-[11px] text-white/50">
-                      {selectedYear.totalOrders} ped ({selectedYear.totalPodsSold} pods)
+                      {selectedYear.totalOrders} ped ({selectedYear.totalPodsSold} un)
                     </p>
                   </div>
 
@@ -4126,13 +4126,13 @@ export default function FinanceDashboard() {
                   </div>
                 </div>
 
-                {/* 3. Pods Vendidos */}
+                {/* 3. Unidades Vendidas */}
                 <div className="bg-black/40 border border-white/15 rounded-2xl p-3.5 sm:p-3 space-y-1.5">
                   <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider block">
-                    Pods Vendidos
+                    Unidades Vendidas
                   </span>
                   <div className="text-base sm:text-lg font-black text-white">
-                    {compBaseCycle.totalPodsSold} pods
+                    {compBaseCycle.totalPodsSold} un
                   </div>
                   <div className="flex items-center justify-between text-[10px] pt-0.5">
                     <span className="text-white/40">Ant: {compTargetCycle.totalPodsSold}</span>
@@ -4234,10 +4234,10 @@ export default function FinanceDashboard() {
                         <th className="py-2 px-3">Dia</th>
                         <th className="py-2 px-3">Data Atual</th>
                         <th className="py-2 px-3 text-right">Venda Atual (R$)</th>
-                        <th className="py-2 px-3 text-center">Pods</th>
+                        <th className="py-2 px-3 text-center">Unidades</th>
                         <th className="py-2 px-3">Data Anterior</th>
                         <th className="py-2 px-3 text-right">Venda Anterior (R$)</th>
-                        <th className="py-2 px-3 text-center">Pods</th>
+                        <th className="py-2 px-3 text-center">Unidades</th>
                         <th className="py-2 px-3 text-right">Variação (R$)</th>
                         <th className="py-2 px-3 text-right">Acumulado Atual</th>
                         <th className="py-2 px-3 text-right">Acumulado Anterior</th>
@@ -4335,7 +4335,7 @@ export default function FinanceDashboard() {
                 <td className="py-3.5 px-4 text-right font-bold text-red-400">
                   {grossRevenue > 0 ? ((cmv / grossRevenue) * 100).toFixed(1) : 0}%
                 </td>
-                <td className="py-3.5 px-4 text-muted-foreground">Custo de aquisição pago ao fornecedor pelos pods</td>
+                <td className="py-3.5 px-4 text-muted-foreground">Custo de aquisição pago ao fornecedor pelos produtos</td>
               </tr>
 
               {/* Line 3: Marketing */}
