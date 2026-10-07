@@ -57,7 +57,7 @@ export function SmartAutocomplete({
   createLabel = (t) => `Criar novo "${t}"`,
   sanitize,
   onEnterWithoutSelection,
-  maxSuggestions = 6,
+  maxSuggestions = 4,
   ariaLabel,
 }: SmartAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -81,22 +81,28 @@ export function SmartAutocomplete({
 
   const query = normalizeForMatch(value);
 
+  // REGRA FUNDAMENTAL: Campo vazio NUNCA gera sugestões e NUNCA abre dropdown
   const suggestions = useMemo(() => {
+    if (!query) return [];
+
     const scored = uniqueOptions
       .map((o) => {
         const v = normalizeForMatch(o.value);
         const l = normalizeForMatch(o.label || o.value);
-        if (query && !v.includes(query) && !l.includes(query)) return null;
-        const starts = query && (v.startsWith(query) || l.startsWith(query)) ? 1 : 0;
+        if (!v.includes(query) && !l.includes(query)) return null;
+        // Prioriza quem começa com o termo digitado
+        const starts = (v.startsWith(query) || l.startsWith(query)) ? 1 : 0;
         return { o, starts };
       })
       .filter(Boolean) as { o: SmartOption; starts: number }[];
+
     scored.sort(
       (a, b) =>
-        (b.o.priority || 0) - (a.o.priority || 0) ||
         b.starts - a.starts ||
+        (b.o.priority || 0) - (a.o.priority || 0) ||
         (a.o.label || a.o.value).localeCompare(b.o.label || b.o.value, "pt-BR", { numeric: true })
     );
+
     return scored.slice(0, maxSuggestions).map((s) => s.o);
   }, [uniqueOptions, query, maxSuggestions]);
 
@@ -104,11 +110,15 @@ export function SmartAutocomplete({
     () => (query ? uniqueOptions.find((o) => normalizeForMatch(o.value) === query) : undefined),
     [uniqueOptions, query]
   );
+
+  // "Criar novo" só aparece se o usuário digitou algo e não é match exato
   const showCreate = !!query && !exactMatch;
   const totalItems = suggestions.length + (showCreate ? 1 : 0);
-  const visible = open && !disabled && totalItems > 0;
 
-  // Posicionamento inteligente (fixed): acompanha o input, respeita o viewport, não cobre a tela inteira
+  // VISÍVEL SOMENTE SE O USUÁRIO DIGITOU ALGO (query não vazio) E HÁ ITENS
+  const visible = open && !disabled && !!query && totalItems > 0;
+
+  // Posicionamento inteligente (fixed): acompanha o input, respeita o viewport, compacto (140-180px máx)
   const updatePosition = () => {
     const el = inputRef.current;
     if (!el) return;
@@ -118,22 +128,21 @@ export function SmartAutocomplete({
     const vH = vv ? vv.height : window.innerHeight;
     const vW = vv ? vv.width : window.innerWidth;
     
-    // Espaço disponível real acima e abaixo considerando visualViewport
-    const spaceBelow = vTop + vH - r.bottom - 8;
-    const spaceAbove = r.top - vTop - 8;
+    // Espaço disponível real acima e abaixo
+    const spaceBelow = vTop + vH - r.bottom - 6;
+    const spaceAbove = r.top - vTop - 6;
     
-    // Largura estritamente idêntica à do input (nunca menor ou maior na tela)
+    // Largura estritamente idêntica à do input
     const width = Math.min(r.width, vW - 16);
     const left = Math.max(8, Math.min(r.left, vW - width - 8));
     
-    // Altura compacta: no desktop/mobile acompanha o conteúdo, com máx 220px-240px (~5 a 6 itens)
-    // Se houver poucos itens (ex: 1, 2, 3), o max-height diminui proporcionalmente
-    const contentEstimate = Math.max(70, (totalItems * 40) + 32);
-    const preferredMaxH = Math.min(240, contentEstimate);
+    // Altura super compacta: máximo 160-180px para 3-4 itens, ou proporcional ao conteúdo
+    const contentEstimate = Math.max(48, (totalItems * 38) + 8);
+    const preferredMaxH = Math.min(180, contentEstimate);
     
-    // Prioriza abrir abaixo se tiver pelo menos 140px disponíveis, ou se houver mais espaço abaixo do que acima
-    const below = spaceBelow >= 140 || spaceBelow >= spaceAbove;
-    const maxH = Math.max(60, Math.min(preferredMaxH, below ? spaceBelow : spaceAbove));
+    // Prioriza abrir abaixo se tiver pelo menos 110px disponíveis, ou se houver mais espaço abaixo
+    const below = spaceBelow >= 110 || spaceBelow >= spaceAbove;
+    const maxH = Math.max(48, Math.min(preferredMaxH, below ? spaceBelow : spaceAbove));
     
     setPos(
       below
@@ -185,12 +194,16 @@ export function SmartAutocomplete({
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (!open) setOpen(true);
-      if (totalItems > 0) setHighlight((h) => (h + 1) % totalItems);
+      if (totalItems > 0) {
+        e.preventDefault();
+        if (!open) setOpen(true);
+        setHighlight((h) => (h + 1) % totalItems);
+      }
     } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      if (totalItems > 0) setHighlight((h) => (h <= 0 ? totalItems - 1 : h - 1));
+      if (totalItems > 0) {
+        e.preventDefault();
+        setHighlight((h) => (h <= 0 ? totalItems - 1 : h - 1));
+      }
     } else if (e.key === "Escape") {
       if (visible) {
         e.preventDefault();
@@ -240,11 +253,23 @@ export function SmartAutocomplete({
         disabled={disabled}
         placeholder={placeholder}
         className={className}
-        onFocus={() => setOpen(true)}
-        onClick={() => setOpen(true)}
+        onFocus={() => {
+          // Foco simples: NÃO abre se estiver vazio
+          if (query) setOpen(true);
+        }}
+        onClick={() => {
+          // Clique simples: NÃO abre se estiver vazio
+          if (query) setOpen(true);
+        }}
         onChange={(e) => {
-          onChange(sanitize ? sanitize(e.target.value) : e.target.value);
-          setOpen(true);
+          const newVal = sanitize ? sanitize(e.target.value) : e.target.value;
+          onChange(newVal);
+          // Digitou algo: abre se tiver texto; se apagou tudo: fecha imediatamente
+          if (normalizeForMatch(newVal)) {
+            setOpen(true);
+          } else {
+            setOpen(false);
+          }
           setHighlight(-1);
         }}
         onKeyDown={onKeyDown}
@@ -268,45 +293,43 @@ export function SmartAutocomplete({
             // Evita perder o foco do input antes do toque ser processado
             onMouseDown={(e) => e.preventDefault()}
           >
-            {suggestions.length > 0 && (
-              <div className="px-3 py-1 text-[9px] uppercase font-bold tracking-wider text-muted-foreground/60 select-none">
-                {sectionTitle}
+            {suggestions.length === 0 && showCreate && (
+              <div className="px-3 py-1.5 text-[11px] text-muted-foreground/70">
+                Nenhum resultado encontrado
               </div>
             )}
-            
-            {suggestions.length === 0 && !showCreate && (
-              <div className="px-3 py-2 text-[11px] text-muted-foreground/70 text-center">Nenhum resultado encontrado</div>
+
+            {suggestions.length > 0 && (
+              <div className="divide-y divide-white/5">
+                {suggestions.map((o, i) => {
+                  const isCurrent = normalizeForMatch(o.value) === query;
+                  return (
+                    <button
+                      key={o.value}
+                      id={`${listId}-${i}`}
+                      data-idx={i}
+                      type="button"
+                      role="option"
+                      aria-selected={highlight === i}
+                      onClick={() => select(o.value)}
+                      onMouseEnter={() => setHighlight(i)}
+                      className={`w-full min-h-[36px] flex items-center justify-between gap-2 px-3 py-1.5 text-left text-xs text-white/90 transition-colors cursor-pointer ${
+                        highlight === i ? "bg-emerald-500/20 text-white" : "hover:bg-white/5 active:bg-white/10"
+                      }`}
+                    >
+                      <span className="truncate font-medium">{o.label || o.value}</span>
+                      <span className="flex items-center gap-1.5 shrink-0">
+                        {o.hint && <span className="text-[10px] text-muted-foreground/60">{o.hint}</span>}
+                        {isCurrent && <Check className="size-3.5 text-emerald-400" />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             )}
 
-            <div className="divide-y divide-white/5">
-              {suggestions.map((o, i) => {
-                const isCurrent = normalizeForMatch(o.value) === query;
-                return (
-                  <button
-                    key={o.value}
-                    id={`${listId}-${i}`}
-                    data-idx={i}
-                    type="button"
-                    role="option"
-                    aria-selected={highlight === i}
-                    onClick={() => select(o.value)}
-                    onMouseEnter={() => setHighlight(i)}
-                    className={`w-full min-h-[38px] flex items-center justify-between gap-2 px-3 py-2 text-left text-xs text-white/90 transition-colors cursor-pointer ${
-                      highlight === i ? "bg-emerald-500/20 text-white" : "hover:bg-white/5 active:bg-white/10"
-                    }`}
-                  >
-                    <span className="truncate font-medium">{o.label || o.value}</span>
-                    <span className="flex items-center gap-1.5 shrink-0">
-                      {o.hint && <span className="text-[10px] text-muted-foreground/60">{o.hint}</span>}
-                      {isCurrent && <Check className="size-3.5 text-emerald-400" />}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
             {showCreate && (
-              <div className="pt-1 mt-0.5 border-t border-white/10">
+              <div className={suggestions.length > 0 ? "pt-1 mt-0.5 border-t border-white/10" : ""}>
                 <button
                   id={`${listId}-${suggestions.length}`}
                   data-idx={suggestions.length}
@@ -315,7 +338,7 @@ export function SmartAutocomplete({
                   aria-selected={highlight === suggestions.length}
                   onClick={commitTyped}
                   onMouseEnter={() => setHighlight(suggestions.length)}
-                  className={`w-full min-h-[38px] flex items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-emerald-400 transition-colors cursor-pointer ${
+                  className={`w-full min-h-[36px] flex items-center gap-2 px-3 py-1.5 text-left text-xs font-semibold text-emerald-400 transition-colors cursor-pointer ${
                     highlight === suggestions.length ? "bg-emerald-500/20" : "hover:bg-emerald-500/10 active:bg-emerald-500/20"
                   }`}
                 >
