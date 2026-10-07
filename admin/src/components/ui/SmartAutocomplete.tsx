@@ -57,7 +57,7 @@ export function SmartAutocomplete({
   createLabel = (t) => `Criar novo "${t}"`,
   sanitize,
   onEnterWithoutSelection,
-  maxSuggestions = 8,
+  maxSuggestions = 6,
   ariaLabel,
 }: SmartAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -108,7 +108,7 @@ export function SmartAutocomplete({
   const totalItems = suggestions.length + (showCreate ? 1 : 0);
   const visible = open && !disabled && totalItems > 0;
 
-  // Posicionamento em portal (fixed): não é cortado por overflow do modal e respeita teclado virtual
+  // Posicionamento inteligente (fixed): acompanha o input, respeita o viewport, não cobre a tela inteira
   const updatePosition = () => {
     const el = inputRef.current;
     if (!el) return;
@@ -116,13 +116,21 @@ export function SmartAutocomplete({
     const vv = window.visualViewport;
     const vTop = vv ? vv.offsetTop : 0;
     const vH = vv ? vv.height : window.innerHeight;
-    const vW = window.innerWidth;
+    const vW = vv ? vv.width : window.innerWidth;
+    
+    // Espaço disponível real acima e abaixo considerando visualViewport (teclado mobile)
     const spaceBelow = vTop + vH - r.bottom - 8;
     const spaceAbove = r.top - vTop - 8;
-    const width = Math.min(Math.max(r.width, 240), vW - 16);
-    const left = Math.min(Math.max(r.left, 8), vW - width - 8);
-    const below = spaceBelow >= Math.min(220, spaceAbove);
-    const maxH = Math.max(120, Math.min(300, below ? spaceBelow : spaceAbove));
+    
+    // Largura estritamente alinhada ao input, com garantia de limites do viewport
+    const width = Math.min(r.width, vW - 16);
+    const left = Math.max(8, Math.min(r.left, vW - width - 8));
+    
+    // Altura controlada: compacto (~4-5 itens, máx 200px em mobile / 240px em desktop)
+    const preferredMaxH = Math.min(200, Math.max(100, (totalItems * 40) + 36));
+    const below = spaceBelow >= 120 || spaceBelow >= spaceAbove;
+    const maxH = Math.min(preferredMaxH, below ? spaceBelow : spaceAbove);
+    
     setPos(
       below
         ? { top: r.bottom + 4, left, width, maxH }
@@ -252,57 +260,65 @@ export function SmartAutocomplete({
               width: pos.width,
               maxHeight: pos.maxH,
             }}
-            className="z-[80] overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#161616] shadow-2xl shadow-black/60 py-1 animate-in fade-in duration-100"
+            className="z-[9999] overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#121212]/95 backdrop-blur-md shadow-xl shadow-black/80 py-1 animate-in fade-in duration-100 divide-y divide-white/5 custom-scrollbar text-xs"
             // Evita perder o foco do input antes do toque ser processado
             onMouseDown={(e) => e.preventDefault()}
           >
-            {suggestions.length > 0 ? (
-              <div className="px-3 pt-1.5 pb-1 text-[10px] uppercase font-semibold tracking-wider text-muted-foreground/70">
+            {suggestions.length > 0 && (
+              <div className="px-2.5 py-1 text-[9px] uppercase font-bold tracking-wider text-muted-foreground/60 select-none">
                 {sectionTitle}
               </div>
-            ) : (
-              <div className="px-3 pt-2 pb-1 text-[11px] text-muted-foreground/70">Nenhum resultado encontrado</div>
             )}
-            {suggestions.map((o, i) => {
-              const isCurrent = normalizeForMatch(o.value) === query;
-              return (
+            
+            {suggestions.length === 0 && !showCreate && (
+              <div className="px-2.5 py-2 text-[11px] text-muted-foreground/70 text-center">Nenhum resultado</div>
+            )}
+
+            <div className="divide-y divide-white/5">
+              {suggestions.map((o, i) => {
+                const isCurrent = normalizeForMatch(o.value) === query;
+                return (
+                  <button
+                    key={o.value}
+                    id={`${listId}-${i}`}
+                    data-idx={i}
+                    type="button"
+                    role="option"
+                    aria-selected={highlight === i}
+                    onClick={() => select(o.value)}
+                    onMouseEnter={() => setHighlight(i)}
+                    className={`w-full min-h-[36px] sm:min-h-[38px] flex items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs text-white/90 transition-colors cursor-pointer ${
+                      highlight === i ? "bg-emerald-500/20 text-white" : "hover:bg-white/5 active:bg-white/10"
+                    }`}
+                  >
+                    <span className="truncate font-medium">{o.label || o.value}</span>
+                    <span className="flex items-center gap-1 shrink-0">
+                      {o.hint && <span className="text-[9px] text-muted-foreground/60">{o.hint}</span>}
+                      {isCurrent && <Check className="size-3 text-emerald-400" />}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {showCreate && (
+              <div className="pt-0.5">
                 <button
-                  key={o.value}
-                  id={`${listId}-${i}`}
-                  data-idx={i}
+                  id={`${listId}-${suggestions.length}`}
+                  data-idx={suggestions.length}
                   type="button"
                   role="option"
-                  aria-selected={highlight === i}
-                  onClick={() => select(o.value)}
-                  onMouseEnter={() => setHighlight(i)}
-                  className={`w-full min-h-[44px] flex items-center justify-between gap-2 px-3 py-2 text-left text-sm text-white transition-colors cursor-pointer ${
-                    highlight === i ? "bg-emerald-500/15" : "hover:bg-white/5"
+                  aria-selected={highlight === suggestions.length}
+                  onClick={commitTyped}
+                  onMouseEnter={() => setHighlight(suggestions.length)}
+                  className={`w-full min-h-[36px] sm:min-h-[38px] flex items-center gap-2 px-2.5 py-1.5 text-left text-xs font-semibold text-emerald-400 transition-colors cursor-pointer ${
+                    highlight === suggestions.length ? "bg-emerald-500/20" : "hover:bg-emerald-500/10 active:bg-emerald-500/20"
                   }`}
                 >
-                  <span className="truncate">{o.label || o.value}</span>
-                  <span className="flex items-center gap-1.5 shrink-0">
-                    {o.hint && <span className="text-[10px] text-muted-foreground/70">{o.hint}</span>}
-                    {isCurrent && <Check className="size-3.5 text-emerald-400" />}
-                  </span>
+                  <Plus className="size-3.5 shrink-0" />
+                  <span className="truncate">{createLabel(value.replace(/\s+/g, " ").trim())}</span>
                 </button>
-              );
-            })}
-            {showCreate && (
-              <button
-                id={`${listId}-${suggestions.length}`}
-                data-idx={suggestions.length}
-                type="button"
-                role="option"
-                aria-selected={highlight === suggestions.length}
-                onClick={commitTyped}
-                onMouseEnter={() => setHighlight(suggestions.length)}
-                className={`w-full min-h-[44px] flex items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-emerald-400 border-t border-white/5 transition-colors cursor-pointer ${
-                  highlight === suggestions.length ? "bg-emerald-500/15" : "hover:bg-emerald-500/10"
-                }`}
-              >
-                <Plus className="size-4 shrink-0" />
-                <span className="truncate">{createLabel(value.replace(/\s+/g, " ").trim())}</span>
-              </button>
+              </div>
             )}
           </div>,
           document.body
