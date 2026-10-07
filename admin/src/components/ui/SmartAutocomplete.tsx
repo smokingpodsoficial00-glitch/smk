@@ -118,18 +118,22 @@ export function SmartAutocomplete({
     const vH = vv ? vv.height : window.innerHeight;
     const vW = vv ? vv.width : window.innerWidth;
     
-    // Espaço disponível real acima e abaixo considerando visualViewport (teclado mobile)
+    // Espaço disponível real acima e abaixo considerando visualViewport
     const spaceBelow = vTop + vH - r.bottom - 8;
     const spaceAbove = r.top - vTop - 8;
     
-    // Largura estritamente alinhada ao input, com garantia de limites do viewport
+    // Largura estritamente idêntica à do input (nunca menor ou maior na tela)
     const width = Math.min(r.width, vW - 16);
     const left = Math.max(8, Math.min(r.left, vW - width - 8));
     
-    // Altura controlada: compacto (~4-5 itens, máx 200px em mobile / 240px em desktop)
-    const preferredMaxH = Math.min(200, Math.max(100, (totalItems * 40) + 36));
-    const below = spaceBelow >= 120 || spaceBelow >= spaceAbove;
-    const maxH = Math.min(preferredMaxH, below ? spaceBelow : spaceAbove);
+    // Altura compacta: no desktop/mobile acompanha o conteúdo, com máx 220px-240px (~5 a 6 itens)
+    // Se houver poucos itens (ex: 1, 2, 3), o max-height diminui proporcionalmente
+    const contentEstimate = Math.max(70, (totalItems * 40) + 32);
+    const preferredMaxH = Math.min(240, contentEstimate);
+    
+    // Prioriza abrir abaixo se tiver pelo menos 140px disponíveis, ou se houver mais espaço abaixo do que acima
+    const below = spaceBelow >= 140 || spaceBelow >= spaceAbove;
+    const maxH = Math.max(60, Math.min(preferredMaxH, below ? spaceBelow : spaceAbove));
     
     setPos(
       below
@@ -260,18 +264,18 @@ export function SmartAutocomplete({
               width: pos.width,
               maxHeight: pos.maxH,
             }}
-            className="z-[9999] overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#121212]/95 backdrop-blur-md shadow-xl shadow-black/80 py-1 animate-in fade-in duration-100 divide-y divide-white/5 custom-scrollbar text-xs"
+            className="z-[9999] overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#141414] shadow-2xl shadow-black/90 py-1 animate-in fade-in duration-100 custom-scrollbar text-xs box-border"
             // Evita perder o foco do input antes do toque ser processado
             onMouseDown={(e) => e.preventDefault()}
           >
             {suggestions.length > 0 && (
-              <div className="px-2.5 py-1 text-[9px] uppercase font-bold tracking-wider text-muted-foreground/60 select-none">
+              <div className="px-3 py-1 text-[9px] uppercase font-bold tracking-wider text-muted-foreground/60 select-none">
                 {sectionTitle}
               </div>
             )}
             
             {suggestions.length === 0 && !showCreate && (
-              <div className="px-2.5 py-2 text-[11px] text-muted-foreground/70 text-center">Nenhum resultado</div>
+              <div className="px-3 py-2 text-[11px] text-muted-foreground/70 text-center">Nenhum resultado encontrado</div>
             )}
 
             <div className="divide-y divide-white/5">
@@ -287,14 +291,14 @@ export function SmartAutocomplete({
                     aria-selected={highlight === i}
                     onClick={() => select(o.value)}
                     onMouseEnter={() => setHighlight(i)}
-                    className={`w-full min-h-[36px] sm:min-h-[38px] flex items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs text-white/90 transition-colors cursor-pointer ${
+                    className={`w-full min-h-[38px] flex items-center justify-between gap-2 px-3 py-2 text-left text-xs text-white/90 transition-colors cursor-pointer ${
                       highlight === i ? "bg-emerald-500/20 text-white" : "hover:bg-white/5 active:bg-white/10"
                     }`}
                   >
                     <span className="truncate font-medium">{o.label || o.value}</span>
-                    <span className="flex items-center gap-1 shrink-0">
-                      {o.hint && <span className="text-[9px] text-muted-foreground/60">{o.hint}</span>}
-                      {isCurrent && <Check className="size-3 text-emerald-400" />}
+                    <span className="flex items-center gap-1.5 shrink-0">
+                      {o.hint && <span className="text-[10px] text-muted-foreground/60">{o.hint}</span>}
+                      {isCurrent && <Check className="size-3.5 text-emerald-400" />}
                     </span>
                   </button>
                 );
@@ -302,7 +306,7 @@ export function SmartAutocomplete({
             </div>
 
             {showCreate && (
-              <div className="pt-0.5">
+              <div className="pt-1 mt-0.5 border-t border-white/10">
                 <button
                   id={`${listId}-${suggestions.length}`}
                   data-idx={suggestions.length}
@@ -311,7 +315,7 @@ export function SmartAutocomplete({
                   aria-selected={highlight === suggestions.length}
                   onClick={commitTyped}
                   onMouseEnter={() => setHighlight(suggestions.length)}
-                  className={`w-full min-h-[36px] sm:min-h-[38px] flex items-center gap-2 px-2.5 py-1.5 text-left text-xs font-semibold text-emerald-400 transition-colors cursor-pointer ${
+                  className={`w-full min-h-[38px] flex items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-emerald-400 transition-colors cursor-pointer ${
                     highlight === suggestions.length ? "bg-emerald-500/20" : "hover:bg-emerald-500/10 active:bg-emerald-500/20"
                   }`}
                 >
