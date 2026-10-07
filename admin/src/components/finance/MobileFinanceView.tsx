@@ -195,6 +195,10 @@ export interface MobileFinanceViewProps {
     totalRealized: number;
     target: number;
     remaining: number;
+    surplus?: number;
+    isTargetAchieved?: boolean;
+    diffFromTarget?: number;
+    finalCumulativeBalance?: number;
     progressPerc: number;
     remainingDays: number;
     dailyPaceNeeded: number;
@@ -992,7 +996,15 @@ function MobileFinanceViewComponent({
                     {monthlyTrajectory.progressPerc.toFixed(1)}% atingido
                   </span>
                   <span className="text-white/60">
-                    Faltam {formatBRL(monthlyTrajectory.remaining)}
+                    {monthlyTrajectory.isTargetAchieved ? (
+                      <span className="text-emerald-300 font-bold">
+                        Excedente +{formatBRL(monthlyTrajectory.surplus || 0)}
+                      </span>
+                    ) : (
+                      <span>
+                        Faltam {formatBRL(monthlyTrajectory.remaining)} (Saldo: -{formatBRL(Math.abs(monthlyTrajectory.diffFromTarget ?? (monthlyTrajectory.totalRealized - monthlyTrajectory.target)))})
+                      </span>
+                    )}
                   </span>
                 </div>
                 <div className="h-2.5 w-full bg-white/10 rounded-full overflow-hidden">
@@ -1112,6 +1124,28 @@ function MobileFinanceViewComponent({
                         style={{ width: `${Math.min(100, wp.percentage)}%` }}
                       />
                     </div>
+
+                    {/* Compensação Acumulada da Semana */}
+                    {(wp.status !== "FUTURE" || wp.revenue > 0) && (
+                      <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px]">
+                        <span className="text-white/50">
+                          {wp.netWeeklyResult >= 0 ? "Excedente semanal:" : "Déficit semanal:"}
+                        </span>
+                        <span className="font-extrabold text-white/80">
+                          {wp.netWeeklyResult >= 0 ? "+" : ""}
+                          {formatBRL(wp.netWeeklyResult)}
+                        </span>
+                        <span className="text-white/40">| Saldo acumulado:</span>
+                        <span
+                          className={`font-black ${
+                            wp.cumulativeBalance >= 0 ? "text-emerald-400" : "text-amber-400"
+                          }`}
+                        >
+                          {wp.cumulativeBalance >= 0 ? "+" : "-"}
+                          {formatBRL(Math.abs(wp.cumulativeBalance))}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })}

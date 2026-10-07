@@ -1611,10 +1611,18 @@ export default function FinanceDashboard() {
 
   // Trajeto da Meta Mensal (Termômetro de Compensação Global do Ciclo)
   const monthlyTrajectory = useMemo(() => {
-    const totalRealized = weeklyPerformances.reduce((acc, wp) => acc + wp.revenue, 0);
+    const totalRealized = Number(weeklyPerformances.reduce((acc, wp) => acc + wp.revenue, 0).toFixed(2));
     const target = weeklyGoalsConfig.monthlyTarget || 7000;
-    const remaining = Math.max(0, target - totalRealized);
+    const diffFromTarget = Number((totalRealized - target).toFixed(2)); // Saldo total oficial do mês
+    const isTargetAchieved = totalRealized >= target;
+    const remaining = isTargetAchieved ? 0 : Number((target - totalRealized).toFixed(2));
+    const surplus = isTargetAchieved ? diffFromTarget : 0;
     const progressPerc = target > 0 ? (totalRealized / target) * 100 : 0;
+
+    // Saldo acumulado oficial final (ou da última semana processada)
+    const finalCumulativeBalance = weeklyPerformances.length > 0
+      ? weeklyPerformances[weeklyPerformances.length - 1].cumulativeBalance
+      : diffFromTarget;
 
     const [endD, endM, endY] = currentCycle.endDateStr.split("/").map(Number);
     const cycleEndDate = new Date(endY, endM - 1, endD, 23, 59, 59, 999);
@@ -1627,6 +1635,10 @@ export default function FinanceDashboard() {
       totalRealized,
       target,
       remaining,
+      surplus,
+      isTargetAchieved,
+      diffFromTarget,
+      finalCumulativeBalance,
       progressPerc,
       remainingDays,
       dailyPaceNeeded,
@@ -2749,6 +2761,44 @@ export default function FinanceDashboard() {
                     </span>
                   </div>
                 </div>
+
+                {/* Bloco de Compensação da Semana (Resultado Semanal & Saldo Acumulado) */}
+                {(wp.status !== "FUTURE" || wp.revenue > 0) && (
+                  <div className="pt-2 border-t border-white/5 space-y-1 text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/50 text-[10px]">Resultado da semana:</span>
+                      <span
+                        className={`font-black text-[11px] ${
+                          wp.netWeeklyResult >= 0 ? "text-emerald-400" : "text-amber-400"
+                        }`}
+                      >
+                        {wp.netWeeklyResult >= 0 ? "+" : ""}
+                        {formatBRL(wp.netWeeklyResult)}
+                      </span>
+                    </div>
+
+                    {/* Detalhe de amortização de déficit passado */}
+                    {wp.surplusUsedForCompensation > 0 && (
+                      <div className="flex items-center justify-between text-[10px] text-emerald-300/80">
+                        <span>Compensou déficit:</span>
+                        <span className="font-bold">{formatBRL(wp.surplusUsedForCompensation)}</span>
+                      </div>
+                    )}
+
+                    {/* Saldo Acumulado de Compensação até esta semana */}
+                    <div className="flex items-center justify-between pt-0.5 text-[10px]">
+                      <span className="text-white/40">Saldo acumulado:</span>
+                      <span
+                        className={`font-black ${
+                          wp.cumulativeBalance >= 0 ? "text-emerald-300" : "text-amber-300"
+                        }`}
+                      >
+                        {wp.cumulativeBalance >= 0 ? "+ " : "- "}
+                        {formatBRL(Math.abs(wp.cumulativeBalance))}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -2772,11 +2822,19 @@ export default function FinanceDashboard() {
                   </span>
                 </div>
                 <p className="text-[11px] text-white/50 mt-0.5">
-                  {monthlyTrajectory.totalRealized >= monthlyTrajectory.target ? (
-                    <span className="text-emerald-400 font-bold">🎉 Meta mensal batida com sucesso!</span>
+                  {monthlyTrajectory.isTargetAchieved ? (
+                    <span className="text-emerald-400 font-bold">
+                      🎉 Meta mensal batida com sucesso! Excedente acumulado:{" "}
+                      <strong className="text-emerald-300 font-extrabold">{formatBRL(monthlyTrajectory.surplus)}</strong> (Realizado: {formatBRL(monthlyTrajectory.totalRealized)} de {formatBRL(monthlyTrajectory.target)}).
+                    </span>
                   ) : (
                     <span>
-                      Realizado: <strong className="text-white font-bold">{formatBRL(monthlyTrajectory.totalRealized)}</strong>. Faltam exatamente{" "}
+                      Realizado: <strong className="text-white font-bold">{formatBRL(monthlyTrajectory.totalRealized)}</strong>. Saldo acumulado:{" "}
+                      <strong className="text-amber-400 font-bold">
+                        {monthlyTrajectory.diffFromTarget < 0 ? "- " : "+ "}
+                        {formatBRL(Math.abs(monthlyTrajectory.diffFromTarget))}
+                      </strong>
+                      . Faltam exatamente{" "}
                       <strong className="text-emerald-300 font-extrabold">{formatBRL(monthlyTrajectory.remaining)}</strong> para a meta de{" "}
                       <strong className="text-emerald-400 font-bold">{formatBRL(monthlyTrajectory.target)}</strong>.
                     </span>
@@ -2861,31 +2919,51 @@ export default function FinanceDashboard() {
               </div>
             </div>
 
-            {/* Labels das 4 Etapas do Trajeto */}
+            {/* Labels das 4 Etapas do Trajeto com Saldo Acumulado de Cada Etapa */}
             <div className="grid grid-cols-4 text-[10px] pt-1 border-t border-white/5 text-white/50">
-              <div className="text-left">
-                <span className="font-bold text-white/80 block">Semana 1</span>
-                <span>{formatBRL(weeklyGoalsConfig.week1)}</span>
-              </div>
-              <div className="text-center">
-                <span className="font-bold text-white/80 block">Semana 2</span>
-                <span>{formatBRL(weeklyGoalsConfig.week1 + weeklyGoalsConfig.week2)}</span>
-              </div>
-              <div className="text-center">
-                <span className="font-bold text-white/80 block">Semana 3</span>
-                <span>{formatBRL(weeklyGoalsConfig.week1 + weeklyGoalsConfig.week2 + weeklyGoalsConfig.week3)}</span>
-              </div>
-              <div className="text-right">
-                <span className="font-bold text-emerald-400 block">Meta Final</span>
-                <span className="font-extrabold text-white">{formatBRL(monthlyTrajectory.target)}</span>
-              </div>
+              {weeklyPerformances.map((wp, idx) => {
+                const isFinal = idx === 3;
+                return (
+                  <div key={wp.week.weekNumber} className={idx === 0 ? "text-left" : isFinal ? "text-right" : "text-center"}>
+                    <span className={`font-bold block ${isFinal ? "text-emerald-400" : "text-white/80"}`}>
+                      {isFinal ? "Meta Final" : wp.week.label}
+                    </span>
+                    <span className="text-white/40 block">
+                      {isFinal ? formatBRL(monthlyTrajectory.target) : formatBRL(wp.goal)}
+                    </span>
+                    {(wp.status !== "FUTURE" || wp.revenue > 0) && (
+                      <span
+                        className={`text-[9px] font-extrabold block mt-0.5 ${
+                          wp.cumulativeBalance >= 0 ? "text-emerald-400" : "text-amber-400"
+                        }`}
+                      >
+                        Saldo: {wp.cumulativeBalance >= 0 ? "+" : "-"}
+                        {formatBRL(Math.abs(wp.cumulativeBalance))}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
-            {/* Nota de Inteligência e Compensação Automática */}
+            {/* Nota de Inteligência e Compensação Automática Explicativa */}
             <div className="pt-2 border-t border-white/5 flex items-start gap-2 text-[11px] text-white/60 leading-relaxed">
               <Sparkles className="size-3.5 text-amber-400 shrink-0 mt-0.5" />
               <span>
-                <strong className="text-white">Compensação Automática de Metas:</strong> O progresso do mês é contínuo. Como a Semana 2 iniciou dia 21 e você já está em 45% da meta semanal em apenas 2 dias, qualquer excedente vendido nos próximos dias e no final de semana cobrirá automaticamente o déficit da Semana 1, avançando o trajeto rumo aos <strong className="text-emerald-300">{formatBRL(monthlyTrajectory.target)}</strong>!
+                <strong className="text-white">Compensação Automática de Metas:</strong> Os excedentes de semanas que ultrapassam a meta compensam automaticamente déficits acumulados de semanas anteriores.{" "}
+                {monthlyTrajectory.isTargetAchieved ? (
+                  <span className="text-emerald-300 font-bold">
+                    Meta mensal batida com crédito excedente acumulado de {formatBRL(monthlyTrajectory.surplus)}!
+                  </span>
+                ) : monthlyTrajectory.diffFromTarget < 0 ? (
+                  <span>
+                    Saldo acumulado atual: <strong className="text-amber-400 font-bold">-{formatBRL(Math.abs(monthlyTrajectory.diffFromTarget))}</strong> (faltam {formatBRL(monthlyTrajectory.remaining)} para bater a meta mensal de {formatBRL(monthlyTrajectory.target)}).
+                  </span>
+                ) : (
+                  <span>
+                    Crédito acumulado atual: <strong className="text-emerald-300 font-bold">+{formatBRL(monthlyTrajectory.diffFromTarget)}</strong>.
+                  </span>
+                )}
               </span>
             </div>
           </div>

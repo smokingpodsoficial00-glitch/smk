@@ -32,6 +32,12 @@ export interface WeekPerformance {
   podsSold: number;
   percentage: number;
   status: "CURRENT" | "ACHIEVED" | "BELOW" | "FUTURE";
+  // Propriedades da Regra de Compensação Acumulada
+  netWeeklyResult: number; // revenue - goal (excedente positivo ou déficit negativo da semana)
+  previousBalance: number; // saldo acumulado trazido das semanas anteriores
+  cumulativeBalance: number; // previousBalance + netWeeklyResult
+  surplusUsedForCompensation: number; // quanto do excedente desta semana abateu déficits passados
+  remainingCredit: number; // crédito positivo remanescente desta semana / acumulado
 }
 
 export interface WeeklyGoalsConfig {
@@ -376,6 +382,7 @@ export function calculateWeeklyPerformances(
   persistedCosts: Record<string, number> = {}
 ): WeekPerformance[] {
   const weeks = getCycleWeeks(cycle);
+  let runningBalance = 0;
 
   return weeks.map((w) => {
     // Filtrar pedidos que caem dentro desta semana pelo fuso America/Sao_Paulo
@@ -430,15 +437,41 @@ export function calculateWeeklyPerformances(
       }
     }
 
+    const weekRevFixed = Number(weekRev.toFixed(2));
     const weekProfit = Number(((weekRev - weekCmv) + weekNationalShippingMargin).toFixed(2));
     const goalForWeek = goals[`week${w.weekNumber}`] || 1750;
-    const percentage = goalForWeek > 0 ? Math.round((weekRev / goalForWeek) * 100) : 0;
+    const percentage = goalForWeek > 0 ? Math.round((weekRevFixed / goalForWeek) * 100) : 0;
+
+    // Regra Oficial de Compensação:
+    // netWeeklyResult = REALIZADO DA SEMANA - META DA SEMANA
+    const netWeeklyResult = Number((weekRevFixed - goalForWeek).toFixed(2));
+    const previousBalance = Number(runningBalance.toFixed(2));
+    const newCumulative = Number((previousBalance + netWeeklyResult).toFixed(2));
+
+    // Se a semana teve excedente (netWeeklyResult > 0) e havia déficit anterior (previousBalance < 0):
+    // calcula quanto do excedente foi consumido para compensar
+    let surplusUsed = 0;
+    let remainingCred = 0;
+
+    if (netWeeklyResult > 0) {
+      if (previousBalance < 0) {
+        const priorDeficit = Math.abs(previousBalance);
+        surplusUsed = Number(Math.min(netWeeklyResult, priorDeficit).toFixed(2));
+        remainingCred = Number(Math.max(0, netWeeklyResult - priorDeficit).toFixed(2));
+      } else {
+        surplusUsed = 0;
+        remainingCred = netWeeklyResult;
+      }
+    }
+
+    // Atualiza o saldo acumulado de compensação carregado para as próximas semanas
+    runningBalance = newCumulative;
 
     let status: WeekPerformance["status"] = "FUTURE";
     if (w.isCurrentWeek) {
       status = "CURRENT";
     } else if (w.isPastWeek) {
-      status = weekRev >= goalForWeek ? "ACHIEVED" : "BELOW";
+      status = weekRevFixed >= goalForWeek ? "ACHIEVED" : "BELOW";
     } else {
       status = "FUTURE";
     }
@@ -446,12 +479,17 @@ export function calculateWeeklyPerformances(
     return {
       week: w,
       goal: goalForWeek,
-      revenue: Number(weekRev.toFixed(2)),
+      revenue: weekRevFixed,
       profit: weekProfit,
       ordersCount: weekOrders.length,
       podsSold: weekPods,
       percentage,
       status,
+      netWeeklyResult,
+      previousBalance,
+      cumulativeBalance: newCumulative,
+      surplusUsedForCompensation: surplusUsed,
+      remainingCredit: remainingCred,
     };
   });
 }
