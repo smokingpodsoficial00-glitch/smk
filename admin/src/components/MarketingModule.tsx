@@ -1003,44 +1003,43 @@ export default function MarketingModule() {
           </div>
 
           {/* Botões de Ação do Header */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Status & Conexão do WhatsApp */}
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            {/* Botão de Conexão do WhatsApp */}
             <button
+              type="button"
+              data-tour="btn-conectar-whatsapp"
               onClick={handleStartConnectWhatsApp}
               disabled={qrLoading}
-              className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all ${
+              className={`px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-2 cursor-pointer transition-all shadow-sm active:scale-95 shrink-0 ${
                 whatsAppConnected
-                  ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
-                  : !backendOnline
-                  ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400'
-                  : whatsAppSessionStatus === 'SESSION_INVALID'
-                  ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400'
+                  ? 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/40 text-emerald-400'
                   : whatsAppSessionStatus === 'CONNECTING'
-                  ? 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300 animate-pulse'
-                  : 'bg-white/5 hover:bg-white/10 border-white/15 text-white/80'
+                  ? 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/40 text-amber-300 animate-pulse'
+                  : whatsAppSessionStatus === 'SESSION_INVALID'
+                  ? 'bg-red-500/20 hover:bg-red-500/30 border-red-500/40 text-red-300'
+                  : !backendOnline
+                  ? 'bg-red-500/15 hover:bg-red-500/25 border-red-500/30 text-red-400'
+                  : 'bg-emerald-600/90 hover:bg-emerald-500 text-white border-emerald-400/30 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
               }`}
               title={
                 whatsAppConnected
                   ? "🟢 WhatsApp Conectado e Pronto para Disparos"
-                  : !backendOnline
-                  ? "Backend Offline. Inicie o servidor backend."
+                  : whatsAppSessionStatus === 'CONNECTING'
+                  ? "Conectando ao WhatsApp..."
                   : whatsAppSessionStatus === 'SESSION_INVALID'
                   ? "🔴 Sessão Inválida — Conectar Novamente"
+                  : !backendOnline
+                  ? "Backend Offline. Inicie o servidor backend."
                   : hasSavedSession
-                  ? "⚪ WhatsApp Desconectado (Sessão Salva — Clique para Conectar)"
-                  : "Clique para Conectar WhatsApp"
+                  ? "⚪ WhatsApp Desconectado (Clique para Conectar)"
+                  : "Clique para Conectar WhatsApp via QR Code"
               }
             >
               {whatsAppConnected ? (
                 <>
                   <span className="size-2 rounded-full bg-emerald-400 animate-ping" />
-                  <Smartphone className="size-4" />
+                  <Smartphone className="size-4 text-emerald-400" />
                   <span>WhatsApp Conectado</span>
-                </>
-              ) : !backendOnline ? (
-                <>
-                  <AlertTriangle className="size-4 text-red-400" />
-                  <span>Backend Offline</span>
                 </>
               ) : whatsAppSessionStatus === 'CONNECTING' ? (
                 <>
@@ -1050,12 +1049,17 @@ export default function MarketingModule() {
               ) : whatsAppSessionStatus === 'SESSION_INVALID' ? (
                 <>
                   <AlertTriangle className="size-4 text-red-400" />
-                  <span>Sessão Inválida — Conectar Novamente</span>
+                  <span>Conectar Novamente</span>
+                </>
+              ) : !backendOnline ? (
+                <>
+                  <AlertTriangle className="size-4 text-red-400" />
+                  <span>Backend Offline</span>
                 </>
               ) : (
                 <>
-                  <QrCode className="size-4 text-white/70" />
-                  <span>{hasSavedSession ? 'Conectar WhatsApp (Restaurar Sessão)' : 'Conectar WhatsApp'}</span>
+                  <QrCode className="size-4 text-white" />
+                  <span>{hasSavedSession ? 'Conectar WhatsApp' : 'Conectar WhatsApp'}</span>
                 </>
               )}
             </button>
@@ -1063,7 +1067,7 @@ export default function MarketingModule() {
             <button
               onClick={syncWhatsAppContactsAndGroups}
               disabled={loadingSync}
-              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50 shrink-0"
               title="Sincroniza contatos da agenda do WhatsApp e grupos"
             >
               <RefreshCw className={`size-3.5 text-white ${loadingSync ? 'animate-spin' : ''}`} />
@@ -1073,7 +1077,7 @@ export default function MarketingModule() {
             <button
               data-tour="btn-nova-campanha"
               onClick={() => handleOpenCampaignModal()}
-              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-extrabold flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] active:scale-95"
+              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-extrabold flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] active:scale-95 shrink-0"
             >
               <Plus className="size-4 stroke-[3]" />
               <span>Nova Campanha</span>
