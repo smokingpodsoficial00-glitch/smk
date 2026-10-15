@@ -4,7 +4,7 @@ import {
   AlertTriangle, RefreshCw, MessageSquare, Play, Pause, ExternalLink,
   Flame, Lock, Copy, Check, Plus, Trash2, Edit3, ArrowRight, CheckSquare,
   Square, Calendar, Layers, ShieldCheck, HelpCircle, ChevronRight,
-  ToggleLeft, ToggleRight, Zap, Smartphone
+  ToggleLeft, ToggleRight, Zap, Smartphone, QrCode, LogOut
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -128,6 +128,125 @@ export default function MarketingModule() {
   
   // Campanhas Criadas
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+
+  // Estado da Conexão do WhatsApp Oficial & QR Code (Ciclo Lazy / Sob Demanda)
+  const [whatsAppSessionStatus, setWhatsAppSessionStatus] = useState<string>('DISCONNECTED');
+  const [hasSavedSession, setHasSavedSession] = useState<boolean>(false);
+  const [whatsAppConnected, setWhatsAppConnected] = useState<boolean>(false);
+  const [qrCodeImageUrl, setQrCodeImageUrl] = useState<string | null>(null);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [backendOnline, setBackendOnline] = useState<boolean>(true);
+  const [qrLoading, setQrLoading] = useState<boolean>(false);
+
+  // Consulta status sem disparar geração contínua de QR
+  const checkWhatsAppStatus = async () => {
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/qr`);
+      if (res.ok) {
+        setBackendOnline(true);
+        const data = await res.json();
+        setWhatsAppSessionStatus(data.status || 'DISCONNECTED');
+        setHasSavedSession(!!data.hasSavedSession);
+
+        if (data.isReady || data.status === 'CONNECTED') {
+          setWhatsAppConnected(true);
+          setQrCodeImageUrl(null);
+        } else {
+          setWhatsAppConnected(false);
+          if (data.status === 'QR_AVAILABLE' && data.qrImageUrl) {
+            setQrCodeImageUrl(data.qrImageUrl);
+          } else {
+            setQrCodeImageUrl(null);
+          }
+        }
+      } else {
+        setBackendOnline(false);
+      }
+    } catch (e) {
+      setBackendOnline(false);
+    }
+  };
+
+  // Checa status inicial no mount
+  useEffect(() => {
+    checkWhatsAppStatus();
+  }, []);
+
+  // Polling ativo APENAS enquanto o modal de conexão estiver aberto e não conectado
+  useEffect(() => {
+    if (!isQrModalOpen || whatsAppConnected) return;
+    const interval = setInterval(checkWhatsAppStatus, 2500);
+    return () => clearInterval(interval);
+  }, [isQrModalOpen, whatsAppConnected]);
+
+  // Ação explícita do usuário: "Conectar WhatsApp"
+  const handleStartConnectWhatsApp = async () => {
+    setIsQrModalOpen(true);
+    setQrLoading(true);
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/whatsapp/connect`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setWhatsAppSessionStatus(data.status || 'CONNECTING');
+        setHasSavedSession(!!data.hasSavedSession);
+        if (data.isReady) {
+          setWhatsAppConnected(true);
+          setQrCodeImageUrl(null);
+        } else if (data.qrImageUrl) {
+          setWhatsAppConnected(false);
+          setQrCodeImageUrl(data.qrImageUrl);
+        }
+      } else {
+        alert('Falha ao comunicar com o servidor backend.');
+      }
+    } catch (err: any) {
+      alert(`Erro ao iniciar conexão: ${err.message}`);
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  // Ação de cancelamento da conexão pelo usuário
+  const handleCancelConnect = async () => {
+    setIsQrModalOpen(false);
+    if (!whatsAppConnected) {
+      try {
+        await fetch(`${getBackendUrl()}/api/whatsapp/disconnect`, { method: 'POST' });
+      } catch (e) {}
+      setQrCodeImageUrl(null);
+      setWhatsAppSessionStatus('DISCONNECTED');
+    }
+  };
+
+  const handleRefreshQr = async () => {
+    setQrLoading(true);
+    try {
+      await fetch(`${getBackendUrl()}/api/whatsapp/connect`, { method: 'POST' });
+      await checkWhatsAppStatus();
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const handleLogoutWhatsApp = async () => {
+    if (!confirm('Deseja realmente SAIR do WhatsApp? A sessão será excluída e exigirá novo QR Code para conectar.')) {
+      return;
+    }
+    setQrLoading(true);
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/logout`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      setWhatsAppConnected(false);
+      setQrCodeImageUrl(null);
+      setWhatsAppSessionStatus('SESSION_INVALID');
+      setHasSavedSession(false);
+      alert(data.message || 'Sessão destruída.');
+    } catch (e) {
+      alert('Não foi possível comunicar com o servidor backend.');
+    } finally {
+      setQrLoading(false);
+    }
+  };
 
   // Modais de Criação / Edição
   const [isListModalOpen, setIsListModalOpen] = useState(false);
@@ -885,6 +1004,62 @@ export default function MarketingModule() {
 
           {/* Botões de Ação do Header */}
           <div className="flex flex-wrap items-center gap-3">
+            {/* Status & Conexão do WhatsApp */}
+            <button
+              onClick={handleStartConnectWhatsApp}
+              disabled={qrLoading}
+              className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all ${
+                whatsAppConnected
+                  ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                  : !backendOnline
+                  ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400'
+                  : whatsAppSessionStatus === 'SESSION_INVALID'
+                  ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400'
+                  : whatsAppSessionStatus === 'CONNECTING'
+                  ? 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300 animate-pulse'
+                  : 'bg-white/5 hover:bg-white/10 border-white/15 text-white/80'
+              }`}
+              title={
+                whatsAppConnected
+                  ? "🟢 WhatsApp Conectado e Pronto para Disparos"
+                  : !backendOnline
+                  ? "Backend Offline. Inicie o servidor backend."
+                  : whatsAppSessionStatus === 'SESSION_INVALID'
+                  ? "🔴 Sessão Inválida — Conectar Novamente"
+                  : hasSavedSession
+                  ? "⚪ WhatsApp Desconectado (Sessão Salva — Clique para Conectar)"
+                  : "Clique para Conectar WhatsApp"
+              }
+            >
+              {whatsAppConnected ? (
+                <>
+                  <span className="size-2 rounded-full bg-emerald-400 animate-ping" />
+                  <Smartphone className="size-4" />
+                  <span>WhatsApp Conectado</span>
+                </>
+              ) : !backendOnline ? (
+                <>
+                  <AlertTriangle className="size-4 text-red-400" />
+                  <span>Backend Offline</span>
+                </>
+              ) : whatsAppSessionStatus === 'CONNECTING' ? (
+                <>
+                  <RefreshCw className="size-4 text-amber-300 animate-spin" />
+                  <span>Conectando WhatsApp...</span>
+                </>
+              ) : whatsAppSessionStatus === 'SESSION_INVALID' ? (
+                <>
+                  <AlertTriangle className="size-4 text-red-400" />
+                  <span>Sessão Inválida — Conectar Novamente</span>
+                </>
+              ) : (
+                <>
+                  <QrCode className="size-4 text-white/70" />
+                  <span>{hasSavedSession ? 'Conectar WhatsApp (Restaurar Sessão)' : 'Conectar WhatsApp'}</span>
+                </>
+              )}
+            </button>
+
             <button
               onClick={syncWhatsAppContactsAndGroups}
               disabled={loadingSync}
@@ -905,6 +1080,29 @@ export default function MarketingModule() {
             </button>
           </div>
         </div>
+
+        {/* Alerta quando desconectado */}
+        {!whatsAppConnected && (
+          <div className="mt-3 bg-white/5 border border-white/10 px-4 py-2.5 rounded-xl flex items-center justify-between gap-3 text-xs text-white/80">
+            <div className="flex items-center gap-2">
+              <span className={`size-2 rounded-full ${whatsAppSessionStatus === 'SESSION_INVALID' ? 'bg-red-400' : 'bg-white/40'}`} />
+              <span>
+                {whatsAppSessionStatus === 'SESSION_INVALID'
+                  ? 'O WhatsApp foi desconectado pelo celular ou a sessão expirou. Conecte novamente para habilitar os disparos.'
+                  : hasSavedSession
+                  ? 'WhatsApp em espera. Clique em Conectar para ativar os envios da loja.'
+                  : 'Conecte o WhatsApp da loja para habilitar os disparos automáticos e sincronização.'}
+              </span>
+            </div>
+            <button
+              onClick={handleStartConnectWhatsApp}
+              className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+            >
+              <QrCode className="size-3.5" />
+              <span>{hasSavedSession ? 'Ativar Conexão' : 'Conectar WhatsApp'}</span>
+            </button>
+          </div>
+        )}
 
         {syncStatus && (
           <div className="mt-3 text-xs text-white/90 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg font-mono">
@@ -1854,6 +2052,182 @@ export default function MarketingModule() {
                 className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold shadow-sm active:scale-95"
               >
                 Salvar Campanha
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 📱 MODAL: QR CODE CONEXÃO WHATSAPP OFICIAL                    */}
+      {/* ============================================================ */}
+      {isQrModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#111] border border-white/10 rounded-3xl w-full max-w-md p-6 space-y-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="size-9 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400">
+                  <Smartphone className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Conexão Oficial do WhatsApp</h3>
+                  <p className="text-[11px] text-white/40">Disparos de marketing e sincronização da loja</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCancelConnect}
+                className="size-8 rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white flex items-center justify-center text-sm cursor-pointer transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {whatsAppConnected ? (
+              <div className="space-y-4 text-center py-3">
+                <div className="size-16 rounded-full bg-emerald-500/15 border-2 border-emerald-500/40 flex items-center justify-center mx-auto text-emerald-400 shadow-xl shadow-emerald-500/15">
+                  <CheckCircle2 className="size-9" />
+                </div>
+                <div>
+                  <h4 className="text-base font-extrabold text-white">WhatsApp Conectado e Pronto!</h4>
+                  <p className="text-xs text-white/50 mt-1 max-w-xs mx-auto">
+                    A sessão está ativa e pronta para disparos automáticos e sincronização da loja.
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-white/5 rounded-2xl border border-white/5 text-xs text-white/70 space-y-2 text-left">
+                  <div className="flex justify-between items-center">
+                    <span className="text-white/50">Contatos na base:</span>
+                    <strong className="text-white font-mono">{allContacts.length}</strong>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-white/50">Grupos detectados:</span>
+                    <strong className="text-white font-mono">{whatsAppGroups.length}</strong>
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t border-white/5">
+                    <span className="text-white/50">Status do Motor:</span>
+                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                      <span className="size-2 rounded-full bg-emerald-400 animate-ping" /> Online e Operando
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex flex-col sm:flex-row justify-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      syncWhatsAppContactsAndGroups();
+                      setIsQrModalOpen(false);
+                    }}
+                    className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold rounded-xl cursor-pointer shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+                  >
+                    Sincronizar Dados Agora
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLogoutWhatsApp}
+                    disabled={qrLoading}
+                    className="px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all"
+                  >
+                    <LogOut className="size-3.5" />
+                    <span>Desconectar Sessão</span>
+                  </button>
+                </div>
+              </div>
+            ) : !backendOnline ? (
+              <div className="space-y-4 text-center py-3">
+                <div className="size-14 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mx-auto text-red-400 shadow-lg shadow-red-500/10">
+                  <AlertTriangle className="size-7" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Servidor Backend Não Detectado</h4>
+                  <p className="text-xs text-white/50 mt-1 max-w-xs mx-auto leading-relaxed">
+                    O motor do WhatsApp roda no servidor Node.js. Para gerar o QR Code ou conectar o celular da loja, certifique-se de iniciar o backend.
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-black/60 border border-white/10 rounded-2xl text-left font-mono text-[11px] text-white/70 space-y-1.5">
+                  <span className="text-white/40 block text-[10px] uppercase font-bold tracking-wider">Como iniciar o backend:</span>
+                  <div className="text-emerald-400 font-bold bg-white/5 p-2 rounded-xl border border-white/5 select-all">
+                    cd backend &amp;&amp; npm start
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRefreshQr}
+                    disabled={qrLoading}
+                    className="px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold rounded-xl flex items-center gap-2 cursor-pointer transition-all"
+                  >
+                    <RefreshCw className={`size-3.5 ${qrLoading ? 'animate-spin' : ''}`} />
+                    <span>Testar Conexão Novamente</span>
+                  </button>
+                </div>
+              </div>
+            ) : qrCodeImageUrl ? (
+              <div className="space-y-4 text-center py-2">
+                <p className="text-xs text-white/70 max-w-xs mx-auto">
+                  Abra o WhatsApp no celular da loja, vá em <strong>Aparelhos Conectados ➔ Conectar Aparelho</strong> e aponte a câmera para o QR Code abaixo:
+                </p>
+                <div className="bg-white p-4 rounded-2xl inline-block mx-auto shadow-2xl shadow-emerald-500/10 border-2 border-white">
+                  <img src={qrCodeImageUrl} alt="QR Code WhatsApp" className="size-60 object-contain mx-auto" />
+                </div>
+                <div className="text-[11px] text-emerald-400/90 flex items-center justify-center gap-2 font-mono">
+                  <RefreshCw className="size-3 animate-spin" />
+                  <span>Aguardando leitura no celular...</span>
+                </div>
+                <div className="pt-2 flex flex-wrap justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRefreshQr}
+                    disabled={qrLoading}
+                    className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 text-xs font-medium rounded-xl flex items-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <RefreshCw className={`size-3 ${qrLoading ? 'animate-spin' : ''}`} />
+                    <span>Atualizar QR Code</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLogoutWhatsApp}
+                    disabled={qrLoading}
+                    className="px-3.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-medium rounded-xl flex items-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <LogOut className="size-3" />
+                    <span>Resetar Sessão Presa</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 text-center py-8">
+                <RefreshCw className="size-8 text-amber-400 animate-spin mx-auto" />
+                <div>
+                  <h4 className="text-sm font-bold text-white">Iniciando Motor do WhatsApp...</h4>
+                  <p className="text-xs text-white/60 mt-1 max-w-xs mx-auto">
+                    O servidor está carregando a sessão e gerando o QR Code para leitura.
+                  </p>
+                </div>
+                <div className="pt-3 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={handleLogoutWhatsApp}
+                    disabled={qrLoading}
+                    className="px-3.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-300 text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <LogOut className="size-3" />
+                    <span>Forçar Novo QR Code (Resetar Sessão Presa)</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="border-t border-white/10 pt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={handleCancelConnect}
+                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold cursor-pointer transition-colors"
+              >
+                {whatsAppConnected ? 'Fechar' : 'Cancelar / Fechar'}
               </button>
             </div>
           </div>
