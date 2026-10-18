@@ -37,6 +37,7 @@ import {
   type PayrollConfig
 } from '@/lib/partnerPayroll';
 import { runPartnersValidationSuite, type PartnersTestSuiteReport } from '@/lib/partnersTester';
+import { runPayrollOfficialTestSuite, type PayrollTestSuiteReport } from '@/lib/payrollTester';
 
 import { NewPartnerModal } from './partners/NewPartnerModal';
 import { NewTransactionModal } from './partners/NewTransactionModal';

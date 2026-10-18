@@ -3,7 +3,7 @@
  * Persistência Híbrida Multi-Tenant: Cache Local Instantâneo + Sincronização Supabase por company_id
  */
 
-import { supabase } from "@/lib/supabase";
+import { supabase } from "./supabase";
 import { type Partner, type PartnerTransaction } from "./partners";
 import { getCycleForDate } from "./financialCycles";
 

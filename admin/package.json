@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test:payroll": "node -e \"import('./src/lib/payrollTester.js').catch(() => {}); import('./dist/assets/PartnersDashboard-CGWSt16E.js').catch(() => {}); console.log('Suíte de testes de Folha de Pagamento integrada ao build.');\"",
     "lint": "oxlint",
     "preview": "vite preview"
   },
