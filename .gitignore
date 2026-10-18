@@ -10,7 +10,7 @@ backup/*.json
 backup_*.json
 scratch/
 *.sql
-
+!backend/migrations/*.sql
 
 # Build & Output
 dist/

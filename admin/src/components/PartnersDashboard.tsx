@@ -27,6 +27,7 @@ import {
 } from '@/lib/financialCycles';
 import {
   loadLocalPayrollConfig,
+  fetchPayrollConfigFromSupabase,
   syncPayrollConfigFromOrders,
   savePayrollConfigToSupabase,
   calculatePayrollOverview,
@@ -127,8 +128,8 @@ export default function PartnersDashboard() {
         setOperationalExpenses(mkt);
       } catch (e) {}
 
-      const syncedPayrollCfg = syncPayrollConfigFromOrders(
-        rawOrders || [],
+      // Carrega configuração de folha prioritariamente da tabela companies (isolada por tenant)
+      const syncedPayrollCfg = await fetchPayrollConfigFromSupabase(
         targetCompanyId,
         partnersData
       );
@@ -471,11 +472,13 @@ export default function PartnersDashboard() {
                 style={{ backgroundColor: pm.partner.avatar_color || '#10b981' }} 
               />
               <span className="font-semibold text-white/90">{pm.partner.name}:</span>
-              <span className="font-mono font-bold text-emerald-400">
-                {financials.hasDefinedCapital ? `${pm.equityPercentage.toFixed(2)}%` : '0,00%'}
+              <span className={`font-mono font-bold ${pm.netCapitalInvested < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                {financials.hasDefinedCapital && pm.netCapitalInvested >= 0 
+                  ? `${pm.equityPercentage.toFixed(2)}%` 
+                  : 'Não calculável'}
               </span>
-              <span className="text-[11px] text-white/40 font-mono">
-                ({formatBRL(pm.netCapitalInvested)} investidos)
+              <span className={`text-[11px] font-mono ${pm.netCapitalInvested < 0 ? 'text-rose-400 font-bold' : 'text-white/40'}`}>
+                ({formatBRL(pm.netCapitalInvested)} investidos{pm.netCapitalInvested < 0 ? ' · Saldo devedor' : ''})
               </span>
             </div>
           ))}
@@ -818,9 +821,16 @@ export default function PartnersDashboard() {
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                        {financials.hasDefinedCapital ? `${pm.equityPercentage.toFixed(2)}%` : '0,00%'}
-                      </span>
+                      {financials.hasDefinedCapital && pm.netCapitalInvested >= 0 ? (
+                        <span className="text-xs font-semibold text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                          {pm.equityPercentage.toFixed(2)}%
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold text-rose-400 px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center gap-1">
+                          <AlertTriangle className="size-3" />
+                          <span>Não calculável</span>
+                        </span>
+                      )}
                       <button
                         onClick={() => setEditingPartner(pm.partner)}
                         className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-all cursor-pointer"
@@ -860,8 +870,13 @@ export default function PartnersDashboard() {
                   {/* 3. Informações Secundárias Úteis */}
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="bg-[#050505] p-2.5 rounded-xl border border-white/5 space-y-0.5">
-                      <span className="text-[10px] text-white/40 block">Capital Investido</span>
-                      <span className="font-semibold text-white">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-white/40 block">Capital Investido</span>
+                        {pm.netCapitalInvested < 0 && (
+                          <span className="text-[9px] text-rose-400 font-bold bg-rose-500/10 px-1 rounded">Devedor</span>
+                        )}
+                      </div>
+                      <span className={`font-semibold ${pm.netCapitalInvested < 0 ? 'text-rose-400 font-mono' : 'text-white'}`}>
                         {formatBRL(pm.netCapitalInvested)}
                       </span>
                     </div>

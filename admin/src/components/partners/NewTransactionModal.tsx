@@ -131,6 +131,9 @@ export function NewTransactionModal({
     }
 
     const finalDesc = description.trim() ? description.trim() : defaultDesc;
+    const clientSubmissionId = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
     try {
       await createPartnerTransaction({
@@ -141,7 +144,8 @@ export function NewTransactionModal({
         amount: numAmount,
         date,
         description: finalDesc,
-        destinationCategory: 'CAIXA_GERAL'
+        destinationCategory: 'CAIXA_GERAL',
+        idempotencyKey: clientSubmissionId
       });
 
       onTransactionCreated();

@@ -498,6 +498,9 @@ export async function fetchPartnerTransactions(companyId?: string): Promise<Part
   return getLocalPartnerTransactions(targetCompanyId);
 }
 
+const inFlightTransactions = new Map<string, Promise<PartnerTransaction>>();
+const completedIdempotentTransactions = new Map<string, { tx: PartnerTransaction; timestamp: number }>();
+
 export async function createPartnerTransaction(payload: {
   companyId?: string;
   partnerId?: string | null;
@@ -507,51 +510,102 @@ export async function createPartnerTransaction(payload: {
   date?: string;
   description: string;
   destinationCategory?: string;
+  idempotencyKey?: string;
 }): Promise<PartnerTransaction> {
   const targetCompanyId = payload.companyId || DEFAULT_COMPANY_ID;
-  const newId = typeof crypto !== 'undefined' && crypto.randomUUID 
-    ? crypto.randomUUID 
-      ? crypto.randomUUID() 
-      : `tx_${Date.now()}`
-    : `tx_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+  const idempotencyKey = payload.idempotencyKey?.trim();
 
-  const txPayload = {
-    id: newId,
-    company_id: targetCompanyId,
-    partner_id: payload.partnerId || null,
-    type: payload.type,
-    amount: Math.max(0, Number(payload.amount) || 0),
-    date: payload.date || new Date().toISOString().split("T")[0],
-    description: payload.description.trim(),
-    destination_category: payload.destinationCategory || 'ESTOQUE',
-  };
-
-  let savedTx: PartnerTransaction = {
-    ...txPayload,
-    created_at: new Date().toISOString()
-  };
-
-  try {
-    const { data, error } = await supabase
-      .from("smoking_partner_transactions")
-      .insert(txPayload)
-      .select()
-      .single();
-
-    if (!error && data) {
-      savedTx = data as PartnerTransaction;
-    } else if (error) {
-      console.warn("[Partners] Erro ao registrar transação no Supabase (usando fallback local):", error.message);
+  // Se uma chave de idempotência foi fornecida, verifica se já foi concluída nos últimos 60 segundos
+  if (idempotencyKey) {
+    const cached = completedIdempotentTransactions.get(idempotencyKey);
+    if (cached && (Date.now() - cached.timestamp < 60000)) {
+      console.info("[Partners] Transação idempotente já processada retornada do cache:", idempotencyKey);
+      return cached.tx;
     }
-  } catch (e: any) {
-    console.warn("[Partners] Exceção ao inserir transação no Supabase (usando fallback local):", e?.message || e);
+
+    // Se a mesma operação com a mesma chave estiver em andamento (retry ou clique simultâneo), reutiliza a promise
+    if (inFlightTransactions.has(idempotencyKey)) {
+      console.info("[Partners] Transação com mesma chave em andamento. Reutilizando execução (single-flight):", idempotencyKey);
+      return inFlightTransactions.get(idempotencyKey)!;
+    }
   }
 
-  // Sincroniza cache local
-  const current = getLocalPartnerTransactions(targetCompanyId).filter(t => t.id !== savedTx.id);
-  saveLocalPartnerTransactions([savedTx, ...current], targetCompanyId);
+  const executionPromise = (async () => {
+    // Se foi fornecida idempotencyKey e parece um UUID ou ID único, podemos usá-lo como o ID estável da transação
+    // prevenindo inserção duplicada no banco
+    const newId = idempotencyKey 
+      ? `tx_idemp_${idempotencyKey}`
+      : (typeof crypto !== 'undefined' && crypto.randomUUID 
+          ? crypto.randomUUID() 
+          : `tx_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`);
 
-  return savedTx;
+    const txPayload = {
+      id: newId,
+      company_id: targetCompanyId,
+      partner_id: payload.partnerId || null,
+      type: payload.type,
+      amount: Math.max(0, Number(payload.amount) || 0),
+      date: payload.date || new Date().toISOString().split("T")[0],
+      description: payload.description.trim(),
+      destination_category: payload.destinationCategory || 'ESTOQUE',
+    };
+
+    let savedTx: PartnerTransaction = {
+      ...txPayload,
+      created_at: new Date().toISOString()
+    };
+
+    try {
+      // Tenta inserir no Supabase. Se o ID já existir (concorrência de rede), recupera o registro existente
+      const { data, error } = await supabase
+        .from("smoking_partner_transactions")
+        .insert(txPayload)
+        .select()
+        .single();
+
+      if (!error && data) {
+        savedTx = data as PartnerTransaction;
+      } else if (error) {
+        // Se deu erro de chave primária duplicada por causa do retry da idempotencyKey, busca a existente
+        if (error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('violates unique constraint')) {
+          const { data: existing } = await supabase
+            .from("smoking_partner_transactions")
+            .select("*")
+            .eq("id", newId)
+            .maybeSingle();
+          if (existing) {
+            savedTx = existing as PartnerTransaction;
+          }
+        } else {
+          console.warn("[Partners] Erro ao registrar transação no Supabase (usando fallback local):", error.message);
+        }
+      }
+    } catch (e: any) {
+      console.warn("[Partners] Exceção ao inserir transação no Supabase (usando fallback local):", e?.message || e);
+    }
+
+    // Sincroniza cache local
+    const current = getLocalPartnerTransactions(targetCompanyId).filter(t => t.id !== savedTx.id);
+    saveLocalPartnerTransactions([savedTx, ...current], targetCompanyId);
+
+    if (idempotencyKey) {
+      completedIdempotentTransactions.set(idempotencyKey, { tx: savedTx, timestamp: Date.now() });
+    }
+
+    return savedTx;
+  })();
+
+  if (idempotencyKey) {
+    inFlightTransactions.set(idempotencyKey, executionPromise);
+  }
+
+  try {
+    return await executionPromise;
+  } finally {
+    if (idempotencyKey) {
+      inFlightTransactions.delete(idempotencyKey);
+    }
+  }
 }
 
 export async function updatePartnerTransaction(
@@ -728,7 +782,7 @@ export function calculatePartnersFinancials(params: {
       if (tx.type === 'PRO_LABORE') pro += amt;
     }
 
-    const net = Math.max(0, gross - withdr);
+    const net = gross - withdr;
     partnerCapitalMap[partner.id] = {
       grossContributed: gross,
       withdrawn: withdr,

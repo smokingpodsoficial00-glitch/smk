@@ -175,7 +175,9 @@ export function saveLocalPayrollConfig(
 }
 
 /**
- * Persiste a configuração de Salários e Reinvestimento no Supabase para todos os sócios da empresa
+ * Persiste a configuração de Salários e Reinvestimento no Supabase de forma isolada por company_id
+ * Fonte Oficial Primária: tabela companies (campo jsonb payment_gateway -> payroll_config)
+ * Fonte de Contingência: localStorage
  */
 export async function savePayrollConfigToSupabase(
   config: PayrollConfig,
@@ -190,56 +192,99 @@ export async function savePayrollConfigToSupabase(
   saveLocalPayrollConfig(payload, targetCompanyId);
 
   try {
-    const { data: existingRows, error: fetchErr } = await supabase
+    // 1. Persistência Oficial e Isolada: tabela companies
+    const { data: compData, error: compFetchErr } = await supabase
+      .from("companies")
+      .select("payment_gateway")
+      .eq("id", targetCompanyId)
+      .maybeSingle();
+
+    if (!compFetchErr && compData) {
+      const currentGw = (compData.payment_gateway && typeof compData.payment_gateway === 'object')
+        ? compData.payment_gateway
+        : {};
+
+      const updatedGw = {
+        ...currentGw,
+        payroll_config: payload,
+      };
+
+      const { error: compUpdateErr } = await supabase
+        .from("companies")
+        .update({ payment_gateway: updatedGw })
+        .eq("id", targetCompanyId);
+
+      if (!compUpdateErr) {
+        window.dispatchEvent(new CustomEvent("smk-payroll-config-updated"));
+        return true;
+      }
+      console.warn("[Payroll] Aviso ao atualizar companies.payment_gateway:", compUpdateErr.message);
+    }
+  } catch (e) {
+    console.warn("[Payroll] Exceção ao salvar config em companies:", e);
+  }
+
+  window.dispatchEvent(new CustomEvent("smk-payroll-config-updated"));
+  return true;
+}
+
+/**
+ * Sincroniza e carrega a configuração de salários:
+ * 1º Tenta a fonte oficial isolada em companies.payment_gateway.payroll_config
+ * 2º Se não encontrar, faz fallback de leitura para a antiga linha legada em smoking_orders (preservação retroativa)
+ * 3º Fallback final: localStorage
+ */
+export async function fetchPayrollConfigFromSupabase(
+  companyId?: string,
+  partners: Partner[] = []
+): Promise<PayrollConfig> {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+
+  try {
+    // 1. Busca na fonte oficial isolada: companies.payment_gateway.payroll_config
+    const { data: compData, error: compErr } = await supabase
+      .from("companies")
+      .select("payment_gateway")
+      .eq("id", targetCompanyId)
+      .maybeSingle();
+
+    if (!compErr && compData?.payment_gateway?.payroll_config) {
+      const cfg = compData.payment_gateway.payroll_config;
+      if (cfg && typeof cfg.reinvestmentPct === "number") {
+        const normalized = normalizePayrollConfig(cfg, partners);
+        saveLocalPayrollConfig(normalized, targetCompanyId);
+        return normalized;
+      }
+    }
+
+    // 2. Fallback de transição retroativa: lê linha antiga em smoking_orders sem apagar dados
+    const { data: legacyRows, error: legErr } = await supabase
       .from("smoking_orders")
-      .select("id")
+      .select("items")
       .eq("client_phone", SYSTEM_PAYROLL_CONFIG_KEY)
       .eq("company_id", targetCompanyId)
       .limit(1);
 
-    if (fetchErr) {
-      console.warn("[Payroll] Aviso ao buscar config no Supabase:", fetchErr.message);
-      return false;
-    }
-
-    if (existingRows && existingRows.length > 0) {
-      const { error: updErr } = await supabase
-        .from("smoking_orders")
-        .update({ items: [payload] })
-        .eq("id", existingRows[0].id);
-
-      if (updErr) {
-        console.warn("[Payroll] Aviso ao atualizar config no Supabase:", updErr.message);
-        return false;
-      }
-    } else {
-      const { error: insErr } = await supabase
-        .from("smoking_orders")
-        .insert({
-          client_phone: SYSTEM_PAYROLL_CONFIG_KEY,
-          client_name: "System Config Partner Payroll",
-          shipping_address: "CONFIG",
-          items: [payload],
-          total_amount: 0,
-          company_id: targetCompanyId,
-        });
-
-      if (insErr) {
-        console.warn("[Payroll] Aviso ao inserir config no Supabase:", insErr.message);
-        return false;
+    if (!legErr && legacyRows && legacyRows.length > 0 && Array.isArray(legacyRows[0].items) && legacyRows[0].items.length > 0) {
+      const saved = legacyRows[0].items[0];
+      if (saved && typeof saved.reinvestmentPct === "number") {
+        const normalized = normalizePayrollConfig(saved, partners);
+        saveLocalPayrollConfig(normalized, targetCompanyId);
+        // Auto-migra para a nova fonte oficial
+        await savePayrollConfigToSupabase(normalized, targetCompanyId);
+        return normalized;
       }
     }
-
-    window.dispatchEvent(new CustomEvent("smk-payroll-config-updated"));
-    return true;
   } catch (e) {
-    console.warn("[Payroll] Exceção ao salvar config no Supabase:", e);
-    return false;
+    console.warn("[Payroll] Exceção ao consultar configuração remota de salários:", e);
   }
+
+  const local = loadLocalPayrollConfig(targetCompanyId, partners);
+  return local;
 }
 
 /**
- * Sincroniza a configuração de salários a partir da lista de smoking_orders carregada do Supabase
+ * Mantido para compatibilidade retroativa com fluxos que passam rawOrders
  */
 export function syncPayrollConfigFromOrders(
   rawOrders: any[],
