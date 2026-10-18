@@ -6,6 +6,19 @@
 -- do projeto correspondente (Dashboard Supabase -> SQL Editor -> Nova Query -> Run).
 -- ============================================================================
 
+-- 0. GARANTIR A FUNÇÃO HELPER DE IDENTIFICAÇÃO DO TENANT COM CAST DE TIPOS REAIS
+-- No banco real:
+-- - public.company_users.auth_user_id é TEXT
+-- - public.company_users.company_id é UUID
+-- - auth.uid() retorna UUID
+CREATE OR REPLACE FUNCTION public.get_auth_company_id()
+RETURNS UUID AS $$
+  SELECT company_id FROM public.company_users 
+  WHERE auth_user_id = auth.uid()::text 
+  AND is_active = true
+  LIMIT 1;
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
 -- 1. ADICIONAR COLUNA idempotency_key EM public.smoking_partner_transactions
 -- Totalmente aditiva e retrocompatível com registros históricos (que permanecem NULL)
 ALTER TABLE IF EXISTS public.smoking_partner_transactions 
@@ -42,21 +55,21 @@ CREATE POLICY "Strict tenant isolation for partners select" ON public.smoking_pa
   FOR SELECT TO authenticated
   USING (
     company_id = public.get_auth_company_id() 
-    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid() AND is_super_admin = true)
+    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid()::text AND is_super_admin = true)
   );
 
 CREATE POLICY "Strict tenant isolation for partners insert" ON public.smoking_partners
   FOR INSERT TO authenticated
   WITH CHECK (
     company_id = public.get_auth_company_id() 
-    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid() AND is_super_admin = true)
+    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid()::text AND is_super_admin = true)
   );
 
 CREATE POLICY "Strict tenant isolation for partners update" ON public.smoking_partners
   FOR UPDATE TO authenticated
   USING (
     company_id = public.get_auth_company_id() 
-    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid() AND is_super_admin = true)
+    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid()::text AND is_super_admin = true)
   )
   WITH CHECK (
     company_id = public.get_auth_company_id() 
@@ -85,32 +98,32 @@ CREATE POLICY "Strict tenant isolation for partner transactions select" ON publi
   FOR SELECT TO authenticated
   USING (
     company_id = public.get_auth_company_id() 
-    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid() AND is_super_admin = true)
+    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid()::text AND is_super_admin = true)
   );
 
 CREATE POLICY "Strict tenant isolation for partner transactions insert" ON public.smoking_partner_transactions
   FOR INSERT TO authenticated
   WITH CHECK (
     company_id = public.get_auth_company_id() 
-    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid() AND is_super_admin = true)
+    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid()::text AND is_super_admin = true)
   );
 
 CREATE POLICY "Strict tenant isolation for partner transactions update" ON public.smoking_partner_transactions
   FOR UPDATE TO authenticated
   USING (
     company_id = public.get_auth_company_id() 
-    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid() AND is_super_admin = true)
+    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid()::text AND is_super_admin = true)
   )
   WITH CHECK (
     company_id = public.get_auth_company_id() 
-    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid() AND is_super_admin = true)
+    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid()::text AND is_super_admin = true)
   );
 
 CREATE POLICY "Strict tenant isolation for partner transactions delete" ON public.smoking_partner_transactions
   FOR DELETE TO authenticated
   USING (
     company_id = public.get_auth_company_id() 
-    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid() AND is_super_admin = true)
+    OR EXISTS (SELECT 1 FROM public.company_users WHERE auth_user_id = auth.uid()::text AND is_super_admin = true)
   );
 
 -- 4. PERMISSÕES EXPLÍCITAS E REVOGAÇÃO DO ACESSO PÚBLICO
