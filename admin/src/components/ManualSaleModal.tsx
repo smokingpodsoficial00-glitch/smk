@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ensureBuyerInBroadcastList } from "@/lib/marketingLists";
 import { BRAZILIAN_STATES } from "@/lib/nationalSales";
 import { notifyMobileSale } from "@/lib/saleNotifications";
+import { validateCartStockAvailability, executeAtomicSaleWithStockLock } from "@/lib/stockValidation";
 import { MobileManualSaleFlow } from "./sale/MobileManualSaleFlow";
 import {
   ShoppingCart,
@@ -338,10 +339,16 @@ export function ManualSaleModal({
   };
 
   const handleSelectFlavor = (f: any) => {
+    const stockNum = Number(f.stock) || 0;
+    if (stockNum <= 0) {
+      setErrorMessage(`Produto esgotado: ${f.name || ""} (${f.flavor || ""}). Não é possível registrar esta venda.`);
+      return;
+    }
     setSelectedFlavorId(f.id);
     setFlavorQuery(f.flavor || "");
     setIsFlavorDropdownOpen(false);
     setCustomPrice(f.price ? String(f.price) : "");
+    setErrorMessage("");
   };
 
   const handleClearFlavor = () => {
@@ -386,13 +393,27 @@ export function ManualSaleModal({
       return;
     }
 
+    if (activeFormItem.maxStock <= 0) {
+      setErrorMessage(`Produto esgotado: ${activeFormItem.modelName} (${activeFormItem.flavor}). Não é possível registrar esta venda.`);
+      return;
+    }
+
     const existingIdx = items.findIndex((i) => i.productId === activeFormItem.productId);
     if (existingIdx >= 0) {
       const updated = [...items];
-      updated[existingIdx].quantity += activeFormItem.quantity;
+      const newQty = updated[existingIdx].quantity + activeFormItem.quantity;
+      if (newQty > activeFormItem.maxStock) {
+        setErrorMessage(`Estoque insuficiente! Disponível: ${activeFormItem.maxStock} un.`);
+        return;
+      }
+      updated[existingIdx].quantity = newQty;
       updated[existingIdx].price = activeFormItem.price;
       setItems(updated);
     } else {
+      if (activeFormItem.quantity > activeFormItem.maxStock) {
+        setErrorMessage(`Estoque insuficiente! Disponível: ${activeFormItem.maxStock} un.`);
+        return;
+      }
       setItems([...items, activeFormItem]);
     }
 
@@ -666,9 +687,6 @@ export function ManualSaleModal({
         };
       });
 
-      // 3. Inserir Pedido PAGO e CONCLUIDO em smoking_orders
-      let insertedOrderId: string | null = null;
-      
       // Mapear método de pagamento para a constraint do Supabase ('PIX' | 'CREDITO_LINK')
       const safePaymentMethod = paymentMethod === "CARTAO" ? "CREDITO_LINK" : "PIX";
 
@@ -686,65 +704,26 @@ export function ManualSaleModal({
         company_id: companyId,
       };
 
-      let { data: insertedData, error: orderErr } = await supabase
-        .from("smoking_orders")
-        .insert(payload)
-        .select("id")
-        .single();
+      // 3. Executar venda com trava atômica de estoque e concorrência
+      const atomicResult = await executeAtomicSaleWithStockLock({
+        companyId,
+        orderPayload: payload,
+        items: effectiveItems.map((item) => ({
+          productId: item.productId,
+          brand: item.brand,
+          modelName: item.modelName,
+          flavor: item.flavor,
+          quantity: item.quantity,
+          price: item.price,
+          costPrice: item.costPrice,
+        })),
+      });
 
-      if (orderErr) {
-        // Se houver erro de delivery_status constraint
-        if (orderErr.message?.includes("delivery_status")) {
-          payload.delivery_status = "PREPARANDO";
-        }
-        // Se houver erro de payment_method constraint
-        if (orderErr.message?.includes("payment_method")) {
-          payload.payment_method = "PIX";
-        }
-
-        const retryRes = await supabase
-          .from("smoking_orders")
-          .insert(payload)
-          .select("id")
-          .single();
-        orderErr = retryRes.error;
-        insertedData = retryRes.data;
+      if (!atomicResult.success) {
+        throw new Error(atomicResult.errorMessage || "Falha ao registrar venda devido a restrição de estoque.");
       }
 
-      if (orderErr) {
-        throw new Error(`Erro ao salvar pedido: ${orderErr.message}`);
-      }
-
-      if (insertedData?.id) {
-        insertedOrderId = insertedData.id;
-      }
-
-      // 4. Abater estoque diretamente em smoking_products para cada item vendido
-      for (const item of effectiveItems) {
-        if (!item.productId) continue;
-        try {
-          const { data: pData } = await supabase
-            .from("smoking_products")
-            .select("stock")
-            .eq("id", item.productId)
-            .single();
-
-          if (pData) {
-            const currentStock = typeof pData.stock === "number" ? pData.stock : parseInt(String(pData.stock || "0"), 10);
-            const qtyToDeduct = Number(item.quantity) || 1;
-            const newStock = Math.max(0, currentStock - qtyToDeduct);
-
-            await supabase
-              .from("smoking_products")
-              .update({ stock: newStock })
-              .eq("id", item.productId);
-
-            console.log(`[ManualSaleModal] Baixa de estoque para ${item.modelName} - ${item.flavor}: ${currentStock} -> ${newStock}`);
-          }
-        } catch (stockErr) {
-          console.error("Erro ao abater estoque do produto no Supabase:", stockErr);
-        }
-      }
+      const insertedOrderId = atomicResult.orderId || null;
 
       // 5. Inserir automaticamente na Lista de Transmissão de Compradores do Marketing
       let marketingListNote = "";
@@ -1357,22 +1336,26 @@ export function ManualSaleModal({
                           filteredFlavors.map((f) => {
                             const isSelected = selectedFlavorId === f.id;
                             const stockNum = Number(f.stock) || 0;
+                            const isOutOfStock = stockNum <= 0;
                             return (
                               <button
                                 key={f.id}
                                 type="button"
+                                disabled={isOutOfStock}
                                 onClick={() => handleSelectFlavor(f)}
-                                className={`w-full px-3.5 py-2.5 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer text-xs ${
-                                  isSelected
-                                    ? "bg-emerald-500/15 text-emerald-300 font-bold"
-                                    : "hover:bg-white/10 text-white/85"
+                                className={`w-full px-3.5 py-2.5 text-left flex items-center justify-between gap-3 transition-colors text-xs ${
+                                  isOutOfStock
+                                    ? "opacity-40 cursor-not-allowed bg-red-950/10 hover:bg-red-950/10"
+                                    : isSelected
+                                    ? "bg-emerald-500/15 text-emerald-300 font-bold cursor-pointer"
+                                    : "hover:bg-white/10 text-white/85 cursor-pointer"
                                 }`}
                               >
                                 <div className="min-w-0">
-                                  <div className="font-bold truncate text-white">{f.flavor}</div>
+                                  <div className={`font-bold truncate ${isOutOfStock ? "text-white/40 line-through" : "text-white"}`}>{f.flavor}</div>
                                   <div className="flex items-center gap-2 text-[10px] text-white/50">
-                                    <span className={stockNum > 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
-                                      {stockNum > 0 ? `${stockNum} un em estoque` : "Sem estoque"}
+                                    <span className={stockNum > 0 ? "text-emerald-400 font-medium" : "text-red-400 font-bold"}>
+                                      {stockNum > 0 ? `${stockNum} un em estoque` : "Esgotado (0 un)"}
                                     </span>
                                     {f.price && (
                                       <span>• R$ {Number(f.price).toFixed(2).replace(".", ",")}</span>

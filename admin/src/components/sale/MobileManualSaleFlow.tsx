@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ensureBuyerInBroadcastList } from "@/lib/marketingLists";
 import { BRAZILIAN_STATES } from "@/lib/nationalSales";
 import { notifyMobileSale } from "@/lib/saleNotifications";
+import { validateCartStockAvailability, executeAtomicSaleWithStockLock } from "@/lib/stockValidation";
 import {
   ShoppingCart,
   User,
@@ -425,12 +426,17 @@ export function MobileManualSaleFlow({
     const unitPrice = parseFloat(customPrice.replace(",", ".")) || Number(currentSelectedFlavorProd.price) || 0;
     const maxStock = Number(currentSelectedFlavorProd.stock) || 0;
 
+    if (maxStock <= 0) {
+      setErrorMessage(`Produto esgotado: ${currentSelectedFlavorProd.name} (${currentSelectedFlavorProd.flavor}). Não é possível registrar esta venda.`);
+      return;
+    }
+
     if (itemQuantity <= 0) {
       setErrorMessage("A quantidade deve ser de no mínimo 1 unidade.");
       return;
     }
 
-    if (maxStock > 0 && itemQuantity > maxStock) {
+    if (itemQuantity > maxStock) {
       setErrorMessage(`Estoque insuficiente! Disponível: ${maxStock} un.`);
       return;
     }
@@ -439,7 +445,7 @@ export function MobileManualSaleFlow({
     if (existingIdx >= 0) {
       const updated = [...items];
       const newQty = updated[existingIdx].quantity + itemQuantity;
-      if (maxStock > 0 && newQty > maxStock) {
+      if (newQty > maxStock) {
         setErrorMessage(`Não é possível ultrapassar o estoque total de ${maxStock} un.`);
         return;
       }
@@ -482,7 +488,12 @@ export function MobileManualSaleFlow({
       return;
     }
 
-    if (item.maxStock > 0 && newQty > item.maxStock) {
+    if (item.maxStock <= 0) {
+      setErrorMessage(`Produto esgotado: ${item.modelName} (${item.flavor}). Não é possível registrar esta venda.`);
+      return;
+    }
+
+    if (newQty > item.maxStock) {
       setErrorMessage(`Estoque máximo para este sabor é de ${item.maxStock} un.`);
       return;
     }
@@ -531,6 +542,11 @@ export function MobileManualSaleFlow({
     // Se o operador selecionou um sabor mas não clicou explicitamente em 'Adicionar'
     if (items.length === 0) {
       if (currentSelectedFlavorProd) {
+        const maxStock = Number(currentSelectedFlavorProd.stock) || 0;
+        if (maxStock <= 0) {
+          setErrorMessage(`Produto esgotado: ${currentSelectedFlavorProd.name} (${currentSelectedFlavorProd.flavor}). Não é possível registrar esta venda.`);
+          return;
+        }
         handleAddItemToCart();
       } else {
         setErrorMessage("Adicione pelo menos 1 produto ao pedido para prosseguir.");
@@ -656,7 +672,7 @@ export function MobileManualSaleFlow({
       // Mapear método de pagamento para as constraints do Supabase ('PIX' | 'CREDITO_LINK')
       const safePaymentMethod = paymentMethod === "CARTAO" ? "CREDITO_LINK" : "PIX";
 
-      // 4. Inserir Pedido Pago em smoking_orders
+      // 4. Inserir Pedido Pago em smoking_orders com trava de estoque
       const payload: any = {
         customer_id: finalCustomerId,
         client_name: clientName.trim(),
@@ -671,57 +687,23 @@ export function MobileManualSaleFlow({
         company_id: companyId,
       };
 
-      let { error: orderErr } = await supabase
-        .from("smoking_orders")
-        .insert(payload)
-        .select("id")
-        .single();
+      // 4. Executar venda com trava atômica de estoque e concorrência
+      const atomicResult = await executeAtomicSaleWithStockLock({
+        companyId,
+        orderPayload: payload,
+        items: items.map((item) => ({
+          productId: item.productId,
+          brand: item.brand,
+          modelName: item.modelName,
+          flavor: item.flavor,
+          quantity: item.quantity,
+          price: item.price,
+          costPrice: item.costPrice,
+        })),
+      });
 
-      if (orderErr) {
-        if (orderErr.message?.includes("delivery_status")) {
-          payload.delivery_status = "PREPARANDO";
-        }
-        if (orderErr.message?.includes("payment_method")) {
-          payload.payment_method = "PIX";
-        }
-
-        const retryRes = await supabase
-          .from("smoking_orders")
-          .insert(payload)
-          .select("id")
-          .single();
-        orderErr = retryRes.error;
-      }
-
-      if (orderErr) {
-        throw new Error(`Erro ao salvar pedido: ${orderErr.message}`);
-      }
-
-      // 5. Abater estoque em smoking_products para cada item vendido
-      for (const item of items) {
-        if (!item.productId) continue;
-        try {
-          const { data: pData } = await supabase
-            .from("smoking_products")
-            .select("stock")
-            .eq("id", item.productId)
-            .single();
-
-          if (pData) {
-            const currentStock = typeof pData.stock === "number" ? pData.stock : parseInt(String(pData.stock || "0"), 10);
-            const qtyToDeduct = Number(item.quantity) || 1;
-            const newStock = Math.max(0, currentStock - qtyToDeduct);
-
-            await supabase
-              .from("smoking_products")
-              .update({ stock: newStock })
-              .eq("id", item.productId);
-
-            console.log(`[MobileManualSaleFlow] Baixa de estoque ${item.modelName} - ${item.flavor}: ${currentStock} -> ${newStock}`);
-          }
-        } catch (stockErr) {
-          console.error("Erro ao abater estoque do produto:", stockErr);
-        }
+      if (!atomicResult.success) {
+        throw new Error(atomicResult.errorMessage || "Falha ao registrar venda devido a restrição de estoque.");
       }
 
       // 6. Lista de Transmissão de Marketing (se habilitado)

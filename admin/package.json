@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "test:payroll": "tsx src/lib/payrollTester.ts",
     "test:investment": "tsx src/lib/investmentSimulatorTester.ts",
+    "test:stock": "tsx src/lib/stockValidationTester.ts",
     "lint": "oxlint",
     "preview": "vite preview"
   },
