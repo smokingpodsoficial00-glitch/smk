@@ -109,10 +109,18 @@ export const PayrollConfigModal: React.FC<PayrollConfigModalProps> = ({
     setSaving(true);
     setError(null);
     try {
+      const cleanReinvest = Number(reinvestmentPct.toFixed(2));
+      const cleanPartners = partnerPcts;
+
       await onSave({
-        reinvestmentPct: Number(reinvestmentPct.toFixed(2)),
-        partnerPcts,
+        ...currentConfig,
+        reinvestmentPct: cleanReinvest,
+        partnerPcts: cleanPartners,
         periodMode,
+        nextCycleRule: {
+          reinvestmentPct: cleanReinvest,
+          partnerPcts: cleanPartners,
+        },
         updatedAt: new Date().toISOString(),
       });
       onClose();

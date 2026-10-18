@@ -23,7 +23,8 @@ import {
 } from '@/lib/partners';
 import {
   getCurrentCycle,
-  calculateMetricsForCycle
+  calculateMetricsForCycle,
+  generateHistoricalMonthlyCycles
 } from '@/lib/financialCycles';
 import {
   loadLocalPayrollConfig,
@@ -31,6 +32,7 @@ import {
   syncPayrollConfigFromOrders,
   savePayrollConfigToSupabase,
   calculatePayrollOverview,
+  ensureCycleRuleRegistered,
   isCompanyExpenseTransaction,
   type PayrollConfig
 } from '@/lib/partnerPayroll';
@@ -209,17 +211,48 @@ export default function PartnersDashboard() {
     );
   }, [orders, repurchases, persistedCosts, transactions, partners]);
 
+  // 2.1.1 Histórico de todos os ciclos mensais
+  const historicalMonthlyMetrics = useMemo(() => {
+    return generateHistoricalMonthlyCycles(
+      orders,
+      repurchases,
+      persistedCosts,
+      transactions,
+      partners
+    );
+  }, [orders, repurchases, persistedCosts, transactions, partners]);
+
+  // Congelamento / snapshot idempotente do ciclo vigente se ainda não registrado
+  useEffect(() => {
+    if (!loading && partners.length > 0 && currentCycleMetrics.cycle.id) {
+      const { config: updatedCfg, hasChanged } = ensureCycleRuleRegistered(
+        currentCycleMetrics.cycle.id,
+        payrollConfig,
+        partners
+      );
+      if (hasChanged) {
+        setPayrollConfig(updatedCfg);
+        savePayrollConfigToSupabase(updatedCfg, targetCompanyId);
+      }
+    }
+  }, [loading, partners, currentCycleMetrics.cycle.id, targetCompanyId]);
+
   // 2.2 Visão Consolidada de Salários & Reinvestimento
   const payrollOverview = useMemo(() => {
+    const cycleList = historicalMonthlyMetrics.map(m => ({
+      cycleId: m.cycle.id,
+      netProfit: m.netProfit
+    }));
     return calculatePayrollOverview({
       partners,
       transactions,
       config: payrollConfig,
       cycleNetProfit: currentCycleMetrics.netProfit,
       allTimeNetProfit: financials.netProfitRealized,
-      currentCycleId: currentCycleMetrics.cycle.id
+      currentCycleId: currentCycleMetrics.cycle.id,
+      historicalCycleMetrics: cycleList
     });
-  }, [partners, transactions, payrollConfig, currentCycleMetrics.netProfit, financials.netProfitRealized, currentCycleMetrics.cycle.id]);
+  }, [partners, transactions, payrollConfig, currentCycleMetrics.netProfit, financials.netProfitRealized, currentCycleMetrics.cycle.id, historicalMonthlyMetrics]);
 
   const handleSavePayrollConfig = async (newConfig: PayrollConfig) => {
     setPayrollConfig(newConfig);
@@ -605,7 +638,7 @@ export default function PartnersDashboard() {
               <div>
                 <h3 className="text-sm font-semibold text-white">Fundo de Reinvestimento</h3>
                 <p className="text-[11px] text-white/40">
-                  Lucro retido no caixa para reposição de estoque e expansão
+                  {payrollOverview.periodMode === "CYCLE" ? "Aporte retido no ciclo atual" : "Lucro acumulado retido"}
                 </p>
               </div>
               <div className="text-2xl font-bold text-white pt-1">
@@ -614,89 +647,114 @@ export default function PartnersDashboard() {
             </div>
 
             <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-white/50">
-              <span>Status do Reinvestimento:</span>
-              <span className="text-emerald-400 font-medium flex items-center gap-1">
-                <CheckCircle2 className="size-3" /> Retido no Caixa Real
+              <span>Saldo Histórico Acumulado:</span>
+              <span className={`font-semibold ${payrollOverview.totalReinvestmentAccumulated >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {formatBRL(payrollOverview.totalReinvestmentAccumulated)}
               </span>
             </div>
           </div>
 
           {/* Cards de Salário Individual de Cada Sócio */}
-          {payrollOverview.partnerItems.map((item) => (
-            <div
-              key={item.partner.id}
-              className="bg-[#050505] border border-white/5 hover:border-white/10 rounded-2xl p-4 flex flex-col justify-between space-y-3 transition-all"
-            >
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="size-7 rounded-lg flex items-center justify-center text-xs font-bold text-white"
-                      style={{ backgroundColor: item.partner.avatar_color || "#10b981" }}
-                    >
-                      {item.partner.name.slice(0, 2).toUpperCase()}
+          {payrollOverview.partnerItems.map((item) => {
+            const isNegative = item.availableToReceive < 0;
+            const canWithdraw = item.availableToReceive > 0;
+
+            return (
+              <div
+                key={item.partner.id}
+                className="bg-[#050505] border border-white/5 hover:border-white/10 rounded-2xl p-4 flex flex-col justify-between space-y-3 transition-all"
+              >
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="size-7 rounded-lg flex items-center justify-center text-xs font-bold text-white"
+                        style={{ backgroundColor: item.partner.avatar_color || "#10b981" }}
+                      >
+                        {item.partner.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-white leading-tight">
+                          Salário · {item.partner.name}
+                        </h3>
+                        <span className="text-[10px] text-white/40">
+                          Pró-Labore: <strong className="text-white/70 font-medium">{item.salaryPct}% do lucro</strong>
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-white leading-tight">
-                        Salário · {item.partner.name}
-                      </h3>
-                      <span className="text-[10px] text-white/40">
-                        Pró-Labore: <strong className="text-white/70 font-medium">{item.salaryPct}% do lucro</strong>
+                  </div>
+
+                  {/* Valores: Gerado, Já Recebido e Disponível */}
+                  <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
+                    <div className="p-2.5 rounded-xl bg-[#0a0a0a] border border-white/5">
+                      <span className="text-[10px] text-white/40 block">
+                        Gerado ({item.salaryPct}%)
+                      </span>
+                      <span className={`font-semibold ${item.grossSalaryGenerated >= 0 ? 'text-white' : 'text-rose-400'}`}>
+                        {formatBRL(item.grossSalaryGenerated)}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-[#0a0a0a] border border-white/5">
+                      <span className="text-[10px] text-white/40 block">
+                        Já Recebido
+                      </span>
+                      <span className="font-semibold text-white/70">
+                        {formatBRL(item.salaryPaidInPeriod)}
                       </span>
                     </div>
                   </div>
+
+                  {/* Saldo Disponível para Sacar */}
+                  <div className={`p-3 rounded-xl border flex items-center justify-between ${
+                    isNegative 
+                      ? "bg-rose-500/5 border-rose-500/20" 
+                      : canWithdraw 
+                      ? "bg-[#0a0a0a] border-white/5" 
+                      : "bg-[#0a0a0a] border-white/5 opacity-60"
+                  }`}>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-white/40 block">
+                          Disponível para Receber
+                        </span>
+                        {isNegative && (
+                          <span className="text-[9px] px-1 rounded bg-rose-500/20 text-rose-400 font-bold">
+                            Devedor
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-lg font-bold ${
+                        isNegative ? 'text-rose-400' : canWithdraw ? 'text-emerald-400' : 'text-white/40'
+                      }`}>
+                        {formatBRL(item.availableToReceive)}
+                      </span>
+                    </div>
+                    <Wallet className={`size-4 ${isNegative ? 'text-rose-400' : canWithdraw ? 'text-emerald-400' : 'text-white/30'}`} />
+                  </div>
                 </div>
 
-                {/* Valores: Gerado, Já Recebido e Disponível */}
-                <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-                  <div className="p-2.5 rounded-xl bg-[#0a0a0a] border border-white/5">
-                    <span className="text-[10px] text-white/40 block">
-                      Gerado ({item.salaryPct}%)
-                    </span>
-                    <span className="font-semibold text-white">
-                      {formatBRL(item.grossSalaryGenerated)}
-                    </span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-[#0a0a0a] border border-white/5">
-                    <span className="text-[10px] text-white/40 block">
-                      Já Recebido
-                    </span>
-                    <span className="font-semibold text-white/70">
-                      {formatBRL(item.salaryPaidInPeriod)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Saldo Disponível para Sacar */}
-                <div className="p-3 rounded-xl bg-[#0a0a0a] border border-white/5 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-white/40 block">
-                      Disponível para Receber
-                    </span>
-                    <span className="text-lg font-bold text-emerald-400">
-                      {formatBRL(item.availableToReceive)}
-                    </span>
-                  </div>
-                  <Wallet className="size-4 text-emerald-400" />
-                </div>
+                <button
+                  type="button"
+                  disabled={!canWithdraw}
+                  onClick={() =>
+                    handleOpenTransactionModal(
+                      'PRO_LABORE',
+                      item.partner.id,
+                      item.availableToReceive > 0 ? item.availableToReceive : undefined
+                    )
+                  }
+                  className={`w-full py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                    canWithdraw
+                      ? "bg-emerald-500 hover:bg-emerald-400 text-black cursor-pointer"
+                      : "bg-white/5 border border-white/10 text-white/30 cursor-not-allowed"
+                  }`}
+                >
+                  <Banknote className="size-3.5" />
+                  <span>{canWithdraw ? "Receber / Sacar Salário" : isNegative ? "Saldo Devedor (Saque Bloqueado)" : "Sem Saldo para Sacar"}</span>
+                </button>
               </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  handleOpenTransactionModal(
-                    'PRO_LABORE',
-                    item.partner.id,
-                    item.availableToReceive > 0 ? item.availableToReceive : undefined
-                  )
-                }
-                className="w-full py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-black transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Banknote className="size-3.5" />
-                <span>Receber / Sacar Salário</span>
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

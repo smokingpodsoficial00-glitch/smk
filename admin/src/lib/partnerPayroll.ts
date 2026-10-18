@@ -10,19 +10,29 @@ import { getCycleForDate } from "./financialCycles";
 export const SYSTEM_PAYROLL_CONFIG_KEY = "__SYSTEM_SMK_PAYROLL_CONFIG__";
 const DEFAULT_COMPANY_ID = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
 
+export interface CyclePayrollRule {
+  cycleId: string;
+  reinvestmentPct: number;
+  partnerPcts: Record<string, number>;
+  effectiveFrom?: string;
+  lockedAt?: string;
+}
+
 export interface PayrollConfig {
   reinvestmentPct: number; // Padrão: 50%
   partnerPcts: Record<string, number>; // Ex: { "id_eduardo": 25, "id_gabriel": 25 }
   periodMode: "CYCLE" | "ALL_TIME"; // Base de cálculo: Ciclo Atual ou Acumulado Geral
+  cycleRules?: Record<string, CyclePayrollRule>; // Snapshots históricos imutáveis por ciclo financeiro (14 a 13)
+  nextCycleRule?: { reinvestmentPct: number; partnerPcts: Record<string, number> }; // Agendado para entrar em vigor no próximo ciclo
   updatedAt?: string;
 }
 
 export interface PartnerPayrollItem {
   partner: Partner;
   salaryPct: number; // % do lucro total destinada ao salário deste sócio (ex: 25%)
-  grossSalaryGenerated: number; // Valor bruto gerado no período/ciclo
+  grossSalaryGenerated: number; // Valor bruto gerado no período/ciclo (pode ser negativo em caso de prejuízo)
   salaryPaidInPeriod: number; // Total já sacado/pago de salário no período/ciclo
-  availableToReceive: number; // Saldo líquido disponível para sacar (inclui acumulado de ciclos anteriores se em modo ciclo)
+  availableToReceive: number; // Saldo líquido disponível para sacar (pode ser negativo/devedor)
   totalSalaryPaidAllTime: number; // Histórico total de salários recebidos
   carriedOverPendingSalary?: number; // Saldo remanescente acumulado de ciclos anteriores não retirado
 }
@@ -31,7 +41,8 @@ export interface PayrollOverview {
   periodMode: "CYCLE" | "ALL_TIME";
   baseNetProfit: number;
   reinvestmentPct: number;
-  reinvestmentAmount: number;
+  reinvestmentAmount: number; // Fundo apurado no ciclo/período selecionado
+  totalReinvestmentAccumulated: number; // Saldo histórico acumulado de todos os ciclos (incluindo prejuízos)
   totalPartnersPct: number;
   totalPartnersGenerated: number;
   totalPartnersPaid: number;
@@ -90,6 +101,7 @@ export function buildDefaultPayrollConfig(partners: Partner[] = []): PayrollConf
     reinvestmentPct,
     partnerPcts,
     periodMode: "CYCLE",
+    cycleRules: {}
   };
 }
 
@@ -143,6 +155,8 @@ export function normalizePayrollConfig(
     reinvestmentPct,
     partnerPcts,
     periodMode: rawConfig.periodMode === "ALL_TIME" ? "ALL_TIME" : "CYCLE",
+    cycleRules: rawConfig.cycleRules || {},
+    nextCycleRule: rawConfig.nextCycleRule,
     updatedAt: rawConfig.updatedAt,
   };
 }
@@ -314,7 +328,107 @@ export function syncPayrollConfigFromOrders(
 }
 
 /**
+ * Helper de cálculo monetário em centavos inteiros com reconciliação precisa
+ * Distribui um valor total (positivo ou negativo) entre múltiplos percentuais garantindo soma exata.
+ */
+export function distributeAmountInCents(
+  totalAmount: number,
+  shares: Array<{ id: string; pct: number }>
+): Record<string, number> {
+  const totalCents = Math.round(totalAmount * 100);
+  const result: Record<string, number> = {};
+
+  if (shares.length === 0) return result;
+
+  let allocatedCents = 0;
+  shares.forEach((item, index) => {
+    if (index === shares.length - 1) {
+      const remainder = totalCents - allocatedCents;
+      result[item.id] = remainder / 100;
+    } else {
+      const cents = Math.round((totalCents * item.pct) / 100);
+      result[item.id] = cents / 100;
+      allocatedCents += cents;
+    }
+  });
+
+  return result;
+}
+
+/**
+ * Obtém os percentuais vigentes para um ciclo específico:
+ * 1. Procura se há regra salva e imutável para aquele cycleId em config.cycleRules.
+ * 2. Se não houver, aplica os percentuais globais configurados.
+ */
+export function getRuleForCycle(
+  cycleId: string,
+  config: PayrollConfig,
+  partners: Partner[]
+): { reinvestmentPct: number; partnerPcts: Record<string, number> } {
+  const normalized = normalizePayrollConfig(config, partners);
+  if (normalized.cycleRules && normalized.cycleRules[cycleId]) {
+    const rule = normalized.cycleRules[cycleId];
+    return {
+      reinvestmentPct: rule.reinvestmentPct,
+      partnerPcts: rule.partnerPcts,
+    };
+  }
+  return {
+    reinvestmentPct: normalized.reinvestmentPct,
+    partnerPcts: normalized.partnerPcts,
+  };
+}
+
+/**
+ * Registra o snapshot de percentuais para o ciclo se ainda não estiver congelado.
+ */
+export function ensureCycleRuleRegistered(
+  cycleId: string,
+  config: PayrollConfig,
+  partners: Partner[]
+): { config: PayrollConfig; hasChanged: boolean } {
+  const normalized = normalizePayrollConfig(config, partners);
+  const rules = { ...(normalized.cycleRules || {}) };
+
+  if (rules[cycleId]) {
+    return { config: normalized, hasChanged: false };
+  }
+
+  // Se houver regra agendada em nextCycleRule e este for o ciclo futuro, ativa-a
+  let newRule: CyclePayrollRule;
+  if (normalized.nextCycleRule) {
+    newRule = {
+      cycleId,
+      reinvestmentPct: normalized.nextCycleRule.reinvestmentPct,
+      partnerPcts: normalized.nextCycleRule.partnerPcts,
+      lockedAt: new Date().toISOString(),
+    };
+  } else {
+    newRule = {
+      cycleId,
+      reinvestmentPct: normalized.reinvestmentPct,
+      partnerPcts: normalized.partnerPcts,
+      lockedAt: new Date().toISOString(),
+    };
+  }
+
+  rules[cycleId] = newRule;
+
+  const updatedConfig: PayrollConfig = {
+    ...normalized,
+    reinvestmentPct: newRule.reinvestmentPct,
+    partnerPcts: newRule.partnerPcts,
+    cycleRules: rules,
+    nextCycleRule: undefined, // Consumida
+    updatedAt: new Date().toISOString(),
+  };
+
+  return { config: updatedConfig, hasChanged: true };
+}
+
+/**
  * Calcula o resumo completo de Reinvestimento e Folha Salarial de cada sócio
+ * Suporta lucros positivos, prejuízos negativos, saldos devedores e regras por ciclo
  */
 export function calculatePayrollOverview(params: {
   config: PayrollConfig;
@@ -323,6 +437,7 @@ export function calculatePayrollOverview(params: {
   cycleNetProfit: number;
   allTimeNetProfit: number;
   currentCycleId: string;
+  historicalCycleMetrics?: Array<{ cycleId: string; netProfit: number }>;
 }): PayrollOverview {
   const {
     config,
@@ -331,21 +446,50 @@ export function calculatePayrollOverview(params: {
     cycleNetProfit,
     allTimeNetProfit,
     currentCycleId,
+    historicalCycleMetrics = [],
   } = params;
 
   const realPartners = filterRealHumanPartners(partners);
   const normalized = normalizePayrollConfig(config, realPartners);
   const periodMode = normalized.periodMode;
 
-  const baseNetProfit = Math.max(
-    0,
-    periodMode === "CYCLE" ? cycleNetProfit : allTimeNetProfit
+  // Regra 1 e 3: Não truncar o resultado em zero. Prejuízos são representados negativamente.
+  const baseNetProfit = Number(
+    (periodMode === "CYCLE" ? cycleNetProfit : allTimeNetProfit).toFixed(2)
   );
 
-  const reinvestmentPct = normalized.reinvestmentPct;
-  const reinvestmentAmount = Number(
-    ((baseNetProfit * reinvestmentPct) / 100).toFixed(2)
-  );
+  // Obtém percentuais vigentes do ciclo atual
+  const activeCycleRule = getRuleForCycle(currentCycleId, normalized, realPartners);
+  const activeReinvestmentPct = periodMode === "CYCLE" ? activeCycleRule.reinvestmentPct : normalized.reinvestmentPct;
+  const activePartnerPcts = periodMode === "CYCLE" ? activeCycleRule.partnerPcts : normalized.partnerPcts;
+
+  // Distribuição exata em centavos no período selecionado
+  const sharesForPeriod = [
+    { id: "REINVESTMENT", pct: activeReinvestmentPct },
+    ...realPartners.map((p) => ({ id: p.id, pct: Number(activePartnerPcts[p.id] ?? 0) })),
+  ];
+  const distributedPeriodCents = distributeAmountInCents(baseNetProfit, sharesForPeriod);
+
+  const reinvestmentAmount = distributedPeriodCents["REINVESTMENT"] ?? 0;
+
+  // Cálculo do Fundo de Reinvestimento Histórico Acumulado (Regra 8)
+  // Se métricas históricas de ciclo forem fornecidas, acumula ciclo a ciclo com seus respectivos percentuais
+  let totalReinvestmentAccumulated = 0;
+  if (historicalCycleMetrics.length > 0) {
+    for (const hCycle of historicalCycleMetrics) {
+      const hRule = getRuleForCycle(hCycle.cycleId, normalized, realPartners);
+      const hShares = [
+        { id: "REINVESTMENT", pct: hRule.reinvestmentPct },
+        ...realPartners.map((p) => ({ id: p.id, pct: Number(hRule.partnerPcts[p.id] ?? 0) })),
+      ];
+      const hDist = distributeAmountInCents(hCycle.netProfit, hShares);
+      totalReinvestmentAccumulated += hDist["REINVESTMENT"] ?? 0;
+    }
+    totalReinvestmentAccumulated = Number(totalReinvestmentAccumulated.toFixed(2));
+  } else {
+    // Fallback: aplica percentual histórico configurado sobre o resultado líquido total
+    totalReinvestmentAccumulated = Number(((allTimeNetProfit * normalized.reinvestmentPct) / 100).toFixed(2));
+  }
 
   let totalPartnersPct = 0;
   let totalPartnersGenerated = 0;
@@ -353,10 +497,8 @@ export function calculatePayrollOverview(params: {
   let totalPartnersAvailable = 0;
 
   const partnerItems: PartnerPayrollItem[] = realPartners.map((partner) => {
-    const salaryPct = Number(normalized.partnerPcts[partner.id] ?? 0);
-    const grossSalaryGenerated = Number(
-      ((baseNetProfit * salaryPct) / 100).toFixed(2)
-    );
+    const salaryPct = Number(activePartnerPcts[partner.id] ?? 0);
+    const grossSalaryGenerated = distributedPeriodCents[partner.id] ?? 0;
 
     // Transações de salário / pró-labore / distribuição de lucro deste sócio
     const salaryTxs = (transactions || []).filter(
@@ -388,20 +530,46 @@ export function calculatePayrollOverview(params: {
     let carriedOverPendingSalary = 0;
 
     if (periodMode === "ALL_TIME") {
+      // Regra 7: No Acumulado Geral, aplica percentuais atuais sobre o resultado histórico e desconta os saques
+      // Permite saldo negativo se saques > direito acumulado ou se o negócio acumulou prejuízo
       availableToReceive = Number(
-        Math.max(0, grossSalaryGenerated - totalSalaryPaidAllTime).toFixed(2)
+        (grossSalaryGenerated - totalSalaryPaidAllTime).toFixed(2)
       );
     } else {
-      // No modo ciclo, calculamos o saldo gerado no ciclo atual menos os saques do ciclo atual.
-      // Se allTimeNetProfit acumulado gerou mais direito do que o total sacado na história,
-      // a diferença que não pertence ao ciclo atual é acumulada como rollover (carryover).
-      const allTimeGrossGenerated = Number(((allTimeNetProfit * salaryPct) / 100).toFixed(2));
-      const totalAllTimeAvailable = Math.max(0, allTimeGrossGenerated - totalSalaryPaidAllTime);
-      const cycleAvailable = Math.max(0, grossSalaryGenerated - salaryPaidInPeriod);
+      // Regra 4, 5 e 6: No Modo Ciclo, calculamos a evolução histórica de todos os ciclos até o momento
+      if (historicalCycleMetrics.length > 0) {
+        let allTimeGeneratedFromCycles = 0;
+        let previousCyclesGenerated = 0;
 
-      carriedOverPendingSalary = Number(Math.max(0, totalAllTimeAvailable - cycleAvailable).toFixed(2));
-      // O disponível total do sócio é o direito do ciclo corrente + acumulado de ciclos anteriores não retirados
-      availableToReceive = Number((cycleAvailable + carriedOverPendingSalary).toFixed(2));
+        for (const hCycle of historicalCycleMetrics) {
+          const hRule = getRuleForCycle(hCycle.cycleId, normalized, realPartners);
+          const hShares = [
+            { id: "REINVESTMENT", pct: hRule.reinvestmentPct },
+            ...realPartners.map((p) => ({ id: p.id, pct: Number(hRule.partnerPcts[p.id] ?? 0) })),
+          ];
+          const hDist = distributeAmountInCents(hCycle.netProfit, hShares);
+          const share = hDist[partner.id] ?? 0;
+          allTimeGeneratedFromCycles += share;
+          if (hCycle.cycleId !== currentCycleId) {
+            previousCyclesGenerated += share;
+          }
+        }
+
+        const previousCyclesSalaryPaid = Number((totalSalaryPaidAllTime - salaryPaidInPeriod).toFixed(2));
+        carriedOverPendingSalary = Number((previousCyclesGenerated - previousCyclesSalaryPaid).toFixed(2));
+        const cycleAvailable = Number((grossSalaryGenerated - salaryPaidInPeriod).toFixed(2));
+
+        // Saldo disponível acumula o ciclo atual e os saldos remanescentes (positivos ou negativos)
+        availableToReceive = Number((carriedOverPendingSalary + cycleAvailable).toFixed(2));
+      } else {
+        // Fallback linear preservando saldo negativo se houver
+        const allTimeGrossGenerated = Number(((allTimeNetProfit * salaryPct) / 100).toFixed(2));
+        const totalAllTimeAvailable = Number((allTimeGrossGenerated - totalSalaryPaidAllTime).toFixed(2));
+        const cycleAvailable = Number((grossSalaryGenerated - salaryPaidInPeriod).toFixed(2));
+
+        carriedOverPendingSalary = Number((totalAllTimeAvailable - cycleAvailable).toFixed(2));
+        availableToReceive = Number((carriedOverPendingSalary + cycleAvailable).toFixed(2));
+      }
     }
 
     totalPartnersPct += salaryPct;
@@ -423,8 +591,9 @@ export function calculatePayrollOverview(params: {
   return {
     periodMode,
     baseNetProfit: Number(baseNetProfit.toFixed(2)),
-    reinvestmentPct,
+    reinvestmentPct: activeReinvestmentPct,
     reinvestmentAmount,
+    totalReinvestmentAccumulated,
     totalPartnersPct: Number(totalPartnersPct.toFixed(2)),
     totalPartnersGenerated: Number(totalPartnersGenerated.toFixed(2)),
     totalPartnersPaid: Number(totalPartnersPaid.toFixed(2)),
