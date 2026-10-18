@@ -43,6 +43,7 @@ import { NewPartnerModal } from './partners/NewPartnerModal';
 import { NewTransactionModal } from './partners/NewTransactionModal';
 import { EditPartnerModal } from './partners/EditPartnerModal';
 import { DilutionSimulatorModal } from './partners/DilutionSimulatorModal';
+import { InvestmentSimulatorModal } from './partners/InvestmentSimulatorModal';
 import { PayrollConfigModal } from './partners/PayrollConfigModal';
 
 export default function PartnersDashboard() {
@@ -75,6 +76,7 @@ export default function PartnersDashboard() {
   const [newTxDefaultAmount, setNewTxDefaultAmount] = useState<number | undefined>(undefined);
   const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
   const [showDilutionModal, setShowDilutionModal] = useState<boolean>(false);
+  const [showInvestmentModal, setShowInvestmentModal] = useState<boolean>(false);
   const [txToDelete, setTxToDelete] = useState<PartnerTransaction | null>(null);
   const [isDeletingTx, setIsDeletingTx] = useState<boolean>(false);
   const [updatingTxId, setUpdatingTxId] = useState<string | null>(null);
@@ -403,7 +405,7 @@ export default function PartnersDashboard() {
         {/* Ações Rápidas */}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowDilutionModal(true)}
+            onClick={() => setShowInvestmentModal(true)}
             className="px-3.5 py-2 rounded-xl text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Calculator className="size-3.5 text-white/60 shrink-0" />
@@ -1145,6 +1147,13 @@ export default function PartnersDashboard() {
           currentNetCapitalInvested={
             financials.partnerMetrics.find(m => m.partner.id === editingPartner.id)?.netCapitalInvested || 0
           }
+        />
+      )}
+
+      {showInvestmentModal && (
+        <InvestmentSimulatorModal
+          isOpen={showInvestmentModal}
+          onClose={() => setShowInvestmentModal(false)}
         />
       )}
 
