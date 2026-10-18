@@ -343,31 +343,7 @@
       "legacyMetadata": {}
     },
     {
-      "id": "camp_1792356696465",
-      "name": "CPM TESTE OFERTA COM FOTO",
-      "message": "🔥 OFERTA DO DIA NO VIP: [NOME_DO_MODELO]! 💨\n\n💰 Apenas R$ [PREÇO]\n\n✨ Sabores disponíveis em estoque agora:\n• [Sabor 1]\n• [Sabor 2]\n• [Sabor 3]\n\n🚀 Peça direto no nosso cardápio ou no whatsapp antes que esgote:\n👉 [LINK_DO_CARDAPIO_VERCEL]",
-      "variations": [],
-      "useVariations": false,
-      "targetType": "group",
-      "selectedListIds": [
-        "0d925499-da68-4a93-9591-f4b6f78744b1"
-      ],
-      "targetGroupId": "120363430820740157@g.us",
-      "targetGroupName": "SMK MATERIAL MKT",
-      "frequencyDays": 1,
-      "scheduledTime": "18:14",
-      "startDate": "2026-10-18",
-      "batchSize": 5,
-      "batchIntervalMinutes": 35,
-      "isStockOffer": true,
-      "stockOfferCount": 2,
-      "status": "active",
-      "totalRecipients": 3,
-      "createdAt": "2026-10-18T20:51:36.465Z",
-      "updatedAt": "2026-10-18T20:51:36.465Z"
-    },
-    {
-      "id": "camp_1792357758521",
+      "id": "camp_1792357759238",
       "name": "CPM OFERTAS DIÁRIAS SMK COM FOTO",
       "message": "🔥 OFERTA DO DIA NO VIP: [NOME_DO_MODELO]! 💨\n\n💰 Apenas R$ [PREÇO]\n\n✨ Sabores disponíveis em estoque agora:\n• [Sabor 1]\n• [Sabor 2]\n• [Sabor 3]\n\n🚀 Peça direto no nosso cardápio ou no whatsapp antes que esgote:\n👉 [LINK_DO_CARDAPIO_VERCEL]",
       "variations": [],
@@ -384,38 +360,36 @@
       "startDate": "2026-10-18",
       "batchSize": 5,
       "batchIntervalMinutes": 35,
-      "isStockOffer": true,
-      "stockOfferCount": 2,
-      "status": "paused",
       "totalRecipients": 62,
-      "createdAt": "2026-10-18T21:09:18.521Z",
-      "updatedAt": "2026-10-18T21:09:18.521Z"
+      "status": "active",
+      "createdAt": "2026-10-18T21:09:19.238Z",
+      "updatedAt": "2026-10-18T21:09:19.238Z"
     },
     {
-      "id": "camp_1792357794113",
-      "name": "cpm teste oferta com foto 3",
-      "message": "🔥 OFERTA DO DIA NO VIP: [NOME_DO_MODELO]! 💨\n\n💰 Apenas R$ [PREÇO]\n\n✨ Sabores disponíveis em estoque agora:\n• [Sabor 1]\n• [Sabor 2]\n• [Sabor 3]\n\n🚀 Peça direto no nosso cardápio ou no whatsapp antes que esgote:\n👉 [LINK_DO_CARDAPIO_VERCEL]",
+      "id": "camp_1792359260737",
+      "name": "CPM TESTE 01 OFERTA COM FOTO",
+      "message": ".",
       "variations": [],
       "useVariations": false,
       "targetType": "group",
       "selectedListIds": [
         "0d925499-da68-4a93-9591-f4b6f78744b1"
       ],
-      "targetGroupId": "120363430820740157@g.us",
-      "targetGroupName": "SMK MATERIAL MKT",
-      "frequencyDays": 7,
-      "scheduledWeekday": "QUARTA",
-      "scheduledTime": "18:11",
-      "scheduledTime2": "18:12",
+      "targetGroupId": "120363427803492997@g.us",
+      "targetGroupName": "SMK/FINANÇAS/GERAL",
+      "frequencyDays": 1,
+      "scheduledTime": "18:35",
+      "scheduledTime2": "18:37",
       "startDate": "2026-10-18",
       "batchSize": 5,
       "batchIntervalMinutes": 35,
       "isStockOffer": true,
       "stockOfferCount": 2,
-      "status": "paused",
-      "totalRecipients": 3,
-      "createdAt": "2026-10-18T21:09:54.113Z",
-      "updatedAt": "2026-10-18T21:09:54.113Z"
+      "totalRecipients": 2,
+      "status": "active",
+      "createdAt": "2026-10-18T21:34:21.072Z",
+      "updatedAt": "2026-10-18T21:34:21.072Z",
+      "lastRunDate": "18/10/2026"
     }
   ],
   "idempotencyKeys": [
@@ -433,9 +407,19 @@
       "key": "camp_1792356696724_2026-10-18_slot1_18:14",
       "timestamp": "2026-10-18T21:14:13.342Z",
       "campaignName": "CPM TESTE OFERTA COM FOTO"
+    },
+    {
+      "key": "camp_1792359260737_2026-10-18_slot1",
+      "timestamp": "2026-10-18T21:35:49.801Z",
+      "campaignName": "CPM TESTE 01 OFERTA COM FOTO"
+    },
+    {
+      "key": "camp_1792359260737_2026-10-18_slot2",
+      "timestamp": "2026-10-18T21:37:48.697Z",
+      "campaignName": "CPM TESTE 01 OFERTA COM FOTO"
     }
   ],
-  "lastUpdated": "2026-10-18T21:14:28.392Z",
+  "lastUpdated": "2026-10-18T21:37:48.697Z",
   "lists": [
     {
       "id": "0d925499-da68-4a93-9591-f4b6f78744b1",
@@ -5405,5 +5389,15 @@
   "recentStockOfferModels": [
     "V80 ULTRA SLIM",
     "BC15K"
+  ],
+  "dailyStockOffers": {
+    "2026-10-18": [
+      "BC15K",
+      "V250"
+    ]
+  },
+  "stockOfferCycle": [
+    "BC15K",
+    "V250"
   ]
 }

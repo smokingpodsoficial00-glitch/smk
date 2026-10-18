@@ -902,40 +902,50 @@ async function buildStockOfferMessage(options = {}) {
     if (!config.dailyStockOffers || typeof config.dailyStockOffers !== 'object') {
       config.dailyStockOffers = {};
     }
+    if (!Array.isArray(config.stockOfferCycle)) {
+      config.stockOfferCycle = [];
+    }
 
-    // Modelos que JÁ FORAM OFERTADOS HOJE
+    const allModelNames = allModels.map(m => m.name);
+
+    // 1. Modelos que JÁ FORAM OFERTADOS HOJE (trava diária absoluta: proibido repetir no mesmo dia!)
     const todayOffered = Array.isArray(config.dailyStockOffers[todayStr]) 
       ? config.dailyStockOffers[todayStr] 
       : [];
 
-    // 🔒 REGRA DE OURO: Modelos que AINDA NÃO FORAM ofertados hoje (proibido repetir no mesmo dia!)
-    let candidatesNotToday = allModels.filter(m => !todayOffered.includes(m.name));
-    
-    // Se o catálogo tiver menos modelos do que o count diário, usa o que resta
-    let availablePool = candidatesNotToday.length > 0 ? candidatesNotToday : allModels;
+    // 2. Modelos que já saíram no ciclo atual (filtrando apenas os que ainda existem com estoque ativo)
+    let cycleOffered = config.stockOfferCycle.filter(name => allModelNames.includes(name));
 
-    // Rotação inteligente dos últimos 3 dias (sem travas eternas)
-    const recentPastDaysOffered = [];
-    Object.keys(config.dailyStockOffers).forEach(dateKey => {
-      if (dateKey !== todayStr) {
-        const list = config.dailyStockOffers[dateKey] || [];
-        list.forEach(name => {
-          if (!recentPastDaysOffered.includes(name)) recentPastDaysOffered.push(name);
-        });
+    // 3. Modelos prioritários: AINDA NÃO OFERTADOS NO CICLO e NÃO OFERTADOS HOJE
+    let unofferedInCycle = allModels.filter(m => !cycleOffered.includes(m.name) && !todayOffered.includes(m.name));
+
+    // 4. Se todos os modelos do catálogo já foram ofertados no ciclo (ou restarem menos que o count):
+    if (unofferedInCycle.length < count) {
+      console.log(`🔄 [StockOffer] Ciclo completo atingido! Todos os modelos com estoque já foram divulgados. Reiniciando novo ciclo...`);
+      // Reinicia o ciclo para começar tudo de novo
+      cycleOffered = [];
+      config.stockOfferCycle = [];
+
+      // Candidatos para a nova rodada: todos os modelos ativos, exceto os que JÁ saíram HOJE
+      unofferedInCycle = allModels.filter(m => !todayOffered.includes(m.name));
+      if (unofferedInCycle.length === 0) {
+        unofferedInCycle = allModels;
       }
-    });
-
-    // Dos modelos elegíveis de hoje, prioriza os que não saíram nos últimos 3 dias
-    let freshestPool = availablePool.filter(m => !recentPastDaysOffered.includes(m.name));
-    if (freshestPool.length < count) {
-      freshestPool = availablePool;
     }
 
-    // Embaralha aleatoriamente e seleciona a quantidade
-    const shuffled = freshestPool.sort(() => 0.5 - Math.random());
+    // 5. Embaralha aleatoriamente dentre os modelos que ainda não foram ofertados
+    const shuffled = unofferedInCycle.sort(() => 0.5 - Math.random());
     const selected = shuffled.slice(0, count);
 
-    // Registra modelos escolhidos no dia de hoje
+    // 6. Registra os modelos no ciclo atual
+    selected.forEach(m => {
+      if (!cycleOffered.includes(m.name)) {
+        cycleOffered.push(m.name);
+      }
+    });
+    config.stockOfferCycle = cycleOffered;
+
+    // 7. Registra os modelos na trava diária de hoje
     if (!config.dailyStockOffers[todayStr]) config.dailyStockOffers[todayStr] = [];
     selected.forEach(m => {
       if (!config.dailyStockOffers[todayStr].includes(m.name)) {
@@ -943,7 +953,7 @@ async function buildStockOfferMessage(options = {}) {
       }
     });
 
-    // Limpeza de histórico: mantém apenas os últimos 7 dias
+    // Limpeza de histórico diário antigo: mantém apenas os últimos 7 dias
     const allDates = Object.keys(config.dailyStockOffers).sort();
     if (allDates.length > 7) {
       const datesToRemove = allDates.slice(0, allDates.length - 7);
