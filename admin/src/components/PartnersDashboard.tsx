@@ -423,25 +423,9 @@ export default function PartnersDashboard() {
       </header>
 
 
-      {/* ━━━ 4 CARDS CENTRAIS (COM PROJEÇÃO DE LUCRO E MARGEM ATUAL) ━━━━━━━ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* 1. Patrimônio Econômico Projetado Total */}
-        <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-4 space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">
-              Patrimônio Projetado
-            </span>
-            <Landmark className="size-4 text-emerald-400" />
-          </div>
-          <div className="text-xl font-bold text-white tracking-tight">
-            {formatBRL(financials.companyTotalProjectedEquity)}
-          </div>
-          <p className="text-[10px] text-white/40">
-            Capital ({formatBRL(financials.totalNetCapitalInvested)}) + Lucro ({formatBRL(financials.companyTotalProjectedProfit)})
-          </p>
-        </div>
-
-        {/* 2. Capital Investido Total */}
+      {/* ━━━ CARDS CENTRAIS DE CAPITAL, LUCRO E PATRIMÔNIO REAL ━━━━━━━━━━━ */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        {/* 1. Capital Investido Total */}
         <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-4 space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">
