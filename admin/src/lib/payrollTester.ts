@@ -466,6 +466,60 @@ export function runPayrollOfficialTestSuite(): PayrollTestSuiteReport {
     results.push({ id: 14, description: 'Isolamento de dados', passed: false, details: e.message, error: e.message });
   }
 
+  // 15. Preservação de saldos em ciclos históricos sem snapshot prévio
+  try {
+    const historicalWithoutSnapshot = [
+      { cycleId: '2026-07', netProfit: 1000 },
+      { cycleId: '2026-08', netProfit: 2000 }
+    ];
+    // Antes da introdução de snapshots
+    const cfgWithoutSnapshots: PayrollConfig = {
+      reinvestmentPct: 50,
+      partnerPcts: { 'p1-eduardo': 25, 'p2-gabriel': 25 },
+      periodMode: 'CYCLE',
+      cycleRules: {}
+    };
+    const overviewBefore = calculatePayrollOverview({
+      config: cfgWithoutSnapshots,
+      partners: mockPartners,
+      transactions: [],
+      cycleNetProfit: 2000,
+      allTimeNetProfit: 3000,
+      currentCycleId: '2026-08',
+      historicalCycleMetrics: historicalWithoutSnapshot
+    });
+
+    const eduBefore = overviewBefore.partnerItems.find(p => p.partner.id === 'p1-eduardo');
+    const availableBefore = eduBefore?.availableToReceive ?? 0;
+
+    // Depois: introdução do snapshot para o ciclo atual 2026-08 sem inventar snapshot para 2026-07
+    const { config: cfgWithSnapshot } = ensureCycleRuleRegistered('2026-08', cfgWithoutSnapshots, mockPartners);
+    const overviewAfter = calculatePayrollOverview({
+      config: cfgWithSnapshot,
+      partners: mockPartners,
+      transactions: [],
+      cycleNetProfit: 2000,
+      allTimeNetProfit: 3000,
+      currentCycleId: '2026-08',
+      historicalCycleMetrics: historicalWithoutSnapshot
+    });
+    const eduAfter = overviewAfter.partnerItems.find(p => p.partner.id === 'p1-eduardo');
+    const availableAfter = eduAfter?.availableToReceive ?? 0;
+
+    // O saldo de 2026-07 e 2026-08 deve ser idêntico antes e depois da transição
+    const ok = availableBefore === 750 && availableAfter === 750 && availableBefore === availableAfter;
+    results.push({
+      id: 15,
+      description: 'Preservação de saldos em ciclos históricos sem snapshot prévio (transição segura)',
+      passed: ok,
+      details: ok
+        ? `Saldos preservados com precisão antes e depois da transição: R$ ${availableBefore.toFixed(2)} === R$ ${availableAfter.toFixed(2)}`
+        : `Divergência: antes R$ ${availableBefore}, depois R$ ${availableAfter}`
+    });
+  } catch (e: any) {
+    results.push({ id: 15, description: 'Preservação de saldos sem snapshot', passed: false, details: e.message, error: e.message });
+  }
+
   const passedTests = results.filter(r => r.passed).length;
   const failedTests = results.filter(r => !r.passed).length;
   const allPassed = failedTests === 0;
@@ -483,3 +537,33 @@ export function runPayrollOfficialTestSuite(): PayrollTestSuiteReport {
 if (typeof window !== 'undefined') {
   (window as any).__runPayrollTestSuite = runPayrollOfficialTestSuite;
 }
+
+// Execução direta como script de teste automatizado via CLI (tsx / node)
+export function runCli(): void {
+  console.log("=== BATERIA DE TESTES OFICIAIS — FOLHA DE PAGAMENTO SMK ===");
+  const report = runPayrollOfficialTestSuite();
+  console.log(`Executados: ${report.totalTests} | Passaram: ${report.passedTests} | Falharam: ${report.failedTests}`);
+  for (const r of report.results) {
+    console.log(`[${r.passed ? "OK" : "FAIL"}] #${r.id} ${r.description}`);
+    if (!r.passed) {
+      console.error(`       Erro: ${r.details}`);
+    }
+  }
+  if (!report.allPassed) {
+    console.error("\n❌ FALHA: Um ou mais testes de folha de pagamento reprovaram.");
+    if (typeof process !== "undefined" && process.exit) {
+      process.exit(1);
+    }
+  } else {
+    console.log("\n✅ SUCESSO: Todos os testes passaram com êxito.");
+    if (typeof process !== "undefined" && process.exit) {
+      process.exit(0);
+    }
+  }
+}
+
+// Se executado diretamente na linha de comando
+if (typeof process !== "undefined" && process.argv && process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('payrollTester.ts')) {
+  runCli();
+}
+
