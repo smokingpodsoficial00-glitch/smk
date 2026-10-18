@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, Users, Settings, CircleDollarSign, 
-  Store, ChevronRight, LogOut, Megaphone, Scale, CheckSquare, Compass, Crown, Sun, Moon, Menu, X, Smartphone, Bell,
+  Store, ChevronRight, LogOut, Megaphone, Scale, Compass, Crown, Sun, Moon, Menu, X, Smartphone, Bell,
   Plus, MoreHorizontal
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -51,7 +51,6 @@ export function DashboardLayout() {
     if (p.includes('/clientes')) return 'CRM & Últimas Vendas';
     if (p.includes('/marketing')) return 'Marketing';
     if (p.includes('/socios')) return 'Sócios & Equity';
-    if (p.includes('/tarefas')) return 'Tarefas (QG)';
     if (p.includes('/gestao-saas')) return 'Vendas do SaaS';
     if (p.includes('/configuracoes')) return 'Configurações';
     return displayName;
@@ -195,33 +194,6 @@ export function DashboardLayout() {
                   Sócios
                   <span className="text-[9px] bg-white/10 text-white border border-white/20 px-1.5 py-0.5 rounded-full font-bold shadow-sm">
                     EQUITY
-                  </span>
-                </span>
-              )}
-            </NavLink>
-          )}
-
-          {/* Tarefas */}
-          {canAccess('tarefas') && (
-            <NavLink 
-              to="/tarefas"
-              title={collapsed ? "Tarefas dos Sócios" : undefined}
-              className={({ isActive }) =>
-                `flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
-                  collapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
-                } ${
-                  isActive 
-                    ? 'bg-white/10 text-white font-extrabold border-l-2 border-white pl-3.5 shadow-[0_0_15px_rgba(255,255,255,0.15)]' 
-                    : 'text-white/60 hover:bg-white/5 hover:text-white border-l-2 border-transparent pl-4'
-                }`
-              }
-            >
-              <CheckSquare className="size-4 shrink-0 text-white/80" />
-              {!collapsed && (
-                <span className="truncate flex items-center gap-2">
-                  Tarefas
-                  <span className="text-[9px] bg-white/10 text-white border border-white/20 px-1.5 py-0.5 rounded-full font-bold shadow-sm">
-                    QG
                   </span>
                 </span>
               )}
@@ -520,22 +492,6 @@ export function DashboardLayout() {
                     >
                       <Megaphone className="size-4 shrink-0 text-white/70" />
                       <span className="text-xs font-semibold truncate">Marketing</span>
-                    </NavLink>
-                  )}
-                  {canAccess('tarefas') && (
-                    <NavLink
-                      to="/tarefas"
-                      onClick={() => setIsMoreSheetOpen(false)}
-                      className={({ isActive }) =>
-                        `flex items-center gap-2.5 p-3 rounded-2xl border transition-all ${
-                          isActive 
-                            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 font-bold' 
-                            : 'bg-white/5 border-white/5 text-white/80 hover:bg-white/10'
-                        }`
-                      }
-                    >
-                      <CheckSquare className="size-4 shrink-0 text-white/70" />
-                      <span className="text-xs font-semibold truncate">Tarefas (QG)</span>
                     </NavLink>
                   )}
                   {canAccess('gestao-saas') && (

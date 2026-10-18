@@ -15,7 +15,6 @@ const SupplyChainDashboard = lazy(() => import('./components/SupplyChainDashboar
 const CRMDashboard = lazy(() => import('./components/CRMDashboard'));
 const MarketingModule = lazy(() => import('./components/MarketingModule'));
 const PartnersDashboard = lazy(() => import('./components/PartnersDashboard'));
-const TasksDashboard = lazy(() => import('./components/TasksDashboard'));
 const SettingsPage = lazy(() => import('./components/SettingsPage'));
 const SaasManagementDashboard = lazy(() => import('./components/SaasManagementDashboard'));
 const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage })));
@@ -142,7 +141,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'tarefas',
-        element: <SuspenseWrap><TasksDashboard /></SuspenseWrap>,
+        element: <Navigate to="/pedidos" replace />,
       },
       {
         path: 'configuracoes',
