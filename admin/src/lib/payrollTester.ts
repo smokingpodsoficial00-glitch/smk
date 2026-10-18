@@ -466,58 +466,84 @@ export function runPayrollOfficialTestSuite(): PayrollTestSuiteReport {
     results.push({ id: 14, description: 'Isolamento de dados', passed: false, details: e.message, error: e.message });
   }
 
-  // 15. Preservação de saldos em ciclos históricos sem snapshot prévio
+  // 15. Tratamento de ciclos históricos sem snapshot (com saques, prejuízo anterior e percentuais distintos)
   try {
-    const historicalWithoutSnapshot = [
+    // Cenário Realista:
+    // Ciclo 2026-06: Prejuízo de -R$ 400,00 (Sem snapshot: percentuais históricos originais desconhecidos -> adota fallback estável da configuração vigente de 50%/25%/25%)
+    // Ciclo 2026-07: Lucro de R$ 1.000,00 (Possui snapshot congelado de 60% Loja / 20% Eduardo / 20% Gabriel)
+    // Ciclo 2026-08: Ciclo Atual com Lucro de R$ 800,00 (Vigente atual: 50% Loja / 25% Eduardo / 25% Gabriel)
+    // Saques registrados: Sócio realizou saque de R$ 50,00 em 2026-07
+    const historicalMetrics = [
+      { cycleId: '2026-06', netProfit: -400 },
       { cycleId: '2026-07', netProfit: 1000 },
-      { cycleId: '2026-08', netProfit: 2000 }
+      { cycleId: '2026-08', netProfit: 800 }
     ];
-    // Antes da introdução de snapshots
-    const cfgWithoutSnapshots: PayrollConfig = {
+
+    const historicalTxs: PartnerTransaction[] = [
+      {
+        id: 'tx-hist-1',
+        partner_id: 'p1-eduardo',
+        type: 'PRO_LABORE',
+        amount: 50,
+        date: '2026-07-20',
+        description: 'Saque realizado em julho',
+        destination_category: 'CAIXA_GERAL',
+        created_at: new Date('2026-07-20').toISOString()
+      }
+    ];
+
+    const configWithMixedSnapshots: PayrollConfig = {
       reinvestmentPct: 50,
       partnerPcts: { 'p1-eduardo': 25, 'p2-gabriel': 25 },
       periodMode: 'CYCLE',
-      cycleRules: {}
+      cycleRules: {
+        // Ciclo 2026-07 possui snapshot registrado com 60% / 20% / 20%
+        '2026-07': {
+          cycleId: '2026-07',
+          reinvestmentPct: 60,
+          partnerPcts: { 'p1-eduardo': 20, 'p2-gabriel': 20 },
+          lockedAt: '2026-07-14T00:00:00.000Z'
+        }
+        // 2026-06 NÃO possui snapshot (percentual histórico original desconhecido -> fallback determinístico da regra vigente)
+      }
     };
-    const overviewBefore = calculatePayrollOverview({
-      config: cfgWithoutSnapshots,
+
+    const overview = calculatePayrollOverview({
+      config: configWithMixedSnapshots,
       partners: mockPartners,
-      transactions: [],
-      cycleNetProfit: 2000,
-      allTimeNetProfit: 3000,
+      transactions: historicalTxs,
+      cycleNetProfit: 800,
+      allTimeNetProfit: 1400,
       currentCycleId: '2026-08',
-      historicalCycleMetrics: historicalWithoutSnapshot
+      historicalCycleMetrics: historicalMetrics
     });
 
-    const eduBefore = overviewBefore.partnerItems.find(p => p.partner.id === 'p1-eduardo');
-    const availableBefore = eduBefore?.availableToReceive ?? 0;
+    const edu = overview.partnerItems.find(p => p.partner.id === 'p1-eduardo');
+    
+    // Cálculo Matemático Esperado:
+    // 2026-06 (Sem snapshot -> Fallback 25%): -400 * 25% = -R$ 100,00
+    // 2026-07 (Com snapshot -> 20%): +1000 * 20% = +R$ 200,00
+    // Total gerado em ciclos anteriores: -100 + 200 = +R$ 100,00
+    // Saques realizados em ciclos anteriores: R$ 50,00
+    // Carried over pending (remanscente anterior): 100 - 50 = +R$ 50,00
+    // Ciclo Atual 2026-08 (Regra ativa 25%): +800 * 25% = +R$ 200,00
+    // Saques no ciclo atual: R$ 0,00
+    // Disponível total: Carried Over (50) + Ciclo Atual (200) = R$ 250,00
+    const expectedAvailable = 250.00;
+    const ok = edu?.availableToReceive === expectedAvailable && 
+               edu?.grossSalaryGenerated === 200.00 &&
+               edu?.carriedOverPendingSalary === 50.00;
 
-    // Depois: introdução do snapshot para o ciclo atual 2026-08 sem inventar snapshot para 2026-07
-    const { config: cfgWithSnapshot } = ensureCycleRuleRegistered('2026-08', cfgWithoutSnapshots, mockPartners);
-    const overviewAfter = calculatePayrollOverview({
-      config: cfgWithSnapshot,
-      partners: mockPartners,
-      transactions: [],
-      cycleNetProfit: 2000,
-      allTimeNetProfit: 3000,
-      currentCycleId: '2026-08',
-      historicalCycleMetrics: historicalWithoutSnapshot
-    });
-    const eduAfter = overviewAfter.partnerItems.find(p => p.partner.id === 'p1-eduardo');
-    const availableAfter = eduAfter?.availableToReceive ?? 0;
-
-    // O saldo de 2026-07 e 2026-08 deve ser idêntico antes e depois da transição
-    const ok = availableBefore === 750 && availableAfter === 750 && availableBefore === availableAfter;
     results.push({
       id: 15,
-      description: 'Preservação de saldos em ciclos históricos sem snapshot prévio (transição segura)',
+      description: 'Tratamento de ciclos sem snapshot com saques, prejuízo anterior e regras conhecidas vs desconhecidas',
       passed: ok,
       details: ok
-        ? `Saldos preservados com precisão antes e depois da transição: R$ ${availableBefore.toFixed(2)} === R$ ${availableAfter.toFixed(2)}`
-        : `Divergência: antes R$ ${availableBefore}, depois R$ ${availableAfter}`
+        ? `Reconciliação multi-ciclo comprovada: Ciclos passados (-R$ 100 + R$ 200 - R$ 50 saque = R$ 50) + Ciclo atual (R$ 200) = Disponível R$ ${edu?.availableToReceive.toFixed(2)}`
+        : `Divergência: esperado R$ ${expectedAvailable}, obtido R$ ${edu?.availableToReceive}`
     });
   } catch (e: any) {
-    results.push({ id: 15, description: 'Preservação de saldos sem snapshot', passed: false, details: e.message, error: e.message });
+    results.push({ id: 15, description: 'Tratamento de ciclos sem snapshot e multi-ciclo', passed: false, details: e.message, error: e.message });
   }
 
   const passedTests = results.filter(r => r.passed).length;
