@@ -1154,6 +1154,8 @@ export default function PartnersDashboard() {
         <InvestmentSimulatorModal
           isOpen={showInvestmentModal}
           onClose={() => setShowInvestmentModal(false)}
+          financialOverview={financials}
+          historicalCycles={historicalMonthlyMetrics}
         />
       )}
 
