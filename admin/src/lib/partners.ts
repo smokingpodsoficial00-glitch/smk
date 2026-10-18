@@ -598,25 +598,22 @@ export async function createPartnerTransaction(payload: {
     let dbErrorMsg: string | null = null;
 
     try {
-      // 4. Inserção no Supabase com suporte resiliente a schema pré-migration
+      // 4. Inserção no Supabase com validação estrita de idempotência
       let { data, error } = await supabase
         .from("smoking_partner_transactions")
         .insert(txPayload)
         .select()
         .single();
 
-      // Se der erro de coluna inexistente (caso a migration 010 ainda não tenha sido rodada no SQL Editor),
-      // faz retry sem o campo idempotency_key preservando o UUID válido e a transação
+      // Se der erro de coluna inexistente (migration 010 ainda não executada no Supabase):
+      // BLOQUEIO EXPLÍCITO DE SEGURANÇA: Não mascarar falha como sucesso nem permitir operações financeiras
+      // sem garantia real de idempotência contra duplicidade.
       if (error && (error.code === '42703' || error.message?.includes('idempotency_key'))) {
-        console.warn("[Partners] Coluna idempotency_key não detectada na tabela física. Inserindo sem a coluna:", error.message);
-        const { idempotency_key: _, ...payloadWithoutKey } = txPayload;
-        const retryRes = await supabase
-          .from("smoking_partner_transactions")
-          .insert(payloadWithoutKey)
-          .select()
-          .single();
-        data = retryRes.data;
-        error = retryRes.error;
+        const migrationMissingMsg = 
+          "Operação interrompida por segurança: O banco de dados ainda não possui a proteção de idempotência ativa (coluna 'idempotency_key' inexistente). " +
+          "Para evitar duplicações financeiras em caso de oscilação de rede, execute a migration 010 (backend/migrations/010_partners_security_and_idempotency.sql) no SQL Editor do Supabase.";
+        console.error("[Partners]", migrationMissingMsg);
+        throw new Error(migrationMissingMsg);
       }
 
       if (!error && data) {

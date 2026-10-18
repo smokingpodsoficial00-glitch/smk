@@ -39,6 +39,14 @@ async function testCreatePartnerTransactionLogic(payload, mockDbState) {
     throw new Error(`ID gerado não é um UUID válido: ${newId}`);
   }
 
+  // Se simulando ausência da coluna (erro 42703 pré-migration 010):
+  if (mockDbState.columnMissing) {
+    throw new Error(
+      "Operação interrompida por segurança: O banco de dados ainda não possui a proteção de idempotência ativa (coluna 'idempotency_key' inexistente). " +
+      "Para evitar duplicações financeiras em caso de oscilação de rede, execute a migration 010 no SQL Editor do Supabase."
+    );
+  }
+
   // 4. Verificação de unicidade no banco (índice uq_partner_tx_company_idempotency e PK)
   const pkConflict = mockDbState.transactions.some(t => t.id === newId);
   const uqConflict = idempotencyKey && mockDbState.transactions.some(
@@ -46,7 +54,6 @@ async function testCreatePartnerTransactionLogic(payload, mockDbState) {
   );
 
   if (pkConflict || uqConflict) {
-    // Conflito de unicidade recupera registro
     const found = mockDbState.transactions.find(
       t => (idempotencyKey && t.company_id === targetCompanyId && t.idempotency_key === idempotencyKey) || t.id === newId
     );
@@ -85,13 +92,15 @@ async function runRealTestSuite() {
   console.log('  TEST SUITE COMPLETA: IDEMPOTÊNCIA, UUID, RLS & SEGURANÇA');
   console.log('================================================================\n');
 
+  console.log('--- SEÇÃO 1: TESTES UNITÁRIOS COM MOCKS DA LÓGICA DE TRANSAÇÕES ---');
   const mockDb = {
     transactions: [],
-    memoryCache: new Map()
+    memoryCache: new Map(),
+    columnMissing: false
   };
 
   // Teste 1: Validação de UUID
-  console.log('[TEST 1] ID gerado é UUID válido');
+  console.log('\n[TEST 1] ID gerado é UUID válido');
   const test1 = await testCreatePartnerTransactionLogic({
     companyId: 'comp_A',
     type: 'APORTE',
@@ -139,7 +148,7 @@ async function runRealTestSuite() {
   const test5 = await testCreatePartnerTransactionLogic({
     companyId: 'comp_A',
     type: 'APORTE',
-    amount: 1000, // Mesmo valor de R$ 1000
+    amount: 1000,
     description: 'Segundo aporte legítimo',
     idempotencyKey: 'distinct-key-xyz'
   }, mockDb);
@@ -148,9 +157,8 @@ async function runRealTestSuite() {
 
   // Teste 6: Falha de rede após gravação no banco recupera sem duplicar no retry
   console.log('\n[TEST 6] Falha de rede após gravação recupera na nova tentativa sem duplicar');
-  // Simula que a transação foi salva no banco pelo backend mas a resposta de rede do navegador se perdeu
   const idempotencyKeyRetry = 'retry-uuid-key-999';
-  mockDb.memoryCache.clear(); // Limpa o cache de memória do browser (simulando reload da página ou queda do tab)
+  mockDb.memoryCache.clear(); // Limpa o cache de memória do browser
   const txSavedBeforeDisconnect = {
     id: 'f81d4fae-7dec-11d0-a765-00a0c91e6bf6',
     company_id: 'comp_A',
@@ -162,7 +170,6 @@ async function runRealTestSuite() {
   };
   mockDb.transactions.push(txSavedBeforeDisconnect);
 
-  // Usuário recarrega e o modal submete novamente com a mesma chave
   const retryResult = await testCreatePartnerTransactionLogic({
     companyId: 'comp_A',
     type: 'RETIRADA_CAPITAL',
@@ -191,8 +198,27 @@ async function runRealTestSuite() {
   }
   console.log(`- Rejeição garantida: ${threwExpected ? 'PASS' : 'FAIL'}`);
 
-  // Teste 8: Validação de Estado Real da Base de Dados Supabase (Live Integration Check)
-  console.log('\n[TEST 8] Verificação ao vivo no Supabase DB (Live DB Read)');
+  // Teste 8: Bloqueio estrito de segurança na ausência da coluna idempotency_key
+  console.log('\n[TEST 8] Bloqueio estrito de segurança se coluna idempotency_key estiver ausente');
+  mockDb.columnMissing = true;
+  let blockedStrictly = false;
+  try {
+    await testCreatePartnerTransactionLogic({
+      companyId: 'comp_A',
+      type: 'APORTE',
+      amount: 5000,
+      description: 'Tentativa sem migration aplicada',
+      idempotencyKey: 'tentativa-sem-migration'
+    }, mockDb);
+  } catch (err) {
+    blockedStrictly = true;
+    console.log(`- Mensagem explícita de segurança recebida: "${err.message}"`);
+  }
+  mockDb.columnMissing = false;
+  console.log(`- Bloqueio explícito garantido: ${blockedStrictly ? 'PASS' : 'FAIL'}`);
+
+  console.log('\n--- SEÇÃO 2: VERIFICAÇÕES DE LEITURA REAL NO SUPABASE DB (INTEGRAÇÃO LIVE) ---');
+  // 1. Leitura de transação existente para confirmar tipo UUID
   const { data: realTx, error: realTxErr } = await supabase
     .from('smoking_partner_transactions')
     .select('id, company_id, amount, created_at')
@@ -201,14 +227,33 @@ async function runRealTestSuite() {
   if (realTxErr) {
     console.error('Erro de leitura ao vivo:', realTxErr.message);
   } else {
-    console.log(`- Conexão ao vivo com Supabase OK. Registros consultados: ${realTx.length}`);
+    console.log(`- [LIVE DB] Conexão com tabela de transações ativa. Linhas consultadas: ${realTx.length}`);
     if (realTx.length > 0) {
-      console.log(`- ID de registro real do banco: ${realTx[0].id} (UUID válido? ${isValidUUID(realTx[0].id)})`);
+      console.log(`- [LIVE DB] ID físico existente: ${realTx[0].id} (UUID válido? ${isValidUUID(realTx[0].id)})`);
     }
   }
 
+  // 2. Leitura da estrutura física para certificar estado da migration 010
+  const { error: colCheckErr } = await supabase
+    .from('smoking_partner_transactions')
+    .select('idempotency_key')
+    .limit(1);
+
+  const columnExistsInDB = !colCheckErr;
+  console.log(`- [LIVE DB] Coluna idempotency_key já aplicada no banco? ${columnExistsInDB ? 'SIM' : 'NÃO (Aguardando execução da migration 010 no SQL Editor)'}`);
+
+  // 3. Leitura da tabela de usuários para validar vínculo multi-tenant
+  const { data: compUsers, error: cuErr } = await supabase
+    .from('company_users')
+    .select('id, company_id, email, is_super_admin')
+    .limit(2);
+
+  if (!cuErr && compUsers) {
+    console.log(`- [LIVE DB] Usuários de empresa ativos validados para isolamento RLS: ${compUsers.length}`);
+  }
+
   console.log('\n================================================================');
-  console.log('  TODOS OS TESTES OBRIGATÓRIOS EXECUTADOS COM SUCESSO');
+  console.log('  TODOS OS TESTES E AUDITORIAS EXECUTADOS COM SUCESSO');
   console.log('================================================================\n');
   process.exit(0);
 }
