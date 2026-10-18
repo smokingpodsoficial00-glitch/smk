@@ -401,57 +401,13 @@ export default function PartnersDashboard() {
         </div>
 
         {/* Ações Rápidas */}
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={async () => {
-              setIsValidating(true);
-              try {
-                const rep = await runPartnersValidationSuite();
-                setTestReport(rep);
-              } finally {
-                setIsValidating(false);
-                loadAllData();
-              }
-            }}
-            disabled={isValidating}
-            className="px-3 py-2 rounded-xl text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-            title="Executar bateria controlada de testes"
-          >
-            <ShieldCheck className="size-3.5 text-emerald-400 shrink-0" />
-            <span className="truncate">{isValidating ? 'Validando...' : 'Validar Sociedade'}</span>
-          </button>
-
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setShowDilutionModal(true)}
-            className="px-3 py-2 rounded-xl text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Calculator className="size-3.5 text-white/60 shrink-0" />
-            <span className="truncate">Simulador Aportes</span>
-          </button>
-
-          <button
-            onClick={() => setShowNewPartnerModal(true)}
-            className="px-3 py-2 rounded-xl text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <UserPlus className="size-3.5 text-white/60 shrink-0" />
-            <span className="truncate">Cadastrar Sócio</span>
-          </button>
-
-          <button
-            onClick={() => handleOpenTransactionModal('DESPESA_OPERACIONAL')}
-            className="px-3 py-2 rounded-xl text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <Building2 className="size-3.5 text-white/60 shrink-0" />
-            <span className="truncate">Custo da Empresa</span>
-          </button>
-
-          <button
-            onClick={() => handleOpenTransactionModal('APORTE')}
-            className="col-span-2 sm:col-span-1 px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-black transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="size-3.5 stroke-[2.5] shrink-0" />
-            <span>Novo Aporte / Retirada</span>
+            <span>Simulador Aportes</span>
           </button>
         </div>
       </header>
