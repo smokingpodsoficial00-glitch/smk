@@ -681,13 +681,13 @@ export default function MarketingModule() {
         updatedAt: new Date().toISOString()
       };
 
-      setCampaigns(prev => [...prev, newCamp]);
+      setCampaigns(prev => [...prev.filter(c => c.id !== newCamp.id), newCamp]);
       setIsCampaignModalOpen(false);
 
       try {
         const raw = localStorage.getItem(LOCAL_STORAGE_CAMPAIGNS);
         const stored = raw ? JSON.parse(raw) : [];
-        const newStored = [...stored, newCamp];
+        const newStored = [...stored.filter((c: any) => c.id !== newCamp.id), newCamp];
         localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(newStored));
 
         fetch(`${getBackendUrl()}/api/marketing/campaigns`, {
@@ -697,7 +697,13 @@ export default function MarketingModule() {
         }).catch(() => {});
       } catch (e) {}
 
-      createMarketingCampaign(company.id, newCamp).catch(e => console.warn('[Marketing] Erro ao criar Supabase:', e));
+      createMarketingCampaign(company.id, newCamp)
+        .then(created => {
+          if (created && created.id && created.id !== newCamp.id) {
+            setCampaigns(prev => prev.map(c => c.id === newCamp.id ? created : c));
+          }
+        })
+        .catch(e => console.warn('[Marketing] Erro ao criar Supabase:', e));
     }
   };
 

@@ -71,7 +71,7 @@
       "createdAt": "2026-09-11T15:03:53.192241+00:00",
       "frequencyDays": 14,
       "updatedAt": "2026-09-21T18:04:48.085Z",
-      "lastRunDate": "18/10/2026"
+      "lastRunDate": "23/09/2026"
     },
     {
       "id": "7374d4ba-9031-446f-9c7b-d001608641bf",
@@ -93,7 +93,7 @@
       "createdAt": "2026-09-11T15:03:53.290095+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:04:55.317Z",
-      "lastRunDate": "02/10/2026"
+      "lastRunDate": "25/09/2026"
     },
     {
       "id": "9ff7cae1-0689-4eec-bf4d-4142e2f78b76",
@@ -158,7 +158,7 @@
       "createdAt": "2026-09-11T15:03:53.589803+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:05:18.800Z",
-      "lastRunDate": "03/10/2026"
+      "lastRunDate": "26/09/2026"
     },
     {
       "id": "d4046bf1-b741-40cd-b330-6ab8afc72d3e",
@@ -180,7 +180,7 @@
       "createdAt": "2026-09-11T15:03:53.667722+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:05:28.671Z",
-      "lastRunDate": "03/10/2026"
+      "lastRunDate": "26/09/2026"
     },
     {
       "id": "28d26f94-c2ff-4268-b5ff-d7e65674dd62",
@@ -201,7 +201,8 @@
       "startDate": "2026-08-26",
       "createdAt": "2026-09-11T15:03:53.754434+00:00",
       "frequencyDays": 7,
-      "updatedAt": "2026-09-26T22:36:58.862Z"
+      "updatedAt": "2026-09-26T22:36:58.862Z",
+      "lastRunDate": "03/10/2026"
     },
     {
       "id": "68573283-0eff-42fe-9a39-c6dc16f446c0",
@@ -288,7 +289,7 @@
       "createdAt": "2026-09-11T15:03:54.136387+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:06:03.607Z",
-      "lastRunDate": "30/09/2026"
+      "lastRunDate": "23/09/2026"
     },
     {
       "id": "e939f055-0c27-4d5c-ab26-d26e04651b35",
@@ -340,6 +341,81 @@
       "createdAt": "2026-09-17T17:43:54.486847+00:00",
       "updatedAt": "2026-09-17T17:43:54.486847+00:00",
       "legacyMetadata": {}
+    },
+    {
+      "id": "camp_1792356696465",
+      "name": "CPM TESTE OFERTA COM FOTO",
+      "message": "🔥 OFERTA DO DIA NO VIP: [NOME_DO_MODELO]! 💨\n\n💰 Apenas R$ [PREÇO]\n\n✨ Sabores disponíveis em estoque agora:\n• [Sabor 1]\n• [Sabor 2]\n• [Sabor 3]\n\n🚀 Peça direto no nosso cardápio ou no whatsapp antes que esgote:\n👉 [LINK_DO_CARDAPIO_VERCEL]",
+      "variations": [],
+      "useVariations": false,
+      "targetType": "group",
+      "selectedListIds": [
+        "0d925499-da68-4a93-9591-f4b6f78744b1"
+      ],
+      "targetGroupId": "120363430820740157@g.us",
+      "targetGroupName": "SMK MATERIAL MKT",
+      "frequencyDays": 1,
+      "scheduledTime": "18:14",
+      "startDate": "2026-10-18",
+      "batchSize": 5,
+      "batchIntervalMinutes": 35,
+      "isStockOffer": true,
+      "stockOfferCount": 2,
+      "status": "active",
+      "totalRecipients": 3,
+      "createdAt": "2026-10-18T20:51:36.465Z",
+      "updatedAt": "2026-10-18T20:51:36.465Z"
+    },
+    {
+      "id": "camp_1792357758521",
+      "name": "CPM OFERTAS DIÁRIAS SMK COM FOTO",
+      "message": "🔥 OFERTA DO DIA NO VIP: [NOME_DO_MODELO]! 💨\n\n💰 Apenas R$ [PREÇO]\n\n✨ Sabores disponíveis em estoque agora:\n• [Sabor 1]\n• [Sabor 2]\n• [Sabor 3]\n\n🚀 Peça direto no nosso cardápio ou no whatsapp antes que esgote:\n👉 [LINK_DO_CARDAPIO_VERCEL]",
+      "variations": [],
+      "useVariations": false,
+      "targetType": "group",
+      "selectedListIds": [
+        "0d925499-da68-4a93-9591-f4b6f78744b1"
+      ],
+      "targetGroupId": "120363429733361752@g.us",
+      "targetGroupName": "Clientes Smoking Vip",
+      "frequencyDays": 1,
+      "scheduledTime": "15:00",
+      "scheduledTime2": "18:40",
+      "startDate": "2026-10-18",
+      "batchSize": 5,
+      "batchIntervalMinutes": 35,
+      "isStockOffer": true,
+      "stockOfferCount": 2,
+      "status": "paused",
+      "totalRecipients": 62,
+      "createdAt": "2026-10-18T21:09:18.521Z",
+      "updatedAt": "2026-10-18T21:09:18.521Z"
+    },
+    {
+      "id": "camp_1792357794113",
+      "name": "cpm teste oferta com foto 3",
+      "message": "🔥 OFERTA DO DIA NO VIP: [NOME_DO_MODELO]! 💨\n\n💰 Apenas R$ [PREÇO]\n\n✨ Sabores disponíveis em estoque agora:\n• [Sabor 1]\n• [Sabor 2]\n• [Sabor 3]\n\n🚀 Peça direto no nosso cardápio ou no whatsapp antes que esgote:\n👉 [LINK_DO_CARDAPIO_VERCEL]",
+      "variations": [],
+      "useVariations": false,
+      "targetType": "group",
+      "selectedListIds": [
+        "0d925499-da68-4a93-9591-f4b6f78744b1"
+      ],
+      "targetGroupId": "120363430820740157@g.us",
+      "targetGroupName": "SMK MATERIAL MKT",
+      "frequencyDays": 7,
+      "scheduledWeekday": "QUARTA",
+      "scheduledTime": "18:11",
+      "scheduledTime2": "18:12",
+      "startDate": "2026-10-18",
+      "batchSize": 5,
+      "batchIntervalMinutes": 35,
+      "isStockOffer": true,
+      "stockOfferCount": 2,
+      "status": "paused",
+      "totalRecipients": 3,
+      "createdAt": "2026-10-18T21:09:54.113Z",
+      "updatedAt": "2026-10-18T21:09:54.113Z"
     }
   ],
   "idempotencyKeys": [
@@ -347,9 +423,19 @@
       "key": "4e4a393c-5a6b-44cf-9488-ec5e3c025937_2026-10-18_15:00",
       "timestamp": "2026-10-18T18:00:07.338Z",
       "campaignName": "CPM GRUPO INSTAGRAM"
+    },
+    {
+      "key": "camp_1792356696465_2026-10-18_slot1_18:14",
+      "timestamp": "2026-10-18T21:14:12.870Z",
+      "campaignName": "CPM TESTE OFERTA COM FOTO"
+    },
+    {
+      "key": "camp_1792356696724_2026-10-18_slot1_18:14",
+      "timestamp": "2026-10-18T21:14:13.342Z",
+      "campaignName": "CPM TESTE OFERTA COM FOTO"
     }
   ],
-  "lastUpdated": "2026-10-18T18:00:07.339Z",
+  "lastUpdated": "2026-10-18T21:14:28.392Z",
   "lists": [
     {
       "id": "0d925499-da68-4a93-9591-f4b6f78744b1",
@@ -5315,5 +5401,9 @@
     "camp_teste_unit": [
       "5511999999999"
     ]
-  }
+  },
+  "recentStockOfferModels": [
+    "V80 ULTRA SLIM",
+    "BC15K"
+  ]
 }

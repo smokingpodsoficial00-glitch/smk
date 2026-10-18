@@ -329,7 +329,7 @@ export async function createMarketingCampaign(
     console.warn('[MarketingCampaigns] Supabase falhou ao criar campanha. Utilizando fallback local + backend:', err?.message || err);
     const validListIds = Array.from(new Set(data.selectedListIds || [])).filter(Boolean);
     const fallbackCamp: Campaign = {
-      id: `camp_${Date.now()}`,
+      id: (data as any).id || `camp_${Date.now()}`,
       name: data.name.trim(),
       message: data.message,
       variations: data.variations || [],
@@ -345,6 +345,9 @@ export async function createMarketingCampaign(
       startDate: data.startDate || undefined,
       batchSize,
       batchIntervalMinutes: batchInterval,
+      imageUrl: data.imageUrl || undefined,
+      isStockOffer: !!data.isStockOffer,
+      stockOfferCount: Number(data.stockOfferCount) || 1,
       totalRecipients: data.totalRecipients || 0,
       status: data.status || 'active',
       createdAt: new Date().toISOString(),
@@ -352,7 +355,7 @@ export async function createMarketingCampaign(
     };
 
     const currentAll = getOfflineCampaignsCache();
-    const newAll = [...currentAll, fallbackCamp];
+    const newAll = [...currentAll.filter(c => c.id !== fallbackCamp.id), fallbackCamp];
     saveOfflineCampaignsCache(newAll);
     syncCampaignsWithBackend(newAll);
 

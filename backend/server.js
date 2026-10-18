@@ -894,26 +894,62 @@ async function buildStockOfferMessage(options = {}) {
     const allModels = Array.from(modelMap.values()).filter(m => m.flavors.length > 0);
     if (allModels.length === 0) return null;
 
-    // Histórico de modelos recentes para rotação anti-repetição
-    const config = loadMarketingConfig();
-    const recentModels = config.recentStockOfferModels || [];
+    // Data de hoje no fuso horário de São Paulo
+    const nowSP = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const todayStr = nowSP.toISOString().split('T')[0];
 
-    // Prioriza modelos não ofertados recentemente
-    let eligibleModels = allModels.filter(m => !recentModels.includes(m.name));
-    if (eligibleModels.length < count) {
-      eligibleModels = allModels;
+    const config = loadMarketingConfig();
+    if (!config.dailyStockOffers || typeof config.dailyStockOffers !== 'object') {
+      config.dailyStockOffers = {};
     }
 
-    // Embaralha aleatoriamente
-    const shuffled = eligibleModels.sort(() => 0.5 - Math.random());
+    // Modelos que JÁ FORAM OFERTADOS HOJE
+    const todayOffered = Array.isArray(config.dailyStockOffers[todayStr]) 
+      ? config.dailyStockOffers[todayStr] 
+      : [];
+
+    // 🔒 REGRA DE OURO: Modelos que AINDA NÃO FORAM ofertados hoje (proibido repetir no mesmo dia!)
+    let candidatesNotToday = allModels.filter(m => !todayOffered.includes(m.name));
+    
+    // Se o catálogo tiver menos modelos do que o count diário, usa o que resta
+    let availablePool = candidatesNotToday.length > 0 ? candidatesNotToday : allModels;
+
+    // Rotação inteligente dos últimos 3 dias (sem travas eternas)
+    const recentPastDaysOffered = [];
+    Object.keys(config.dailyStockOffers).forEach(dateKey => {
+      if (dateKey !== todayStr) {
+        const list = config.dailyStockOffers[dateKey] || [];
+        list.forEach(name => {
+          if (!recentPastDaysOffered.includes(name)) recentPastDaysOffered.push(name);
+        });
+      }
+    });
+
+    // Dos modelos elegíveis de hoje, prioriza os que não saíram nos últimos 3 dias
+    let freshestPool = availablePool.filter(m => !recentPastDaysOffered.includes(m.name));
+    if (freshestPool.length < count) {
+      freshestPool = availablePool;
+    }
+
+    // Embaralha aleatoriamente e seleciona a quantidade
+    const shuffled = freshestPool.sort(() => 0.5 - Math.random());
     const selected = shuffled.slice(0, count);
 
-    // Registra modelos escolhidos no histórico
-    if (!config.recentStockOfferModels) config.recentStockOfferModels = [];
-    selected.forEach(m => config.recentStockOfferModels.push(m.name));
-    if (config.recentStockOfferModels.length > 10) {
-      config.recentStockOfferModels = config.recentStockOfferModels.slice(-10);
+    // Registra modelos escolhidos no dia de hoje
+    if (!config.dailyStockOffers[todayStr]) config.dailyStockOffers[todayStr] = [];
+    selected.forEach(m => {
+      if (!config.dailyStockOffers[todayStr].includes(m.name)) {
+        config.dailyStockOffers[todayStr].push(m.name);
+      }
+    });
+
+    // Limpeza de histórico: mantém apenas os últimos 7 dias
+    const allDates = Object.keys(config.dailyStockOffers).sort();
+    if (allDates.length > 7) {
+      const datesToRemove = allDates.slice(0, allDates.length - 7);
+      datesToRemove.forEach(d => delete config.dailyStockOffers[d]);
     }
+
     saveMarketingConfig(config);
 
     // Monta as ofertas formatadas com a copy oficial do usuário
@@ -1224,7 +1260,7 @@ app.post('/api/marketing/send-direct', async (req, res) => {
           }
         }
       } else {
-        sentResult = await sendBaileysMessage(targetJid, text || 'Ofertas em atualização.', { imageUrl });
+        return res.status(400).json({ success: false, message: 'Nenhum pod disponível com estoque positivo no momento.' });
       }
     } else {
       sentResult = await sendBaileysMessage(targetJid, text, { imageUrl });
@@ -1437,7 +1473,7 @@ async function marketingSchedulerTick() {
         }
       }
 
-      const idempKey = `${camp.id}_${todayStr}_${matchedSlot}_${currentTimeStr}`;
+      const idempKey = `${camp.id}_${todayStr}_${matchedSlot}`;
       const alreadyFired = (config.idempotencyKeys || []).some(entry => entry.key === idempKey);
       if (alreadyFired) continue;
 
@@ -1454,14 +1490,10 @@ async function marketingSchedulerTick() {
                 if (idx < offers.length - 1) await new Promise(r => setTimeout(r, 4000));
               }
             } else {
-              const formattedMsg = (camp.message || '')
-                .replace(/\[Nome\]/gi, 'Pessoal')
-                .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods.vercel.app')
-                .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
-              await sendBaileysMessage(camp.targetGroupId, formattedMsg, { imageUrl: camp.imageUrl });
+              console.warn(`⚠️ [Scheduler Grupo] Campanha "${camp.name}" (${matchedSlot}): Nenhum pod disponível com estoque positivo no momento.`);
             }
           } else {
-            const formattedMsg = camp.message
+            const formattedMsg = (camp.message || '')
               .replace(/\[Nome\]/gi, 'Pessoal')
               .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods.vercel.app')
               .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
