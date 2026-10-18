@@ -17,7 +17,13 @@ export function getBackendUrl(): string {
     if (custom && custom.trim().length > 0) {
       return custom.trim().replace(/\/+$/, '');
     }
+
+    // Se estiver rodando na Vercel em produção, conecta automaticamente ao túnel da loja
+    if (window.location.hostname.endsWith('vercel.app')) {
+      return 'https://recognize-legislation-mile-cap.trycloudflare.com';
+    }
   }
 
   return 'http://localhost:3006';
 }
+

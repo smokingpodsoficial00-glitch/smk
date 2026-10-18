@@ -37,3 +37,6 @@ backend/baileys_auth*/
 # Temp & Cache
 .cache/
 .temp/
+
+backend/bin/
+backend/baileys_auth/
