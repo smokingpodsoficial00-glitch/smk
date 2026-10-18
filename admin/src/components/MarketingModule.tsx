@@ -37,6 +37,12 @@ interface WhatsAppGroup {
 
 const OFFICIAL_TEMPLATES = [
   {
+    id: 'oferta_do_dia_vip',
+    title: '🔥 Oferta do Dia no VIP (Foto + Sabores)',
+    badge: 'Nova • Vitrine Estoque',
+    text: `🔥 OFERTA DO DIA NO VIP: [NOME_DO_MODELO]! 💨\n\n💰 Apenas R$ [PREÇO]\n\n✨ Sabores disponíveis em estoque agora:\n• [Sabor 1]\n• [Sabor 2]\n• [Sabor 3]\n\n🚀 Peça direto no nosso cardápio ou no whatsapp antes que esgote:\n👉 [LINK_DO_CARDAPIO_VERCEL]`,
+  },
+  {
     id: 'weekend_vip',
     title: 'Final de Semana + Grupo VIP',
     badge: 'Mais Convertida',
@@ -275,6 +281,9 @@ export default function MarketingModule() {
   const [campaignFormStartDate, setCampaignFormStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [campaignFormBatchSize, setCampaignFormBatchSize] = useState<number>(5);
   const [campaignFormInterval, setCampaignFormInterval] = useState<number>(35);
+  const [campaignFormImageUrl, setCampaignFormImageUrl] = useState<string>('');
+  const [campaignFormIsStockOffer, setCampaignFormIsStockOffer] = useState<boolean>(false);
+  const [campaignFormStockOfferCount, setCampaignFormStockOfferCount] = useState<number>(1);
   const [cardapioUrl] = useState('https://smoking-pods.vercel.app');
   const [grupoVipUrl] = useState('');
 
@@ -538,6 +547,9 @@ export default function MarketingModule() {
       setCampaignFormStartDate(campToEdit.startDate || new Date().toISOString().split('T')[0]);
       setCampaignFormBatchSize(campToEdit.batchSize || 5);
       setCampaignFormInterval(campToEdit.batchIntervalMinutes || 35);
+      setCampaignFormImageUrl(campToEdit.imageUrl || '');
+      setCampaignFormIsStockOffer(!!campToEdit.isStockOffer);
+      setCampaignFormStockOfferCount(campToEdit.stockOfferCount || 1);
     } else {
       setEditingCampaign(null);
       setCampaignFormName('');
@@ -554,6 +566,9 @@ export default function MarketingModule() {
       setCampaignFormStartDate(new Date().toISOString().split('T')[0]);
       setCampaignFormBatchSize(5);
       setCampaignFormInterval(35);
+      setCampaignFormImageUrl('');
+      setCampaignFormIsStockOffer(false);
+      setCampaignFormStockOfferCount(1);
     }
     setIsCampaignModalOpen(true);
   };
@@ -604,6 +619,9 @@ export default function MarketingModule() {
         startDate: campaignFormStartDate,
         batchSize: campaignFormBatchSize || 5,
         batchIntervalMinutes: campaignFormInterval || 35,
+        imageUrl: campaignFormImageUrl.trim() || undefined,
+        isStockOffer: campaignFormIsStockOffer,
+        stockOfferCount: campaignFormStockOfferCount,
         totalRecipients: totalCount,
         updatedAt: new Date().toISOString()
       };
@@ -649,6 +667,9 @@ export default function MarketingModule() {
         startDate: campaignFormStartDate,
         batchSize: 5,
         batchIntervalMinutes: 35,
+        imageUrl: campaignFormImageUrl.trim() || undefined,
+        isStockOffer: campaignFormIsStockOffer,
+        stockOfferCount: campaignFormStockOfferCount,
         status: 'active',
         totalRecipients: totalCount,
         createdAt: new Date().toISOString(),
@@ -824,6 +845,9 @@ export default function MarketingModule() {
                 campaignId: camp.id,
                 companyId: company?.id,
                 force: forceSend,
+                imageUrl: camp.imageUrl,
+                isStockOffer: camp.isStockOffer,
+                stockOfferCount: camp.stockOfferCount || 1,
               })
             });
             const resData = await res.json();
@@ -931,6 +955,9 @@ export default function MarketingModule() {
             name: camp.targetGroupName || 'Grupo VIP',
             text: formattedMsg,
             companyId: company?.id,
+            imageUrl: camp.imageUrl,
+            isStockOffer: camp.isStockOffer,
+            stockOfferCount: camp.stockOfferCount || 1,
           })
         });
 
@@ -1247,13 +1274,29 @@ export default function MarketingModule() {
                                 <div>
                                   <span className="text-white/40">Frequência: </span>
                                   <span className="text-white/80">
-                                    {camp.frequencyDays === 0 
-                                      ? 'Disparo Único' 
-                                      : camp.scheduledWeekday 
-                                        ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()}${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}` 
-                                        : `A cada ${camp.frequencyDays} dias`}
+                                    {camp.frequencyDays === 1
+                                      ? `Diário (Todo Dia)${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}`
+                                      : camp.frequencyDays === 0 
+                                        ? 'Disparo Único' 
+                                        : camp.scheduledWeekday 
+                                          ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()}${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}` 
+                                          : `A cada ${camp.frequencyDays} dias${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}`}
                                   </span>
                                 </div>
+                                {(camp.isStockOffer || camp.imageUrl) && (
+                                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                    {camp.isStockOffer && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                                        🔥 Vitrine Estoque ({camp.stockOfferCount || 1} {camp.stockOfferCount === 2 ? 'pods' : 'pod'}/dia)
+                                      </span>
+                                    )}
+                                    {camp.imageUrl && !camp.isStockOffer && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                                        📸 Com Imagem
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
 
                               {/* 3. Mensagem da Campanha (Tipografia padrão do sistema, sem mono) */}
@@ -1372,13 +1415,29 @@ export default function MarketingModule() {
                                   <div>
                                     <span className="text-white/40">Frequência: </span>
                                     <span className="text-white/80">
-                                      {camp.frequencyDays === 0 
-                                        ? 'Disparo Único' 
-                                        : camp.frequencyDays === 7 && camp.scheduledWeekday
-                                          ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()}${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}` 
-                                          : `A cada ${camp.frequencyDays} dias${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}`}
+                                      {camp.frequencyDays === 1
+                                        ? `Diário (Todo Dia)${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}`
+                                        : camp.frequencyDays === 0 
+                                          ? 'Disparo Único' 
+                                          : camp.frequencyDays === 7 && camp.scheduledWeekday
+                                            ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()}${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}` 
+                                            : `A cada ${camp.frequencyDays} dias${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}`}
                                     </span>
                                   </div>
+                                  {(camp.isStockOffer || camp.imageUrl) && (
+                                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                      {camp.isStockOffer && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                                          🔥 Vitrine Estoque ({camp.stockOfferCount || 1} {camp.stockOfferCount === 2 ? 'pods' : 'pod'}/dia)
+                                        </span>
+                                      )}
+                                      {camp.imageUrl && !camp.isStockOffer && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                                          📸 Com Imagem
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
 
                                 {/* 3. Mensagem da Campanha (Tipografia padrão do sistema, sem mono) */}
@@ -1895,13 +1954,14 @@ export default function MarketingModule() {
                     className="w-full bg-[#050505] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
                   >
                     <option value={0}>Disparo Único (Manual)</option>
+                    <option value={1}>Diário (Todo Dia)</option>
                     <option value={7}>Semanal (Toda Semana)</option>
                     <option value={14}>Quinzenal (A cada 14 dias)</option>
                     <option value={30}>Mensal (A cada 30 dias)</option>
                   </select>
                 </div>
 
-                {campaignFormFrequency === 7 ? (
+                {campaignFormFrequency === 7 && (
                   <div>
                     <label className="text-xs font-bold text-white/70 block mb-1">Dia da Semana</label>
                     <select
@@ -1918,7 +1978,9 @@ export default function MarketingModule() {
                       <option value="DOMINGO">Todo Domingo</option>
                     </select>
                   </div>
-                ) : campaignFormFrequency > 0 ? (
+                )}
+
+                {campaignFormFrequency > 0 && (
                   <div>
                     <label className="text-xs font-bold text-white/70 block mb-1">⏰ Horário do Disparo</label>
                     <input
@@ -1928,7 +1990,7 @@ export default function MarketingModule() {
                       className="w-full bg-[#050505] border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-400"
                     />
                   </div>
-                ) : null}
+                )}
 
                 {/* Selo Anti-Ban Automático */}
                 {campaignFormTargetType === 'lists' && (
@@ -1942,6 +2004,91 @@ export default function MarketingModule() {
                         Disparos em lotes seguros de 5 contatos com intervalo inteligente para máxima proteção do seu WhatsApp.
                       </span>
                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Opções de Vitrine de Estoque Dinâmico & Mídia */}
+              <div className="p-4 bg-[#050505] border border-white/10 rounded-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                      <Flame className="size-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-white block">
+                        Vitrine Automática de Estoque (Foto + Sabores)
+                      </span>
+                      <span className="text-[11px] text-white/50">
+                        Puxa pods reais do estoque com fotos e sabores disponíveis, aplicando rotação anti-repetição.
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !campaignFormIsStockOffer;
+                      setCampaignFormIsStockOffer(next);
+                      if (next && (!campaignFormMessage || campaignFormMessage === OFFICIAL_TEMPLATES[1].text)) {
+                        setCampaignFormMessage(OFFICIAL_TEMPLATES[0].text);
+                      }
+                    }}
+                    className="cursor-pointer text-white/60 hover:text-white transition-colors"
+                  >
+                    {campaignFormIsStockOffer ? (
+                      <ToggleRight className="size-7 text-amber-400" />
+                    ) : (
+                      <ToggleLeft className="size-7 text-white/30" />
+                    )}
+                  </button>
+                </div>
+
+                {campaignFormIsStockOffer && (
+                  <div className="pt-3 border-t border-white/5 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <span className="text-xs font-semibold text-white/80 block">Pods ofertados por disparo:</span>
+                        <span className="text-[10px] text-white/40">Quantos pods diferentes serão divulgados em cada execução</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {[1, 2].map((num) => (
+                          <button
+                            key={num}
+                            type="button"
+                            onClick={() => setCampaignFormStockOfferCount(num)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              campaignFormStockOfferCount === num
+                                ? 'bg-amber-500 text-black shadow-sm'
+                                : 'bg-white/5 text-white/60 hover:text-white border border-white/10'
+                            }`}
+                          >
+                            {num} {num === 1 ? 'Pod' : 'Pods'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/15 text-[11px] text-amber-300/80">
+                      ℹ️ O robô consulta a tabela de produtos ativos com estoque &gt; 0, anexa a foto oficial do pod e preenche automaticamente o modelo, preço e sabores do dia.
+                    </div>
+                  </div>
+                )}
+
+                {/* Imagem Manual / Fallback */}
+                {!campaignFormIsStockOffer && (
+                  <div className="pt-3 border-t border-white/5">
+                    <label className="text-xs font-bold text-white/70 block mb-1">
+                      📸 URL da Imagem (Opcional)
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://exemplo.com/banner-promocional.jpg"
+                      value={campaignFormImageUrl}
+                      onChange={(e) => setCampaignFormImageUrl(e.target.value)}
+                      className="w-full bg-black border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-emerald-500/50"
+                    />
+                    <span className="text-[10px] text-white/40 mt-1 block">
+                      Ao preencher, a mensagem será disparada com esta imagem anexada.
+                    </span>
                   </div>
                 )}
               </div>

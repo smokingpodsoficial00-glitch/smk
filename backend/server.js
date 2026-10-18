@@ -810,8 +810,8 @@ async function resolveCanonicalWhatsAppJid(rawPhone) {
   }
 }
 
-// Enviar mensagem via Baileys com presença "digitando"
-async function sendBaileysMessage(target, text) {
+// Enviar mensagem via Baileys com suporte opcional a imagem e presença "digitando"
+async function sendBaileysMessage(target, text, options = {}) {
   if (!sock || !isWhatsAppReady) {
     throw new Error('WhatsApp não está conectado.');
   }
@@ -831,8 +831,115 @@ async function sendBaileysMessage(target, text) {
     await sock.sendPresenceUpdate('composing', jid);
   } catch (e) {}
 
+  if (options && options.imageUrl) {
+    try {
+      return await sock.sendMessage(jid, {
+        image: { url: options.imageUrl },
+        caption: String(text)
+      });
+    } catch (imgErr) {
+      console.warn(`⚠️ [Baileys] Falha ao enviar imagem (${options.imageUrl}), enviando como texto:`, imgErr.message);
+      return await sock.sendMessage(jid, { text: String(text) });
+    }
+  }
+
   return await sock.sendMessage(jid, { text: String(text) });
 }
+
+// Construtor dinâmico de Oferta do Dia integrada ao estoque real (Leitura estrita)
+async function buildStockOfferMessage(options = {}) {
+  try {
+    const cardapioUrl = options.cardapioUrl || 'https://smoking-pods.vercel.app';
+    const count = Math.min(Math.max(Number(options.count) || 1, 1), 2); // 1 ou 2 pods
+
+    const { data: products, error } = await supabase
+      .from('smoking_products')
+      .select('name, brand, flavor, price, stock, image_url, is_active')
+      .gt('stock', 0)
+      .eq('is_active', true);
+
+    if (error || !products || products.length === 0) {
+      console.warn('⚠️ [StockOffer] Nenhum produto ativo com estoque positivo encontrado.');
+      return null;
+    }
+
+    // Agrupa sabores e menor preço por modelo
+    const modelMap = new Map();
+    products.forEach(p => {
+      const modelKey = p.name ? p.name.trim() : '';
+      if (!modelKey) return;
+
+      if (!modelMap.has(modelKey)) {
+        modelMap.set(modelKey, {
+          name: modelKey,
+          brand: p.brand || '',
+          price: Number(p.price) || 0,
+          imageUrl: p.image_url || null,
+          flavors: []
+        });
+      }
+
+      const item = modelMap.get(modelKey);
+      if (p.flavor && !item.flavors.includes(p.flavor.trim())) {
+        item.flavors.push(p.flavor.trim());
+      }
+      if (p.image_url && !item.imageUrl) {
+        item.imageUrl = p.image_url;
+      }
+      if (Number(p.price) > 0 && (item.price === 0 || Number(p.price) < item.price)) {
+        item.price = Number(p.price);
+      }
+    });
+
+    const allModels = Array.from(modelMap.values()).filter(m => m.flavors.length > 0);
+    if (allModels.length === 0) return null;
+
+    // Histórico de modelos recentes para rotação anti-repetição
+    const config = loadMarketingConfig();
+    const recentModels = config.recentStockOfferModels || [];
+
+    // Prioriza modelos não ofertados recentemente
+    let eligibleModels = allModels.filter(m => !recentModels.includes(m.name));
+    if (eligibleModels.length < count) {
+      eligibleModels = allModels;
+    }
+
+    // Embaralha aleatoriamente
+    const shuffled = eligibleModels.sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, count);
+
+    // Registra modelos escolhidos no histórico
+    if (!config.recentStockOfferModels) config.recentStockOfferModels = [];
+    selected.forEach(m => config.recentStockOfferModels.push(m.name));
+    if (config.recentStockOfferModels.length > 10) {
+      config.recentStockOfferModels = config.recentStockOfferModels.slice(-10);
+    }
+    saveMarketingConfig(config);
+
+    // Monta as ofertas formatadas com a copy oficial do usuário
+    const offers = selected.map(model => {
+      const formattedPrice = model.price > 0 
+        ? model.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '0,00';
+
+      const flavorsList = model.flavors.map(f => `• ${f}`).join('\n');
+
+      const messageText = `🔥 OFERTA DO DIA NO VIP: ${model.name.toUpperCase()}! 💨\n\n💰 Apenas R$ ${formattedPrice}\n\n✨ Sabores disponíveis em estoque agora:\n${flavorsList}\n\n🚀 Peça direto no nosso cardápio ou no whatsapp antes que esgote:\n👉 ${cardapioUrl}`;
+
+      return {
+        modelName: model.name,
+        imageUrl: model.imageUrl,
+        messageText
+      };
+    });
+
+    return offers;
+  } catch (err) {
+    console.error('❌ [StockOffer] Erro ao construir oferta de estoque:', err.message);
+    return null;
+  }
+}
+
 
 // =============================================
 // ROTAS DE MARKETING & CONEXÃO WHATSAPP SOB DEMANDA
@@ -1022,15 +1129,33 @@ app.post('/api/marketing/scan-chats', async (req, res) => {
   return res.json({ success: true, message: 'Varredura concluída.' });
 });
 
+app.post('/api/marketing/stock-offer-preview', async (req, res) => {
+  try {
+    const count = Number(req.query.count) || 1;
+    const offers = await buildStockOfferMessage({ count });
+    return res.json({ success: true, offers: offers || [] });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/api/marketing/send-direct', async (req, res) => {
   try {
-    const { phone, name, text, campaignId, force } = req.body;
+    const { phone, name, text, campaignId, force, imageUrl, isStockOffer, stockOfferCount } = req.body;
 
-    if (!phone || !text) {
+    if (!phone) {
       return res.status(400).json({
         success: false,
         error: 'DADOS_OBRIGATORIOS',
-        message: 'Telefone e texto da mensagem são obrigatórios.'
+        message: 'Telefone é obrigatório.'
+      });
+    }
+
+    if (!isStockOffer && !text) {
+      return res.status(400).json({
+        success: false,
+        error: 'DADOS_OBRIGATORIOS',
+        message: 'Texto da mensagem é obrigatório.'
       });
     }
 
@@ -1085,7 +1210,25 @@ app.post('/api/marketing/send-direct', async (req, res) => {
     }
 
     console.log(`📢 [Marketing] Enviando mensagem para ${targetJid} (${name || 'Cliente'})...`);
-    const sentResult = await sendBaileysMessage(targetJid, text);
+    
+    let sentResult;
+    if (isStockOffer) {
+      const count = Number(stockOfferCount) || 1;
+      const offers = await buildStockOfferMessage({ count });
+      if (offers && offers.length > 0) {
+        for (let idx = 0; idx < offers.length; idx++) {
+          const offer = offers[idx];
+          sentResult = await sendBaileysMessage(targetJid, offer.messageText, { imageUrl: offer.imageUrl });
+          if (idx < offers.length - 1) {
+            await new Promise(r => setTimeout(r, 4000));
+          }
+        }
+      } else {
+        sentResult = await sendBaileysMessage(targetJid, text || 'Ofertas em atualização.', { imageUrl });
+      }
+    } else {
+      sentResult = await sendBaileysMessage(targetJid, text, { imageUrl });
+    }
 
     if (campaignId && !isTestCampaign) {
       markPhoneAsSent(campaignId, cleanDigits, config);
@@ -1121,32 +1264,39 @@ app.post('/api/marketing/test-dispatch', async (req, res) => {
       return res.status(503).json({ error: 'WhatsApp não está conectado.' });
     }
 
-    if (camp.targetType !== 'group' || !camp.targetGroupId) {
-      return res.status(400).json({ error: 'Teste imediato só disponível para campanhas de grupo.' });
-    }
+    const trace = [];
+    trace.push(`Iniciando teste da campanha "${camp.name}"...`);
 
-    const formattedMsg = camp.message
-      .replace(/\[Nome\]/gi, 'Pessoal')
-      .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods.vercel.app')
-      .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
+    if (camp.targetType === 'group' && camp.targetGroupId) {
+      if (camp.isStockOffer) {
+        const count = Number(camp.stockOfferCount) || 1;
+        const offers = await buildStockOfferMessage({ count });
+        if (offers && offers.length > 0) {
+          for (let idx = 0; idx < offers.length; idx++) {
+            const offer = offers[idx];
+            trace.push(`Enviando oferta do modelo "${offer.modelName}" com foto para o grupo ${camp.targetGroupId}...`);
+            await sendBaileysMessage(camp.targetGroupId, offer.messageText, { imageUrl: offer.imageUrl });
+            if (idx < offers.length - 1) await new Promise(r => setTimeout(r, 4000));
+          }
+          trace.push(`✅ Ofertas disparadas com sucesso no grupo.`);
+        } else {
+          trace.push(`⚠️ Nenhum produto com estoque ativo encontrado para gerar a oferta.`);
+        }
+      } else {
+        const formattedMsg = camp.message
+          .replace(/\[Nome\]/gi, 'Pessoal')
+          .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods.vercel.app')
+          .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
 
-    let groupChatId = camp.targetGroupId;
-    if (String(groupChatId).includes('chat.whatsapp.com/')) {
-      try {
-        const inviteCode = String(groupChatId).split('chat.whatsapp.com/')[1].trim().split('?')[0];
-        const resolved = await sock.groupAcceptInvite(inviteCode);
-        groupChatId = resolved || `${inviteCode}@g.us`;
-      } catch (invErr) {
-        console.warn('⚠️ [Test] Não resolveu convite:', invErr.message);
+        trace.push(`Enviando mensagem para o grupo ${camp.targetGroupId}...`);
+        await sendBaileysMessage(camp.targetGroupId, formattedMsg, { imageUrl: camp.imageUrl });
+        trace.push(`✅ Mensagem de texto enviada com sucesso ao grupo.`);
       }
     }
 
-    console.log(`🧪 [Marketing Test] Disparando teste para ${groupChatId}...`);
-    await sendBaileysMessage(groupChatId, formattedMsg);
-
-    return res.json({ success: true, message: `Teste disparado com sucesso para "${camp.name}"!` });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.json({ success: true, trace });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
   }
 });
 
@@ -1284,12 +1434,30 @@ async function marketingSchedulerTick() {
 
       if (camp.targetType === 'group' && camp.targetGroupId) {
         try {
-          const formattedMsg = camp.message
-            .replace(/\[Nome\]/gi, 'Pessoal')
-            .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods.vercel.app')
-            .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
+          if (camp.isStockOffer) {
+            const count = Number(camp.stockOfferCount) || 1;
+            const offers = await buildStockOfferMessage({ count });
+            if (offers && offers.length > 0) {
+              for (let idx = 0; idx < offers.length; idx++) {
+                const offer = offers[idx];
+                await sendBaileysMessage(camp.targetGroupId, offer.messageText, { imageUrl: offer.imageUrl });
+                if (idx < offers.length - 1) await new Promise(r => setTimeout(r, 4000));
+              }
+            } else {
+              const formattedMsg = (camp.message || '')
+                .replace(/\[Nome\]/gi, 'Pessoal')
+                .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods.vercel.app')
+                .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
+              await sendBaileysMessage(camp.targetGroupId, formattedMsg, { imageUrl: camp.imageUrl });
+            }
+          } else {
+            const formattedMsg = camp.message
+              .replace(/\[Nome\]/gi, 'Pessoal')
+              .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods.vercel.app')
+              .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
 
-          await sendBaileysMessage(camp.targetGroupId, formattedMsg);
+            await sendBaileysMessage(camp.targetGroupId, formattedMsg, { imageUrl: camp.imageUrl });
+          }
 
           if (!config.idempotencyKeys) config.idempotencyKeys = [];
           config.idempotencyKeys.push({ key: idempKey, timestamp: new Date().toISOString(), campaignName: camp.name });

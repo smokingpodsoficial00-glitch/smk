@@ -19,7 +19,10 @@ export interface Campaign {
   batchIntervalMinutes: number;
   status: 'active' | 'paused' | 'completed' | 'draft' | 'archived';
   lastRunDate?: string;
-  totalRecipients: number;
+  totalRecipients?: number;
+  imageUrl?: string;
+  isStockOffer?: boolean;
+  stockOfferCount?: number;
   createdAt: string;
   updatedAt?: string;
   legacyId?: string;
@@ -80,6 +83,9 @@ function mapDbRowToCampaign(row: any): Campaign {
     batchIntervalMinutes: row.batch_interval_minutes || 35,
     status: row.status as any,
     lastRunDate: lastRunDateStr,
+    imageUrl: row.legacy_metadata?.image_url || row.image_url || undefined,
+    isStockOffer: !!(row.legacy_metadata?.is_stock_offer || row.is_stock_offer),
+    stockOfferCount: Number(row.legacy_metadata?.stock_offer_count || row.stock_offer_count) || 1,
     totalRecipients: row.total_recipients || 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -225,6 +231,9 @@ export async function createMarketingCampaign(
     batchIntervalMinutes?: number;
     status?: 'active' | 'paused' | 'draft' | 'archived' | 'completed';
     totalRecipients?: number;
+    imageUrl?: string;
+    isStockOffer?: boolean;
+    stockOfferCount?: number;
   }
 ): Promise<Campaign> {
   if (!companyId) {
@@ -261,7 +270,12 @@ export async function createMarketingCampaign(
         batch_size: batchSize,
         batch_interval_minutes: batchInterval,
         total_recipients: data.totalRecipients || 0,
-        status: data.status || 'active'
+        status: data.status || 'active',
+        legacy_metadata: {
+          image_url: data.imageUrl || null,
+          is_stock_offer: !!data.isStockOffer,
+          stock_offer_count: Number(data.stockOfferCount) || 1
+        }
       })
       .select('*')
       .single();
@@ -377,8 +391,15 @@ export async function updateMarketingCampaign(
   if (updates.scheduledWeekday !== undefined) payload.scheduled_weekday = updates.scheduledWeekday || null;
   if (updates.scheduledTime !== undefined) payload.scheduled_time = updates.scheduledTime;
   if (updates.startDate !== undefined) payload.start_date = updates.startDate || null;
-  if (updates.batchSize !== undefined) payload.batch_size = Math.min(5, Math.max(1, Number(updates.batchSize) || 5));
   if (updates.batchIntervalMinutes !== undefined) payload.batch_interval_minutes = Math.max(35, Number(updates.batchIntervalMinutes) || 35);
+  if (updates.imageUrl !== undefined || updates.isStockOffer !== undefined || updates.stockOfferCount !== undefined) {
+    payload.legacy_metadata = {
+      ...(updates.legacyMetadata || {}),
+      image_url: updates.imageUrl !== undefined ? updates.imageUrl : (updates.legacyMetadata?.image_url || null),
+      is_stock_offer: updates.isStockOffer !== undefined ? !!updates.isStockOffer : (!!updates.legacyMetadata?.is_stock_offer),
+      stock_offer_count: Number(updates.stockOfferCount || updates.legacyMetadata?.stock_offer_count) || 1
+    };
+  }
 
   try {
     if (!expectedUpdatedAt) {
@@ -484,6 +505,9 @@ export async function updateMarketingCampaign(
     startDate: updates.startDate !== undefined ? updates.startDate : existing?.startDate,
     createdAt: existing?.createdAt || new Date().toISOString(),
     frequencyDays: freq !== undefined ? freq : (existing?.frequencyDays ?? 7),
+    imageUrl: updates.imageUrl !== undefined ? updates.imageUrl : existing?.imageUrl,
+    isStockOffer: updates.isStockOffer !== undefined ? updates.isStockOffer : existing?.isStockOffer,
+    stockOfferCount: updates.stockOfferCount !== undefined ? updates.stockOfferCount : (existing?.stockOfferCount || 1),
     updatedAt: new Date().toISOString()
   };
 
