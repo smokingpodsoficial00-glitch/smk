@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   ArrowDownRight,
@@ -61,6 +61,7 @@ export function NewTransactionModal({
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const idempotencyKeyRef = useRef<string>('');
 
   useEffect(() => {
     if (isOpen) {
@@ -85,6 +86,10 @@ export function NewTransactionModal({
       setDescription('');
       setDate(new Date().toISOString().split('T')[0]);
       setErrorMsg(null);
+      // Gera uma chave de idempotência estável para a sessão deste modal
+      idempotencyKeyRef.current = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
   }, [isOpen, defaultType, defaultPartnerId, defaultAmount, partners.length]);
 
@@ -131,9 +136,12 @@ export function NewTransactionModal({
     }
 
     const finalDesc = description.trim() ? description.trim() : defaultDesc;
-    const clientSubmissionId = typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    const clientSubmissionId = idempotencyKeyRef.current;
 
     try {
       await createPartnerTransaction({
@@ -152,7 +160,7 @@ export function NewTransactionModal({
       onClose();
     } catch (err: any) {
       console.error('Erro ao registrar transação:', err);
-      setErrorMsg('Ocorreu um erro ao salvar o lançamento. Tente novamente.');
+      setErrorMsg(err?.message || 'Ocorreu um erro ao salvar o lançamento no banco de dados. Tente novamente.');
     } finally {
       setSubmitting(false);
     }

@@ -36,6 +36,7 @@ export interface PartnerTransaction {
   date: string; // YYYY-MM-DD
   description: string;
   destination_category: string;
+  idempotency_key?: string | null;
   created_at: string;
 }
 
@@ -501,6 +502,22 @@ export async function fetchPartnerTransactions(companyId?: string): Promise<Part
 const inFlightTransactions = new Map<string, Promise<PartnerTransaction>>();
 const completedIdempotentTransactions = new Map<string, { tx: PartnerTransaction; timestamp: number }>();
 
+function generateSecureUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback RFC4122 v4 UUID gerado via crypto.getRandomValues ou Math.random
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+function isValidUUID(str: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+}
+
 export async function createPartnerTransaction(payload: {
   companyId?: string;
   partnerId?: string | null;
@@ -514,32 +531,55 @@ export async function createPartnerTransaction(payload: {
 }): Promise<PartnerTransaction> {
   const targetCompanyId = payload.companyId || DEFAULT_COMPANY_ID;
   const idempotencyKey = payload.idempotencyKey?.trim();
+  const cacheKey = idempotencyKey ? `${targetCompanyId}:${idempotencyKey}` : '';
 
-  // Se uma chave de idempotência foi fornecida, verifica se já foi concluída nos últimos 60 segundos
-  if (idempotencyKey) {
-    const cached = completedIdempotentTransactions.get(idempotencyKey);
+  // 1. Deduplicação em memória rápida (anti duplo-clique / retry imediato dentro de 60s)
+  if (cacheKey) {
+    const cached = completedIdempotentTransactions.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp < 60000)) {
-      console.info("[Partners] Transação idempotente já processada retornada do cache:", idempotencyKey);
+      console.info("[Partners] Transação idempotente já processada retornada do cache:", cacheKey);
       return cached.tx;
     }
 
-    // Se a mesma operação com a mesma chave estiver em andamento (retry ou clique simultâneo), reutiliza a promise
-    if (inFlightTransactions.has(idempotencyKey)) {
-      console.info("[Partners] Transação com mesma chave em andamento. Reutilizando execução (single-flight):", idempotencyKey);
-      return inFlightTransactions.get(idempotencyKey)!;
+    // Single-flight: se a mesma operação com a mesma chave estiver em voo, reaproveita a Promise
+    if (inFlightTransactions.has(cacheKey)) {
+      console.info("[Partners] Transação com mesma chave em andamento (single-flight):", cacheKey);
+      return inFlightTransactions.get(cacheKey)!;
     }
   }
 
   const executionPromise = (async () => {
-    // Se foi fornecida idempotencyKey e parece um UUID ou ID único, podemos usá-lo como o ID estável da transação
-    // prevenindo inserção duplicada no banco
-    const newId = idempotencyKey 
-      ? `tx_idemp_${idempotencyKey}`
-      : (typeof crypto !== 'undefined' && crypto.randomUUID 
-          ? crypto.randomUUID() 
-          : `tx_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`);
+    // 2. Se temos idempotencyKey, verifica no banco de dados se ela já foi gravada anteriormente
+    // Isso garante recuperação perfeita mesmo se a conexão tiver caído após a gravação da primeira tentativa
+    if (idempotencyKey) {
+      try {
+        const { data: existingTx, error: checkErr } = await supabase
+          .from("smoking_partner_transactions")
+          .select("*")
+          .eq("company_id", targetCompanyId)
+          .eq("idempotency_key", idempotencyKey)
+          .maybeSingle();
 
-    const txPayload = {
+        if (!checkErr && existingTx) {
+          console.info("[Partners] Transação idempotente já existente localizada no Supabase:", existingTx.id);
+          const foundTx = existingTx as PartnerTransaction;
+          completedIdempotentTransactions.set(cacheKey, { tx: foundTx, timestamp: Date.now() });
+          return foundTx;
+        }
+      } catch (checkEx) {
+        // Se a coluna idempotency_key ainda não existir no schema físico, ignora o erro de coluna inexistente
+        console.warn("[Partners] Verificação prévia de idempotência no banco ignorada:", checkEx);
+      }
+    }
+
+    // 3. Garante que o campo 'id' seja SEMPRE um UUID estritamente válido
+    // Se a idempotencyKey fornecida for um UUID válido, podemos usá-la com segurança como id estável;
+    // caso contrário, geramos um UUID v4 novo e compatível com a restrição UUID do PostgreSQL.
+    const newId = idempotencyKey && isValidUUID(idempotencyKey)
+      ? idempotencyKey
+      : generateSecureUUID();
+
+    const txPayload: any = {
       id: newId,
       company_id: targetCompanyId,
       partner_id: payload.partnerId || null,
@@ -550,60 +590,106 @@ export async function createPartnerTransaction(payload: {
       destination_category: payload.destinationCategory || 'ESTOQUE',
     };
 
-    let savedTx: PartnerTransaction = {
-      ...txPayload,
-      created_at: new Date().toISOString()
-    };
+    if (idempotencyKey) {
+      txPayload.idempotency_key = idempotencyKey;
+    }
+
+    let savedTx: PartnerTransaction | null = null;
+    let dbErrorMsg: string | null = null;
 
     try {
-      // Tenta inserir no Supabase. Se o ID já existir (concorrência de rede), recupera o registro existente
-      const { data, error } = await supabase
+      // 4. Inserção no Supabase com suporte resiliente a schema pré-migration
+      let { data, error } = await supabase
         .from("smoking_partner_transactions")
         .insert(txPayload)
         .select()
         .single();
 
+      // Se der erro de coluna inexistente (caso a migration 010 ainda não tenha sido rodada no SQL Editor),
+      // faz retry sem o campo idempotency_key preservando o UUID válido e a transação
+      if (error && (error.code === '42703' || error.message?.includes('idempotency_key'))) {
+        console.warn("[Partners] Coluna idempotency_key não detectada na tabela física. Inserindo sem a coluna:", error.message);
+        const { idempotency_key: _, ...payloadWithoutKey } = txPayload;
+        const retryRes = await supabase
+          .from("smoking_partner_transactions")
+          .insert(payloadWithoutKey)
+          .select()
+          .single();
+        data = retryRes.data;
+        error = retryRes.error;
+      }
+
       if (!error && data) {
         savedTx = data as PartnerTransaction;
       } else if (error) {
-        // Se deu erro de chave primária duplicada por causa do retry da idempotencyKey, busca a existente
+        // 5. Conflito de unicidade (violação do índice uq_partner_tx_company_idempotency ou da Primary Key)
         if (error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('violates unique constraint')) {
-          const { data: existing } = await supabase
-            .from("smoking_partner_transactions")
-            .select("*")
-            .eq("id", newId)
-            .maybeSingle();
-          if (existing) {
-            savedTx = existing as PartnerTransaction;
+          console.info("[Partners] Conflito de unicidade detectado. Consultando transação gravada anteriormente...");
+          
+          let existingData: any = null;
+          if (idempotencyKey) {
+            const { data: byKey } = await supabase
+              .from("smoking_partner_transactions")
+              .select("*")
+              .eq("company_id", targetCompanyId)
+              .eq("idempotency_key", idempotencyKey)
+              .maybeSingle();
+            existingData = byKey;
+          }
+
+          if (!existingData) {
+            const { data: byId } = await supabase
+              .from("smoking_partner_transactions")
+              .select("*")
+              .eq("id", newId)
+              .maybeSingle();
+            existingData = byId;
+          }
+
+          if (existingData) {
+            savedTx = existingData as PartnerTransaction;
+          } else {
+            dbErrorMsg = `Conflito de unicidade sem recuperação: ${error.message}`;
           }
         } else {
-          console.warn("[Partners] Erro ao registrar transação no Supabase (usando fallback local):", error.message);
+          dbErrorMsg = `Falha ao persistir transação no banco de dados: ${error.message}`;
         }
       }
     } catch (e: any) {
-      console.warn("[Partners] Exceção ao inserir transação no Supabase (usando fallback local):", e?.message || e);
+      dbErrorMsg = `Exceção de rede ou banco ao inserir transação: ${e?.message || e}`;
     }
 
-    // Sincroniza cache local
-    const current = getLocalPartnerTransactions(targetCompanyId).filter(t => t.id !== savedTx.id);
-    saveLocalPartnerTransactions([savedTx, ...current], targetCompanyId);
+    // 6. Integridade Rígida: NÃO considerar operação concluída se a gravação no Supabase falhar
+    if (!savedTx) {
+      const finalError = new Error(dbErrorMsg || "Erro desconhecido ao salvar transação no banco.");
+      console.error("[Partners]", finalError.message);
+      throw finalError;
+    }
 
-    if (idempotencyKey) {
-      completedIdempotentTransactions.set(idempotencyKey, { tx: savedTx, timestamp: Date.now() });
+    // 7. Sincroniza cache local e de idempotência com o registro real gravado
+    try {
+      const current = getLocalPartnerTransactions(targetCompanyId).filter(t => t.id !== savedTx!.id);
+      saveLocalPartnerTransactions([savedTx, ...current], targetCompanyId);
+    } catch (cacheErr) {
+      console.warn("[Partners] Aviso ao atualizar cache local:", cacheErr);
+    }
+
+    if (cacheKey) {
+      completedIdempotentTransactions.set(cacheKey, { tx: savedTx, timestamp: Date.now() });
     }
 
     return savedTx;
   })();
 
-  if (idempotencyKey) {
-    inFlightTransactions.set(idempotencyKey, executionPromise);
+  if (cacheKey) {
+    inFlightTransactions.set(cacheKey, executionPromise);
   }
 
   try {
     return await executionPromise;
   } finally {
-    if (idempotencyKey) {
-      inFlightTransactions.delete(idempotencyKey);
+    if (cacheKey) {
+      inFlightTransactions.delete(cacheKey);
     }
   }
 }
