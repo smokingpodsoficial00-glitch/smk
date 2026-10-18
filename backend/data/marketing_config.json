@@ -71,7 +71,7 @@
       "createdAt": "2026-09-11T15:03:53.192241+00:00",
       "frequencyDays": 14,
       "updatedAt": "2026-09-21T18:04:48.085Z",
-      "lastRunDate": "23/09/2026"
+      "lastRunDate": "18/10/2026"
     },
     {
       "id": "7374d4ba-9031-446f-9c7b-d001608641bf",
@@ -344,87 +344,12 @@
   ],
   "idempotencyKeys": [
     {
-      "key": "bdbc5c95-4770-4fba-8425-4dec704098bc_2026-09-21_14:05",
-      "timestamp": "2026-09-21T17:05:34.904Z",
-      "campaignName": "CPM GRUPO ESTOQUE SEMANAL"
-    },
-    {
-      "key": "4e4a393c-5a6b-44cf-9488-ec5e3c025937_2026-09-21_15:00",
-      "timestamp": "2026-09-21T18:00:34.784Z",
+      "key": "4e4a393c-5a6b-44cf-9488-ec5e3c025937_2026-10-18_15:00",
+      "timestamp": "2026-10-18T18:00:07.338Z",
       "campaignName": "CPM GRUPO INSTAGRAM"
-    },
-    {
-      "key": "4e4a393c-5a6b-44cf-9488-ec5e3c025937_2026-09-23_15:00",
-      "timestamp": "2026-09-23T18:00:48.812Z",
-      "campaignName": "CPM GRUPO INSTAGRAM"
-    },
-    {
-      "key": "a898626b-11df-4ea8-879c-185b88433a6e_2026-09-23_16:00",
-      "timestamp": "2026-09-23T19:00:48.554Z",
-      "campaignName": "CPM  LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!"
-    },
-    {
-      "key": "7374d4ba-9031-446f-9c7b-d001608641bf_2026-09-25_13:00",
-      "timestamp": "2026-09-25T16:00:38.369Z",
-      "campaignName": "REATIVAÇÃO SEXTOU/ESCASSEZ"
-    },
-    {
-      "key": "ccec49ef-56a2-45e5-92ce-a66e1749e275_2026-09-26_14:00",
-      "timestamp": "2026-09-26T17:00:50.726Z",
-      "campaignName": "CPM SABADÃO 1"
-    },
-    {
-      "key": "d4046bf1-b741-40cd-b330-6ab8afc72d3e_2026-09-26_17:30",
-      "timestamp": "2026-09-26T20:30:52.522Z",
-      "campaignName": "CPM SABADÃO 2"
-    },
-    {
-      "key": "28d26f94-c2ff-4268-b5ff-d7e65674dd62_2026-09-26_19:30",
-      "timestamp": "2026-09-26T22:30:52.926Z",
-      "campaignName": "CPM SABADÃO 3"
-    },
-    {
-      "key": "c3558551-5f8a-4aaf-8e75-fb1ca2a966d4_2026-09-27_19:30",
-      "timestamp": "2026-09-27T22:30:25.405Z",
-      "campaignName": "CPM DOMINGO 2"
-    },
-    {
-      "key": "bdbc5c95-4770-4fba-8425-4dec704098bc_2026-09-28_14:05",
-      "timestamp": "2026-09-28T17:05:46.489Z",
-      "campaignName": "CPM GRUPO ESTOQUE SEMANAL"
-    },
-    {
-      "key": "a200c5bf-c667-4a05-bafd-bdf324195cdb_2026-09-29_16:00",
-      "timestamp": "2026-09-29T19:00:45.363Z",
-      "campaignName": "AVISO SALVAR CONTATO"
-    },
-    {
-      "key": "a898626b-11df-4ea8-879c-185b88433a6e_2026-09-30_16:00",
-      "timestamp": "2026-09-30T19:00:30.755Z",
-      "campaignName": "CPM  LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!"
-    },
-    {
-      "key": "7374d4ba-9031-446f-9c7b-d001608641bf_2026-10-02_13:00",
-      "timestamp": "2026-10-02T16:00:37.705Z",
-      "campaignName": "REATIVAÇÃO SEXTOU/ESCASSEZ"
-    },
-    {
-      "key": "9ff7cae1-0689-4eec-bf4d-4142e2f78b76_2026-10-02_17:30",
-      "timestamp": "2026-10-02T20:30:39.480Z",
-      "campaignName": "CPM SEXTOU 2"
-    },
-    {
-      "key": "ccec49ef-56a2-45e5-92ce-a66e1749e275_2026-10-03_14:00",
-      "timestamp": "2026-10-03T17:00:37.185Z",
-      "campaignName": "CPM SABADÃO 1"
-    },
-    {
-      "key": "d4046bf1-b741-40cd-b330-6ab8afc72d3e_2026-10-03_17:30",
-      "timestamp": "2026-10-03T20:30:27.895Z",
-      "campaignName": "CPM SABADÃO 2"
     }
   ],
-  "lastUpdated": "2026-10-03T20:30:27.895Z",
+  "lastUpdated": "2026-10-18T18:00:07.339Z",
   "lists": [
     {
       "id": "0d925499-da68-4a93-9591-f4b6f78744b1",

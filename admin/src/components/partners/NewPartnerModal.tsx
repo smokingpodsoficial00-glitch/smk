@@ -136,7 +136,7 @@ export function NewPartnerModal({
                 Participação Resultante:
               </span>
               <span className="font-mono font-extrabold text-emerald-400 text-sm">
-                {estimatedEquityPct.toFixed(2)}%
+                {simulatedNewTotalCapital > 0 ? `${estimatedEquityPct.toFixed(2)}%` : 'Não calculável'}
               </span>
             </div>
             <div className="flex items-center justify-between text-[10px] text-white/50 pt-1 border-t border-white/10">

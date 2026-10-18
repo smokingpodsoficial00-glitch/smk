@@ -988,12 +988,12 @@ export default function MarketingModule() {
       <header className="px-4 py-4 sm:px-6 sm:py-5 border-b border-white/10 shrink-0 bg-[#0a0a0a]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg sm:text-2xl font-bold text-white flex items-center gap-2">
-                <Megaphone className="size-5 sm:size-6 text-white shrink-0" />
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                <Megaphone className="size-5 text-emerald-400 shrink-0" />
                 <span>Módulo de Marketing & Disparos</span>
               </h2>
-              <span className="text-[10px] font-mono uppercase bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-bold shadow-sm">
+              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md font-medium">
                 Anti-Ban Ativo
               </span>
             </div>
@@ -1003,23 +1003,23 @@ export default function MarketingModule() {
           </div>
 
           {/* Botões de Ação do Header */}
-          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             {/* Botão de Conexão do WhatsApp */}
             <button
               type="button"
               data-tour="btn-conectar-whatsapp"
               onClick={handleStartConnectWhatsApp}
               disabled={qrLoading}
-              className={`px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-2 cursor-pointer transition-all shadow-sm active:scale-95 shrink-0 ${
+              className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all active:scale-95 shrink-0 ${
                 whatsAppConnected
-                  ? 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/40 text-emerald-400'
+                  ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
                   : whatsAppSessionStatus === 'CONNECTING'
-                  ? 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/40 text-amber-300 animate-pulse'
+                  ? 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/30 text-amber-300 animate-pulse'
                   : whatsAppSessionStatus === 'SESSION_INVALID'
-                  ? 'bg-red-500/20 hover:bg-red-500/30 border-red-500/40 text-red-300'
+                  ? 'bg-red-500/15 hover:bg-red-500/25 border-red-500/30 text-red-300'
                   : !backendOnline
-                  ? 'bg-red-500/15 hover:bg-red-500/25 border-red-500/30 text-red-400'
-                  : 'bg-emerald-600/90 hover:bg-emerald-500 text-white border-emerald-400/30 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+                  ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/25 text-red-400'
+                  : 'bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold border-transparent shadow-sm'
               }`}
               title={
                 whatsAppConnected
@@ -1058,7 +1058,7 @@ export default function MarketingModule() {
                 </>
               ) : (
                 <>
-                  <QrCode className="size-4 text-white" />
+                  <QrCode className="size-4 text-black" />
                   <span>{hasSavedSession ? 'Conectar WhatsApp' : 'Conectar WhatsApp'}</span>
                 </>
               )}
@@ -1067,17 +1067,17 @@ export default function MarketingModule() {
             <button
               onClick={syncWhatsAppContactsAndGroups}
               disabled={loadingSync}
-              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50 shrink-0"
+              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50 shrink-0"
               title="Sincroniza contatos da agenda do WhatsApp e grupos"
             >
-              <RefreshCw className={`size-3.5 text-white ${loadingSync ? 'animate-spin' : ''}`} />
-              <span>{loadingSync ? 'Sincronizando...' : 'Sincronizar WhatsApp'}</span>
+              <RefreshCw className={`size-3.5 text-white/70 ${loadingSync ? 'animate-spin' : ''}`} />
+              <span>{loadingSync ? 'Sincronizando...' : 'Sincronizar'}</span>
             </button>
 
             <button
               data-tour="btn-nova-campanha"
               onClick={() => handleOpenCampaignModal()}
-              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-black text-xs font-extrabold flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] active:scale-95 shrink-0"
+              className="px-4 py-2 rounded-xl bg-white hover:bg-white/90 text-black text-xs font-extrabold flex items-center gap-2 cursor-pointer transition-all shadow-sm active:scale-95 shrink-0"
             >
               <Plus className="size-4 stroke-[3]" />
               <span>Nova Campanha</span>
@@ -1085,14 +1085,14 @@ export default function MarketingModule() {
           </div>
         </div>
 
-        {/* Alerta quando desconectado */}
+        {/* Alerta minimalista quando desconectado */}
         {!whatsAppConnected && (
-          <div className="mt-3 bg-white/5 border border-white/10 px-4 py-2.5 rounded-xl flex items-center justify-between gap-3 text-xs text-white/80">
-            <div className="flex items-center gap-2">
-              <span className={`size-2 rounded-full ${whatsAppSessionStatus === 'SESSION_INVALID' ? 'bg-red-400' : 'bg-white/40'}`} />
-              <span>
+          <div className="mt-3.5 bg-white/[0.03] border border-white/10 px-4 py-2 rounded-xl flex items-center justify-between gap-3 text-xs text-white/70">
+            <div className="flex items-center gap-2.5">
+              <span className={`size-2 rounded-full shrink-0 ${whatsAppSessionStatus === 'SESSION_INVALID' ? 'bg-red-400' : 'bg-white/30'}`} />
+              <span className="text-[11px] sm:text-xs">
                 {whatsAppSessionStatus === 'SESSION_INVALID'
-                  ? 'O WhatsApp foi desconectado pelo celular ou a sessão expirou. Conecte novamente para habilitar os disparos.'
+                  ? 'A sessão foi desconectada pelo celular ou expirou. Clique em Conectar Novamente para reativar.'
                   : hasSavedSession
                   ? 'WhatsApp em espera. Clique em Conectar para ativar os envios da loja.'
                   : 'Conecte o WhatsApp da loja para habilitar os disparos automáticos e sincronização.'}
@@ -1100,43 +1100,43 @@ export default function MarketingModule() {
             </div>
             <button
               onClick={handleStartConnectWhatsApp}
-              className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+              className="px-3 py-1 bg-white/10 hover:bg-white/15 text-white border border-white/15 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
             >
               <QrCode className="size-3.5" />
-              <span>{hasSavedSession ? 'Ativar Conexão' : 'Conectar WhatsApp'}</span>
+              <span>{hasSavedSession ? 'Ativar Conexão' : 'Conectar'}</span>
             </button>
           </div>
         )}
 
         {syncStatus && (
-          <div className="mt-3 text-xs text-white/90 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg font-mono">
+          <div className="mt-3 text-xs text-white/80 bg-white/[0.03] border border-white/10 px-3 py-1.5 rounded-lg font-mono">
             {syncStatus}
           </div>
         )}
 
-        {/* Barra de Sub-Navegação (Abas Limpas) */}
-        <div className="flex gap-2 mt-5">
+        {/* Barra de Sub-Navegação (Tabs Discretas com Indicador Verde) */}
+        <div className="flex items-center gap-6 mt-4 border-b border-white/5">
           <button
             onClick={() => setActiveTab('campaigns')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`pb-2.5 text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 border-b-2 ${
               activeTab === 'campaigns'
-                ? 'bg-white/10 text-white border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.1)]'
-                : 'text-white/50 hover:bg-white/5 hover:text-white border border-transparent'
+                ? 'text-white border-emerald-400 font-bold'
+                : 'text-white/40 hover:text-white/80 border-transparent'
             }`}
           >
-            <Layers className="size-4 text-white" />
+            <Layers className="size-4" />
             <span>Campanhas ({campaigns.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('broadcast_lists')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`pb-2.5 text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 border-b-2 ${
               activeTab === 'broadcast_lists'
-                ? 'bg-white/10 text-white border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.1)]'
-                : 'text-white/50 hover:bg-white/5 hover:text-white border border-transparent'
+                ? 'text-white border-emerald-400 font-bold'
+                : 'text-white/40 hover:text-white/80 border-transparent'
             }`}
           >
-            <Users className="size-4 text-white" />
+            <Users className="size-4" />
             <span>Listas de Transmissão ({broadcastLists.length})</span>
           </button>
         </div>
@@ -1201,14 +1201,14 @@ export default function MarketingModule() {
                   if (groupCamps.length === 0) return null;
                   return (
                     <div className="space-y-4">
-                      <div className="flex items-center gap-2 pb-2 border-b border-amber-500/20">
-                        <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                      <div className="flex items-center gap-2.5 pb-2.5 border-b border-white/5">
+                        <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                           <MessageSquare className="size-4" />
                         </div>
                         <div>
-                          <h3 className="text-sm font-extrabold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                          <h3 className="text-xs font-semibold text-white tracking-wider uppercase flex items-center gap-2">
                             Campanhas de Grupo (WhatsApp VIP)
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-white/50 font-mono">
                               {groupCamps.length}
                             </span>
                           </h3>
@@ -1216,42 +1216,37 @@ export default function MarketingModule() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {groupCamps.map(camp => (
                           <div 
                             key={camp.id}
-                            className="bg-[#0c0a06] border border-amber-500/25 hover:border-amber-500/50 rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all shadow-[0_4px_20px_rgba(245,158,11,0.05)] hover:shadow-[0_4px_25px_rgba(245,158,11,0.12)] group"
+                            className="bg-[#0a0a0a] border border-white/10 hover:border-white/20 rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all group"
                           >
                             <div className="space-y-3">
+                              {/* 1. Primeira Linha: Nome da campanha + Status discreto */}
                               <div className="flex items-start justify-between gap-2">
-                                <h3 className="text-base font-bold text-white group-hover:text-amber-400 transition-colors">
+                                <h3 className="text-sm font-semibold text-white truncate group-hover:text-emerald-300 transition-colors">
                                   {camp.name}
                                 </h3>
-                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
-                                  camp.status === 'active' 
-                                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' 
-                                    : 'bg-white/5 text-white/40 border-white/10'
+                                <span className={`text-[11px] font-medium shrink-0 flex items-center gap-1.5 ${
+                                  camp.status === 'active' ? 'text-emerald-400' : 'text-white/40'
                                 }`}>
-                                  {camp.status === 'active' ? '🟢 Ativa' : '⚪ Off'}
+                                  <span className={`size-1.5 rounded-full ${camp.status === 'active' ? 'bg-emerald-400' : 'bg-white/30'}`} />
+                                  {camp.status === 'active' ? 'Ativa' : 'Pausada'}
                                 </span>
                               </div>
 
-                              {/* Informações de Destino */}
-                              <div className="p-3 bg-[#050505] rounded-xl border border-amber-500/10 space-y-1.5 text-xs">
-                                <div className="flex items-center justify-between text-white/60">
-                                  <span>Destino:</span>
-                                  <span className="font-bold text-amber-400 flex items-center gap-1">
-                                    <MessageSquare className="size-3" /> Grupo VIP
+                              {/* 2. Informações Básicas (Destino e Frequência) */}
+                              <div className="text-xs space-y-1 text-white/60">
+                                <div>
+                                  <span className="text-white/40">Destino: </span>
+                                  <span className="text-white/80 font-medium">
+                                    {camp.targetGroupName || 'Clientes Smoking Vip'}
                                   </span>
                                 </div>
-                                
-                                <div className="text-[11px] text-amber-300/80 font-mono truncate">
-                                  💬 {camp.targetGroupName || 'Grupo VIP Oficial'}
-                                </div>
-
-                                <div className="flex items-center justify-between text-white/60 pt-1 border-t border-white/5">
-                                  <span>Frequência:</span>
-                                  <span className="font-semibold text-white">
+                                <div>
+                                  <span className="text-white/40">Frequência: </span>
+                                  <span className="text-white/80">
                                     {camp.frequencyDays === 0 
                                       ? 'Disparo Único' 
                                       : camp.scheduledWeekday 
@@ -1261,69 +1256,57 @@ export default function MarketingModule() {
                                 </div>
                               </div>
 
-                              {/* Prévia da Mensagem */}
-                              <p className="text-xs text-white/50 line-clamp-3 font-mono bg-[#050505] p-2.5 rounded-lg border border-white/5">
-                                {camp.message}
-                              </p>
+                              {/* 3. Mensagem da Campanha (Tipografia padrão do sistema, sem mono) */}
+                              <div className="bg-[#050505] p-3 rounded-xl border border-white/5">
+                                <p className="text-xs text-white/70 line-clamp-3 leading-relaxed whitespace-pre-line">
+                                  {camp.message}
+                                </p>
+                              </div>
                             </div>
 
-                            {/* Ações da Campanha */}
-                            <div className="flex flex-col gap-3 pt-3 border-t border-amber-500/10">
-                              {/* Switch Toggle */}
-                              <div 
-                                className="flex items-center justify-between cursor-pointer group/toggle"
-                                onClick={() => toggleCampaignStatus(camp.id)}
-                              >
-                                <div className="flex items-center gap-2">
+                            {/* 4. Rodapé de Ações */}
+                            <div className="flex items-center justify-between pt-3 border-t border-white/5 gap-2">
+                              {/* Lado Esquerdo: Ativar/Desativar + Editar + Excluir */}
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleCampaignStatus(camp.id)}
+                                  title={camp.status === 'active' ? 'Pausar Campanha' : 'Ativar Campanha'}
+                                  className="text-white/40 hover:text-white transition-colors cursor-pointer"
+                                >
                                   {camp.status === 'active' ? (
-                                    <ToggleRight className="size-7 text-emerald-400 transition-all" />
+                                    <ToggleRight className="size-6 text-emerald-400" />
                                   ) : (
-                                    <ToggleLeft className="size-7 text-white/30 transition-all" />
+                                    <ToggleLeft className="size-6 text-white/30" />
                                   )}
-                                  <div className="flex flex-col">
-                                    <span className={`text-[11px] font-bold uppercase tracking-wider ${
-                                      camp.status === 'active' ? 'text-emerald-400' : 'text-white/40'
-                                    }`}>
-                                      {camp.status === 'active' ? '🟢 Automação Ligada' : '⚪ Desligada'}
-                                    </span>
-                                    {camp.status === 'active' && camp.scheduledWeekday && camp.scheduledTime && (
-                                      <span className="text-[10px] text-white/40 font-mono">
-                                        Toda {camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()} às {camp.scheduledTime}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Botões de Ação */}
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5">
-                                  <button
-                                    onClick={() => handleOpenCampaignModal(camp)}
-                                    title="Editar Configurações da Campanha"
-                                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
-                                  >
-                                    <Edit3 className="size-3.5" />
-                                  </button>
-
-                                  <button
-                                    onClick={() => handleDeleteCampaign(camp.id)}
-                                    title="Excluir Campanha"
-                                    className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all cursor-pointer"
-                                  >
-                                    <Trash2 className="size-3.5" />
-                                  </button>
-                                </div>
+                                </button>
 
                                 <button
-                                  onClick={() => handleExecuteCampaign(camp)}
-                                  disabled={executingCampaignId === camp.id}
-                                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md disabled:opacity-50"
+                                  onClick={() => handleOpenCampaignModal(camp)}
+                                  title="Editar Campanha"
+                                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-all cursor-pointer"
                                 >
-                                  <Send className="size-3 stroke-[2.5]" />
-                                  <span>Disparar no Grupo</span>
+                                  <Edit3 className="size-3.5" />
+                                </button>
+
+                                <button
+                                  onClick={() => handleDeleteCampaign(camp.id)}
+                                  title="Excluir Campanha"
+                                  className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-all cursor-pointer"
+                                >
+                                  <Trash2 className="size-3.5" />
                                 </button>
                               </div>
+
+                              {/* Lado Direito: Disparar no Grupo */}
+                              <button
+                                onClick={() => handleExecuteCampaign(camp)}
+                                disabled={executingCampaignId === camp.id}
+                                className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+                              >
+                                <Send className="size-3" />
+                                <span>Disparar no Grupo</span>
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -1338,22 +1321,22 @@ export default function MarketingModule() {
                   if (listCamps.length === 0) return null;
                   return (
                     <div className="space-y-4">
-                      <div className="flex items-center gap-2 pb-2 border-b border-purple-500/20">
-                        <div className="p-1.5 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-400">
+                      <div className="flex items-center gap-2.5 pb-2.5 border-b border-white/5">
+                        <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                           <Users className="size-4" />
                         </div>
                         <div>
-                          <h3 className="text-sm font-extrabold text-purple-400 uppercase tracking-wider flex items-center gap-2">
-                            Campanhas no Privado (1 a 1 / Listas de Transmissão)
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-mono">
+                          <h3 className="text-xs font-semibold text-white tracking-wider uppercase flex items-center gap-2">
+                            Campanhas no Privado (1 a 1 / Listas)
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-white/50 font-mono">
                               {listCamps.length}
                             </span>
                           </h3>
-                          <p className="text-[11px] text-white/40">Disparos diretos para o WhatsApp de cada cliente com cadência segura</p>
+                          <p className="text-[11px] text-white/40">Disparos diretos para o WhatsApp com cadência anti-ban</p>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {listCamps.map(camp => {
                           const targetListNames = broadcastLists
                             .filter(l => camp.selectedListIds?.includes(l.id))
@@ -1362,38 +1345,33 @@ export default function MarketingModule() {
                           return (
                             <div 
                               key={camp.id}
-                              className="bg-[#0b0811] border border-purple-500/25 hover:border-purple-500/50 rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all shadow-[0_4px_20px_rgba(168,85,247,0.05)] hover:shadow-[0_4px_25px_rgba(168,85,247,0.12)] group"
+                              className="bg-[#0a0a0a] border border-white/10 hover:border-white/20 rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all group"
                             >
                               <div className="space-y-3">
+                                {/* 1. Primeira Linha: Nome da campanha + Status discreto */}
                                 <div className="flex items-start justify-between gap-2">
-                                  <h3 className="text-base font-bold text-white group-hover:text-purple-400 transition-colors">
+                                  <h3 className="text-sm font-semibold text-white truncate group-hover:text-emerald-300 transition-colors">
                                     {camp.name}
                                   </h3>
-                                  <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
-                                    camp.status === 'active' 
-                                      ? 'bg-purple-500/15 text-purple-300 border-purple-500/30' 
-                                      : 'bg-white/5 text-white/40 border-white/10'
+                                  <span className={`text-[11px] font-medium shrink-0 flex items-center gap-1.5 ${
+                                    camp.status === 'active' ? 'text-emerald-400' : 'text-white/40'
                                   }`}>
-                                    {camp.status === 'active' ? '🟢 Ativa' : '⚪ Off'}
+                                    <span className={`size-1.5 rounded-full ${camp.status === 'active' ? 'bg-emerald-400' : 'bg-white/30'}`} />
+                                    {camp.status === 'active' ? 'Ativa' : 'Pausada'}
                                   </span>
                                 </div>
 
-                                {/* Informações de Destino */}
-                                <div className="p-3 bg-[#050505] rounded-xl border border-purple-500/10 space-y-1.5 text-xs">
-                                  <div className="flex items-center justify-between text-white/60">
-                                    <span>Destino:</span>
-                                    <span className="font-bold text-purple-400 flex items-center gap-1">
-                                      <Users className="size-3" /> {targetListNames.length} Listas Selecionadas
+                                {/* 2. Informações Básicas (Destino e Frequência) */}
+                                <div className="text-xs space-y-1 text-white/60">
+                                  <div>
+                                    <span className="text-white/40">Destino: </span>
+                                    <span className="text-white/80 font-medium">
+                                      {targetListNames.length > 0 ? targetListNames.join(', ') : `${targetListNames.length} listas`}
                                     </span>
                                   </div>
-                                  
-                                  <div className="text-[11px] text-purple-300/80 font-mono truncate">
-                                    📁 {targetListNames.join(', ') || 'Nenhuma lista'}
-                                  </div>
-
-                                  <div className="flex items-center justify-between text-white/60 pt-1 border-t border-white/5">
-                                    <span>Frequência:</span>
-                                    <span className="font-semibold text-white">
+                                  <div>
+                                    <span className="text-white/40">Frequência: </span>
+                                    <span className="text-white/80">
                                       {camp.frequencyDays === 0 
                                         ? 'Disparo Único' 
                                         : camp.frequencyDays === 7 && camp.scheduledWeekday
@@ -1403,86 +1381,65 @@ export default function MarketingModule() {
                                   </div>
                                 </div>
 
-                                {/* Prévia da Mensagem */}
-                                <p className="text-xs text-white/50 line-clamp-3 font-mono bg-[#050505] p-2.5 rounded-lg border border-white/5">
-                                  {camp.message}
-                                </p>
+                                {/* 3. Mensagem da Campanha (Tipografia padrão do sistema, sem mono) */}
+                                <div className="bg-[#050505] p-3 rounded-xl border border-white/5">
+                                  <p className="text-xs text-white/70 line-clamp-3 leading-relaxed whitespace-pre-line">
+                                    {camp.message}
+                                  </p>
+                                </div>
                               </div>
 
-                              {/* Ações da Campanha */}
-                              <div className="flex flex-col gap-3 pt-3 border-t border-purple-500/10">
-                                {/* Switch Toggle */}
-                                <div 
-                                  className="flex items-center justify-between cursor-pointer group/toggle"
-                                  onClick={() => toggleCampaignStatus(camp.id)}
-                                >
-                                  <div className="flex items-center gap-2">
+                              {/* 4. Rodapé de Ações */}
+                              <div className="flex items-center justify-between pt-3 border-t border-white/5 gap-2">
+                                {/* Lado Esquerdo: Ativar/Desativar + Editar + Excluir */}
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleCampaignStatus(camp.id)}
+                                    title={camp.status === 'active' ? 'Pausar Campanha' : 'Ativar Campanha'}
+                                    className="text-white/40 hover:text-white transition-colors cursor-pointer"
+                                  >
                                     {camp.status === 'active' ? (
-                                      <ToggleRight className="size-7 text-purple-400 transition-all" />
+                                      <ToggleRight className="size-6 text-emerald-400" />
                                     ) : (
-                                      <ToggleLeft className="size-7 text-white/30 transition-all" />
+                                      <ToggleLeft className="size-6 text-white/30" />
                                     )}
-                                    <div className="flex flex-col">
-                                      <span className={`text-[11px] font-bold uppercase tracking-wider ${
-                                        camp.status === 'active' ? 'text-purple-400' : 'text-white/40'
-                                      }`}>
-                                        {camp.status === 'active' 
-                                          ? (camp.frequencyDays > 0 ? '🟢 Automação Ligada' : '🟢 Campanha Ativa') 
-                                          : '⚪ Desligada / Pausada'}
-                                      </span>
-                                      {camp.status === 'active' && camp.frequencyDays > 0 && (
-                                        <span className="text-[10px] text-white/40 font-mono">
-                                          {camp.frequencyDays === 7 && camp.scheduledWeekday
-                                            ? `Toda ${camp.scheduledWeekday.charAt(0) + camp.scheduledWeekday.slice(1).toLowerCase()} às ${camp.scheduledTime || '15:00'}`
-                                            : `A cada ${camp.frequencyDays} dias às ${camp.scheduledTime || '15:00'}`}
-                                        </span>
-                                      )}
-                                      {camp.frequencyDays === 0 && (
-                                        <span className="text-[10px] text-white/40 font-mono">
-                                          Disparo manual avulso
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleOpenCampaignModal(camp)}
+                                    title="Editar Campanha"
+                                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-all cursor-pointer"
+                                  >
+                                    <Edit3 className="size-3.5" />
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleDeleteCampaign(camp.id)}
+                                    title="Excluir Campanha"
+                                    className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-all cursor-pointer"
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </button>
                                 </div>
 
-                                {/* Botões de Ação */}
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-1.5">
-                                    <button
-                                      onClick={() => handleOpenCampaignModal(camp)}
-                                      title="Editar Configurações da Campanha"
-                                      className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
-                                    >
-                                      <Edit3 className="size-3.5" />
-                                    </button>
-
-                                    <button
-                                      onClick={() => handleDeleteCampaign(camp.id)}
-                                      title="Excluir Campanha"
-                                      className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all cursor-pointer"
-                                    >
-                                      <Trash2 className="size-3.5" />
-                                    </button>
-                                  </div>
-
-                                  {executingCampaignId === camp.id ? (
-                                    <button
-                                      onClick={handleStopCampaign}
-                                      className="px-3.5 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md animate-pulse"
-                                    >
-                                      <span>🛑 Parar Disparos</span>
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => handleExecuteCampaign(camp)}
-                                      className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-md shadow-purple-600/20"
-                                    >
-                                      <Send className="size-3" />
-                                      <span>{camp.frequencyDays > 0 ? 'Disparar Lote' : 'Disparar Tudo'}</span>
-                                    </button>
-                                  )}
-                                </div>
+                                {/* Lado Direito: Ação de Disparo Principal */}
+                                {executingCampaignId === camp.id ? (
+                                  <button
+                                    onClick={handleStopCampaign}
+                                    className="px-3.5 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all animate-pulse"
+                                  >
+                                    <span>🛑 Parar Disparos</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleExecuteCampaign(camp)}
+                                    className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all"
+                                  >
+                                    <Send className="size-3" />
+                                    <span>{camp.frequencyDays > 0 ? 'Disparar Lote' : 'Disparar Tudo'}</span>
+                                  </button>
+                                )}
                               </div>
                             </div>
                           );
@@ -1503,8 +1460,8 @@ export default function MarketingModule() {
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Users className="size-5 text-purple-400" />
+                <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <Users className="size-4 text-emerald-400" />
                   Listas de Transmissão Salvas
                 </h3>
                 <p className="text-xs text-white/50">
@@ -1520,37 +1477,37 @@ export default function MarketingModule() {
                   title="Higieniza e remove duplicatas entre listas"
                 >
                   <Zap className={`size-3.5 text-emerald-400 ${loadingSanitize ? 'animate-spin' : ''}`} />
-                  <span>{loadingSanitize ? 'Higienizando...' : '⚡ Higienizar & Desduplicar'}</span>
+                  <span>{loadingSanitize ? 'Higienizando...' : 'Higienizar & Desduplicar'}</span>
                 </button>
 
                 <button
                   onClick={() => handleOpenListModal()}
-                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-2 cursor-pointer transition-all"
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all"
                 >
-                  <Plus className="size-4" /> Nova Lista de Transmissão
+                  <Plus className="size-4" /> Nova Lista
                 </button>
               </div>
             </div>
 
             {/* Grid de Listas */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {broadcastLists.map(list => (
                 <div
                   key={list.id}
-                  className="bg-[#0a0a0a] border border-white/10 hover:border-purple-500/30 rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all shadow-md group"
+                  className="bg-[#0a0a0a] border border-white/10 hover:border-white/20 rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all group"
                 >
                   <div className="space-y-2.5">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 font-bold">
+                        <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-emerald-400 font-bold">
                           <Users className="size-4" />
                         </div>
                         <div>
-                          <h4 className="text-sm font-bold text-white group-hover:text-purple-300 transition-colors">
+                          <h4 className="text-sm font-semibold text-white group-hover:text-emerald-300 transition-colors">
                             {list.name}
                           </h4>
-                          <span className="text-[10px] text-purple-400 font-mono">
-                            {list.contacts.length} contatos vinculados
+                          <span className="text-[10px] text-white/50 font-mono">
+                            {list.contacts.length} {list.contacts.length === 1 ? 'contato' : 'contatos'}
                           </span>
                         </div>
                       </div>
@@ -1562,7 +1519,7 @@ export default function MarketingModule() {
 
                     {/* Amostra dos Primeiros Contatos */}
                     <div className="p-3 bg-[#050505] rounded-xl border border-white/5 space-y-1">
-                      <span className="text-[10px] text-white/40 uppercase font-bold block mb-1">Membros na Lista:</span>
+                      <span className="text-[10px] text-white/40 uppercase font-semibold block mb-1">Membros na Lista:</span>
                       {list.contacts.length === 0 ? (
                         <span className="text-xs text-white/30 italic">Nenhum contato adicionado ainda</span>
                       ) : (
@@ -1574,7 +1531,7 @@ export default function MarketingModule() {
                         ))
                       )}
                       {list.contacts.length > 3 && (
-                        <span className="text-[10px] text-purple-400 block pt-1">
+                        <span className="text-[10px] text-emerald-400 block pt-1">
                           + {list.contacts.length - 3} outros contatos...
                         </span>
                       )}
@@ -1584,10 +1541,10 @@ export default function MarketingModule() {
                   <div className="flex items-center justify-between pt-3 border-t border-white/5">
                     <button
                       onClick={() => handleOpenListModal(list)}
-                      className="text-xs text-purple-400 hover:text-purple-300 font-bold flex items-center gap-1 cursor-pointer"
+                      className="text-xs text-white/70 hover:text-emerald-400 font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
                     >
                       <Edit3 className="size-3.5" />
-                      <span>Gerenciar Contatos (+Adicionar)</span>
+                      <span>Gerenciar Contatos</span>
                     </button>
 
                     <button

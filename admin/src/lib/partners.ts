@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { isOrderNational, extractNationalInfo } from "./nationalSales";
 import { isCompanyEntityPartner, isCompanyExpenseTransaction } from "./partnerPayroll";
+import { calculateAllTimeMetrics } from "./financialCycles";
 
 export type PartnerTransactionType = 
   | 'APORTE'              // Entrada de capital novo do sócio na empresa (Altera Capital e % de Equity)
@@ -634,78 +635,35 @@ export function calculatePartnersFinancials(params: {
     repurchases = []
   } = params;
 
-  // 1. DRE OFICIAL: Processar Vendas, CMV e Frete (Idêntico ao FinanceDashboard.tsx)
-  let revenueSum = 0;
-  let cmvSum = 0;
-  let shippingSum = 0;
-  let podsSoldSum = 0;
-  let nationalShippingProfitSum = 0;
-
-  const validOrders = (orders || []).filter(
-    (o) =>
-      o.delivery_status !== 'CANCELADO' &&
-      o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' &&
-      (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_')) &&
-      (!o.client_name || !o.client_name.toLowerCase().includes('system config'))
+  // 1. DRE OFICIAL & TESOURARIA: Delegar ao motor oficial do Financeiro (Fonte Única de Verdade)
+  const allTimeMetrics = calculateAllTimeMetrics(
+    orders,
+    repurchases,
+    persistedCosts,
+    transactions,
+    partners
   );
 
-  const pCosts = (persistedCosts || {}) as Record<string, number>;
-  const dCosts = (DEFAULT_MODEL_COSTS || {}) as Record<string, number>;
+  const revenueSum = allTimeMetrics.grossRevenue;
+  const cmvSum = allTimeMetrics.cmv;
+  const shippingSum = allTimeMetrics.logisticsFee;
+  const podsSoldSum = allTimeMetrics.totalPodsSold;
+  const totalOrdersCount = allTimeMetrics.totalOrders;
+  const stockPurchases = allTimeMetrics.stockPurchases;
+  const realCash = allTimeMetrics.realCash;
 
-  for (const order of validOrders) {
-    const shippingFee = parseFloat(order.shipping_fee || 0);
-    if (!isOrderNational(order)) {
-      shippingSum += shippingFee;
-    } else {
-      const info = extractNationalInfo(order);
-      const shipCharged = info.shippingFeeCharged || shippingFee;
-      const shipCost = info.shippingCostReal || 0;
-      nationalShippingProfitSum += (shipCharged - shipCost);
-    }
-
-    const items = Array.isArray(order.items) ? order.items : [];
-    for (const item of items) {
-      const qty = Number(item.quantity) || 1;
-      const brand = (item.brand || "OUTROS").toUpperCase();
-      const modelName = (item.name || "POD").toUpperCase();
-      const itemPrice = Number(item.price || item.unit_price) || 0;
-      const modelKey = (item.modelKey || `${brand}__${modelName}`).toLowerCase();
-
-      let itemCost = Number(item.cost_price || item.costPrice) || 0;
-      if (!itemCost && item.product_id && pCosts[item.product_id]) {
-        itemCost = pCosts[item.product_id];
-      }
-      if (!itemCost && modelKey && dCosts[modelKey]) {
-        itemCost = dCosts[modelKey];
-      }
-      if (!itemCost) itemCost = 65;
-
-      // Faturamento dos pods (sem frete)
-      revenueSum += qty * itemPrice;
-      cmvSum += qty * itemCost;
-      podsSoldSum += qty;
-    }
-  }
-
-  // Custos operacionais da empresa lançados via Movimentações (ex: DESPESA_OPERACIONAL ou Smoking Pods)
-  let txCompanyExpenses = 0;
-  for (const tx of transactions || []) {
-    if (isCompanyExpenseTransaction(tx, partners)) {
-      txCompanyExpenses += Number(tx.amount) || 0;
-    }
-  }
-
-  const totalOperationalExpenses = Number((operationalExpenses + txCompanyExpenses).toFixed(2));
-
-  // Lucro Líquido Real das Vendas = Faturamento dos Pods + Margem Frete Nacional - CMV - Custos Operacionais
-  const netProfit = revenueSum - cmvSum + nationalShippingProfitSum;
-  const realNetProfitPostMarketing = Number((netProfit - totalOperationalExpenses).toFixed(2));
+  // Custos operacionais da empresa lançados via Movimentações + valor de marketing complementar se houver
+  const totalOperationalExpenses = Number((allTimeMetrics.companyExpenses + (operationalExpenses || 0)).toFixed(2));
+  const realNetProfitPostMarketing = Number((allTimeMetrics.netProfit - (operationalExpenses || 0)).toFixed(2));
   const netProfitMarginPct = revenueSum > 0 ? (realNetProfitPostMarketing / revenueSum) * 100 : 0;
 
   // 2. ESTOQUE OFICIAL: Unidades, Custo na Prateleira e Valor de Venda (Idêntico ao FinanceDashboard.tsx)
   let totalStockCostSum = 0;
   let totalStockRetailSum = 0;
   let totalUnitsSum = 0;
+
+  const pCosts = (persistedCosts || {}) as Record<string, number>;
+  const dCosts = (DEFAULT_MODEL_COSTS || {}) as Record<string, number>;
 
   for (const p of products || []) {
     const stock = Number(p.stock) || 0;
@@ -729,14 +687,14 @@ export function calculatePartnersFinancials(params: {
 
   const stockAssetProfit = Math.max(0, totalStockRetailSum - totalStockCostSum);
 
-  // 3. DETERMINAÇÃO DA MARGEM OFICIAL ATIVA DO NEGÓCIO (NUNCA FIXA / HARDCODED)
+  // 3. DETERMINAÇÃO DA MARGEM OFICIAL ATIVA DO NEGÓCIO
   let officialProfitMarginPct = 0;
   if (revenueSum > 0) {
     officialProfitMarginPct = (realNetProfitPostMarketing / revenueSum) * 100;
   } else if (totalStockRetailSum > 0) {
     officialProfitMarginPct = ((totalStockRetailSum - totalStockCostSum) / totalStockRetailSum) * 100;
   } else {
-    officialProfitMarginPct = 21.0; // Fallback temporário apenas se base estiver 100% zerada
+    officialProfitMarginPct = 21.0;
   }
 
   // 4. TESOURARIA & CAIXA OFICIAL
@@ -782,31 +740,9 @@ export function calculatePartnersFinancials(params: {
     totalNetCapitalInvested += net;
   }
 
-  // 4.2 CAIXA REAL (Idêntico ao FinanceDashboard.tsx)
-  const stockPurchases = (repurchases || []).reduce((sum: number, r: any) => {
-    return sum + (Number(r.stock_purchase_amount) || 0);
-  }, 0);
-  
-  let capitalInflows = 0;
-  let capitalOutflows = 0;
-
-  for (const tx of (transactions || [])) {
-    const amt = Number(tx.amount) || 0;
-    if (tx.type === 'APORTE' && (tx.destination_category === 'CAIXA' || tx.destination_category === 'CAIXA_GERAL')) {
-      capitalInflows += amt;
-    }
-    if (['RETIRADA_CAPITAL', 'DISTRIBUICAO_LUCRO', 'PRO_LABORE', 'DESPESA_OPERACIONAL', 'COMPRA_ESTOQUE'].includes(tx.type)) {
-      capitalOutflows += amt;
-    }
-  }
-  
-  // Caixa Operacional / Real (Incluindo margem de frete nacional para paridade 100% com Financeiro)
-  const operationalCash = (revenueSum + nationalShippingProfitSum) - stockPurchases;
-  const realCash = Number((operationalCash + capitalInflows - capitalOutflows).toFixed(2));
-
   // 5. PATRIMÔNIO REAL TOTAL DA LOJA
-  // Caixa Real + Valor de Venda do Estoque Físico
-  const companyEconomicEquity = (realCash || 0) + (totalStockRetailSum || 0);
+  // Caixa Real Oficial (Financeiro) + Valor de Venda do Estoque Físico
+  const companyEconomicEquity = Number(((realCash || 0) + (totalStockRetailSum || 0)).toFixed(2));
 
   // 6. DISTRIBUIÇÃO DAS FATIAS DE EQUITY
   const hasDefinedCapital = totalNetCapitalInvested > 0;
@@ -889,7 +825,7 @@ export function calculatePartnersFinancials(params: {
     netProfitMarginPct,
     officialProfitMarginPct,
     retainedProfit: Math.max(0, realNetProfitPostMarketing),
-    totalOrdersCount: validOrders.length,
+    totalOrdersCount,
     totalPodsSold: podsSoldSum,
     companyTotalProjectedProfit,
     companyTotalProjectedEquity,

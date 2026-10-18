@@ -20,10 +20,11 @@ export interface PayrollConfig {
 export interface PartnerPayrollItem {
   partner: Partner;
   salaryPct: number; // % do lucro total destinada ao salário deste sócio (ex: 25%)
-  grossSalaryGenerated: number; // Valor bruto gerado no período (Lucro * salaryPct / 100)
-  salaryPaidInPeriod: number; // Total já sacado/pago de salário no período
-  availableToReceive: number; // Saldo disponível para sacar agora
+  grossSalaryGenerated: number; // Valor bruto gerado no período/ciclo
+  salaryPaidInPeriod: number; // Total já sacado/pago de salário no período/ciclo
+  availableToReceive: number; // Saldo líquido disponível para sacar (inclui acumulado de ciclos anteriores se em modo ciclo)
   totalSalaryPaidAllTime: number; // Histórico total de salários recebidos
+  carriedOverPendingSalary?: number; // Saldo remanescente acumulado de ciclos anteriores não retirado
 }
 
 export interface PayrollOverview {
@@ -338,9 +339,25 @@ export function calculatePayrollOverview(params: {
         .toFixed(2)
     );
 
-    const availableToReceive = Number(
-      Math.max(0, grossSalaryGenerated - salaryPaidInPeriod).toFixed(2)
-    );
+    let availableToReceive = 0;
+    let carriedOverPendingSalary = 0;
+
+    if (periodMode === "ALL_TIME") {
+      availableToReceive = Number(
+        Math.max(0, grossSalaryGenerated - totalSalaryPaidAllTime).toFixed(2)
+      );
+    } else {
+      // No modo ciclo, calculamos o saldo gerado no ciclo atual menos os saques do ciclo atual.
+      // Se allTimeNetProfit acumulado gerou mais direito do que o total sacado na história,
+      // a diferença que não pertence ao ciclo atual é acumulada como rollover (carryover).
+      const allTimeGrossGenerated = Number(((allTimeNetProfit * salaryPct) / 100).toFixed(2));
+      const totalAllTimeAvailable = Math.max(0, allTimeGrossGenerated - totalSalaryPaidAllTime);
+      const cycleAvailable = Math.max(0, grossSalaryGenerated - salaryPaidInPeriod);
+
+      carriedOverPendingSalary = Number(Math.max(0, totalAllTimeAvailable - cycleAvailable).toFixed(2));
+      // O disponível total do sócio é o direito do ciclo corrente + acumulado de ciclos anteriores não retirados
+      availableToReceive = Number((cycleAvailable + carriedOverPendingSalary).toFixed(2));
+    }
 
     totalPartnersPct += salaryPct;
     totalPartnersGenerated += grossSalaryGenerated;
@@ -354,6 +371,7 @@ export function calculatePayrollOverview(params: {
       salaryPaidInPeriod,
       availableToReceive,
       totalSalaryPaidAllTime,
+      carriedOverPendingSalary,
     };
   });
 
