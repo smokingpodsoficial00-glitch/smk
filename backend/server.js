@@ -295,6 +295,38 @@ app.get('/api/marketing/sent-history', (req, res) => {
   }
 });
 
+app.get('/api/marketing/stock-cycle-status', async (req, res) => {
+  try {
+    const config = loadMarketingConfig();
+    const { data: products } = await supabase
+      .from('smoking_products')
+      .select('name')
+      .gt('stock', 0)
+      .eq('is_active', true);
+
+    const allModels = Array.from(new Set((products || []).map(p => (p.name || '').trim()))).filter(Boolean);
+    const cycleOffered = (config.stockOfferCycle || []).filter(name => allModels.includes(name));
+    const remainingInCycle = allModels.filter(name => !cycleOffered.includes(name));
+
+    const nowSP = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const todayStr = nowSP.toISOString().split('T')[0];
+    const todayOffered = config.dailyStockOffers?.[todayStr] || [];
+
+    return res.json({
+      success: true,
+      totalModelsInStock: allModels.length,
+      allModels,
+      offeredInCurrentCycle: cycleOffered,
+      remainingInCycle,
+      cycleProgressPercent: Math.round((cycleOffered.length / (allModels.length || 1)) * 100),
+      offeredToday: todayOffered,
+      nextEligibleToday: remainingInCycle.filter(name => !todayOffered.includes(name))
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/marketing/lists-diagnostic', (req, res) => {
   try {
     const config = loadMarketingConfig();
