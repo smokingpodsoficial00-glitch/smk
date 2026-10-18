@@ -14,6 +14,7 @@ export interface Campaign {
   frequencyDays: number;
   scheduledWeekday?: string;
   scheduledTime?: string;
+  scheduledTime2?: string;
   startDate?: string;
   batchSize: number;
   batchIntervalMinutes: number;
@@ -78,6 +79,7 @@ function mapDbRowToCampaign(row: any): Campaign {
     frequencyDays: Number(row.frequency_days) || 7,
     scheduledWeekday: row.scheduled_weekday || undefined,
     scheduledTime: formattedTime,
+    scheduledTime2: row.legacy_metadata?.scheduled_time_2 || row.scheduled_time_2 || undefined,
     startDate: row.start_date || undefined,
     batchSize: row.batch_size || 5,
     batchIntervalMinutes: row.batch_interval_minutes || 35,
@@ -226,6 +228,7 @@ export async function createMarketingCampaign(
     frequencyDays?: number;
     scheduledWeekday?: string;
     scheduledTime?: string;
+    scheduledTime2?: string;
     startDate?: string;
     batchSize?: number;
     batchIntervalMinutes?: number;
@@ -274,7 +277,8 @@ export async function createMarketingCampaign(
         legacy_metadata: {
           image_url: data.imageUrl || null,
           is_stock_offer: !!data.isStockOffer,
-          stock_offer_count: Number(data.stockOfferCount) || 1
+          stock_offer_count: Number(data.stockOfferCount) || 1,
+          scheduled_time_2: data.scheduledTime2 || null
         }
       })
       .select('*')
@@ -337,6 +341,7 @@ export async function createMarketingCampaign(
       frequencyDays: freq,
       scheduledWeekday: freq === 7 ? (data.scheduledWeekday || undefined) : undefined,
       scheduledTime: data.scheduledTime || '15:00',
+      scheduledTime2: data.scheduledTime2 || undefined,
       startDate: data.startDate || undefined,
       batchSize,
       batchIntervalMinutes: batchInterval,
@@ -392,12 +397,13 @@ export async function updateMarketingCampaign(
   if (updates.scheduledTime !== undefined) payload.scheduled_time = updates.scheduledTime;
   if (updates.startDate !== undefined) payload.start_date = updates.startDate || null;
   if (updates.batchIntervalMinutes !== undefined) payload.batch_interval_minutes = Math.max(35, Number(updates.batchIntervalMinutes) || 35);
-  if (updates.imageUrl !== undefined || updates.isStockOffer !== undefined || updates.stockOfferCount !== undefined) {
+  if (updates.imageUrl !== undefined || updates.isStockOffer !== undefined || updates.stockOfferCount !== undefined || updates.scheduledTime2 !== undefined) {
     payload.legacy_metadata = {
       ...(updates.legacyMetadata || {}),
       image_url: updates.imageUrl !== undefined ? updates.imageUrl : (updates.legacyMetadata?.image_url || null),
       is_stock_offer: updates.isStockOffer !== undefined ? !!updates.isStockOffer : (!!updates.legacyMetadata?.is_stock_offer),
-      stock_offer_count: Number(updates.stockOfferCount || updates.legacyMetadata?.stock_offer_count) || 1
+      stock_offer_count: Number(updates.stockOfferCount || updates.legacyMetadata?.stock_offer_count) || 1,
+      scheduled_time_2: updates.scheduledTime2 !== undefined ? (updates.scheduledTime2 || null) : (updates.legacyMetadata?.scheduled_time_2 || null)
     };
   }
 
@@ -502,6 +508,7 @@ export async function updateMarketingCampaign(
     batchIntervalMinutes: updates.batchIntervalMinutes !== undefined ? updates.batchIntervalMinutes : (existing?.batchIntervalMinutes || 35),
     scheduledWeekday: updates.scheduledWeekday !== undefined ? updates.scheduledWeekday : existing?.scheduledWeekday,
     scheduledTime: updates.scheduledTime !== undefined ? updates.scheduledTime : (existing?.scheduledTime || '15:00'),
+    scheduledTime2: updates.scheduledTime2 !== undefined ? updates.scheduledTime2 : existing?.scheduledTime2,
     startDate: updates.startDate !== undefined ? updates.startDate : existing?.startDate,
     createdAt: existing?.createdAt || new Date().toISOString(),
     frequencyDays: freq !== undefined ? freq : (existing?.frequencyDays ?? 7),

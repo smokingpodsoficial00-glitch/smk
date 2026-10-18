@@ -278,6 +278,7 @@ export default function MarketingModule() {
   const [campaignFormFrequency, setCampaignFormFrequency] = useState<number>(7); // dias
   const [campaignFormWeekday, setCampaignFormWeekday] = useState<string>('QUARTA');
   const [campaignFormTime, setCampaignFormTime] = useState<string>('15:00');
+  const [campaignFormTime2, setCampaignFormTime2] = useState<string>('18:00');
   const [campaignFormStartDate, setCampaignFormStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [campaignFormBatchSize, setCampaignFormBatchSize] = useState<number>(5);
   const [campaignFormInterval, setCampaignFormInterval] = useState<number>(35);
@@ -544,6 +545,7 @@ export default function MarketingModule() {
       setCampaignFormFrequency(campToEdit.frequencyDays);
       setCampaignFormWeekday(campToEdit.scheduledWeekday || 'QUARTA');
       setCampaignFormTime(campToEdit.scheduledTime || '15:00');
+      setCampaignFormTime2(campToEdit.scheduledTime2 || '18:00');
       setCampaignFormStartDate(campToEdit.startDate || new Date().toISOString().split('T')[0]);
       setCampaignFormBatchSize(campToEdit.batchSize || 5);
       setCampaignFormInterval(campToEdit.batchIntervalMinutes || 35);
@@ -563,6 +565,7 @@ export default function MarketingModule() {
       setCampaignFormFrequency(7);
       setCampaignFormWeekday('QUARTA');
       setCampaignFormTime('15:00');
+      setCampaignFormTime2('18:00');
       setCampaignFormStartDate(new Date().toISOString().split('T')[0]);
       setCampaignFormBatchSize(5);
       setCampaignFormInterval(35);
@@ -616,6 +619,7 @@ export default function MarketingModule() {
         frequencyDays: Number(campaignFormFrequency),
         scheduledWeekday: Number(campaignFormFrequency) === 7 ? campaignFormWeekday : undefined,
         scheduledTime: campaignFormTime,
+        scheduledTime2: (campaignFormIsStockOffer && campaignFormStockOfferCount === 2) ? campaignFormTime2 : undefined,
         startDate: campaignFormStartDate,
         batchSize: campaignFormBatchSize || 5,
         batchIntervalMinutes: campaignFormInterval || 35,
@@ -664,6 +668,7 @@ export default function MarketingModule() {
         frequencyDays: Number(campaignFormFrequency),
         scheduledWeekday: Number(campaignFormFrequency) === 7 ? campaignFormWeekday : undefined,
         scheduledTime: campaignFormTime,
+        scheduledTime2: (campaignFormIsStockOffer && campaignFormStockOfferCount === 2) ? campaignFormTime2 : undefined,
         startDate: campaignFormStartDate,
         batchSize: 5,
         batchIntervalMinutes: 35,
@@ -1275,7 +1280,9 @@ export default function MarketingModule() {
                                   <span className="text-white/40">Frequência: </span>
                                   <span className="text-white/80">
                                     {camp.frequencyDays === 1
-                                      ? `Diário (Todo Dia)${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}`
+                                      ? (camp.scheduledTime2 
+                                          ? `Diário às ${camp.scheduledTime || '12:00'} e às ${camp.scheduledTime2}` 
+                                          : `Diário (Todo Dia)${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}`)
                                       : camp.frequencyDays === 0 
                                         ? 'Disparo Único' 
                                         : camp.scheduledWeekday 
@@ -1416,7 +1423,9 @@ export default function MarketingModule() {
                                     <span className="text-white/40">Frequência: </span>
                                     <span className="text-white/80">
                                       {camp.frequencyDays === 1
-                                        ? `Diário (Todo Dia)${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}`
+                                        ? (camp.scheduledTime2 
+                                            ? `Diário às ${camp.scheduledTime || '12:00'} e às ${camp.scheduledTime2}` 
+                                            : `Diário (Todo Dia)${camp.scheduledTime ? ` às ${camp.scheduledTime}` : ''}`)
                                         : camp.frequencyDays === 0 
                                           ? 'Disparo Único' 
                                           : camp.frequencyDays === 7 && camp.scheduledWeekday
@@ -1980,7 +1989,7 @@ export default function MarketingModule() {
                   </div>
                 )}
 
-                {campaignFormFrequency > 0 && (
+                {campaignFormFrequency > 0 && (!campaignFormIsStockOffer || campaignFormStockOfferCount !== 2) && (
                   <div>
                     <label className="text-xs font-bold text-white/70 block mb-1">⏰ Horário do Disparo</label>
                     <input
@@ -2047,8 +2056,8 @@ export default function MarketingModule() {
                   <div className="pt-3 border-t border-white/5 space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <span className="text-xs font-semibold text-white/80 block">Pods ofertados por disparo:</span>
-                        <span className="text-[10px] text-white/40">Quantos pods diferentes serão divulgados em cada execução</span>
+                        <span className="text-xs font-semibold text-white/80 block">Pods ofertados por dia:</span>
+                        <span className="text-[10px] text-white/40">Quantos pods diferentes serão divulgados diariamente</span>
                       </div>
                       <div className="flex items-center gap-2">
                         {[1, 2].map((num) => (
@@ -2056,7 +2065,7 @@ export default function MarketingModule() {
                             key={num}
                             type="button"
                             onClick={() => setCampaignFormStockOfferCount(num)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                               campaignFormStockOfferCount === num
                                 ? 'bg-amber-500 text-black shadow-sm'
                                 : 'bg-white/5 text-white/60 hover:text-white border border-white/10'
@@ -2067,8 +2076,49 @@ export default function MarketingModule() {
                         ))}
                       </div>
                     </div>
+
+                    {/* Horários Separados para cada Pod quando selecionar 2 pods */}
+                    {campaignFormStockOfferCount === 2 && (
+                      <div className="p-3.5 bg-black/60 border border-amber-500/25 rounded-xl space-y-3">
+                        <div>
+                          <span className="text-xs font-bold text-amber-300 block">
+                            ⏰ Horários dos Disparos Diários (1 pod em cada horário):
+                          </span>
+                          <span className="text-[11px] text-white/50">
+                            Configure o horário de envio para cada um dos dois pods.
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="bg-[#050505] p-2.5 rounded-lg border border-white/5">
+                            <label className="text-[11px] font-bold text-amber-400/90 block mb-1">
+                              ☀️ 1º Disparo (1º Pod)
+                            </label>
+                            <input
+                              type="time"
+                              value={campaignFormTime}
+                              onChange={(e) => setCampaignFormTime(e.target.value)}
+                              className="w-full bg-black border border-amber-500/30 rounded-lg p-2 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
+                            />
+                            <span className="text-[10px] text-white/40 mt-1 block">Ex: 11:30 (Almoço)</span>
+                          </div>
+                          <div className="bg-[#050505] p-2.5 rounded-lg border border-white/5">
+                            <label className="text-[11px] font-bold text-amber-400/90 block mb-1">
+                              🌙 2º Disparo (2º Pod)
+                            </label>
+                            <input
+                              type="time"
+                              value={campaignFormTime2}
+                              onChange={(e) => setCampaignFormTime2(e.target.value)}
+                              className="w-full bg-black border border-amber-500/30 rounded-lg p-2 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
+                            />
+                            <span className="text-[10px] text-white/40 mt-1 block">Ex: 18:00 (Fim de tarde)</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/15 text-[11px] text-amber-300/80">
-                      ℹ️ O robô consulta a tabela de produtos ativos com estoque &gt; 0, anexa a foto oficial do pod e preenche automaticamente o modelo, preço e sabores do dia.
+                      ℹ️ O robô consulta a tabela de produtos ativos com estoque &gt; 0, anexa a foto oficial do pod e preenche automaticamente o modelo, preço e sabores do dia{campaignFormStockOfferCount === 2 ? ' em cada um dos horários configurados' : ''}.
                     </div>
                   </div>
                 )}

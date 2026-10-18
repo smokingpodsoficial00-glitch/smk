@@ -1405,7 +1405,16 @@ async function marketingSchedulerTick() {
     if (activeCampaigns.length === 0) return;
 
     for (const camp of activeCampaigns) {
-      if (camp.scheduledTime !== currentTimeStr) continue;
+      const isTwoSlots = Boolean(camp.isStockOffer && Number(camp.stockOfferCount) === 2 && camp.scheduledTime2);
+
+      let matchedSlot = null;
+      if (camp.scheduledTime === currentTimeStr) {
+        matchedSlot = 'slot1';
+      } else if (isTwoSlots && camp.scheduledTime2 === currentTimeStr) {
+        matchedSlot = 'slot2';
+      }
+
+      if (!matchedSlot) continue;
 
       if (camp.startDate) {
         const [sy, sm, sd] = camp.startDate.split('-').map(Number);
@@ -1419,7 +1428,7 @@ async function marketingSchedulerTick() {
         if (!camp.scheduledWeekday) continue;
         const expectedWeekday = WEEKDAY_MAP[camp.scheduledWeekday.toUpperCase()];
         if (expectedWeekday === undefined || expectedWeekday !== currentWeekday) continue;
-      } else if (freq > 0) {
+      } else if (freq > 1) {
         if (camp.lastRunDate) {
           const [d, m, y] = camp.lastRunDate.split('/').map(Number);
           const lastDate = new Date(y, m - 1, d, 0, 0, 0);
@@ -1428,14 +1437,15 @@ async function marketingSchedulerTick() {
         }
       }
 
-      const idempKey = `${camp.id}_${todayStr}_${currentTimeStr}`;
+      const idempKey = `${camp.id}_${todayStr}_${matchedSlot}_${currentTimeStr}`;
       const alreadyFired = (config.idempotencyKeys || []).some(entry => entry.key === idempKey);
       if (alreadyFired) continue;
 
       if (camp.targetType === 'group' && camp.targetGroupId) {
         try {
           if (camp.isStockOffer) {
-            const count = Number(camp.stockOfferCount) || 1;
+            // Se tiver 2 horários separados, cada horário dispara 1 pod sorteado
+            const count = isTwoSlots ? 1 : (Number(camp.stockOfferCount) || 1);
             const offers = await buildStockOfferMessage({ count });
             if (offers && offers.length > 0) {
               for (let idx = 0; idx < offers.length; idx++) {
@@ -1467,7 +1477,7 @@ async function marketingSchedulerTick() {
             config.campaigns[campIndex].lastRunDate = nowSP.toLocaleDateString('pt-BR');
           }
           saveMarketingConfig(config);
-          console.log(`✅ [Scheduler Grupo] Campanha "${camp.name}" disparada.`);
+          console.log(`✅ [Scheduler Grupo] Campanha "${camp.name}" (${matchedSlot}) disparada com sucesso às ${currentTimeStr}.`);
         } catch (e) {
           console.error(`❌ [Scheduler Grupo] Erro:`, e.message);
         }
