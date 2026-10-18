@@ -768,24 +768,36 @@ export default function PartnersDashboard() {
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-white/40">Patrimônio Econômico:</span>
                       <span className="text-white/60">
-                        {pm.equityPercentage.toFixed(2)}% da empresa
+                        {financials.hasDefinedCapital && pm.netCapitalInvested >= 0 ? (
+                          `${pm.equityPercentage.toFixed(2)}% da empresa`
+                        ) : (
+                          <span className="text-rose-400 font-medium">Não calculável</span>
+                        )}
                       </span>
                     </div>
                     <div className="text-xl font-bold text-white tracking-tight">
-                      {formatBRL(pm.partnerEconomicEquity)}
+                      {financials.hasDefinedCapital && pm.netCapitalInvested >= 0 ? (
+                        formatBRL(pm.partnerEconomicEquity)
+                      ) : (
+                        <span className="text-sm font-medium text-white/40">Não aplicável</span>
+                      )}
                     </div>
 
-                    {/* Ganho Econômico Real & ROI */}
+                    {/* Rendimento Operacional Atribuído (Lucro das Vendas) */}
                     <div className="flex items-center justify-between pt-1.5 border-t border-white/5 text-xs">
-                      <span className="text-white/40 text-[11px]">Retorno Estimado:</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`font-medium ${pm.economicGain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {pm.economicGain >= 0 ? '+' : ''}{formatBRL(pm.economicGain)}
-                        </span>
-                        <span className="text-[10px] text-white/50">
-                          ({pm.simplifiedROI.toFixed(1)}% ROI)
-                        </span>
-                      </div>
+                      <span className="text-white/40 text-[11px]">Rendimento Operacional:</span>
+                      {financials.hasDefinedCapital && pm.netCapitalInvested >= 0 ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className={`font-medium ${pm.economicProfitShare >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {pm.economicProfitShare >= 0 ? '+' : ''}{formatBRL(pm.economicProfitShare)}
+                          </span>
+                          <span className="text-[10px] text-white/50">
+                            ({pm.simplifiedROI.toFixed(1)}% ROI)
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-white/40 font-medium">Não aplicável</span>
+                      )}
                     </div>
                   </div>
 

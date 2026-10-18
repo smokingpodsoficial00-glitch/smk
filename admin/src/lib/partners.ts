@@ -913,14 +913,22 @@ export function calculatePartnersFinancials(params: {
     companyTotalProjectedEquity += projectedEconomicEquity;
 
     // Fatia Econômica Real do Patrimônio da Empresa
-    const partnerEconomicEquity = companyEconomicEquity * (equityPct / 100);
+    const partnerEconomicEquity = hasDefinedCapital && cap.netInvested >= 0
+      ? companyEconomicEquity * (equityPct / 100)
+      : 0;
     
-    // Parcela Econômica do Lucro Realizado pelas Vendas
-    const economicProfitShare = realNetProfitPostMarketing * (equityPct / 100);
+    // Rendimento Operacional Atribuído: Parcela do Lucro Líquido Realizado pelas Vendas (Sem confundir novos aportes com lucro)
+    const economicProfitShare = hasDefinedCapital && cap.netInvested >= 0
+      ? realNetProfitPostMarketing * (equityPct / 100)
+      : 0;
 
-    // Ganho Econômico Real (Total Return = Patrimônio Atual + Dividendos + Pró-Labore Recebido - Aporte Líquido Atual)
-    const economicGain = partnerEconomicEquity + cap.dividends + cap.proLabore - cap.netInvested;
-    const simplifiedROI = cap.netInvested > 0 ? (economicGain / cap.netInvested) * 100 : 0;
+    // Retorno sobre Capital Investido com base no Rendimento Operacional Atribuído
+    const simplifiedROI = cap.netInvested > 0 ? (economicProfitShare / cap.netInvested) * 100 : 0;
+
+    // Ganho Econômico Total (Patrimônio Líquido Atribuído + Retiradas/Salários Recebidos - Aporte Líquido Atual)
+    const economicGain = hasDefinedCapital && cap.netInvested >= 0
+      ? (partnerEconomicEquity + cap.dividends + cap.proLabore - cap.netInvested)
+      : 0;
 
     // Fatias de Estoque
     const stockCostShare = totalStockCostSum * (equityPct / 100);
