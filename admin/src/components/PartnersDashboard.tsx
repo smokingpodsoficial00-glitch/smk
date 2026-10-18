@@ -422,68 +422,6 @@ export default function PartnersDashboard() {
         </div>
       </header>
 
-      {/* ━━━ BARRA DE COMPOSIÇÃO SOCIETÁRIA ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-4 sm:p-5 space-y-3 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <PieChart className="size-4 text-white" />
-            <span className="text-xs font-bold text-white uppercase tracking-wider">
-              Composição Societária por Capital
-            </span>
-          </div>
-
-          <div>
-            {financials.hasDefinedCapital ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <CheckCircle2 className="size-3" />
-                <span>100.00%</span>
-              </span>
-            ) : (
-              <span className="text-[11px] text-white/50">Sem aportes registrados</span>
-            )}
-          </div>
-        </div>
-
-        {/* Barra Visual Proporcional */}
-        <div className="h-3.5 w-full bg-[#161618] rounded-full overflow-hidden flex p-0.5 border border-white/5">
-          {financials.hasDefinedCapital ? (
-            financials.partnerMetrics.map((pm) => (
-              <div
-                key={pm.partner.id}
-                className="h-full rounded-full transition-all"
-                style={{
-                  width: `${Math.max(1, pm.equityPercentage)}%`,
-                  backgroundColor: pm.partner.avatar_color || '#10b981'
-                }}
-                title={`${pm.partner.name}: ${pm.equityPercentage.toFixed(2)}%`}
-              />
-            ))
-          ) : (
-            <div className="h-full w-full bg-white/5 rounded-full" />
-          )}
-        </div>
-
-        {/* Legenda de Sócios */}
-        <div className="flex flex-wrap items-center gap-4 pt-0.5 text-xs">
-          {financials.partnerMetrics.map((pm) => (
-            <div key={pm.partner.id} className="flex items-center gap-2">
-              <div 
-                className="size-2 rounded-full shrink-0" 
-                style={{ backgroundColor: pm.partner.avatar_color || '#10b981' }} 
-              />
-              <span className="font-semibold text-white/90">{pm.partner.name}:</span>
-              <span className={`font-mono font-bold ${pm.netCapitalInvested < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                {financials.hasDefinedCapital && pm.netCapitalInvested >= 0 
-                  ? `${pm.equityPercentage.toFixed(2)}%` 
-                  : 'Não calculável'}
-              </span>
-              <span className={`text-[11px] font-mono ${pm.netCapitalInvested < 0 ? 'text-rose-400 font-bold' : 'text-white/40'}`}>
-                ({formatBRL(pm.netCapitalInvested)} investidos{pm.netCapitalInvested < 0 ? ' · Saldo devedor' : ''})
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* ━━━ 4 CARDS CENTRAIS (COM PROJEÇÃO DE LUCRO E MARGEM ATUAL) ━━━━━━━ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
