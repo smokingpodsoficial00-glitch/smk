@@ -20,7 +20,7 @@ export function getBackendUrl(): string {
 
     // Se estiver rodando na Vercel em produção, conecta automaticamente ao túnel da loja
     if (window.location.hostname.endsWith('vercel.app')) {
-      return 'https://recognize-legislation-mile-cap.trycloudflare.com';
+      return 'https://pulse-offerings-marvel-obj.trycloudflare.com';
     }
   }
 

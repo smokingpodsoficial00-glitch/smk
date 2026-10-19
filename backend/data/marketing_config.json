@@ -245,7 +245,7 @@
       "createdAt": "2026-09-11T15:03:53.951877+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:05:50.039Z",
-      "lastRunDate": "27/09/2026"
+      "lastRunDate": "18/10/2026"
     },
     {
       "id": "a200c5bf-c667-4a05-bafd-bdf324195cdb",
@@ -322,29 +322,8 @@
       "legacyMetadata": {}
     },
     {
-      "id": "20167b4e-3524-413c-acfb-e83b598f6432",
-      "name": "CPM TESTE GRUPO",
-      "message": "Oii, tudo bem? 💨\nPassando pra te avisar que a *Smoking Pods tá de volta oficialmente à ativa em SBC!*\n\nAs entregas pro final de semana já estão rolando a todo vapor pra você *garantir o seu pod a tempo e não ficar na mão no rolê*. Reabrimos com estoque 100% renovado, produtos originais e o delivery rápido de sempre de *30 a 40 min* pelo Uber Direct.\n\n📦 *Dá uma olhada nos modelos disponíveis no Cardápio Digital:*\n🔗 [LINK_DO_CARDAPIO_VERCEL]\n\n💬 *Também ativamos o Grupo VIP no WhatsApp pra soltar lotes exclusivos e frete promocional pro fds:*\n🔗 [LINK_DO_GRUPO_VIP_WHATSAPP]\n\nQual modelo e sabor posso separar pra você já garantir pro fds?",
-      "variations": [],
-      "useVariations": false,
-      "targetType": "group",
-      "selectedListIds": [],
-      "targetGroupId": "120363430820740157@g.us",
-      "targetGroupName": "SMK MATERIAL MKT",
-      "frequencyDays": 7,
-      "scheduledTime": "15:00",
-      "startDate": "2026-09-17",
-      "batchSize": 5,
-      "batchIntervalMinutes": 35,
-      "status": "active",
-      "totalRecipients": 3,
-      "createdAt": "2026-09-17T17:43:54.486847+00:00",
-      "updatedAt": "2026-09-17T17:43:54.486847+00:00",
-      "legacyMetadata": {}
-    },
-    {
-      "id": "camp_1792357759238",
-      "name": "CPM OFERTAS DIÁRIAS SMK COM FOTO",
+      "id": "camp_1792360452554",
+      "name": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP",
       "message": "🔥 OFERTA DO DIA NO VIP: [NOME_DO_MODELO]! 💨\n\n💰 Apenas R$ [PREÇO]\n\n✨ Sabores disponíveis em estoque agora:\n• [Sabor 1]\n• [Sabor 2]\n• [Sabor 3]\n\n🚀 Peça direto no nosso cardápio ou no whatsapp antes que esgote:\n👉 [LINK_DO_CARDAPIO_VERCEL]",
       "variations": [],
       "useVariations": false,
@@ -356,40 +335,64 @@
       "targetGroupName": "Clientes Smoking Vip",
       "frequencyDays": 1,
       "scheduledTime": "15:00",
-      "scheduledTime2": "18:40",
+      "scheduledTime2": "18:00",
       "startDate": "2026-10-18",
       "batchSize": 5,
       "batchIntervalMinutes": 35,
+      "isStockOffer": true,
+      "stockOfferCount": 2,
       "totalRecipients": 62,
       "status": "active",
-      "createdAt": "2026-10-18T21:09:19.238Z",
-      "updatedAt": "2026-10-18T21:09:19.238Z"
+      "createdAt": "2026-10-18T21:54:12.981Z",
+      "updatedAt": "2026-10-18T21:54:12.981Z"
     },
     {
-      "id": "camp_1792359260737",
-      "name": "CPM TESTE 01 OFERTA COM FOTO",
-      "message": ".",
+      "id": "camp_1792361104826",
+      "name": "CPM GRUPO VIP ( SORTEIO 5 CONTATOS )",
+      "message": "Fala família, beleza?\n\nSeparamos 2 Pods 100% lacrados (do sabor que você escolher) com entrega na faixa aqui no ABC pra sortear exclusivamente pra quem tá aqui no grupo.\n\nE pra participar é bem simples, sem burocracia nenhuma:\n\nMe dá um salve no privado.\nClica no clipezinho do WhatsApp 📎, vai em Contato e me manda o contato de 5 amigos seus que também fumam pod.\nMandou os 5 contatos, eu já te mando o seu número da sorte na hora.\n\nQuem quiser aumentar as chances: a cada 5 amigos que você mandar, ganha mais um número. Se mandar 10, são 2 chances de ganhar.\n\n📅 O sorteio vai rolar no dia 29 ao vivo aqui no grupo.\n\nSó me chamar no privado e mandar os contatos pra garantir sua vaga: https://wa.me/5511977300561?text=Gostaria%20de%20participar%20do%20sorteio!",
       "variations": [],
       "useVariations": false,
       "targetType": "group",
       "selectedListIds": [
         "0d925499-da68-4a93-9591-f4b6f78744b1"
       ],
-      "targetGroupId": "120363427803492997@g.us",
-      "targetGroupName": "SMK/FINANÇAS/GERAL",
-      "frequencyDays": 1,
-      "scheduledTime": "18:35",
-      "scheduledTime2": "18:37",
+      "targetGroupId": "120363429733361752@g.us",
+      "targetGroupName": "Clientes Smoking Vip",
+      "frequencyDays": 0,
+      "scheduledTime": "11:00",
       "startDate": "2026-10-18",
       "batchSize": 5,
       "batchIntervalMinutes": 35,
-      "isStockOffer": true,
-      "stockOfferCount": 2,
-      "totalRecipients": 2,
+      "isStockOffer": false,
+      "stockOfferCount": 1,
+      "totalRecipients": 62,
       "status": "active",
-      "createdAt": "2026-10-18T21:34:21.072Z",
-      "updatedAt": "2026-10-18T21:34:21.072Z",
-      "lastRunDate": "18/10/2026"
+      "createdAt": "2026-10-18T22:05:05.233Z",
+      "updatedAt": "2026-10-18T22:05:05.233Z"
+    },
+    {
+      "id": "camp_1792361244402",
+      "name": "CAMPANHA DIARIA SORTEIO 5 CONTATOS",
+      "message": "Rapaziada, 2 pods de graça + frete grátis no ABC dia 29 aqui no grupo.\n\nNão precisa pagar nada nem preencher nada: só abrir meu privado, clicar em Contato 📎 e mandar o contato de 5 amigos que você sabe que fumam pod.\n\nCoisa de 10 segundos pra garantir seu número:\n https://wa.me/5511977300561?text=Gostaria%20de%20participar%20do%20sorteio!",
+      "variations": [],
+      "useVariations": false,
+      "targetType": "group",
+      "selectedListIds": [
+        "0d925499-da68-4a93-9591-f4b6f78744b1"
+      ],
+      "targetGroupId": "120363429733361752@g.us",
+      "targetGroupName": "Clientes Smoking Vip",
+      "frequencyDays": 1,
+      "scheduledTime": "19:00",
+      "startDate": "2026-10-18",
+      "batchSize": 5,
+      "batchIntervalMinutes": 35,
+      "isStockOffer": false,
+      "stockOfferCount": 1,
+      "totalRecipients": 62,
+      "status": "active",
+      "createdAt": "2026-10-18T22:07:25.024Z",
+      "updatedAt": "2026-10-18T22:07:25.024Z"
     }
   ],
   "idempotencyKeys": [
@@ -417,9 +420,14 @@
       "key": "camp_1792359260737_2026-10-18_slot2",
       "timestamp": "2026-10-18T21:37:48.697Z",
       "campaignName": "CPM TESTE 01 OFERTA COM FOTO"
+    },
+    {
+      "key": "c3558551-5f8a-4aaf-8e75-fb1ca2a966d4_2026-10-18_slot1",
+      "timestamp": "2026-10-18T22:30:10.580Z",
+      "campaignName": "CPM DOMINGO 2"
     }
   ],
-  "lastUpdated": "2026-10-18T21:37:48.697Z",
+  "lastUpdated": "2026-10-18T22:30:10.581Z",
   "lists": [
     {
       "id": "0d925499-da68-4a93-9591-f4b6f78744b1",
@@ -5393,11 +5401,19 @@
   "dailyStockOffers": {
     "2026-10-18": [
       "BC15K",
-      "V250"
+      "V250",
+      "V55 ULTRA THIN",
+      "DURA 35K",
+      "V80 ULTRA SLIM",
+      "TE30K"
     ]
   },
   "stockOfferCycle": [
     "BC15K",
-    "V250"
+    "V250",
+    "V55 ULTRA THIN",
+    "DURA 35K",
+    "V80 ULTRA SLIM",
+    "TE30K"
   ]
 }
