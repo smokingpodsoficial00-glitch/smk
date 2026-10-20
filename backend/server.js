@@ -304,13 +304,28 @@ app.get('/api/marketing/stock-cycle-status', async (req, res) => {
       .gt('stock', 0)
       .eq('is_active', true);
 
-    const allModels = Array.from(new Set((products || []).map(p => (p.name || '').trim()))).filter(Boolean);
-    const cycleOffered = (config.stockOfferCycle || []).filter(name => allModels.includes(name));
-    const remainingInCycle = allModels.filter(name => !cycleOffered.includes(name));
+    const modelMap = new Map();
+    (products || []).forEach(p => {
+      const raw = p.name ? p.name.trim() : '';
+      if (!raw || raw.toUpperCase() === 'TESTE') return;
+      const upper = raw.toUpperCase();
+      if (!modelMap.has(upper)) {
+        modelMap.set(upper, raw);
+      }
+    });
+
+    const allModels = Array.from(modelMap.values());
 
     const nowSP = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
     const todayStr = nowSP.toISOString().split('T')[0];
-    const todayOffered = config.dailyStockOffers?.[todayStr] || [];
+
+    const todayOfferedUpper = (config.dailyStockOffers?.[todayStr] || []).map(n => String(n).trim().toUpperCase());
+    const cycleOfferedUpper = (config.stockOfferCycle || []).map(n => String(n).trim().toUpperCase());
+
+    const cycleOffered = allModels.filter(m => cycleOfferedUpper.includes(m.toUpperCase()));
+    const remainingInCycle = allModels.filter(m => !cycleOfferedUpper.includes(m.toUpperCase()));
+    const offeredToday = allModels.filter(m => todayOfferedUpper.includes(m.toUpperCase()));
+    const nextEligibleToday = remainingInCycle.filter(m => !todayOfferedUpper.includes(m.toUpperCase()));
 
     return res.json({
       success: true,
@@ -319,8 +334,8 @@ app.get('/api/marketing/stock-cycle-status', async (req, res) => {
       offeredInCurrentCycle: cycleOffered,
       remainingInCycle,
       cycleProgressPercent: Math.round((cycleOffered.length / (allModels.length || 1)) * 100),
-      offeredToday: todayOffered,
-      nextEligibleToday: remainingInCycle.filter(name => !todayOffered.includes(name))
+      offeredToday,
+      nextEligibleToday
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -895,15 +910,20 @@ async function buildStockOfferMessage(options = {}) {
       return null;
     }
 
-    // Agrupa sabores e menor preço por modelo
+    // Agrupa sabores e menor preço por modelo normalizado (CASE-INSENSITIVE)
     const modelMap = new Map();
     products.forEach(p => {
-      const modelKey = p.name ? p.name.trim() : '';
-      if (!modelKey) return;
+      const rawName = p.name ? p.name.trim() : '';
+      if (!rawName) return;
 
-      if (!modelMap.has(modelKey)) {
-        modelMap.set(modelKey, {
-          name: modelKey,
+      // Normalização em caixa alta para nunca separar "Ice king" de "ICE KING"
+      const modelUpper = rawName.toUpperCase();
+      if (modelUpper === 'TESTE') return; // ignora dados de teste
+
+      if (!modelMap.has(modelUpper)) {
+        modelMap.set(modelUpper, {
+          name: rawName, // mantém o nome para exibição
+          upperKey: modelUpper,
           brand: p.brand || '',
           price: Number(p.price) || 0,
           imageUrl: p.image_url || null,
@@ -911,8 +931,8 @@ async function buildStockOfferMessage(options = {}) {
         });
       }
 
-      const item = modelMap.get(modelKey);
-      if (p.flavor && !item.flavors.includes(p.flavor.trim())) {
+      const item = modelMap.get(modelUpper);
+      if (p.flavor && !item.flavors.some(f => f.toLowerCase() === p.flavor.trim().toLowerCase())) {
         item.flavors.push(p.flavor.trim());
       }
       if (p.image_url && !item.imageUrl) {
@@ -938,49 +958,43 @@ async function buildStockOfferMessage(options = {}) {
       config.stockOfferCycle = [];
     }
 
-    const allModelNames = allModels.map(m => m.name);
+    // Normaliza os históricos em UPPERCASE para comparação 100% segura
+    const todayOfferedUpper = (config.dailyStockOffers[todayStr] || []).map(n => String(n).trim().toUpperCase());
+    const cycleOfferedUpper = config.stockOfferCycle.map(n => String(n).trim().toUpperCase());
 
-    // 1. Modelos que JÁ FORAM OFERTADOS HOJE (trava diária absoluta: proibido repetir no mesmo dia!)
-    const todayOffered = Array.isArray(config.dailyStockOffers[todayStr]) 
-      ? config.dailyStockOffers[todayStr] 
-      : [];
+    // 1. Modelos prioritários: AINDA NÃO OFERTADOS NO CICLO e NÃO OFERTADOS HOJE
+    let unofferedInCycle = allModels.filter(m => 
+      !cycleOfferedUpper.includes(m.upperKey) && !todayOfferedUpper.includes(m.upperKey)
+    );
 
-    // 2. Modelos que já saíram no ciclo atual (filtrando apenas os que ainda existem com estoque ativo)
-    let cycleOffered = config.stockOfferCycle.filter(name => allModelNames.includes(name));
-
-    // 3. Modelos prioritários: AINDA NÃO OFERTADOS NO CICLO e NÃO OFERTADOS HOJE
-    let unofferedInCycle = allModels.filter(m => !cycleOffered.includes(m.name) && !todayOffered.includes(m.name));
-
-    // 4. Se todos os modelos do catálogo já foram ofertados no ciclo (ou restarem menos que o count):
+    // 2. Se todos os modelos do catálogo já foram ofertados no ciclo (ou restarem menos que o count):
     if (unofferedInCycle.length < count) {
       console.log(`🔄 [StockOffer] Ciclo completo atingido! Todos os modelos com estoque já foram divulgados. Reiniciando novo ciclo...`);
       // Reinicia o ciclo para começar tudo de novo
-      cycleOffered = [];
       config.stockOfferCycle = [];
 
       // Candidatos para a nova rodada: todos os modelos ativos, exceto os que JÁ saíram HOJE
-      unofferedInCycle = allModels.filter(m => !todayOffered.includes(m.name));
+      unofferedInCycle = allModels.filter(m => !todayOfferedUpper.includes(m.upperKey));
       if (unofferedInCycle.length === 0) {
         unofferedInCycle = allModels;
       }
     }
 
-    // 5. Embaralha aleatoriamente dentre os modelos que ainda não foram ofertados
+    // 3. Embaralha aleatoriamente dentre os modelos que ainda não foram ofertados
     const shuffled = unofferedInCycle.sort(() => 0.5 - Math.random());
     const selected = shuffled.slice(0, count);
 
-    // 6. Registra os modelos no ciclo atual
+    // 4. Registra os modelos no ciclo atual (evitando duplicatas case-insensitive)
     selected.forEach(m => {
-      if (!cycleOffered.includes(m.name)) {
-        cycleOffered.push(m.name);
+      if (!config.stockOfferCycle.some(c => c.toUpperCase() === m.upperKey)) {
+        config.stockOfferCycle.push(m.name);
       }
     });
-    config.stockOfferCycle = cycleOffered;
 
-    // 7. Registra os modelos na trava diária de hoje
+    // 5. Registra os modelos na trava diária de hoje (evitando duplicatas case-insensitive)
     if (!config.dailyStockOffers[todayStr]) config.dailyStockOffers[todayStr] = [];
     selected.forEach(m => {
-      if (!config.dailyStockOffers[todayStr].includes(m.name)) {
+      if (!config.dailyStockOffers[todayStr].some(c => c.toUpperCase() === m.upperKey)) {
         config.dailyStockOffers[todayStr].push(m.name);
       }
     });
@@ -1543,14 +1557,15 @@ async function marketingSchedulerTick() {
             await sendBaileysMessage(camp.targetGroupId, formattedMsg, { imageUrl: camp.imageUrl });
           }
 
-          if (!config.idempotencyKeys) config.idempotencyKeys = [];
-          config.idempotencyKeys.push({ key: idempKey, timestamp: new Date().toISOString(), campaignName: camp.name });
+          const freshConfig = loadMarketingConfig();
+          if (!freshConfig.idempotencyKeys) freshConfig.idempotencyKeys = [];
+          freshConfig.idempotencyKeys.push({ key: idempKey, timestamp: new Date().toISOString(), campaignName: camp.name });
 
-          const campIndex = config.campaigns.findIndex(c => c.id === camp.id);
+          const campIndex = freshConfig.campaigns.findIndex(c => c.id === camp.id);
           if (campIndex !== -1) {
-            config.campaigns[campIndex].lastRunDate = nowSP.toLocaleDateString('pt-BR');
+            freshConfig.campaigns[campIndex].lastRunDate = nowSP.toLocaleDateString('pt-BR');
           }
-          saveMarketingConfig(config);
+          saveMarketingConfig(freshConfig);
           console.log(`✅ [Scheduler Grupo] Campanha "${camp.name}" (${matchedSlot}) disparada com sucesso às ${currentTimeStr}.`);
         } catch (e) {
           console.error(`❌ [Scheduler Grupo] Erro:`, e.message);
