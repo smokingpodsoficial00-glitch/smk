@@ -1,5 +1,6 @@
 import type { PodModel } from "@/lib/products";
 import { formatBRL } from "@/lib/cart";
+import { MinimalistVapeIcon } from "./MinimalistVapeIcon";
 
 const vapeIgnite = "https://placehold.co/400x500/121212/ffffff.jpg?text=Ignite";
 const vapeElfbar = "https://placehold.co/400x500/121212/ffffff.jpg?text=ElfBar";
@@ -20,26 +21,34 @@ export function ProductCard({ model, onClick }: { model: PodModel; onClick: () =
 
   return (
     <article onClick={onClick} className="group relative flex flex-col rounded-3xl bg-card border border-border overflow-hidden transition-all duration-500 hover:border-white/20 hover:-translate-y-1 cursor-pointer">
-      <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-b from-elevated to-card">
-        <img src={image} alt={`${model.brand} ${model.name}`} loading="lazy"
-             className="size-full object-cover transition-transform duration-700 group-hover:scale-105" />
-        {outOfStock && (
-          <div className="absolute inset-0 grid place-items-center bg-background/70 backdrop-blur-sm">
-            <span className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Esgotado</span>
+      <div className="relative aspect-[4/5] overflow-hidden bg-black flex items-center justify-center">
+        {outOfStock ? (
+          /* Quando o produto estiver indisponível/esgotado: Vaper minimalista branco com fundo preto puro */
+          <div className="size-full bg-black flex flex-col items-center justify-center relative p-6 select-none transition-transform duration-700 group-hover:scale-105">
+            <MinimalistVapeIcon className="w-24 h-36 sm:w-28 sm:h-40" />
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-1.5">
+              <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.25em] text-white/90 bg-white/10 px-3 py-1 rounded-full border border-white/20 shadow-lg">
+                Esgotado
+              </span>
+            </div>
           </div>
+        ) : (
+          <img src={image} alt={`${model.brand} ${model.name}`} loading="lazy"
+               className="size-full object-cover transition-transform duration-700 group-hover:scale-105" />
         )}
+
         {model.puffs && model.puffs > 0 ? (
-          <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 glass px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-silver">
+          <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 glass px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-silver z-10">
             {model.puffs.toLocaleString("pt-BR")} puffs
           </div>
         ) : null}
         {model.is_promotional && (
-          <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 bg-red-500 text-white font-bold px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] tracking-wider shadow-lg shadow-red-500/40 uppercase flex items-center gap-1 animate-in fade-in">
+          <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 bg-red-500 text-white font-bold px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] tracking-wider shadow-lg shadow-red-500/40 uppercase flex items-center gap-1 animate-in fade-in z-10">
             <span>🔥 OFERTA {model.discount_pct ? `-${model.discount_pct}%` : ""}</span>
           </div>
         )}
         {!model.is_promotional && primaryCategory && (
-          <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 glass-strong px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold text-amber-300 border border-amber-400/40 shadow-[0_0_12px_rgba(251,191,36,0.35)]">
+          <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 glass-strong px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold text-amber-300 border border-amber-400/40 shadow-[0_0_12px_rgba(251,191,36,0.35)] z-10">
             {primaryCategory.badge_text || primaryCategory.name}
           </div>
         )}
@@ -49,8 +58,8 @@ export function ProductCard({ model, onClick }: { model: PodModel; onClick: () =
         <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
           <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.25em] text-muted-foreground">{model.brand}</span>
           <h3 className="text-sm sm:text-lg font-semibold tracking-tight truncate">{model.name}</h3>
-          <span className="text-[11px] sm:text-xs text-primary truncate">
-            {flavorsCount === 0 ? 'Indisponível no momento' : flavorsCount === 1 ? '1 opção disponível' : `${flavorsCount} opções disponíveis`}
+          <span className={`text-[11px] sm:text-xs truncate ${outOfStock ? "text-red-400 font-semibold" : "text-primary"}`}>
+            {outOfStock ? 'Indisponível no momento' : flavorsCount === 1 ? '1 opção disponível' : `${flavorsCount} opções disponíveis`}
           </span>
         </div>
 
@@ -65,8 +74,12 @@ export function ProductCard({ model, onClick }: { model: PodModel; onClick: () =
               {formatBRL(model.price)}
             </span>
           </div>
-          <div className="relative grid place-items-center px-3 sm:px-4 h-8 sm:h-10 rounded-full bg-elevated text-foreground text-[10px] sm:text-xs font-semibold tracking-wide whitespace-nowrap transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-            Ver Opções
+          <div className={`relative grid place-items-center px-3 sm:px-4 h-8 sm:h-10 rounded-full text-[10px] sm:text-xs font-semibold tracking-wide whitespace-nowrap transition-colors ${
+            outOfStock 
+              ? "bg-white/5 text-white/40 border border-white/10" 
+              : "bg-elevated text-foreground group-hover:bg-primary group-hover:text-primary-foreground"
+          }`}>
+            {outOfStock ? "Indisponível" : "Ver Opções"}
           </div>
         </div>
       </div>
