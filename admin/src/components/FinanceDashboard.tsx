@@ -3263,102 +3263,113 @@ export default function FinanceDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-3.5 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 items-stretch">
           {/* Card 1: Custo dos Pods na Prateleira */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-1.5 sm:space-y-2 hover:border-white/30 transition-all min-w-0">
-            <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
-              <Box className="size-4 text-white/70 shrink-0" /> Custo Prateleira
-            </span>
-            <div className="text-xl sm:text-2xl font-extrabold text-white truncate">
-              {formatBRL(stockAssetCost)}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-white/30 transition-all min-w-0">
+            <div className="space-y-1.5 sm:space-y-2">
+              <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
+                <Box className="size-4 text-white/70 shrink-0" /> Custo Prateleira
+              </span>
+              <div className="text-lg sm:text-xl xl:text-2xl font-extrabold text-white truncate">
+                {formatBRL(stockAssetCost)}
+              </div>
             </div>
-            <p className="text-xs text-white/50 truncate">
+            <p className="text-xs text-white/50 truncate mt-2">
               {stockAssetUnits} unidades no armazém.
             </p>
           </div>
 
           {/* Card 2: Valor Potencial de Venda */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-1.5 sm:space-y-2 hover:border-white/30 transition-all min-w-0">
-            <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
-              <DollarSign className="size-4 text-white/70 shrink-0" /> Venda do Estoque
-            </span>
-            <div className="text-xl sm:text-2xl font-extrabold text-white truncate">
-              {formatBRL(stockAssetRetail)}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-white/30 transition-all min-w-0">
+            <div className="space-y-1.5 sm:space-y-2">
+              <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
+                <DollarSign className="size-4 text-white/70 shrink-0" /> Venda do Estoque
+              </span>
+              <div className="text-lg sm:text-xl xl:text-2xl font-extrabold text-white truncate">
+                {formatBRL(stockAssetRetail)}
+              </div>
             </div>
-            <p className="text-xs text-white/50 truncate">
+            <p className="text-xs text-white/50 truncate mt-2">
               Valor bruto na venda das {stockAssetUnits} unidades.
             </p>
           </div>
 
           {/* Card 3: Lucro Potencial do Estoque */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-1.5 sm:space-y-2 hover:border-white/30 transition-all min-w-0">
-            <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
-              <TrendingUp className="size-4 text-emerald-400 shrink-0" /> Lucro Potencial
-            </span>
-            <div className="text-xl sm:text-2xl font-extrabold text-emerald-400 truncate">
-              {formatBRL(stockAssetProfit)}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-white/30 transition-all min-w-0">
+            <div className="space-y-1.5 sm:space-y-2">
+              <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
+                <TrendingUp className="size-4 text-emerald-400 shrink-0" /> Lucro Potencial
+              </span>
+              <div className="text-lg sm:text-xl xl:text-2xl font-extrabold text-emerald-400 truncate">
+                {formatBRL(stockAssetProfit)}
+              </div>
             </div>
-            <p className="text-xs text-white/50 truncate">
+            <p className="text-xs text-white/50 truncate mt-2">
               Lucro ao liquidar o estoque.
             </p>
           </div>
 
           {/* Card 4: Investimento em Marketing (Editável) */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-1.5 sm:space-y-2 relative hover:border-white/30 transition-all min-w-0">
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
-                <Megaphone className="size-4 text-white/70 shrink-0" /> Anúncios / Ads
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsEditingMarketing(!isEditingMarketing)}
-                className="text-[10px] text-white/80 hover:text-white hover:underline font-bold shrink-0"
-              >
-                {isEditingMarketing ? "Salvar" : "Editar"}
-              </button>
-            </div>
-
-            {isEditingMarketing ? (
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="text"
-                  value={marketingSpent || ""}
-                  onChange={(e) => saveMarketingInvestment(e.target.value)}
-                  placeholder="Ex: 50.00"
-                  className="w-full bg-black/60 border border-white/30 rounded-xl px-2.5 py-1 text-xs font-bold text-white focus:outline-none focus:border-white/50"
-                />
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-col justify-between relative hover:border-white/30 transition-all min-w-0">
+            <div className="space-y-1.5 sm:space-y-2">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
+                  <Megaphone className="size-4 text-white/70 shrink-0" /> Anúncios / Ads
+                </span>
                 <button
                   type="button"
-                  onClick={() => setIsEditingMarketing(false)}
-                  className="p-1.5 rounded-xl bg-white text-black hover:bg-white/90 transition-colors shrink-0"
+                  onClick={() => setIsEditingMarketing(!isEditingMarketing)}
+                  className="text-[10px] text-white/80 hover:text-white hover:underline font-bold shrink-0"
                 >
-                  <Check className="size-3.5" />
+                  {isEditingMarketing ? "Salvar" : "Editar"}
                 </button>
               </div>
-            ) : (
-              <div className="text-xl sm:text-2xl font-extrabold text-white truncate">
-                {formatBRL(numericMarketingSpent)}
-              </div>
-            )}
 
-            <p className="text-xs text-white/50 truncate">
+              {isEditingMarketing ? (
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="text"
+                    value={marketingSpent || ""}
+                    onChange={(e) => saveMarketingInvestment(e.target.value)}
+                    placeholder="Ex: 50.00"
+                    className="w-full bg-black/60 border border-white/30 rounded-xl px-2.5 py-1 text-xs font-bold text-white focus:outline-none focus:border-white/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingMarketing(false)}
+                    className="p-1.5 rounded-xl bg-white text-black hover:bg-white/90 transition-colors shrink-0"
+                  >
+                    <Check className="size-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="text-lg sm:text-xl xl:text-2xl font-extrabold text-white truncate">
+                  {formatBRL(numericMarketingSpent)}
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-white/50 truncate mt-2">
               Total investido em tráfego pago.
             </p>
           </div>
 
           {/* Card 5: Patrimônio Total da Loja (Caixa Real + Estoque) */}
-          <div className="sm:col-span-2 lg:col-span-3 2xl:col-span-1 bg-gradient-to-br from-white/10 to-emerald-500/10 border border-white/30 rounded-2xl p-4 sm:p-5 space-y-1.5 sm:space-y-2 hover:border-white/50 transition-all min-w-0 flex flex-col justify-between">
-            <div>
+          <div className="bg-gradient-to-br from-white/10 to-emerald-500/10 border border-white/30 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-white/50 transition-all min-w-0">
+            <div className="space-y-1.5 sm:space-y-2">
               <span className="text-[11px] text-white uppercase font-extrabold tracking-wider flex items-center gap-1.5">
-                <Landmark className="size-4 text-white shrink-0" /> Patrimônio Total da Loja
+                <Landmark className="size-4 text-white shrink-0" />
+                <span className="leading-tight">Patrimônio Total da Loja</span>
               </span>
-              <div className="text-xl sm:text-2xl xl:text-3xl font-black text-white tracking-tight mt-1 truncate">
+              <div className="text-xl sm:text-2xl xl:text-2.5xl font-black text-white tracking-tight truncate">
                 {formatBRL(totalCompanyEquity)}
               </div>
             </div>
-            <p className="text-[11px] sm:text-xs text-white/70 font-medium leading-relaxed">
-              Caixa Real ({formatBRL(realCash)}) + Estoque ({formatBRL(stockAssetRetail)})
-            </p>
+            <div className="mt-2 text-[11px] text-white/70 font-medium leading-snug">
+              <span>Caixa Real ({formatBRL(realCash)})</span>
+              <span className="mx-1">+</span>
+              <span>Estoque ({formatBRL(stockAssetRetail)})</span>
+            </div>
           </div>
         </div>
       </div>
