@@ -20,10 +20,9 @@ export function getBackendUrl(): string {
 
     // Se estiver rodando na Vercel em produção, conecta automaticamente ao túnel da loja
     if (window.location.hostname.endsWith('vercel.app')) {
-      return 'https://pulse-offerings-marvel-obj.trycloudflare.com';
+      return 'https://device-visible-chances-citations.trycloudflare.com';
     }
   }
 
   return 'http://localhost:3006';
 }
-
