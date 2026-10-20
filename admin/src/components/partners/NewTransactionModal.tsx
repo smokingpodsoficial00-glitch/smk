@@ -6,9 +6,6 @@ import {
   DollarSign,
   Calendar,
   AlertCircle,
-  Wallet,
-  Building2,
-  TrendingDown,
   FileText,
   Sparkles
 } from 'lucide-react';
@@ -86,7 +83,6 @@ export function NewTransactionModal({
       setDescription('');
       setDate(new Date().toISOString().split('T')[0]);
       setErrorMsg(null);
-      // Gera uma chave de idempotência estável para a sessão deste modal
       idempotencyKeyRef.current = typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()
         : `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -167,183 +163,144 @@ export function NewTransactionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-[#0e0e10] border border-white/15 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#141416]">
-          <div className="flex items-center gap-2.5">
-            <div
-              className={`size-9 rounded-xl flex items-center justify-center border ${
-                flowDirection === 'ENTRADA'
-                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                  : effectiveType === 'PRO_LABORE'
-                  ? 'bg-purple-500/10 border-purple-500/20 text-purple-400'
-                  : effectiveType === 'DESPESA_OPERACIONAL'
-                  ? 'bg-orange-500/10 border-orange-500/20 text-orange-400'
-                  : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-              }`}
-            >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3.5 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="relative w-full max-w-md bg-[#0a0a0c] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh]">
+        {/* Header Minimalista */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/10 bg-[#0e0e11]">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="size-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/80 shrink-0">
               {flowDirection === 'ENTRADA' ? (
-                <ArrowDownRight className="size-5" />
+                <ArrowDownRight className="size-4 text-emerald-400" />
               ) : (
-                <ArrowUpRight className="size-5" />
+                <ArrowUpRight className="size-4 text-white/70" />
               )}
             </div>
-            <div>
-              <h2 className="text-sm font-bold text-white tracking-tight">
-                {flowDirection === 'ENTRADA'
-                  ? 'Novo Aporte de Capital (Entrada)'
-                  : effectiveType === 'PRO_LABORE'
-                  ? 'Retirada de Salário / Pró-Labore'
-                  : effectiveType === 'DESPESA_OPERACIONAL'
-                  ? 'Lançar Custo / Despesa da Empresa'
-                  : 'Retirada de Capital Investido'}
+            <div className="min-w-0">
+              <h2 className="text-xs sm:text-sm font-bold text-white tracking-tight truncate">
+                Lançar Custo / Despesa da Empresa
               </h2>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[10px] text-white/40 truncate">
                 Integrado em tempo real com Caixa Real, Patrimônio e Financeiro
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-all cursor-pointer"
+            className="p-1 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors cursor-pointer shrink-0 ml-2"
           >
             <X className="size-4" />
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+        {/* Form Body - Visual Limpo, Sem Textos Explicativos e Sem Cards Grandes */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 custom-scrollbar text-white">
           {errorMsg && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2.5 text-xs text-red-400">
-              <AlertCircle className="size-4 shrink-0" />
-              <span>{errorMsg}</span>
+            <div className="p-2.5 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2 text-xs text-red-400">
+              <AlertCircle className="size-3.5 shrink-0" />
+              <span className="leading-tight">{errorMsg}</span>
             </div>
           )}
 
-          {/* 1. Direção: Entrada vs Saída */}
-          <div>
-            <label className="block text-[11px] font-bold text-white/70 uppercase tracking-wider mb-2">
-              1. Direção da Movimentação *
+          {/* 1. MOVIMENTAÇÃO (Segmented Control Minimalista) */}
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider">
+              Movimentação
             </label>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 p-1 bg-black/60 border border-white/10 rounded-xl gap-1">
               <button
                 type="button"
                 onClick={() => setFlowDirection('ENTRADA')}
-                className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   flowDirection === 'ENTRADA'
-                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 shadow-sm'
-                    : 'bg-[#141416] border-white/10 text-white/50 hover:text-white'
+                    ? 'bg-emerald-500 text-black font-extrabold shadow-sm'
+                    : 'text-white/60 hover:text-white'
                 }`}
               >
-                <ArrowDownRight className="size-4 text-emerald-400" />
+                <ArrowDownRight className="size-3.5" />
                 <span>Entrada (Aporte)</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setFlowDirection('SAIDA')}
-                className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   flowDirection === 'SAIDA'
-                    ? 'bg-rose-500/15 border-rose-500/40 text-rose-400 shadow-sm'
-                    : 'bg-[#141416] border-white/10 text-white/50 hover:text-white'
+                    ? 'bg-white text-black font-extrabold shadow-sm'
+                    : 'text-white/60 hover:text-white'
                 }`}
               >
-                <ArrowUpRight className="size-4 text-rose-400" />
-                <span>Saída (Salário / Custo)</span>
+                <ArrowUpRight className="size-3.5" />
+                <span>Saída</span>
               </button>
             </div>
           </div>
 
-          {/* 2. Subtipo de Saída (quando for SAIDA) */}
+          {/* 2. TIPO (Lista Compacta Minimalista) */}
           {flowDirection === 'SAIDA' && (
-            <div className="space-y-2">
-              <label className="block text-[11px] font-bold text-white/70 uppercase tracking-wider">
-                2. Qual é o tipo desta saída? *
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider">
+                Tipo
               </label>
-              <div className="grid grid-cols-1 gap-2">
-                {/* Opção A: Salário / Pró-Labore */}
+              <div className="grid grid-cols-1 gap-1.5">
                 <button
                   type="button"
                   onClick={() => setOutflowSubtype('PRO_LABORE')}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
+                  className={`w-full py-2.5 px-3 rounded-xl border text-left text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
                     outflowSubtype === 'PRO_LABORE'
-                      ? 'bg-purple-500/15 border-purple-500/40 text-white'
-                      : 'bg-[#141416] border-white/10 text-white/60 hover:text-white hover:border-white/20'
+                      ? 'bg-white/10 border-white/30 text-white'
+                      : 'bg-[#121215] border-white/5 text-white/60 hover:text-white hover:border-white/15'
                   }`}
                 >
-                  <div className="p-2 rounded-lg bg-purple-500/15 text-purple-400 shrink-0 mt-0.5">
-                    <Wallet className="size-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-bold text-white flex items-center gap-2">
-                      <span>💸 Retirada de Salário / Lucro (Pró-Labore)</span>
-                    </div>
-                    <p className="text-[11px] text-white/60 mt-0.5 leading-relaxed">
-                      Pagamento do salário do sócio. Desconta do saldo disponível do sócio e do Caixa Real, <strong>sem alterar</strong> o capital investido nem a % da sociedade.
-                    </p>
-                  </div>
+                  <span>Retirada de Salário / Lucro</span>
+                  {outflowSubtype === 'PRO_LABORE' && (
+                    <span className="size-1.5 rounded-full bg-emerald-400" />
+                  )}
                 </button>
 
-                {/* Opção B: Custo / Despesa da Empresa */}
                 <button
                   type="button"
                   onClick={() => setOutflowSubtype('DESPESA_OPERACIONAL')}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
+                  className={`w-full py-2.5 px-3 rounded-xl border text-left text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
                     outflowSubtype === 'DESPESA_OPERACIONAL'
-                      ? 'bg-orange-500/15 border-orange-500/40 text-white'
-                      : 'bg-[#141416] border-white/10 text-white/60 hover:text-white hover:border-white/20'
+                      ? 'bg-white/10 border-white/30 text-white'
+                      : 'bg-[#121215] border-white/5 text-white/60 hover:text-white hover:border-white/15'
                   }`}
                 >
-                  <div className="p-2 rounded-lg bg-orange-500/15 text-orange-400 shrink-0 mt-0.5">
-                    <Building2 className="size-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-bold text-white flex items-center gap-2">
-                      <span>🏢 Custo / Despesa da Empresa</span>
-                    </div>
-                    <p className="text-[11px] text-white/60 mt-0.5 leading-relaxed">
-                      Gasto direto da loja (embalagens, taxas, sistemas, tráfego) sem precisar de um 3º sócio. Atualiza o card <strong>Custos da Empresa</strong> no Financeiro.
-                    </p>
-                  </div>
+                  <span>Custo / Despesa da Empresa</span>
+                  {outflowSubtype === 'DESPESA_OPERACIONAL' && (
+                    <span className="size-1.5 rounded-full bg-emerald-400" />
+                  )}
                 </button>
 
-                {/* Opção C: Retirada de Capital Investido */}
                 <button
                   type="button"
                   onClick={() => setOutflowSubtype('RETIRADA_CAPITAL')}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
+                  className={`w-full py-2.5 px-3 rounded-xl border text-left text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
                     outflowSubtype === 'RETIRADA_CAPITAL'
-                      ? 'bg-rose-500/15 border-rose-500/40 text-white'
-                      : 'bg-[#141416] border-white/10 text-white/60 hover:text-white hover:border-white/20'
+                      ? 'bg-white/10 border-white/30 text-white'
+                      : 'bg-[#121215] border-white/5 text-white/60 hover:text-white hover:border-white/15'
                   }`}
                 >
-                  <div className="p-2 rounded-lg bg-rose-500/15 text-rose-400 shrink-0 mt-0.5">
-                    <TrendingDown className="size-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-bold text-white flex items-center gap-2">
-                      <span>📉 Retirada de Capital Investido</span>
-                    </div>
-                    <p className="text-[11px] text-white/60 mt-0.5 leading-relaxed">
-                      Devolução de aporte inicial. Reduz o Capital Investido do sócio e recalcula a % de participação societária.
-                    </p>
-                  </div>
+                  <span>Retirada de Capital Investido</span>
+                  {outflowSubtype === 'RETIRADA_CAPITAL' && (
+                    <span className="size-1.5 rounded-full bg-emerald-400" />
+                  )}
                 </button>
               </div>
             </div>
           )}
 
-          {/* 3. Sócio Vinculado (Oculto quando for Custo da Empresa) */}
+          {/* Sócio Vinculado (quando não for Custo da Empresa) */}
           {!isCompanyExpense && (
-            <div className="space-y-2">
-              <label className="block text-[11px] font-bold text-white/70 uppercase tracking-wider">
-                Sócio Vinculado *
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider">
+                Sócio
               </label>
               <select
                 value={partnerId}
                 onChange={(e) => setPartnerId(e.target.value)}
-                className="w-full bg-[#161618] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-all cursor-pointer"
+                className="w-full bg-[#121215] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-white/30 transition-all cursor-pointer"
               >
                 {humanPartners.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -352,25 +309,22 @@ export function NewTransactionModal({
                 ))}
               </select>
 
-              {/* Resumo de Saldo de Salário Disponível (quando for PRO_LABORE) */}
               {effectiveType === 'PRO_LABORE' && selectedPartnerPayroll && (
-                <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/25 flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-[10px] uppercase font-bold text-purple-300/80">
-                      Disponível para {selectedPartnerPayroll.partner.name} receber ({selectedPartnerPayroll.salaryPct}%)
-                    </div>
-                    <div className="text-sm font-black text-purple-300 font-mono">
+                <div className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-white/50">Disponível:</span>
+                    <span className="text-xs font-bold font-mono text-emerald-400">
                       {formatBRL(selectedPartnerPayroll.availableToReceive)}
-                    </div>
+                    </span>
                   </div>
                   {selectedPartnerPayroll.availableToReceive > 0 && (
                     <button
                       type="button"
                       onClick={handleFillAvailableSalary}
-                      className="px-2.5 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-[11px] font-bold text-purple-200 transition-colors flex items-center gap-1 cursor-pointer"
+                      className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-[10px] font-bold text-white transition-colors flex items-center gap-1 cursor-pointer"
                     >
-                      <Sparkles className="size-3" />
-                      Preencher Total
+                      <Sparkles className="size-2.5 text-emerald-400" />
+                      Preencher
                     </button>
                   )}
                 </div>
@@ -378,97 +332,68 @@ export function NewTransactionModal({
             </div>
           )}
 
-          {/* 4. Valor e Data */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold text-white/70 uppercase tracking-wider mb-1.5">
-                Valor (R$) *
+          {/* VALOR E DATA */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider">
+                Valor (R$)
               </label>
               <div className="relative">
-                <DollarSign className="size-4 text-emerald-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <DollarSign className="size-3.5 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   required
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  placeholder="Ex: 50,00"
-                  className="w-full bg-[#161618] border border-white/10 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-white font-mono placeholder:text-white/30 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  placeholder="0,00"
+                  className="w-full bg-[#121215] border border-white/10 rounded-xl pl-8 pr-3 py-2 text-xs text-white font-mono placeholder:text-white/20 focus:outline-none focus:border-white/30 transition-all"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-[11px] font-bold text-white/70 uppercase tracking-wider mb-1.5">
-                Data do Registro
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider">
+                Data
               </label>
               <div className="relative">
-                <Calendar className="size-4 text-emerald-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Calendar className="size-3.5 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="date"
                   required
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="w-full bg-[#161618] border border-white/10 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/50 transition-all"
+                  className="w-full bg-[#121215] border border-white/10 rounded-xl pl-8 pr-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-white/30 transition-all"
                 />
               </div>
             </div>
           </div>
 
-          {/* 5. Descrição / Motivo */}
-          <div>
-            <label className="block text-[11px] font-bold text-white/70 uppercase tracking-wider mb-1.5">
-              Descrição / Observação {isCompanyExpense ? '*' : '(Opcional)'}
+          {/* DESCRIÇÃO / OBSERVAÇÃO */}
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider">
+              Descrição / Observação {isCompanyExpense ? '*' : ''}
             </label>
             <div className="relative">
-              <FileText className="size-4 text-white/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <FileText className="size-3.5 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 required={isCompanyExpense}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder={
-                  isCompanyExpense
-                    ? 'Ex: Sacolas personalizadas, taxa de entrega, sistema...'
-                    : effectiveType === 'PRO_LABORE'
-                    ? 'Ex: Salário quinzenal / Pró-labore'
-                    : 'Ex: Observação do lançamento'
-                }
-                className="w-full bg-[#161618] border border-white/10 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-emerald-500/50 transition-all"
+                placeholder={isCompanyExpense ? "Ex: Embalagens, frete, sistema..." : "Opcional"}
+                className="w-full bg-[#121215] border border-white/10 rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-white/30 transition-all"
               />
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 rounded-xl text-xs font-semibold text-muted-foreground hover:text-white hover:bg-white/5 transition-all cursor-pointer"
-            >
-              Cancelar
-            </button>
+          {/* BOTÃO PRINCIPAL SIMPLES E DIRETO */}
+          <div className="pt-2">
             <button
               type="submit"
               disabled={submitting}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50 ${
-                flowDirection === 'ENTRADA'
-                  ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20'
-                  : effectiveType === 'PRO_LABORE'
-                  ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-500/20'
-                  : effectiveType === 'DESPESA_OPERACIONAL'
-                  ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/20'
-                  : 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/20'
-              }`}
+              className="w-full py-3 px-4 rounded-xl text-xs font-extrabold bg-emerald-500 hover:bg-emerald-400 text-black shadow-lg shadow-emerald-500/10 transition-all cursor-pointer active:scale-[0.99] disabled:opacity-50"
             >
-              {submitting
-                ? 'Gravando...'
-                : flowDirection === 'ENTRADA'
-                ? 'Confirmar Aporte'
-                : effectiveType === 'PRO_LABORE'
-                ? 'Confirmar Pagamento de Salário'
-                : effectiveType === 'DESPESA_OPERACIONAL'
-                ? 'Registrar Custo da Empresa'
-                : 'Confirmar Retirada de Capital'}
+              {submitting ? 'Gravando...' : 'Lançar Custo / Despesa'}
             </button>
           </div>
         </form>
