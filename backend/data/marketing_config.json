@@ -71,7 +71,7 @@
       "createdAt": "2026-09-11T15:03:53.192241+00:00",
       "frequencyDays": 14,
       "updatedAt": "2026-09-21T18:04:48.085Z",
-      "lastRunDate": "23/09/2026"
+      "lastRunDate": "20/10/2026"
     },
     {
       "id": "7374d4ba-9031-446f-9c7b-d001608641bf",
@@ -267,7 +267,7 @@
       "createdAt": "2026-09-11T15:03:54.04839+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:05:57.406Z",
-      "lastRunDate": "29/09/2026"
+      "lastRunDate": "20/10/2026"
     },
     {
       "id": "a898626b-11df-4ea8-879c-185b88433a6e",
@@ -344,7 +344,8 @@
       "totalRecipients": 62,
       "status": "active",
       "createdAt": "2026-10-18T21:54:12.981Z",
-      "updatedAt": "2026-10-18T21:54:12.981Z"
+      "updatedAt": "2026-10-18T21:54:12.981Z",
+      "lastRunDate": "20/10/2026"
     },
     {
       "id": "camp_1792361104826",
@@ -368,7 +369,8 @@
       "totalRecipients": 62,
       "status": "active",
       "createdAt": "2026-10-18T22:05:05.233Z",
-      "updatedAt": "2026-10-18T22:05:05.233Z"
+      "updatedAt": "2026-10-18T22:05:05.233Z",
+      "lastRunDate": "20/10/2026"
     },
     {
       "id": "camp_1792361244402",
@@ -425,9 +427,29 @@
       "key": "c3558551-5f8a-4aaf-8e75-fb1ca2a966d4_2026-10-18_slot1",
       "timestamp": "2026-10-18T22:30:10.580Z",
       "campaignName": "CPM DOMINGO 2"
+    },
+    {
+      "key": "camp_1792361104826_2026-10-20_slot1",
+      "timestamp": "2026-10-20T14:00:12.656Z",
+      "campaignName": "CPM GRUPO VIP ( SORTEIO 5 CONTATOS )"
+    },
+    {
+      "key": "4e4a393c-5a6b-44cf-9488-ec5e3c025937_2026-10-20_slot1",
+      "timestamp": "2026-10-20T18:00:14.174Z",
+      "campaignName": "CPM GRUPO INSTAGRAM"
+    },
+    {
+      "key": "camp_1792360452554_2026-10-20_slot1",
+      "timestamp": "2026-10-20T18:00:17.045Z",
+      "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
+    },
+    {
+      "key": "a200c5bf-c667-4a05-bafd-bdf324195cdb_2026-10-20_slot1",
+      "timestamp": "2026-10-20T19:00:14.526Z",
+      "campaignName": "AVISO SALVAR CONTATO"
     }
   ],
-  "lastUpdated": "2026-10-18T22:30:10.581Z",
+  "lastUpdated": "2026-10-20T19:00:14.526Z",
   "lists": [
     {
       "id": "0d925499-da68-4a93-9591-f4b6f78744b1",
@@ -5406,6 +5428,10 @@
       "DURA 35K",
       "V80 ULTRA SLIM",
       "TE30K"
+    ],
+    "2026-10-20": [
+      "Ice king",
+      "FROZEN 20K"
     ]
   },
   "stockOfferCycle": [
@@ -5413,7 +5439,7 @@
     "V250",
     "V55 ULTRA THIN",
     "DURA 35K",
-    "V80 ULTRA SLIM",
-    "TE30K"
+    "Ice king",
+    "FROZEN 20K"
   ]
 }

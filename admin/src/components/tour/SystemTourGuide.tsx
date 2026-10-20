@@ -212,6 +212,7 @@ export function SystemTourGuide() {
     const isDismissed = localStorage.getItem(companyTourKey) === "true";
 
     if (!isDismissed) {
+    if (typeof window !== "undefined" && window.innerWidth < 768) return;
       const t = setTimeout(() => {
         setIsWelcomeOpen(true);
       }, 1000);
@@ -222,6 +223,7 @@ export function SystemTourGuide() {
   // Listener para evento customizado de reabertura manual via Sidebar
   useEffect(() => {
     const handleOpen = () => {
+      if (typeof window !== "undefined" && window.innerWidth < 768) return;
       setIsWelcomeOpen(false);
       setIsMinimized(false);
       setCurrentStep(0);
@@ -475,6 +477,9 @@ export function SystemTourGuide() {
   }, [targetRect]);
 
   const progressPercentage = Math.round(((currentStep + 1) / activeStepsList.length) * 100);
+
+  // No modo celular, o tour e o modal de boas-vindas so 100% desativados
+  if (isMobileView) return null;
 
   return (
     <>
