@@ -405,11 +405,23 @@ export default function PartnersDashboard() {
         {/* Ações Rápidas */}
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => setShowInvestmentModal(true)}
-            className="px-3.5 py-2 rounded-xl text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            className="px-3 sm:px-3.5 py-2 rounded-xl text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+            title="Simulador de Aportes & Projeção"
           >
             <Calculator className="size-3.5 text-white/60 shrink-0" />
             <span>Simulador Aportes</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowNewPartnerModal(true)}
+            className="px-3 sm:px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+            title="Cadastrar Novo Sócio"
+          >
+            <UserPlus className="size-3.5 shrink-0 text-emerald-400" />
+            <span>Cadastrar Sócio</span>
           </button>
         </div>
       </header>
