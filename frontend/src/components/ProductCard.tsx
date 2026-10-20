@@ -2,39 +2,44 @@ import type { PodModel } from "@/lib/products";
 import { formatBRL } from "@/lib/cart";
 import { MinimalistVapeIcon } from "./MinimalistVapeIcon";
 
-const vapeIgnite = "https://placehold.co/400x500/121212/ffffff.jpg?text=Ignite";
-const vapeElfbar = "https://placehold.co/400x500/121212/ffffff.jpg?text=ElfBar";
-const vapeLostmary = "https://placehold.co/400x500/121212/ffffff.jpg?text=LostMary";
-
-const brandImages: Record<string, string> = {
-  Ignite: vapeIgnite, "Elf Bar": vapeElfbar, "Lost Mary": vapeLostmary,
-};
-
 export function ProductCard({ model, onClick }: { model: PodModel; onClick: () => void }) {
   const allVars = model.allVariants && model.allVariants.length > 0 ? model.allVariants : model.variants;
   const outOfStock = allVars.length === 0 || allVars.every(v => (v.stock || 0) <= 0);
   const variantWithImage = model.variants.find(v => !!v.image_url) || model.allVariants?.find(v => !!v.image_url);
-  const image = model.image_url || variantWithImage?.image_url || brandImages[model.brand] || vapeIgnite;
-  const flavorsCount = model.variants.length;
+  
+  // Imagem real cadastrada no modelo ou na variação
+  const hasRealImage = !!(model.image_url || variantWithImage?.image_url);
+  const realImageUrl = model.image_url || variantWithImage?.image_url;
 
+  const flavorsCount = model.variants.length;
   const primaryCategory = model.categories && model.categories.length > 0 ? model.categories[0] : null;
 
   return (
     <article onClick={onClick} className="group relative flex flex-col rounded-3xl bg-card border border-border overflow-hidden transition-all duration-500 hover:border-white/20 hover:-translate-y-1 cursor-pointer">
-      <div className="relative aspect-[4/5] overflow-hidden bg-black flex items-center justify-center">
-        {outOfStock ? (
-          /* Quando o produto estiver indisponível/esgotado: Vaper minimalista branco com fundo preto puro */
+      <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-b from-elevated to-card flex items-center justify-center">
+        {hasRealImage ? (
+          /* Quando TEM foto cadastrada: exibe a foto real do produto */
+          <img
+            src={realImageUrl}
+            alt={`${model.brand} ${model.name}`}
+            loading="lazy"
+            className="size-full object-cover transition-transform duration-700 group-hover:scale-105"
+          />
+        ) : (
+          /* Quando NÃO TEM foto cadastrada: Vaper minimalista branco com fundo preto puro */
           <div className="size-full bg-black flex flex-col items-center justify-center relative p-6 select-none transition-transform duration-700 group-hover:scale-105">
             <MinimalistVapeIcon className="w-24 h-36 sm:w-28 sm:h-40" />
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-1.5">
-              <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.25em] text-white/90 bg-white/10 px-3 py-1 rounded-full border border-white/20 shadow-lg">
-                Esgotado
-              </span>
-            </div>
+            <span className="text-[10px] font-mono tracking-widest text-white/40 uppercase mt-1">
+              {model.brand}
+            </span>
           </div>
-        ) : (
-          <img src={image} alt={`${model.brand} ${model.name}`} loading="lazy"
-               className="size-full object-cover transition-transform duration-700 group-hover:scale-105" />
+        )}
+
+        {/* Overlay padrão de esgotado caso o produto esteja zerado */}
+        {outOfStock && (
+          <div className="absolute inset-0 grid place-items-center bg-background/70 backdrop-blur-sm z-10">
+            <span className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Esgotado</span>
+          </div>
         )}
 
         {model.puffs && model.puffs > 0 ? (
@@ -58,8 +63,8 @@ export function ProductCard({ model, onClick }: { model: PodModel; onClick: () =
         <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
           <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.25em] text-muted-foreground">{model.brand}</span>
           <h3 className="text-sm sm:text-lg font-semibold tracking-tight truncate">{model.name}</h3>
-          <span className={`text-[11px] sm:text-xs truncate ${outOfStock ? "text-red-400 font-semibold" : "text-primary"}`}>
-            {outOfStock ? 'Indisponível no momento' : flavorsCount === 1 ? '1 opção disponível' : `${flavorsCount} opções disponíveis`}
+          <span className="text-[11px] sm:text-xs text-primary truncate">
+            {flavorsCount === 0 ? 'Indisponível no momento' : flavorsCount === 1 ? '1 opção disponível' : `${flavorsCount} opções disponíveis`}
           </span>
         </div>
 
@@ -74,12 +79,8 @@ export function ProductCard({ model, onClick }: { model: PodModel; onClick: () =
               {formatBRL(model.price)}
             </span>
           </div>
-          <div className={`relative grid place-items-center px-3 sm:px-4 h-8 sm:h-10 rounded-full text-[10px] sm:text-xs font-semibold tracking-wide whitespace-nowrap transition-colors ${
-            outOfStock 
-              ? "bg-white/5 text-white/40 border border-white/10" 
-              : "bg-elevated text-foreground group-hover:bg-primary group-hover:text-primary-foreground"
-          }`}>
-            {outOfStock ? "Indisponível" : "Ver Opções"}
+          <div className="relative grid place-items-center px-3 sm:px-4 h-8 sm:h-10 rounded-full bg-elevated text-foreground text-[10px] sm:text-xs font-semibold tracking-wide whitespace-nowrap transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+            Ver Opções
           </div>
         </div>
       </div>
