@@ -29,9 +29,7 @@ export function ProductCard({ model, onClick }: { model: PodModel; onClick: () =
           /* Quando NÃO TEM foto cadastrada: Vaper minimalista branco com fundo preto puro */
           <div className="size-full bg-black flex flex-col items-center justify-center relative p-6 select-none transition-transform duration-700 group-hover:scale-105">
             <MinimalistVapeIcon className="w-24 h-36 sm:w-28 sm:h-40" />
-            <span className="text-[10px] font-mono tracking-widest text-white/40 uppercase mt-1">
-              {model.brand}
-            </span>
+            
           </div>
         )}
 
