@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { 
   X, MessageSquare, ShoppingBag, MapPin, Phone, Crown, Calendar, 
-  Send, Trash2, Edit2, Loader2, CheckCircle2
+  Send, Trash2, Edit2, Loader2, CheckCircle2, User
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { 
@@ -24,12 +24,16 @@ export function ClientProfileModal({
 }) {
   const { company } = useAuth();
   
-  // Estados de Exibição e Edição Básica de Cliente (Nome e Telefone por customer.id)
+  // Estados de Exibição e Edição Cadastral do Cliente
   const [currentName, setCurrentName] = useState<string>(client.name || '');
   const [currentPhone, setCurrentPhone] = useState<string>(client.phone || '');
+  const [currentAddress, setCurrentAddress] = useState<string>(client.address || '');
+  
   const [isEditingClient, setIsEditingClient] = useState(false);
   const [editName, setEditName] = useState<string>(client.name || '');
   const [editPhone, setEditPhone] = useState<string>(client.cleanPhone || client.phone || '');
+  const [editAddress, setEditAddress] = useState<string>(client.address || '');
+  
   const [isSavingClient, setIsSavingClient] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
@@ -43,7 +47,7 @@ export function ClientProfileModal({
         companyId: company?.id 
       });
       if (res.success) {
-        alert('✅ Pedido excluído com sucesso e estoque devolvido.');
+        alert('Pedido excluído com sucesso e estoque devolvido.');
         if (onClientUpdated) onClientUpdated();
         onClose();
       } else {
@@ -56,7 +60,7 @@ export function ClientProfileModal({
     if (confirm(`Deseja realmente remover o cadastro de ${client.name} do CRM?`)) {
       const res = await deleteClientRecord(client.id, company?.id);
       if (res.success) {
-        alert('✅ Cliente removido do CRM.');
+        alert('Cliente removido do CRM.');
         if (onClientUpdated) onClientUpdated();
         onClose();
       } else {
@@ -73,7 +77,7 @@ export function ClientProfileModal({
   
   const copyRecompra = `E aí ${client.name}! Tudo certo? Vi que já faz um tempinho desde a sua última compra de ${client.lastProduct}. Já quer ir garantindo a sua reposição pra não ficar na mão? Me avisa aqui!`;
   
-  const copyGrupoVip = `Fala ${client.name}! Tranquilo? Criamos o *Grupo VIP Fechado no WhatsApp* da nossa loja onde soltamos novidades, lotes novos e condições exclusivas antes de todo mundo.\n\nÉ 100% silencioso (só avisos importantes). Se quiser entrar: [LINK_DO_GRUPO_VIP]`;
+  const copyGrupoVip = `Fala ${client.name}! Tranquilo? Criamos o *Grupo VIP Fechado no WhatsApp* da nossa loja onde soltamos novidades, lotes novos e condições exclusivas antes de todo mundo.\n\n100% silencioso (só avisos importantes). Se quiser entrar: [LINK_DO_GRUPO_VIP]`;
 
   const handleSaveBasicClient = async () => {
     const trimmedName = editName.trim();
@@ -90,6 +94,7 @@ export function ClientProfileModal({
       clientId: client.id,
       name: trimmedName,
       phone: editPhone,
+      address: editAddress,
       companyId: company?.id,
     });
 
@@ -98,14 +103,18 @@ export function ClientProfileModal({
     if (res.success) {
       const newPhoneDisplay = formatPhoneForDisplay(res.savedPhone);
       const newName = res.savedName || trimmedName;
+      const newAddress = res.savedAddress !== undefined ? res.savedAddress : editAddress.trim();
+      
       setCurrentName(newName);
       setCurrentPhone(newPhoneDisplay);
-      setEditSuccess("✅ Dados cadastrais atualizados com sucesso!");
+      setCurrentAddress(newAddress);
+      setEditSuccess("Dados cadastrais e endereço atualizados com sucesso!");
       
       const updatedClientObj: RealClient = {
         ...client,
         name: newName,
         phone: newPhoneDisplay,
+        address: newAddress,
         cleanPhone: res.savedPhone ? res.savedPhone.replace(/\D/g, '') : '',
       };
 
@@ -125,11 +134,11 @@ export function ClientProfileModal({
   const handleCancelEdit = () => {
     setEditName(currentName);
     setEditPhone(currentPhone);
+    setEditAddress(currentAddress);
     setIsEditingClient(false);
     setEditError(null);
     setEditSuccess(null);
   };
-
 
   return (
     <div 
@@ -180,15 +189,16 @@ export function ClientProfileModal({
                     ? (client.cleanPhone || currentPhone) 
                     : '';
                   setEditPhone(initialPhone);
+                  setEditAddress(currentAddress || '');
                   setEditError(null);
                   setEditSuccess(null);
                 }
               }} 
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs font-semibold transition-colors cursor-pointer"
-              title="Editar dados cadastrais do cliente"
+              title="Editar dados cadastrais e endereço"
             >
               <Edit2 className="size-3.5" />
-              <span>Editar cliente</span>
+              <span>Editar cadastro</span>
             </button>
 
             <button 
@@ -207,20 +217,20 @@ export function ClientProfileModal({
           </div>
         </header>
 
-        {/* Formulário Elegante e Direto de Edição Básica de Cliente */}
+        {/* Formulário de Edição de Informações (Nome, Telefone e Endereço) */}
         {isEditingClient && (
           <div className="bg-[#121214] border-b border-amber-500/20 p-5 space-y-4 shrink-0 animate-in fade-in duration-150">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                   <Edit2 className="size-3.5 text-amber-400" />
-                  Editar cliente
+                  Editar dados cadastrais & endereço
                 </h3>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Nome atual: <span className="text-white font-medium">{currentName}</span> • Telefone atual: <span className="font-mono text-white">{currentPhone || '(vazio)'}</span>
+                  Atualize nome, telefone e endereço oficial do cliente no sistema
                 </p>
               </div>
-              <span className="text-[10px] font-mono text-white/40">ID: {client.id}</span>
+              <span className="text-[10px] font-mono text-white/40">ID: {client.id.slice(0, 8)}</span>
             </div>
 
             {editError && (
@@ -239,7 +249,7 @@ export function ClientProfileModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-semibold text-white/70 block mb-1">
-                  Nome
+                  Nome Completo *
                 </label>
                 <input
                   type="text"
@@ -252,7 +262,7 @@ export function ClientProfileModal({
 
               <div>
                 <label className="text-[11px] font-semibold text-white/70 block mb-1">
-                  Telefone
+                  Telefone / WhatsApp
                 </label>
                 <input
                   type="text"
@@ -262,6 +272,20 @@ export function ClientProfileModal({
                   className="w-full bg-[#18181b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400/50 transition-colors font-mono"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-white/70 block mb-1 flex items-center gap-1.5">
+                <MapPin className="size-3 text-amber-400" />
+                Endereço de Entrega Completo
+              </label>
+              <textarea
+                rows={2}
+                value={editAddress}
+                onChange={(e) => setEditAddress(e.target.value)}
+                placeholder="Ex: Rua Alexandra Lunardi Fanani, 57 - Assunção, São Bernardo do Campo - SP, 09810-200"
+                className="w-full bg-[#18181b] border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400/50 transition-colors resize-none"
+              />
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-1">
@@ -293,44 +317,74 @@ export function ClientProfileModal({
           </div>
         )}
 
-
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar flex flex-col gap-6">
           
-          {/* Quick Stats de LTV & Recorrência */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="bg-[#141414] border border-white/5 p-4 rounded-xl flex flex-col justify-between">
-              <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Lifetime Value (LTV)</h4>
-              <p className="text-lg font-bold text-white">{formatBRL(client.spent)}</p>
+          {/* ========================================================
+              PARTE DE CIMA: TODAS AS INFORMAÇÕES DO CLIENTE & ENDEREÇO
+             ======================================================== */}
+          <div className="space-y-3">
+            {/* Bloco Unificado de Dados Cadastrais e Endereço */}
+            <div className="bg-[#141417] border border-white/10 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <User className="size-3 text-emerald-400" />
+                  Dados Cadastrais do Cliente
+                </span>
+                <span className="text-[10px] font-mono text-zinc-500">ID: {client.id.slice(0, 8)}</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-zinc-500 block">Nome Oficial</span>
+                  <p className="font-semibold text-white mt-0.5">{currentName}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-zinc-500 block">WhatsApp / Telefone</span>
+                  <p className="font-mono text-white mt-0.5 flex items-center gap-1">
+                    <Phone className="size-3 text-emerald-400" />
+                    {currentPhone}
+                  </p>
+                </div>
+              </div>
+
+              {/* Endereço de Entrega em Destaque */}
+              <div className="pt-2 border-t border-white/5">
+                <span className="text-[10px] uppercase font-bold text-zinc-500 flex items-center gap-1">
+                  <MapPin className="size-3 text-amber-400" /> Endereço Cadastrado
+                </span>
+                <p className="text-xs text-zinc-200 mt-1 leading-relaxed bg-black/40 border border-white/5 rounded-lg p-2.5">
+                  {currentAddress || 'Nenhum endereço cadastrado para este cliente.'}
+                </p>
+              </div>
             </div>
-            <div className="bg-[#141414] border border-white/5 p-4 rounded-xl flex flex-col justify-between">
-              <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Total de Pedidos</h4>
-              <p className="text-lg font-bold text-white">{client.ordersCount} <span className="text-xs text-muted-foreground font-normal lowercase">compras</span></p>
-            </div>
-            <div className="bg-[#141414] border border-white/5 p-4 rounded-xl flex flex-col justify-between">
-              <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Última Compra</h4>
-              <p className="text-lg font-bold text-white">há {client.daysSinceLastOrder}d</p>
+
+            {/* Quick Stats de LTV & Recorrência */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-[#141414] border border-white/5 p-3.5 rounded-xl flex flex-col justify-between">
+                <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Lifetime Value (LTV)</h4>
+                <p className="text-lg font-bold text-emerald-400 font-mono">{formatBRL(client.spent)}</p>
+              </div>
+              <div className="bg-[#141414] border border-white/5 p-3.5 rounded-xl flex flex-col justify-between">
+                <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Total de Pedidos</h4>
+                <p className="text-lg font-bold text-white">{client.ordersCount} <span className="text-xs text-muted-foreground font-normal lowercase">compras</span></p>
+              </div>
+              <div className="bg-[#141414] border border-white/5 p-3.5 rounded-xl flex flex-col justify-between">
+                <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Última Compra</h4>
+                <p className="text-lg font-bold text-white">há {client.daysSinceLastOrder}d</p>
+              </div>
             </div>
           </div>
 
+          {/* ========================================================
+              PARTE DE BAIXO: DISPAROS DIRETOS & HISTÓRICO DE COMPRAS
+             ======================================================== */}
 
-
-          {/* Endereço de Entrega */}
-          <div className="bg-[#0a0a0a] border border-white/5 p-4 rounded-xl">
-            <h4 className="text-[10px] uppercase font-bold text-muted-foreground mb-1.5 flex items-center gap-1.5 tracking-wider">
-              <MapPin className="size-3 text-emerald-400" />
-              Endereço de Entrega (SBC / ABC)
-            </h4>
-            <p className="text-xs text-white/80 font-mono">
-              {client.address || 'Endereço não informado'}
-            </p>
-          </div>
-
-          {/* Ações Rápidas de Disparo 1-a-1 & Agendamento */}
+          {/* Disparos Diretos & Follow-up */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <Send className="size-3 text-emerald-400" />
-                Disparo Direto & Follow-up
+                Disparos Diretos & Follow-up
               </h3>
 
               <button
@@ -388,52 +442,58 @@ export function ClientProfileModal({
             </div>
           </div>
 
-          {/* Histórico Real de Pedidos */}
+          {/* Histórico Real de Compras */}
           <div>
             <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
               <ShoppingBag className="size-3 text-emerald-400" />
-              Histórico de Pedidos ({client.orders.length})
+              Histórico de Compras ({client.orders.length})
             </h3>
 
-            <div className="flex flex-col gap-2.5">
-              {client.orders.map((order, idx) => {
-                const orderDate = new Date(order.created_at).toLocaleDateString('pt-BR');
-                const items: any[] = Array.isArray(order.items) ? order.items : [];
+            {client.orders.length === 0 ? (
+              <div className="p-6 bg-[#141414] border border-white/5 rounded-xl text-center text-xs text-muted-foreground">
+                Nenhum pedido registrado para este cliente ainda.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {client.orders.map((order) => {
+                  const orderDate = new Date(order.created_at).toLocaleDateString('pt-BR');
+                  const items: any[] = Array.isArray(order.items) ? order.items : [];
 
-                return (
-                  <div key={order.id} className="bg-[#141414] border border-white/5 rounded-xl p-3.5 flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono text-muted-foreground flex items-center gap-1">
-                        <Calendar className="size-3" />
-                        {orderDate}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          {order.delivery_status || 'CONCLUÍDO'}
+                  return (
+                    <div key={order.id} className="bg-[#141414] border border-white/5 rounded-xl p-3.5 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono text-muted-foreground flex items-center gap-1">
+                          <Calendar className="size-3" />
+                          {orderDate}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteOrder(order.id)}
-                          className="p-1 hover:bg-red-500/10 rounded text-white/30 hover:text-red-400 transition-colors cursor-pointer"
-                          title="Excluir esta venda (Devolver ao Estoque)"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            {order.delivery_status || 'CONCLUÍDO'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOrder(order.id)}
+                            className="p-1 hover:bg-red-500/10 rounded text-white/30 hover:text-red-400 transition-colors cursor-pointer"
+                            title="Excluir esta venda (Devolver ao Estoque)"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="text-[11px] font-medium text-white/90">
+                        {items.map(i => `${i.quantity || 1}x ${i.name || 'Produto'} ${i.flavor || ''}`).join(', ') || 'Produto'}
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-2 border-t border-white/5">
+                        <span className="uppercase tracking-wider">Total Pago</span>
+                        <span className="font-mono font-bold text-white">{formatBRL(parseFloat(order.total_amount || 0))}</span>
                       </div>
                     </div>
-
-                    <div className="text-[11px] font-medium text-white/90">
-                      {items.map(i => `${i.quantity || 1}x ${i.name || 'Produto'} ${i.flavor || ''}`).join(', ') || 'Produto'}
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-2 border-t border-white/5">
-                      <span className="uppercase tracking-wider">Total Pago</span>
-                      <span className="font-mono font-bold text-white">{formatBRL(parseFloat(order.total_amount || 0))}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
         </div>

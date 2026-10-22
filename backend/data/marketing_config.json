@@ -70,7 +70,8 @@
       "startDate": "2026-09-21",
       "createdAt": "2026-09-11T15:03:53.192241+00:00",
       "frequencyDays": 14,
-      "updatedAt": "2026-09-21T18:04:48.085Z"
+      "updatedAt": "2026-09-21T18:04:48.085Z",
+      "lastRunDate": "20/10/2026"
     },
     {
       "id": "7374d4ba-9031-446f-9c7b-d001608641bf",
@@ -288,7 +289,7 @@
       "createdAt": "2026-09-11T15:03:54.136387+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:06:03.607Z",
-      "lastRunDate": "23/09/2026"
+      "lastRunDate": "21/10/2026"
     },
     {
       "id": "e939f055-0c27-4d5c-ab26-d26e04651b35",
@@ -344,7 +345,7 @@
       "status": "active",
       "createdAt": "2026-10-18T21:54:12.981Z",
       "updatedAt": "2026-10-18T21:54:12.981Z",
-      "lastRunDate": "20/10/2026"
+      "lastRunDate": "22/10/2026"
     },
     {
       "id": "camp_1792361104826",
@@ -369,7 +370,7 @@
       "status": "active",
       "createdAt": "2026-10-18T22:05:05.233Z",
       "updatedAt": "2026-10-18T22:05:05.233Z",
-      "lastRunDate": "20/10/2026"
+      "lastRunDate": "22/10/2026"
     },
     {
       "id": "camp_1792361244402",
@@ -394,7 +395,7 @@
       "status": "active",
       "createdAt": "2026-10-18T22:07:25.024Z",
       "updatedAt": "2026-10-18T22:07:25.024Z",
-      "lastRunDate": "19/10/2026"
+      "lastRunDate": "21/10/2026"
     }
   ],
   "idempotencyKeys": [
@@ -447,9 +448,54 @@
       "key": "a200c5bf-c667-4a05-bafd-bdf324195cdb_2026-10-20_slot1",
       "timestamp": "2026-10-20T19:00:14.526Z",
       "campaignName": "AVISO SALVAR CONTATO"
+    },
+    {
+      "key": "camp_1792360452554_2026-10-20_slot2",
+      "timestamp": "2026-10-20T21:00:18.174Z",
+      "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
+    },
+    {
+      "key": "camp_1792361244402_2026-10-20_slot1",
+      "timestamp": "2026-10-20T22:00:16.298Z",
+      "campaignName": "CAMPANHA DIARIA SORTEIO 5 CONTATOS"
+    },
+    {
+      "key": "camp_1792361104826_2026-10-21_slot1",
+      "timestamp": "2026-10-21T14:00:23.950Z",
+      "campaignName": "CPM GRUPO VIP ( SORTEIO 5 CONTATOS )"
+    },
+    {
+      "key": "camp_1792360452554_2026-10-21_slot1",
+      "timestamp": "2026-10-21T18:00:28.492Z",
+      "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
+    },
+    {
+      "key": "a898626b-11df-4ea8-879c-185b88433a6e_2026-10-21_slot1",
+      "timestamp": "2026-10-21T19:00:25.919Z",
+      "campaignName": "CPM  LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!"
+    },
+    {
+      "key": "camp_1792360452554_2026-10-21_slot2",
+      "timestamp": "2026-10-21T21:00:29.972Z",
+      "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
+    },
+    {
+      "key": "camp_1792361244402_2026-10-21_slot1",
+      "timestamp": "2026-10-21T22:00:27.751Z",
+      "campaignName": "CAMPANHA DIARIA SORTEIO 5 CONTATOS"
+    },
+    {
+      "key": "camp_1792361104826_2026-10-22_slot1",
+      "timestamp": "2026-10-22T14:00:35.433Z",
+      "campaignName": "CPM GRUPO VIP ( SORTEIO 5 CONTATOS )"
+    },
+    {
+      "key": "camp_1792360452554_2026-10-22_slot1",
+      "timestamp": "2026-10-22T18:00:39.328Z",
+      "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
     }
   ],
-  "lastUpdated": "2026-10-20T19:00:14.526Z",
+  "lastUpdated": "2026-10-22T18:00:39.328Z",
   "lists": [
     {
       "id": "0d925499-da68-4a93-9591-f4b6f78744b1",

@@ -63,24 +63,48 @@ export async function resolveCatalogCompanyId(): Promise<string> {
 
       if (slug && slug !== "smoking-pods") {
         try {
-          // 1. Tenta buscar pelo store_slug exato em store_config
-          const { data: storeData } = await supabase
-            .from("store_config")
+          // 1. Tenta buscar pelo store_slug exato na view pública public_store_config ou na tabela base store_config
+          let storeData: any = null;
+          const { data: vStoreData } = await supabase
+            .from("public_store_config")
             .select("company_id")
             .eq("store_slug", slug)
             .maybeSingle();
+
+          if (vStoreData?.company_id) {
+            storeData = vStoreData;
+          } else {
+            const { data: baseStoreData } = await supabase
+              .from("store_config")
+              .select("company_id")
+              .eq("store_slug", slug)
+              .maybeSingle();
+            storeData = baseStoreData;
+          }
 
           if (storeData?.company_id) {
             return storeData.company_id;
           }
 
-          // 2. Se não achou em store_config, busca na tabela companies pelo nome correspondente ao slug
+          // 2. Se não achou em store_config, busca na view pública public_companies ou na tabela companies
           const formattedName = slug.replace(/-/g, " ");
-          const { data: compData } = await supabase
-            .from("companies")
+          let compData: any = null;
+          const { data: vCompData } = await supabase
+            .from("public_companies")
             .select("id")
             .ilike("name", formattedName)
             .maybeSingle();
+
+          if (vCompData?.id) {
+            compData = vCompData;
+          } else {
+            const { data: baseCompData } = await supabase
+              .from("companies")
+              .select("id")
+              .ilike("name", formattedName)
+              .maybeSingle();
+            compData = baseCompData;
+          }
 
           if (compData?.id) {
             return compData.id;

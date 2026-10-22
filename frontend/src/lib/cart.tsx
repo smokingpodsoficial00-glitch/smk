@@ -89,7 +89,10 @@ export function buildWhatsAppUrl(
 
   const phone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
   const name = storeName || "Smoking Pods";
-  const parts = items.map(i => `${i.quantity}x ${i.product.name} (${i.product.flavor})`).join(", ");
-  const msg = `[PEDIDO-${name.toUpperCase().replace(/\s+/g, "")}] ${parts} | Total: ${formatBRL(total)}`;
+  const storeTag = name.toUpperCase().replace(/\s+/g, "");
+
+  const itemLines = items.map(i => `• ${i.quantity}x ${i.product.name} (${i.product.flavor})`).join("\n");
+  const msg = `[PEDIDO-${storeTag}]\n${itemLines}\n• Total: ${formatBRL(total)}`;
+
   return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
 }

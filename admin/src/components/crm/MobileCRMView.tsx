@@ -66,6 +66,7 @@ export function MobileCRMView({
   const [isEditingClient, setIsEditingClient] = useState(false);
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editAddress, setEditAddress] = useState("");
   const [isSavingClient, setIsSavingClient] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
@@ -282,6 +283,7 @@ export function MobileCRMView({
         clientId: selectedClientForSheet.id,
         name: trimmedName,
         phone: editPhone,
+        address: editAddress,
         companyId,
       });
 
@@ -293,6 +295,7 @@ export function MobileCRMView({
           ...selectedClientForSheet,
           name: res.savedName || trimmedName,
           phone: newPhoneDisplay,
+          address: res.savedAddress !== undefined ? res.savedAddress : editAddress.trim(),
           cleanPhone: newClean,
         };
 
@@ -637,6 +640,7 @@ export function MobileCRMView({
                     setIsEditingClient(false);
                     setEditName(client.name);
                     setEditPhone(cleanPhone || client.phone || "");
+                        setEditAddress(client.address || "");
                     setEditError(null);
                     setEditSuccess(null);
                   }}
@@ -964,6 +968,19 @@ export function MobileCRMView({
                         className="w-full h-11 px-3.5 rounded-xl bg-black/60 border border-white/15 text-white text-base focus:outline-none focus:border-amber-400/50 font-mono"
                       />
                     </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-zinc-300 block mb-1 flex items-center gap-1">
+                        <MapPin className="size-3 text-amber-400" /> Endereço de Entrega
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={editAddress}
+                        onChange={(e) => setEditAddress(e.target.value)}
+                        placeholder="Ex: Rua, número, bairro, cidade..."
+                        className="w-full p-3 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-amber-400/50 resize-none"
+                      />
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-end gap-2 pt-2">
@@ -1015,6 +1032,7 @@ export function MobileCRMView({
                       setEditPhone(
                         selectedClientForSheet.cleanPhone || selectedClientForSheet.phone || ""
                       );
+                      setEditAddress(selectedClientForSheet.address || "");
                     }}
                     className="min-h-[44px] px-3.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/25 text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0"
                   >

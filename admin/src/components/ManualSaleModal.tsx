@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ensureBuyerInBroadcastList } from "@/lib/marketingLists";
+import { ensureSaleCustomer } from "@/lib/crm";
 import { BRAZILIAN_STATES } from "@/lib/nationalSales";
 import { notifyMobileSale } from "@/lib/saleNotifications";
 import { validateCartStockAvailability, executeAtomicSaleWithStockLock } from "@/lib/stockValidation";
@@ -591,19 +592,6 @@ export function ManualSaleModal({
     setSubmitting(true);
 
     try {
-      // 1. Inserir/Atualizar Cliente no CRM (smoking_clients)
-      const rawPhone = clientPhone.trim();
-      const cleanPhone = rawPhone.replace(/\D/g, "");
-      
-      let formattedPhone = "";
-      if (isNoWhatsApp || (!cleanPhone && !rawPhone)) {
-        const cleanSlug = clientName.trim().toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10) || "cliente";
-        formattedPhone = `INSTA_${cleanSlug}_${Date.now().toString().slice(-6)}`;
-      } else {
-        formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
-      }
-
-      let clientSaveWarning: string | null = null;
       const finalAddress = isNationalSale
         ? `[ENVIO NACIONAL: ${nationalState} - ${nationalCity.trim() || "Destino"}] ${nationalStreetAddress.trim() || shippingAddress.trim() || "Envio Correios"}${nationalTrackingCode.trim() ? ` | Rastreio: ${nationalTrackingCode.trim().toUpperCase()}` : ""}`
         : (shippingAddress.trim() || "Atendimento Balcão / WhatsApp");
@@ -612,57 +600,22 @@ export function ManualSaleModal({
         ? `${nationalCity.trim() || "Nacional"} - ${nationalState}`
         : (shippingAddress.trim() || "Atendimento Balcão / WhatsApp");
 
-      // 1. Identificar ou Cadastrar Cliente Oficialmente em smoking_clients (SEM onConflict: 'phone'!)
-      let finalCustomerId: string | null = selectedCustomerId;
+      // 1. Identificar ou Cadastrar Cliente Oficialmente em smoking_clients (OBRIGATÓRIO / SEM VENDAS ÓRFÃS)
+      // Se não for possível encontrar ou salvar o cliente no tenant, a venda é sumariamente abortada!
+      const { customerId: finalCustomerId, formattedPhone } = await ensureSaleCustomer({
+        companyId,
+        selectedCustomerId,
+        clientName,
+        clientPhone,
+        isNoWhatsApp,
+        clientAddressToSave,
+      });
 
-      try {
-        if (finalCustomerId) {
-          // Atualizar dados cadastrais do cliente selecionado EXCLUSIVAMENTE pelo ID (customer.id)
-          let clientUpdQuery = supabase
-            .from("smoking_clients")
-            .update({
-              name: clientName.trim(),
-              ...(cleanPhone.length >= 10 && !isNoWhatsApp ? { phone: formattedPhone } : {}),
-              address: clientAddressToSave,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", finalCustomerId);
-
-          if (companyId) {
-            clientUpdQuery = clientUpdQuery.eq("company_id", companyId);
-          }
-
-          const { error: clientErr } = await clientUpdQuery;
-          if (clientErr) {
-            console.warn("Aviso ao atualizar cliente por ID:", clientErr.message);
-          }
-        } else {
-          // Operador NÃO selecionou cliente existente -> cadastrar NOVO cliente em smoking_clients
-          const newClientPayload: any = {
-            name: clientName.trim(),
-            phone: cleanPhone.length >= 10 && !isNoWhatsApp ? formattedPhone : null,
-            address: clientAddressToSave,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          if (companyId) newClientPayload.company_id = companyId;
-
-          const { data: newClientData, error: newClientErr } = await supabase
-            .from("smoking_clients")
-            .insert(newClientPayload)
-            .select("id")
-            .single();
-
-          if (!newClientErr && newClientData?.id) {
-            finalCustomerId = newClientData.id;
-          } else if (newClientErr) {
-            console.warn("Aviso ao cadastrar novo cliente em smoking_clients:", newClientErr.message);
-          }
-        }
-      } catch (custErr) {
-        console.error("❌ Exceção ao salvar cliente em smoking_clients:", custErr);
-        clientSaveWarning = "Não foi possível atualizar o cadastro do cliente.";
+      if (!finalCustomerId) {
+        throw new Error("Não foi possível confirmar a identidade do cliente no CRM. A venda não foi registrada.");
       }
+
+      const cleanPhone = clientPhone.trim().replace(/\D/g, "");
 
       // 2. Formatar Itens do Pedido no padrão smoking_orders
       const orderItems = effectiveItems.map((item) => {
@@ -754,11 +707,7 @@ export function ManualSaleModal({
         nationalState: isNationalSale ? nationalState : undefined,
       });
 
-      if (clientSaveWarning) {
-        setSuccessMessage(`✅ Venda registrada com sucesso! (${clientSaveWarning})`);
-      } else {
-        setSuccessMessage(`✅ Venda registrada com sucesso! Estoque abatido, ranking, CRM${marketingListNote} atualizados.`);
-      }
+      setSuccessMessage(`✅ Venda registrada com sucesso! Estoque abatido, ranking, CRM${marketingListNote} atualizados.`);
 
       setTimeout(() => {
         invalidateSaleCatalogCache(companyId);

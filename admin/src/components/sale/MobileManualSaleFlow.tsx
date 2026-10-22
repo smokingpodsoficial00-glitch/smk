@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ensureBuyerInBroadcastList } from "@/lib/marketingLists";
+import { ensureSaleCustomer } from "@/lib/crm";
 import { BRAZILIAN_STATES } from "@/lib/nationalSales";
 import { notifyMobileSale } from "@/lib/saleNotifications";
 import { validateCartStockAvailability, executeAtomicSaleWithStockLock } from "@/lib/stockValidation";
@@ -573,19 +574,6 @@ export function MobileManualSaleFlow({
     setSubmitting(true);
 
     try {
-      // 1. Processar dados de contato
-      const rawPhone = clientPhone.trim();
-      const cleanPhone = rawPhone.replace(/\D/g, "");
-
-      let formattedPhone = "";
-      if (isNoWhatsApp || (!cleanPhone && !rawPhone)) {
-        const cleanSlug = clientName.trim().toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10) || "cliente";
-        formattedPhone = `INSTA_${cleanSlug}_${Date.now().toString().slice(-6)}`;
-      } else {
-        formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
-      }
-
-      let clientSaveWarning: string | null = null;
       const finalAddress = isNationalSale
         ? `[ENVIO NACIONAL: ${nationalState} - ${nationalCity.trim() || "Destino"}] ${nationalStreetAddress.trim() || shippingAddress.trim() || "Envio Correios"}${nationalTrackingCode.trim() ? ` | Rastreio: ${nationalTrackingCode.trim().toUpperCase()}` : ""}`
         : (shippingAddress.trim() || "Atendimento Balcão / WhatsApp");
@@ -594,57 +582,15 @@ export function MobileManualSaleFlow({
         ? `${nationalCity.trim() || "Nacional"} - ${nationalState}`
         : (shippingAddress.trim() || "Atendimento Balcão / WhatsApp");
 
-      // 2. Preservar customer_id ou cadastrar novo cliente em smoking_clients
-      let finalCustomerId: string | null = selectedCustomerId;
-
-      try {
-        if (finalCustomerId) {
-          // Cliente existente selecionado: atualiza apenas os campos necessários SEM duplicar
-          let clientUpdQuery = supabase
-            .from("smoking_clients")
-            .update({
-              name: clientName.trim(),
-              ...(cleanPhone.length >= 10 && !isNoWhatsApp ? { phone: formattedPhone } : {}),
-              address: clientAddressToSave,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", finalCustomerId);
-
-          if (companyId) {
-            clientUpdQuery = clientUpdQuery.eq("company_id", companyId);
-          }
-
-          const { error: clientErr } = await clientUpdQuery;
-          if (clientErr) {
-            console.warn("[MobileManualSaleFlow] Aviso ao atualizar cliente existente:", clientErr.message);
-          }
-        } else {
-          // Novo cliente digitado manualmente
-          const newClientPayload: any = {
-            name: clientName.trim(),
-            phone: cleanPhone.length >= 10 && !isNoWhatsApp ? formattedPhone : null,
-            address: clientAddressToSave,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          if (companyId) newClientPayload.company_id = companyId;
-
-          const { data: newClientData, error: newClientErr } = await supabase
-            .from("smoking_clients")
-            .insert(newClientPayload)
-            .select("id")
-            .single();
-
-          if (!newClientErr && newClientData?.id) {
-            finalCustomerId = newClientData.id;
-          } else if (newClientErr) {
-            console.warn("[MobileManualSaleFlow] Aviso ao cadastrar novo cliente:", newClientErr.message);
-          }
-        }
-      } catch (custErr) {
-        console.error("❌ Exceção ao salvar cliente no CRM:", custErr);
-        clientSaveWarning = "Não foi possível sincronizar o cadastro do cliente.";
-      }
+      // 2. Garantir sincronização estrita com smoking_clients (NUNCA gera pedido órfão)
+      const { customerId: finalCustomerId, formattedPhone } = await ensureSaleCustomer({
+        companyId,
+        selectedCustomerId,
+        clientName,
+        clientPhone,
+        isNoWhatsApp,
+        clientAddressToSave,
+      });
 
       // 3. Formatar itens do pedido no padrão smoking_orders
       const orderItems = items.map((item) => {
@@ -707,7 +653,8 @@ export function MobileManualSaleFlow({
       }
 
       // 6. Lista de Transmissão de Marketing (se habilitado)
-      if (autoAddToMarketingList && cleanPhone && !isNoWhatsApp && !formattedPhone.startsWith("INSTA_")) {
+      const cleanPhoneDigits = clientPhone.replace(/\D/g, "");
+      if (autoAddToMarketingList && cleanPhoneDigits && !isNoWhatsApp && !formattedPhone.startsWith("INSTA_")) {
         try {
           await ensureBuyerInBroadcastList({
             companyId,

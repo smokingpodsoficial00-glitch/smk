@@ -85,19 +85,29 @@ async function fetchConfig(): Promise<StoreConfig> {
 
   const companyId = await resolveCatalogCompanyId();
 
-  // 1. Tentar ler da tabela dedicada `store_config` filtrado pela empresa atual
+  // 1. Tentar ler da view pública `public_store_config` (compatível com blindagem de RLS v4) ou fallback para `store_config`
   try {
-    const { data, error } = await supabase
-      .from("store_config")
+    let { data, error } = await supabase
+      .from("public_store_config")
       .select("*")
       .eq("company_id", companyId)
       .maybeSingle();
+
+    if (error || !data) {
+      const fallbackRes = await supabase
+        .from("store_config")
+        .select("*")
+        .eq("company_id", companyId)
+        .maybeSingle();
+      data = fallbackRes.data;
+      error = fallbackRes.error;
+    }
 
     if (!error && data) {
       mainConfig = data as StoreConfig;
     }
   } catch (e) {
-    console.warn("Tabela store_config não acessível no frontend:", e);
+    console.warn("Tabela/view store_config não acessível no frontend:", e);
   }
 
   // 2. Tentar ler da tabela `smoking_products` (__STORE_CONFIG__)

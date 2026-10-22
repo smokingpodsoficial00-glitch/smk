@@ -60,6 +60,119 @@ export function detectFlavorProfile(text: string = ''): { type: FlavorProfileTyp
 }
 
 /**
+ * Resolve ou cadastra o cliente no CRM de forma determinística antes de qualquer venda.
+ * Garante que:
+ * 1. A busca/criação ocorre estritamente dentro do company_id informado (isolamento de tenant);
+ * 2. Se o cliente já existir pelo ID ou por company_id + telefone normalizado, reutiliza seu ID existente;
+ * 3. Se não existir, insere em smoking_clients e confirma o ID retornado;
+ * 4. NUNCA permite venda com customer_id nulo se houver cliente identificado;
+ * 5. Se o cadastro ou busca falhar por qualquer motivo (banco, rede, RLS), LANÇA UM ERRO EXPLÍCITO para abortar a venda.
+ */
+export async function ensureSaleCustomer(params: {
+  companyId?: string;
+  selectedCustomerId?: string | null;
+  clientName: string;
+  clientPhone: string;
+  isNoWhatsApp: boolean;
+  clientAddressToSave: string;
+}): Promise<{ customerId: string; formattedPhone: string }> {
+  const { companyId, selectedCustomerId, clientName, clientPhone, isNoWhatsApp, clientAddressToSave } = params;
+
+  if (!clientName || !clientName.trim()) {
+    throw new Error("O nome do cliente é obrigatório para registrar a venda.");
+  }
+
+  const cleanName = clientName.trim();
+  const rawPhone = (clientPhone || "").trim();
+  const cleanPhone = rawPhone.replace(/\D/g, "");
+
+  let formattedPhone = "";
+  if (isNoWhatsApp || (!cleanPhone && !rawPhone)) {
+    const cleanSlug = cleanName.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10) || "cliente";
+    formattedPhone = `INSTA_${cleanSlug}_${Date.now().toString().slice(-6)}`;
+  } else {
+    formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+  }
+
+  const isRealPhone = cleanPhone.length >= 10 && !isNoWhatsApp;
+
+  // CASO 1: Operador já selecionou um cliente existente do autocomplete
+  if (selectedCustomerId) {
+    let clientUpdQuery = supabase
+      .from("smoking_clients")
+      .update({
+        name: cleanName,
+        ...(isRealPhone ? { phone: formattedPhone } : {}),
+        address: clientAddressToSave,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", selectedCustomerId);
+
+    if (companyId) {
+      clientUpdQuery = clientUpdQuery.eq("company_id", companyId);
+    }
+
+    const { error: updErr } = await clientUpdQuery;
+    if (updErr) {
+      console.warn("[ensureSaleCustomer] Aviso ao atualizar dados do cliente existente:", updErr.message);
+    }
+
+    return { customerId: selectedCustomerId, formattedPhone };
+  }
+
+  // CASO 2: Operador digitou os dados. Verificar se já existe cliente com este telefone dentro do MESMO tenant
+  if (isRealPhone && companyId) {
+    const { data: existingClients, error: searchErr } = await supabase
+      .from("smoking_clients")
+      .select("id, name, phone")
+      .eq("company_id", companyId)
+      .eq("phone", formattedPhone);
+
+    if (!searchErr && existingClients && existingClients.length === 1) {
+      const existing = existingClients[0];
+      // Atualizar dados cadastrais do cliente existente no tenant
+      await supabase
+        .from("smoking_clients")
+        .update({
+          name: cleanName,
+          address: clientAddressToSave,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id);
+
+      return { customerId: existing.id, formattedPhone };
+    }
+  }
+
+  // CASO 3: Cliente novo para este tenant -> Cadastrar oficialmente em smoking_clients
+  const newClientPayload: any = {
+    name: cleanName,
+    phone: isRealPhone ? formattedPhone : null,
+    address: clientAddressToSave,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  if (companyId) newClientPayload.company_id = companyId;
+
+  const { data: newClientData, error: insertErr } = await supabase
+    .from("smoking_clients")
+    .insert(newClientPayload)
+    .select("id")
+    .single();
+
+  if (insertErr || !newClientData?.id) {
+    console.error("[ensureSaleCustomer] Falha crítica ao criar cliente em smoking_clients:", insertErr);
+    throw new Error(
+      "Não foi possível salvar o cliente no CRM (" +
+      (insertErr?.message || "falha de banco de dados") +
+      "). A venda foi cancelada para evitar inconsistência. Tente novamente."
+    );
+  }
+
+  return { customerId: newClientData.id, formattedPhone };
+}
+
+/**
  * Normaliza o telefone para armazenamento padronizado em smoking_clients
  */
 export function normalizePhoneForStorage(phone: string | null | undefined): string | null {
@@ -231,11 +344,12 @@ export interface UpdateBasicClientDataParams {
   clientId: string;
   name: string;
   phone: string | null;
+  address?: string | null;
   companyId?: string;
 }
 
 /**
- * Atualiza dados cadastrais básicos (nome e telefone) do cliente
+ * Atualiza dados cadastrais básicos (nome, telefone e endereço) do cliente
  * EXCLUSIVAMENTE pelo seu ID primário (customer.id).
  * Não faz merge, não move pedidos, não altera históricos.
  */
@@ -243,12 +357,14 @@ export async function updateBasicClientData({
   clientId,
   name,
   phone,
+  address,
   companyId,
 }: UpdateBasicClientDataParams): Promise<{ 
   success: boolean; 
   error?: string;
   savedPhone?: string | null;
   savedName?: string;
+  savedAddress?: string;
 }> {
   try {
     const trimmedName = name ? name.trim() : '';
@@ -261,15 +377,22 @@ export async function updateBasicClientData({
     }
 
     const finalPhone = normalizePhoneForStorage(phone);
+    const finalAddress = address !== undefined ? (address ? address.trim() : '') : undefined;
 
     // UPDATE estrito baseado EXCLUSIVAMENTE no ID do cliente (customer.id)
+    const updatePayload: any = {
+      name: trimmedName,
+      phone: finalPhone,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (finalAddress !== undefined) {
+      updatePayload.address = finalAddress;
+    }
+
     let updateQuery = supabase
       .from('smoking_clients')
-      .update({
-        name: trimmedName,
-        phone: finalPhone,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', clientId);
 
     if (companyId) {
@@ -294,7 +417,8 @@ export async function updateBasicClientData({
     return { 
       success: true, 
       savedName: trimmedName, 
-      savedPhone: finalPhone 
+      savedPhone: finalPhone,
+      savedAddress: finalAddress
     };
   } catch (err: any) {
     console.error('Exceção ao atualizar dados do cliente:', err);

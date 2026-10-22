@@ -53,7 +53,7 @@ export function buildWhatsAppUrl(items: CartItem[], total: number, whatsappNumbe
   const cleanPhone = whatsappNumber ? whatsappNumber.replace(/\D/g, "") : "";
   if (!cleanPhone || cleanPhone.length < 10) return null;
   const phone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
-  const parts = items.map(i => `${i.quantity}x ${i.product.name} (${i.product.flavor})`).join(", ");
-  const msg = `[PEDIDO-SMOKING] ${parts} | Total: ${formatBRL(total)}`;
+  const itemLines = items.map(i => `• ${i.quantity}x ${i.product.name} (${i.product.flavor})`).join("\n");
+  const msg = `[PEDIDO-SMOKINGPODS]\n${itemLines}\n• Total: ${formatBRL(total)}`;
   return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
 }
