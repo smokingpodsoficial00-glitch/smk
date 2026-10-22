@@ -606,12 +606,17 @@ export default function MarketingModule() {
     const selectedGroupName = whatsAppGroups.find(g => g.id === campaignFormTargetGroup)?.name;
 
     if (editingCampaign) {
+      const effectiveVariations = (campaignFormUseVariations && campaignFormTargetType === 'lists')
+        ? campaignFormVariations.filter(v => v.trim().length > 0)
+        : [];
+      const effectiveUseVariations = campaignFormTargetType === 'lists' && campaignFormUseVariations && effectiveVariations.length > 0;
+
       const updatedCamp: Campaign = {
         ...editingCampaign,
         name: campaignFormName.trim(),
         message: campaignFormMessage,
-        variations: editingCampaign.variations || [],
-        useVariations: editingCampaign.useVariations || false,
+        variations: effectiveVariations,
+        useVariations: effectiveUseVariations,
         targetType: campaignFormTargetType,
         selectedListIds: Array.from(campaignFormSelectedLists),
         targetGroupId: campaignFormTargetGroup,
@@ -655,12 +660,17 @@ export default function MarketingModule() {
         editingCampaign.updatedAt || editingCampaign.createdAt
       ).catch(e => console.warn('[Marketing] Erro ao sincronizar campanha:', e));
     } else {
+      const effectiveVariations = (campaignFormUseVariations && campaignFormTargetType === 'lists')
+        ? campaignFormVariations.filter(v => v.trim().length > 0)
+        : [];
+      const effectiveUseVariations = campaignFormTargetType === 'lists' && campaignFormUseVariations && effectiveVariations.length > 0;
+
       const newCamp: Campaign = {
         id: `camp_${Date.now()}`,
         name: campaignFormName.trim(),
         message: campaignFormMessage,
-        variations: [],
-        useVariations: false,
+        variations: effectiveVariations,
+        useVariations: effectiveUseVariations,
         targetType: campaignFormTargetType,
         selectedListIds: Array.from(campaignFormSelectedLists),
         targetGroupId: campaignFormTargetGroup,
@@ -2149,33 +2159,52 @@ export default function MarketingModule() {
                 )}
               </div>
 
-              {/* Mensagem & Modelos */}
+              {/* Mensagem & Modelos com Suporte a 5 Variações Anti-Ban */}
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <label className="text-xs font-bold text-white">Mensagem</label>
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setCampaignFormMessage(prev => prev + ' [Nome]')}
-                      className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] text-white/70 font-mono cursor-pointer"
-                    >
-                      + [Nome]
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCampaignFormMessage(prev => prev + ' [LINK_DO_CARDAPIO_VERCEL]')}
-                      className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] text-white/70 font-mono cursor-pointer"
-                    >
-                      + [Cardápio]
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCampaignFormMessage(prev => prev + ' [LINK_DO_GRUPO_VIP_WHATSAPP]')}
-                      className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] text-white/70 font-mono cursor-pointer"
-                    >
-                      + [Grupo VIP]
-                    </button>
+                    <label className="text-xs font-bold text-white">
+                      {campaignFormUseVariations && campaignFormTargetType === 'lists' ? 'Mensagem Principal (Variação #1)' : 'Mensagem'}
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setCampaignFormMessage(prev => prev + ' [Nome]')}
+                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] text-white/70 font-mono cursor-pointer"
+                      >
+                        + [Nome]
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCampaignFormMessage(prev => prev + ' [LINK_DO_CARDAPIO_VERCEL]')}
+                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] text-white/70 font-mono cursor-pointer"
+                      >
+                        + [Cardápio]
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCampaignFormMessage(prev => prev + ' [LINK_DO_GRUPO_VIP_WHATSAPP]')}
+                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] text-white/70 font-mono cursor-pointer"
+                      >
+                        + [Grupo VIP]
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Toggle de Variações Anti-Ban exclusivo para Listas 1v1 */}
+                  {campaignFormTargetType === 'lists' && (
+                    <button
+                      type="button"
+                      onClick={() => setCampaignFormUseVariations(!campaignFormUseVariations)}
+                      className={`px-3 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        campaignFormUseVariations
+                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm'
+                          : 'bg-white/5 text-white/50 border-white/10 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      <span>🔄 {campaignFormUseVariations ? 'Variações Anti-Ban Ativas' : '+ Ativar 5 Variações Anti-Ban (Spintax)'}</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Modelos Prontos */}
@@ -2192,14 +2221,95 @@ export default function MarketingModule() {
                   ))}
                 </div>
 
-                {/* Caixa de Texto da Mensagem */}
+                {/* Caixa de Texto da Mensagem Principal */}
                 <textarea
-                  rows={6}
+                  rows={5}
                   value={campaignFormMessage}
                   onChange={(e) => setCampaignFormMessage(e.target.value)}
                   className="w-full bg-[#050505] border border-white/10 rounded-xl p-3.5 text-xs text-white font-mono leading-relaxed focus:outline-none focus:border-emerald-500/50"
-                  placeholder="Escreva a mensagem aqui..."
+                  placeholder="Escreva a mensagem principal aqui..."
                 />
+
+                {/* Bloco de Variações Dinâmicas (Spintax) para 1v1 */}
+                {campaignFormTargetType === 'lists' && campaignFormUseVariations && (
+                  <div className="p-4 bg-purple-950/20 border border-purple-500/30 rounded-2xl space-y-3 shadow-inner">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                          🔄 5 Variações Fixas Anti-Ban ({campaignFormVariations.length + 1} de 5 configuradas)
+                        </span>
+                        <p className="text-[10px] text-white/40 mt-0.5">
+                          Cada 1 dos 5 contatos do lote recebe uma mensagem exclusiva. Máximo estrito: 5 variações.
+                        </p>
+                      </div>
+
+                      {campaignFormVariations.length < 4 ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (campaignFormVariations.length < 4) {
+                              setCampaignFormVariations([...campaignFormVariations, '']);
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1 cursor-pointer w-fit"
+                        >
+                          <Plus className="size-3" /> Adicionar Variação ({campaignFormVariations.length + 2}/5)
+                        </button>
+                      ) : (
+                        <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
+                          ✓ Limite Máximo de 5 Variações Atingido
+                        </span>
+                      )}
+                    </div>
+
+                    {campaignFormVariations.length === 0 ? (
+                      <div className="p-4 rounded-xl border border-dashed border-purple-500/20 text-center text-xs text-purple-300/40">
+                        Nenhuma variação adicionada ainda. Clique em <strong>+ Adicionar Variação</strong> acima para colocar textos alternativos com outras saudações e frases.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {campaignFormVariations.map((v, idx) => (
+                          <div key={idx} className="space-y-1.5 bg-black/40 p-3 rounded-xl border border-purple-500/20">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-purple-400 font-mono">Variação #{idx + 2}</span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const copy = [...campaignFormVariations];
+                                    copy[idx] = (copy[idx] || '') + ' [Nome]';
+                                    setCampaignFormVariations(copy);
+                                  }}
+                                  className="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[10px] text-white/50 font-mono cursor-pointer"
+                                >
+                                  + [Nome]
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setCampaignFormVariations(campaignFormVariations.filter((_, i) => i !== idx))}
+                                  className="text-red-400/70 hover:text-red-300 text-[10px] font-bold cursor-pointer ml-1"
+                                >
+                                  ✕ Remover
+                                </button>
+                              </div>
+                            </div>
+                            <textarea
+                              rows={4}
+                              value={v}
+                              onChange={(e) => {
+                                const copy = [...campaignFormVariations];
+                                copy[idx] = e.target.value;
+                                setCampaignFormVariations(copy);
+                              }}
+                              className="w-full bg-[#050505] border border-white/10 rounded-lg p-2.5 text-xs text-white font-mono leading-relaxed focus:outline-none focus:border-purple-500/50"
+                              placeholder={`Texto da variação #${idx + 2}...`}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
