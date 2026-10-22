@@ -473,6 +473,16 @@ export default function MarketingModule() {
       setEditingList(listToEdit);
       setListFormName(listToEdit.name);
       setListFormDesc(listToEdit.description);
+      // Garante que contatos já existentes na lista estejam disponíveis no pool
+      if (listToEdit.contacts && listToEdit.contacts.length > 0) {
+        setAllContacts(prev => {
+          const map = new Map(prev.map(c => [c.id, c]));
+          listToEdit.contacts.forEach(c => {
+            if (!map.has(c.id)) map.set(c.id, c);
+          });
+          return Array.from(map.values());
+        });
+      }
       setListFormSelectedContacts(new Set(listToEdit.contacts.map(c => c.id)));
     } else {
       setEditingList(null);
@@ -483,7 +493,7 @@ export default function MarketingModule() {
     setIsListModalOpen(true);
   };
 
-  // Salva Lista no Supabase
+  // Salva Lista no Supabase / Backend / Cache Local
   const handleSaveList = async () => {
     if (!company?.id) {
       alert('Sessão inválida: nenhuma empresa selecionada.');
@@ -494,7 +504,15 @@ export default function MarketingModule() {
       return;
     }
 
-    const selectedMembers = allContacts.filter(c => listFormSelectedContacts.has(c.id));
+    const contactPool = new Map<string, ContactItem>();
+    allContacts.forEach(c => contactPool.set(c.id, c));
+    if (editingList?.contacts) {
+      editingList.contacts.forEach(c => contactPool.set(c.id, c));
+    }
+
+    const selectedMembers = Array.from(listFormSelectedContacts)
+      .map(id => contactPool.get(id))
+      .filter((c): c is ContactItem => Boolean(c));
 
     try {
       if (editingList) {
@@ -514,6 +532,7 @@ export default function MarketingModule() {
         setBroadcastLists(prev => [...prev, newList]);
       }
       setIsListModalOpen(false);
+      setEditingList(null);
     } catch (err: any) {
       alert(`Erro ao salvar lista: ${err?.message || err}`);
     }

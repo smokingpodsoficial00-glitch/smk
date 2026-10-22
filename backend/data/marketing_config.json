@@ -70,48 +70,7 @@
       "startDate": "2026-09-21",
       "createdAt": "2026-09-11T15:03:53.192241+00:00",
       "frequencyDays": 14,
-      "updatedAt": "2026-09-21T18:04:48.085Z",
-      "key": "4e4a393c-5a6b-44cf-9488-ec5e3c025937_2026-10-19_slot1",
-      "timestamp": "2026-10-19T18:00:33.282Z",
-      "campaignName": "CPM GRUPO INSTAGRAM"
-    },
-    {
-      "key": "camp_1792360452554_2026-10-19_slot1",
-      "timestamp": "2026-10-19T18:00:34.784Z",
-      "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
-    },
-    {
-      "key": "camp_1792360452554_2026-10-19_slot2",
-      "timestamp": "2026-10-19T21:00:34.877Z",
-      "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
-    },
-    {
-      "key": "camp_1792361244402_2026-10-19_slot1",
-      "timestamp": "2026-10-19T22:00:31.412Z",
-      "campaignName": "CAMPANHA DIARIA SORTEIO 5 CONTATOS"
-    },
-    {
-      "key": "camp_1792361104826_2026-10-20_slot1",
-      "timestamp": "2026-10-20T14:00:12.656Z",
-      "campaignName": "CPM GRUPO VIP ( SORTEIO 5 CONTATOS )"
-    },
-    {
-      "key": "4e4a393c-5a6b-44cf-9488-ec5e3c025937_2026-10-20_slot1",
-      "timestamp": "2026-10-20T18:00:14.174Z",
-      "campaignName": "CPM GRUPO INSTAGRAM"
-    },
-    {
-      "key": "camp_1792360452554_2026-10-20_slot1",
-      "timestamp": "2026-10-20T18:00:17.045Z",
-      "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
-    },
-    {
-      "key": "a200c5bf-c667-4a05-bafd-bdf324195cdb_2026-10-20_slot1",
-      "timestamp": "2026-10-20T19:00:14.526Z",
-      "campaignName": "AVISO SALVAR CONTATO"
-    }
-  ],
-  "lastUpdated": "2026-10-20T19:00:14.526Z"
+      "updatedAt": "2026-09-21T18:04:48.085Z"
     },
     {
       "id": "7374d4ba-9031-446f-9c7b-d001608641bf",
@@ -385,11 +344,7 @@
       "status": "active",
       "createdAt": "2026-10-18T21:54:12.981Z",
       "updatedAt": "2026-10-18T21:54:12.981Z",
-<<<<<<< Updated upstream
       "lastRunDate": "20/10/2026"
-=======
-      "lastRunDate": "19/10/2026"
->>>>>>> Stashed changes
     },
     {
       "id": "camp_1792361104826",
@@ -474,7 +429,6 @@
       "campaignName": "CPM DOMINGO 2"
     },
     {
-<<<<<<< Updated upstream
       "key": "camp_1792361104826_2026-10-20_slot1",
       "timestamp": "2026-10-20T14:00:12.656Z",
       "campaignName": "CPM GRUPO VIP ( SORTEIO 5 CONTATOS )"
@@ -496,29 +450,6 @@
     }
   ],
   "lastUpdated": "2026-10-20T19:00:14.526Z",
-=======
-      "key": "4e4a393c-5a6b-44cf-9488-ec5e3c025937_2026-10-19_slot1",
-      "timestamp": "2026-10-19T18:00:33.282Z",
-      "campaignName": "CPM GRUPO INSTAGRAM"
-    },
-    {
-      "key": "camp_1792360452554_2026-10-19_slot1",
-      "timestamp": "2026-10-19T18:00:34.784Z",
-      "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
-    },
-    {
-      "key": "camp_1792360452554_2026-10-19_slot2",
-      "timestamp": "2026-10-19T21:00:34.877Z",
-      "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
-    },
-    {
-      "key": "camp_1792361244402_2026-10-19_slot1",
-      "timestamp": "2026-10-19T22:00:31.412Z",
-      "campaignName": "CAMPANHA DIARIA SORTEIO 5 CONTATOS"
-    }
-  ],
-  "lastUpdated": "2026-10-19T22:00:31.412Z",
->>>>>>> Stashed changes
   "lists": [
     {
       "id": "0d925499-da68-4a93-9591-f4b6f78744b1",

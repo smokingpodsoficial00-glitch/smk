@@ -282,8 +282,35 @@ export async function updateMarketingList(
     throw new Error("companyId e listId são obrigatórios para atualizar uma lista.");
   }
 
+  // 1. Obter estado atual local/offline
+  const currentAll = getOfflineListsCache();
+  const existing = currentAll.find(l => l.id === listId);
+
+  // 2. Montar objeto atualizado imediatamente garantindo a preservação dos contatos
+  const updatedList: BroadcastList = {
+    ...(existing || {
+      id: listId,
+      name: updates.name || 'Lista',
+      description: updates.description || '',
+      color: updates.color || '#10b981',
+      createdAt: new Date().toISOString(),
+      contacts: []
+    }),
+    ...updates,
+    updatedAt: new Date().toISOString(),
+    contacts: updates.contacts !== undefined ? updates.contacts : (existing?.contacts || [])
+  };
+
+  // 3. Persistência imediata local (localStorage) e no Backend Node
+  const newAll = currentAll.some(l => l.id === listId)
+    ? currentAll.map(l => l.id === listId ? updatedList : l)
+    : [...currentAll, updatedList];
+
+  saveOfflineListsCache(newAll);
+  syncListsWithBackend(newAll);
+
+  // 4. Sincronização em nuvem com Supabase (resiliente a falhas de RLS e rede)
   try {
-    // 1. Atualizar campos da lista principal se fornecidos
     const listPatch: any = {};
     if (updates.name !== undefined) listPatch.name = updates.name.trim();
     if (updates.description !== undefined) listPatch.description = updates.description.trim() || null;
@@ -297,7 +324,6 @@ export async function updateMarketingList(
         .eq('company_id', companyId);
     }
 
-    // 2. Se contatos foram informados, efetuar DIFF cirúrgico
     if (updates.contacts !== undefined) {
       const { data: currentContacts, error: fetchErr } = await supabase
         .from('smoking_marketing_list_contacts')
@@ -305,9 +331,9 @@ export async function updateMarketingList(
         .eq('list_id', listId)
         .eq('company_id', companyId);
 
-      if (!fetchErr) {
+      if (!fetchErr && currentContacts) {
         const currentMap = new Map<string, any>();
-        (currentContacts || []).forEach(c => currentMap.set(c.clean_phone, c));
+        currentContacts.forEach(c => currentMap.set(c.clean_phone, c));
 
         const newMap = new Map<string, ContactItem>();
         updates.contacts.forEach(c => {
@@ -354,42 +380,9 @@ export async function updateMarketingList(
         }
       }
     }
-
-    const lists = await fetchMarketingLists(companyId);
-    const updated = lists.find(l => l.id === listId);
-    if (updated) {
-      const currentAll = getOfflineListsCache().map(l => l.id === listId ? updated : l);
-      saveOfflineListsCache(currentAll);
-      syncListsWithBackend(currentAll);
-      return updated;
-    }
   } catch (err: any) {
-    console.warn('[MarketingLists] Supabase falhou na atualização. Utilizando fallback local + backend:', err?.message || err);
+    console.warn('[MarketingLists] Aviso: sincronização remota Supabase falhou:', err?.message || err);
   }
-
-  // Fallback local garantido
-  const currentAll = getOfflineListsCache();
-  const existing = currentAll.find(l => l.id === listId);
-  const updatedList: BroadcastList = {
-    ...(existing || {
-      id: listId,
-      name: updates.name || 'Lista',
-      description: updates.description || '',
-      color: updates.color || '#10b981',
-      createdAt: new Date().toISOString(),
-      contacts: []
-    }),
-    ...updates,
-    updatedAt: new Date().toISOString(),
-    contacts: updates.contacts !== undefined ? updates.contacts : (existing?.contacts || [])
-  };
-
-  const newAll = currentAll.some(l => l.id === listId)
-    ? currentAll.map(l => l.id === listId ? updatedList : l)
-    : [...currentAll, updatedList];
-
-  saveOfflineListsCache(newAll);
-  syncListsWithBackend(newAll);
 
   return updatedList;
 }
