@@ -2,14 +2,7 @@ import { useEffect } from "react";
 import { Minus, Plus, X, Trash2 } from "lucide-react";
 import { buildWhatsAppUrl, formatBRL, useCart } from "@/lib/cart";
 import { useStoreConfig } from "@/lib/useStoreConfig";
-
-const vapeIgnite = "https://placehold.co/400x500/121212/ffffff.jpg?text=Ignite";
-const vapeElfbar = "https://placehold.co/400x500/121212/ffffff.jpg?text=ElfBar";
-const vapeLostmary = "https://placehold.co/400x500/121212/ffffff.jpg?text=LostMary";
-
-const brandImages: Record<string, string> = {
-  Ignite: vapeIgnite, "Elf Bar": vapeElfbar, "Lost Mary": vapeLostmary,
-};
+import { MinimalistVapeIcon } from "./MinimalistVapeIcon";
 
 export function CartSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { items, increment, decrement, remove, totalPrice, totalItems } = useCart();
@@ -61,10 +54,22 @@ export function CartSheet({ open, onClose }: { open: boolean; onClose: () => voi
             ) : (
               <ul className="flex flex-col gap-3">
                 {items.map(item => {
-                  const img = brandImages[item.product.brand] ?? vapeIgnite;
+                  const hasRealImg = Boolean(item.product.image_url);
                   return (
                     <li key={item.product.id} className="flex items-center gap-3 p-2.5 rounded-2xl bg-card/60 border border-border">
-                      <img src={img} alt={item.product.name} className="size-16 rounded-xl object-cover shrink-0" />
+                      <div className="size-16 rounded-xl bg-black border border-border/50 overflow-hidden shrink-0 flex items-center justify-center">
+                        {hasRealImg ? (
+                          <img
+                            src={item.product.image_url}
+                            alt={item.product.name}
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          <div className="size-full flex flex-col items-center justify-center p-1.5">
+                            <MinimalistVapeIcon className="w-6 h-10" />
+                          </div>
+                        )}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{item.product.brand}</p>
                         <p className="text-sm font-semibold truncate">{item.product.name}</p>
