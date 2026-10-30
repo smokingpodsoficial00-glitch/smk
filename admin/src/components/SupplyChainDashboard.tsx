@@ -1585,15 +1585,85 @@ export default function SupplyChainDashboard() {
 
       if (error) throw error;
 
+      // 1. Atualiza localStorage no escopo do admin e do catálogo digital
       try {
-        const storageKey = `store_config_v5_${targetCompanyId}`;
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          parsed.hide_out_of_stock_products = nextValue;
-          localStorage.setItem(storageKey, JSON.stringify(parsed));
+        const storageKeys = [
+          `store_config_v5_${targetCompanyId}`,
+          `store_config_catalog_v5_${targetCompanyId}`
+        ];
+        for (const storageKey of storageKeys) {
+          const saved = localStorage.getItem(storageKey);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            parsed.hide_out_of_stock_products = nextValue;
+            localStorage.setItem(storageKey, JSON.stringify(parsed));
+          } else {
+            localStorage.setItem(storageKey, JSON.stringify({
+              id: targetCompanyId,
+              hide_out_of_stock_products: nextValue,
+              hide_out_of_stock_variants: hideOutOfStockVariants,
+              auto_hide_out_of_stock: Boolean(nextValue || hideOutOfStockVariants)
+            }));
+          }
         }
       } catch {}
+
+      // 2. Transmite via BroadcastChannel local
+      try {
+        if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+          const bc = new BroadcastChannel("store_config_channel_v5");
+          bc.postMessage({
+            id: targetCompanyId,
+            hide_out_of_stock_products: nextValue,
+            hide_out_of_stock_variants: hideOutOfStockVariants,
+            auto_hide_out_of_stock: Boolean(nextValue || hideOutOfStockVariants)
+          });
+          bc.close();
+        }
+      } catch {}
+
+      // 3. Persistência de contingência pública legível no Supabase para o catálogo anon
+      try {
+        const configPayload = {
+          hide_out_of_stock_products: nextValue,
+          hide_out_of_stock_variants: hideOutOfStockVariants,
+          auto_hide_out_of_stock: Boolean(nextValue || hideOutOfStockVariants),
+          updated_at: new Date().toISOString()
+        };
+
+        const { data: existingConfigRow } = await supabase
+          .from("smoking_products")
+          .select("id")
+          .eq("brand", "__STORE_CONFIG__")
+          .eq("company_id", targetCompanyId)
+          .limit(1);
+
+        if (existingConfigRow && existingConfigRow.length > 0) {
+          await supabase
+            .from("smoking_products")
+            .update({
+              flavor: JSON.stringify(configPayload),
+              is_active: true
+            })
+            .eq("id", existingConfigRow[0].id)
+            .eq("company_id", targetCompanyId);
+        } else {
+          await supabase
+            .from("smoking_products")
+            .insert({
+              company_id: targetCompanyId,
+              brand: "__STORE_CONFIG__",
+              name: "STORE_CONFIG",
+              flavor: JSON.stringify(configPayload),
+              price: 0,
+              stock: 0,
+              puffs: 0,
+              is_active: true
+            });
+        }
+      } catch (syncErr) {
+        console.warn("Aviso ao sincronizar linha pública __STORE_CONFIG__:", syncErr);
+      }
 
       setSaveProductsFeedback(true);
       setTimeout(() => setSaveProductsFeedback(false), 3000);
@@ -1634,15 +1704,85 @@ export default function SupplyChainDashboard() {
 
       if (error) throw error;
 
+      // 1. Atualiza localStorage no escopo do admin e do catálogo digital
       try {
-        const storageKey = `store_config_v5_${targetCompanyId}`;
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          parsed.hide_out_of_stock_variants = nextValue;
-          localStorage.setItem(storageKey, JSON.stringify(parsed));
+        const storageKeys = [
+          `store_config_v5_${targetCompanyId}`,
+          `store_config_catalog_v5_${targetCompanyId}`
+        ];
+        for (const storageKey of storageKeys) {
+          const saved = localStorage.getItem(storageKey);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            parsed.hide_out_of_stock_variants = nextValue;
+            localStorage.setItem(storageKey, JSON.stringify(parsed));
+          } else {
+            localStorage.setItem(storageKey, JSON.stringify({
+              id: targetCompanyId,
+              hide_out_of_stock_products: hideOutOfStockProducts,
+              hide_out_of_stock_variants: nextValue,
+              auto_hide_out_of_stock: Boolean(hideOutOfStockProducts || nextValue)
+            }));
+          }
         }
       } catch {}
+
+      // 2. Transmite via BroadcastChannel local
+      try {
+        if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+          const bc = new BroadcastChannel("store_config_channel_v5");
+          bc.postMessage({
+            id: targetCompanyId,
+            hide_out_of_stock_products: hideOutOfStockProducts,
+            hide_out_of_stock_variants: nextValue,
+            auto_hide_out_of_stock: Boolean(hideOutOfStockProducts || nextValue)
+          });
+          bc.close();
+        }
+      } catch {}
+
+      // 3. Persistência de contingência pública legível no Supabase para o catálogo anon
+      try {
+        const configPayload = {
+          hide_out_of_stock_products: hideOutOfStockProducts,
+          hide_out_of_stock_variants: nextValue,
+          auto_hide_out_of_stock: Boolean(hideOutOfStockProducts || nextValue),
+          updated_at: new Date().toISOString()
+        };
+
+        const { data: existingConfigRow } = await supabase
+          .from("smoking_products")
+          .select("id")
+          .eq("brand", "__STORE_CONFIG__")
+          .eq("company_id", targetCompanyId)
+          .limit(1);
+
+        if (existingConfigRow && existingConfigRow.length > 0) {
+          await supabase
+            .from("smoking_products")
+            .update({
+              flavor: JSON.stringify(configPayload),
+              is_active: true
+            })
+            .eq("id", existingConfigRow[0].id)
+            .eq("company_id", targetCompanyId);
+        } else {
+          await supabase
+            .from("smoking_products")
+            .insert({
+              company_id: targetCompanyId,
+              brand: "__STORE_CONFIG__",
+              name: "STORE_CONFIG",
+              flavor: JSON.stringify(configPayload),
+              price: 0,
+              stock: 0,
+              puffs: 0,
+              is_active: true
+            });
+        }
+      } catch (syncErr) {
+        console.warn("Aviso ao sincronizar linha pública __STORE_CONFIG__:", syncErr);
+      }
 
       setSaveVariantsFeedback(true);
       setTimeout(() => setSaveVariantsFeedback(false), 3000);
