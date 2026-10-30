@@ -21,14 +21,33 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem("cart-items");
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((it: any) =>
+        it &&
+        typeof it === 'object' &&
+        it.product &&
+        typeof it.product === 'object' &&
+        typeof it.product.id === 'string' &&
+        typeof it.quantity === 'number' &&
+        it.quantity > 0
+      ).map((it: any) => ({
+        product: {
+          ...it.product,
+          price: typeof it.product.price === 'number' && !isNaN(it.product.price) ? it.product.price : parseFloat(String(it.product.price || 0)) || 0
+        },
+        quantity: it.quantity
+      }));
     } catch {
       return [];
     }
   });
 
   useEffect(() => {
-    localStorage.setItem("cart-items", JSON.stringify(items));
+    try {
+      localStorage.setItem("cart-items", JSON.stringify(items));
+    } catch {}
   }, [items]);
 
   const add = useCallback((p: Product) => {
@@ -56,7 +75,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const clear = useCallback(() => setItems([]), []);
 
   const { totalItems, totalPrice } = useMemo(() => items.reduce(
-    (acc, i) => { acc.totalItems += i.quantity; acc.totalPrice += i.quantity * i.product.price; return acc; },
+    (acc, i) => {
+      const qty = typeof i.quantity === 'number' ? i.quantity : 1;
+      const price = typeof i.product?.price === 'number' ? i.product.price : parseFloat(String(i.product?.price || 0)) || 0;
+      acc.totalItems += qty;
+      acc.totalPrice += qty * price;
+      return acc;
+    },
     { totalItems: 0, totalPrice: 0 }
   ), [items]);
 
