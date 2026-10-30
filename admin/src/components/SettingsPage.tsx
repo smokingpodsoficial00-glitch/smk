@@ -24,6 +24,7 @@ export default function SettingsPage() {
   // Modais integrados
   const [mobilePushModalOpen, setMobilePushModalOpen] = useState(false);
   const [selectedTutorial, setSelectedTutorial] = useState<TutorialItem | null>(null);
+  const [videoStartedNotice, setVideoStartedNotice] = useState(false);
 
   // Form state local
   const [storeName, setStoreName] = useState("");
@@ -329,10 +330,7 @@ export default function SettingsPage() {
             }`}
           >
             <GraduationCap className="size-3.5 text-amber-400" />
-            <span>Vídeo Aulas & Tutoriais</span>
-            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-400/20 text-amber-300 font-extrabold border border-amber-400/30">
-              5 Aulas
-            </span>
+            <span>Videoaulas e tutoriais</span>
           </button>
         </div>
       </div>
@@ -776,77 +774,80 @@ export default function SettingsPage() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════════════════════
-            ABA 3: VÍDEO AULAS & TUTORIAIS (Academia da Loja & Guias Práticos)
+            ABA 3: VIDEOAULAS E TUTORIAIS (Espaço preparado para receber os vídeos)
            ═══════════════════════════════════════════════════════════════════════════ */}
         {activeTab === "tutorials" && (
           <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
             
-            {/* Header da Central de Treinamento */}
-            <div className="bg-gradient-to-r from-amber-500/10 via-white/5 to-transparent border border-white/10 rounded-3xl p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1.5">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/25 text-amber-300 text-[11px] font-bold">
-                  <GraduationCap className="size-3.5" />
-                  Academia Smoking Pods
-                </div>
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  Vídeo Aulas & Tutoriais da Operação
+            {/* Header da Seção */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
+                  <Video className="size-6 text-amber-400" />
+                  <span>Videoaulas e tutoriais</span>
                 </h2>
-                <p className="text-xs text-white/60 max-w-xl leading-relaxed">
-                  Aprenda as melhores práticas para operar sua loja: desde conectar no celular até fechamento de caixa e recuperação de clientes no WhatsApp.
+                <p className="text-xs text-white/50 mt-1">
+                  Espaço reservado para as videoaulas e tutoriais práticos da operação.
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={handleStartTour}
-                className="px-5 py-3 rounded-2xl font-bold text-xs bg-amber-400 hover:bg-amber-300 text-black shadow-lg shadow-amber-400/20 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-2 shrink-0"
+                className="px-4 py-2 rounded-xl font-bold text-xs bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-2 self-start sm:self-auto"
               >
-                <Compass className="size-4" />
-                <span>Iniciar Tour Interativo</span>
+                <Compass className="size-3.5 text-amber-400" />
+                <span>Tour do Sistema</span>
               </button>
             </div>
 
-            {/* Grid de Cards de Tutoriais */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-              {SYSTEM_TUTORIALS.map((tut) => (
-                <div
-                  key={tut.id}
-                  onClick={() => setSelectedTutorial(tut)}
-                  className="group bg-[#0a0a0a] border border-white/10 hover:border-white/25 rounded-3xl p-5 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 cursor-pointer shadow-lg relative overflow-hidden"
-                >
-                  <div className="space-y-3.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="size-10 rounded-2xl bg-white/5 border border-white/15 flex items-center justify-center transition-transform group-hover:scale-105">
-                        {tut.icon}
-                      </div>
-
-                      <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/60 font-medium">
-                        ⏱️ {tut.duration}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-white/40 block mb-1">
-                        {tut.category}
-                      </span>
-                      <h3 className="text-sm font-bold text-white group-hover:text-amber-300 transition-colors line-clamp-2">
-                        {tut.title}
-                      </h3>
-                      <p className="text-xs text-white/50 mt-1.5 line-clamp-2 leading-relaxed">
-                        {tut.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 mt-4 border-t border-white/5 flex items-center justify-between text-xs font-bold text-white/80 group-hover:text-white">
-                    <span className="flex items-center gap-1.5 text-[11px]">
-                      <Play className="size-3 text-amber-400 fill-amber-400" />
-                      Ver Aula / Passo a Passo
-                    </span>
-                    <ChevronRight className="size-4 text-white/40 group-hover:translate-x-1 transition-transform" />
+            {/* Container Principal de Vídeo (Player Placeholder) */}
+            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#141414] via-[#0c0c0c] to-black p-8 sm:p-14 text-center shadow-2xl flex flex-col items-center justify-center min-h-[380px]">
+              
+              {/* Efeito de iluminação de fundo */}
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(251,191,36,0.07),transparent_70%)] pointer-events-none" />
+              
+              <div className="relative z-10 max-w-md mx-auto space-y-6 flex flex-col items-center">
+                
+                {/* Ícone Play em Destaque */}
+                <div className="size-20 rounded-3xl bg-white/5 border border-white/15 flex items-center justify-center shadow-xl backdrop-blur-sm group hover:scale-105 transition-transform">
+                  <div className="size-12 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center">
+                    <Play className="size-6 text-amber-400 fill-amber-400 translate-x-0.5" />
                   </div>
                 </div>
-              ))}
+
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold text-white tracking-tight">
+                    Videoaulas e tutoriais
+                  </h3>
+                  <p className="text-xs text-white/50 leading-relaxed">
+                    Área reservada para as videoaulas da loja. Quando você enviar os vídeos, eles serão adicionados aqui para reprodução direta.
+                  </p>
+                </div>
+
+                {/* Botão Principal Iniciar Vídeo */}
+                <div className="pt-2 flex flex-col items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVideoStartedNotice(true);
+                      setTimeout(() => setVideoStartedNotice(false), 5000);
+                    }}
+                    className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-2xl bg-white hover:bg-white/90 text-black font-extrabold text-sm shadow-[0_0_25px_rgba(255,255,255,0.2)] hover:scale-105 transition-all cursor-pointer active:scale-95"
+                  >
+                    <Play className="size-4 fill-black" />
+                    <span>Iniciar vídeo</span>
+                  </button>
+
+                  {videoStartedNotice && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-200 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/25 px-4 py-2.5 rounded-xl flex items-center gap-2">
+                      <Sparkles className="size-3.5 shrink-0 text-amber-400" />
+                      <span>Área pronta! Os vídeos enviados serão vinculados diretamente neste player.</span>
+                    </div>
+                  )}
+                </div>
+
+              </div>
             </div>
 
           </div>
