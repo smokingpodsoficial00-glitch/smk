@@ -54,84 +54,84 @@ export async function resolveCatalogCompanyId(): Promise<string> {
   if (_resolvedCompanyIdPromise) return _resolvedCompanyIdPromise;
 
   _resolvedCompanyIdPromise = (async () => {
-    if (typeof window !== "undefined") {
-      const urlParams = new URLSearchParams(window.location.search);
-      const paramCompany = urlParams.get("company") || urlParams.get("c");
-      if (paramCompany && paramCompany.trim().length > 0) {
-        return paramCompany.trim();
-      }
+    const DEFAULT_ID = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+    try {
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        const paramCompany = urlParams.get("company") || urlParams.get("c");
+        if (paramCompany && paramCompany.trim().length > 0) {
+          return paramCompany.trim();
+        }
 
-      let slug = urlParams.get("loja");
-      if (!slug) {
-        const host = window.location.hostname;
-        if (!host.includes("localhost") && !host.includes("127.0.0.1")) {
-          const parts = host.split(".");
-          if (parts.length >= 3 && !["www", "smoking-pods-catalogo", "admin", "app"].includes(parts[0])) {
-            slug = parts[0];
+        let slug = urlParams.get("loja");
+        if (!slug) {
+          const host = window.location.hostname.toLowerCase();
+          // Ignora localhost e domínios Vercel (onde o subdomínio é o nome do deploy Vercel, não o slug da loja)
+          if (!host.includes("localhost") && !host.includes("127.0.0.1") && !host.endsWith("vercel.app")) {
+            const parts = host.split(".");
+            if (parts.length >= 3 && !["www", "smoking-pods-catalogo", "admin", "app"].includes(parts[0])) {
+              slug = parts[0];
+            }
           }
         }
-      }
 
-      if (slug && slug !== "smoking-pods") {
-        try {
-          let storeData: any = null;
-          const { data: vStoreData } = await supabase
-            .from("public_store_config")
-            .select("company_id")
-            .eq("store_slug", slug)
-            .maybeSingle();
+        const cleanSlug = (slug || "").trim().toLowerCase();
+        if (cleanSlug && !["smoking-pods", "smoking-pods-01", "smokingpods"].includes(cleanSlug)) {
+          try {
+            const { data: vStoreData } = await supabase
+              .from("public_store_config")
+              .select("company_id")
+              .eq("store_slug", cleanSlug)
+              .maybeSingle();
 
-          if (vStoreData?.company_id) {
-            storeData = vStoreData;
-          } else {
+            if (vStoreData?.company_id) {
+              return vStoreData.company_id;
+            }
+
             const { data: baseStoreData } = await supabase
               .from("store_config")
               .select("company_id")
-              .eq("store_slug", slug)
+              .eq("store_slug", cleanSlug)
               .maybeSingle();
-            storeData = baseStoreData;
-          }
 
-          if (storeData?.company_id) {
-            return storeData.company_id;
-          }
+            if (baseStoreData?.company_id) {
+              return baseStoreData.company_id;
+            }
 
-          const formattedName = slug.replace(/-/g, " ");
-          let compData: any = null;
-          const { data: vCompData } = await supabase
-            .from("public_companies")
-            .select("id")
-            .ilike("name", formattedName)
-            .maybeSingle();
+            const formattedName = cleanSlug.replace(/-/g, " ");
+            const { data: vCompData } = await supabase
+              .from("public_companies")
+              .select("id")
+              .ilike("name", formattedName)
+              .maybeSingle();
 
-          if (vCompData?.id) {
-            compData = vCompData;
-          } else {
+            if (vCompData?.id) {
+              return vCompData.id;
+            }
+
             const { data: baseCompData } = await supabase
               .from("companies")
               .select("id")
               .ilike("name", formattedName)
               .maybeSingle();
-            compData = baseCompData;
-          }
 
-          if (compData?.id) {
-            return compData.id;
+            if (baseCompData?.id) {
+              return baseCompData.id;
+            }
+          } catch (e) {
+            console.warn("Erro ao buscar empresa por slug no catálogo:", e);
           }
-
-          return "00000000-0000-0000-0000-000000000000";
-        } catch (e) {
-          console.warn("Erro ao buscar empresa por slug no catálogo:", e);
-          return "00000000-0000-0000-0000-000000000000";
         }
       }
-    }
 
-    const envCompanyId = import.meta.env.VITE_COMPANY_ID;
-    if (envCompanyId && typeof envCompanyId === "string" && envCompanyId.trim().length > 0) {
-      return envCompanyId.trim();
+      const envCompanyId = import.meta.env.VITE_COMPANY_ID;
+      if (envCompanyId && typeof envCompanyId === "string" && envCompanyId.trim().length > 0) {
+        return envCompanyId.trim();
+      }
+    } catch (e) {
+      console.warn("Erro ao resolver empresa no catálogo:", e);
     }
-    return "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+    return DEFAULT_ID;
   })();
 
   return _resolvedCompanyIdPromise;
@@ -170,7 +170,7 @@ export async function hydrateMissingModelImages(
       memoryImageCache[p.id] = p.image_url;
       continue;
     }
-    if (memoryImageCache[groupKey] || memoryImageCache[p.id]) continue;
+    if (memoryImageCache[groupKey] !== undefined || memoryImageCache[p.id] !== undefined) continue;
     if (!seenGroupKeys.has(groupKey)) {
       seenGroupKeys.add(groupKey);
       missingRepIds.push(p.id);
@@ -197,14 +197,27 @@ export async function hydrateMissingModelImages(
           memoryImageCache[r.id] = r.image_url;
         }
       }
-      try {
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem(CATALOG_IMAGE_CACHE_KEY, JSON.stringify(memoryImageCache));
-        }
-      } catch {}
-      if (onImagesLoaded) {
-        onImagesLoaded({ ...memoryImageCache });
+    }
+
+    // Marca como vazia qualquer chave consultada que veio sem foto para não reconsultar
+    for (const p of items) {
+      const groupKey = `${(p.brand || "").trim().toLowerCase()}__${(p.name || "").trim().toLowerCase()}`;
+      if (memoryImageCache[groupKey] === undefined) {
+        memoryImageCache[groupKey] = "";
       }
+      if (memoryImageCache[p.id] === undefined) {
+        memoryImageCache[p.id] = "";
+      }
+    }
+
+    try {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(CATALOG_IMAGE_CACHE_KEY, JSON.stringify(memoryImageCache));
+      }
+    } catch {}
+
+    if (onImagesLoaded && imgRows && imgRows.length > 0) {
+      onImagesLoaded({ ...memoryImageCache });
     }
   } catch (e) {
     console.warn("Aviso ao carregar imagens de modelos:", e);

@@ -95,29 +95,56 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
   const [cartOpen, setCartOpen] = useState(false);
   const [selectedModelName, setSelectedModelName] = useState<string | null>(null);
 
+  let isSyncingLive = false;
+
   const loadProducts = async () => {
     let companyId = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
     try {
       companyId = await resolveCatalogCompanyId();
     } catch (e) {
-      console.error(e);
+      console.warn("Falha ao resolver companyId:", e);
     }
-    const [data, cats, catMap] = await Promise.all([
-      fetchProductsFromSupabase(companyId, (imgMap) => {
-        setHydratedImages(imgMap);
-      }),
-      fetchCategories(companyId),
-      fetchProductCategoryMappings(companyId),
-      fetchConfig()
-    ]);
-    setProductList(data);
-    setCategories(cats);
-    setCategoryMappings(catMap.productMap);
-    setLoading(false);
+
+    try {
+      // Timeout defensivo de 8s para garantir que o cliente NUNCA fique travado na tela de carregamento
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout ao carregar catálogo")), 8000)
+      );
+
+      const [data, cats, catMap] = await Promise.race([
+        Promise.all([
+          fetchProductsFromSupabase(companyId, (imgMap) => {
+            setHydratedImages(imgMap);
+          }),
+          fetchCategories(companyId),
+          fetchProductCategoryMappings(companyId),
+          fetchConfig()
+        ]),
+        timeoutPromise
+      ]);
+
+      if (data && data.length > 0) setProductList(data);
+      if (cats && cats.length > 0) setCategories(cats);
+      if (catMap?.productMap) setCategoryMappings(catMap.productMap);
+    } catch (err) {
+      console.error("Aviso ao carregar dados do catálogo:", err);
+      // Fallback seguro: tenta obter ao menos a lista de produtos
+      try {
+        const fallbackData = await fetchProductsFromSupabase(companyId);
+        if (fallbackData && fallbackData.length > 0) {
+          setProductList(fallbackData);
+        }
+      } catch {}
+    } finally {
+      // GARANTIA: Finaliza sempre o spinner para a página carregar
+      setLoading(false);
+    }
   };
 
-  // Sincronização leve ao vivo (23KB em ~100ms): atualiza estoque, visibilidade e destaques (⭐) instantaneamente
+  // Sincronização leve ao vivo: atualiza estoque, visibilidade e destaques (⭐) sem travar a interface
   const syncLiveCatalog = async () => {
+    if (isSyncingLive) return;
+    isSyncingLive = true;
     try {
       const companyId = await resolveCatalogCompanyId();
       const [data, catMap] = await Promise.all([
@@ -127,9 +154,11 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
         fetchProductCategoryMappings(companyId),
         fetchConfig()
       ]);
-      setProductList(data);
-      setCategoryMappings(catMap.productMap);
-    } catch {}
+      if (data && data.length > 0) setProductList(data);
+      if (catMap?.productMap) setCategoryMappings(catMap.productMap);
+    } catch {} finally {
+      isSyncingLive = false;
+    }
   };
 
   useEffect(() => {
@@ -197,7 +226,7 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
       if (typeof document === "undefined" || document.visibilityState === "visible") {
         syncLiveCatalog();
       }
-    }, 2500);
+    }, 25000);
 
     return () => {
       supabase.removeChannel(subscription);
@@ -310,21 +339,27 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
       const matchedCategories = categories.filter(c => modelCategoryIds.includes(c.id));
 
       const priceVariants = displayedVariants.length > 0 ? displayedVariants : baseVariants;
-      const hasAnyPromo = priceVariants.some(v => v.is_promotional);
-      const minPrice = priceVariants.length > 0 ? Math.min(...priceVariants.map(v => v.price)) : m.price;
-      const maxOriginalPrice = hasAnyPromo 
-        ? Math.max(...priceVariants.filter(v => v.is_promotional).map(v => v.original_price || v.price))
-        : minPrice;
-      const maxDiscountPct = hasAnyPromo
-        ? Math.max(...priceVariants.filter(v => v.is_promotional).map(v => v.discount_pct || 0))
-        : 0;
+      const promoVariants = priceVariants.filter(v => v.is_promotional);
+      const hasAnyPromo = promoVariants.length > 0;
+
+      const rawPrices = priceVariants.map(v => typeof v.price === 'number' ? v.price : parseFloat(String(v.price || 0)) || 0);
+      const minPrice = rawPrices.length > 0 ? Math.min(...rawPrices) : (typeof m.price === 'number' ? m.price : parseFloat(String(m.price || 0)) || 0);
+      const safeMinPrice = isFinite(minPrice) ? minPrice : 0;
+
+      const rawOriginalPrices = promoVariants.map(v => typeof v.original_price === 'number' ? v.original_price : v.price);
+      const maxOriginalPrice = rawOriginalPrices.length > 0 ? Math.max(...rawOriginalPrices) : safeMinPrice;
+      const safeMaxOriginalPrice = isFinite(maxOriginalPrice) ? maxOriginalPrice : safeMinPrice;
+
+      const rawDiscounts = promoVariants.map(v => typeof v.discount_pct === 'number' ? v.discount_pct : parseFloat(String(v.discount_pct || 0)) || 0);
+      const maxDiscountPct = rawDiscounts.length > 0 ? Math.max(...rawDiscounts) : 0;
+      const safeDiscountPct = isFinite(maxDiscountPct) ? maxDiscountPct : 0;
 
       result.push({
         ...m,
-        price: minPrice,
-        original_price: hasAnyPromo && maxOriginalPrice > minPrice ? maxOriginalPrice : undefined,
+        price: safeMinPrice,
+        original_price: hasAnyPromo && safeMaxOriginalPrice > safeMinPrice ? safeMaxOriginalPrice : undefined,
         is_promotional: hasAnyPromo,
-        discount_pct: maxDiscountPct,
+        discount_pct: safeDiscountPct,
         image_url: modelImage,
         allVariants: baseVariants,
         variants: displayedVariants,

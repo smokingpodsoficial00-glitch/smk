@@ -69,8 +69,9 @@ export function useCart() {
   return ctx;
 }
 
-export function formatBRL(value: number) {
-  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+export function formatBRL(value: number | undefined | null) {
+  const num = typeof value === 'number' && !isNaN(value) ? value : parseFloat(String(value || 0)) || 0;
+  return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 /**
