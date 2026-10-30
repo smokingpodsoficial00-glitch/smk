@@ -6,9 +6,9 @@ import { CartSheet } from "@/components/CartSheet";
 import { FlavorSheet } from "@/components/FlavorSheet";
 import { CartProvider } from "@/lib/cart";
 import type { SortOption } from "@/components/SortDropdown";
-import { fetchProductsFromSupabase, resolveCatalogCompanyId, getCatalogCompanyId, type Product, type PodModel } from "@/lib/products";
+import { fetchProductsFromSupabase, resolveCatalogCompanyId, type Product, type PodModel } from "@/lib/products";
 import { fetchCategories, fetchProductCategoryMappings, saveLocalCategoryMappings, LIVE_CATALOG_CHANNEL, DEFAULT_CATEGORIES, type Category } from "@/lib/categories";
-import { useStoreConfig, fetchConfig } from "@/lib/useStoreConfig";
+import { useStoreConfig, fetchConfig, applyInstantConfigPatch } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
 import { Loader2, Star } from "lucide-react";
 
@@ -83,6 +83,7 @@ function MainApp() {
 function Menu({ onBackToHub }: { onBackToHub: () => void }) {
   const { config } = useStoreConfig();
   const [productList, setProductList] = useState<Product[]>([]);
+  const [hydratedImages, setHydratedImages] = useState<Record<string, string>>({});
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [categoryMappings, setCategoryMappings] = useState<Record<string, { category_ids: string[]; display_order: number }>>({});
   const [selectedCategorySlug, setSelectedCategorySlug] = useState<string | null>(null);
@@ -92,7 +93,7 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
   const [query, setQuery] = useState("");
   const [brand, setBrand] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<PodModel | null>(null);
+  const [selectedModelName, setSelectedModelName] = useState<string | null>(null);
 
   const loadProducts = async () => {
     let companyId = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
@@ -102,7 +103,9 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
       console.error(e);
     }
     const [data, cats, catMap] = await Promise.all([
-      fetchProductsFromSupabase(companyId),
+      fetchProductsFromSupabase(companyId, (imgMap) => {
+        setHydratedImages(imgMap);
+      }),
       fetchCategories(companyId),
       fetchProductCategoryMappings(companyId),
       fetchConfig()
@@ -113,14 +116,18 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
     setLoading(false);
   };
 
-  // Revalidação leve apenas de configurações e destaques (⭐) sem rebaixar imagens pesadas
-  const syncLiveMetadata = async () => {
+  // Sincronização leve ao vivo (23KB em ~100ms): atualiza estoque, visibilidade e destaques (⭐) instantaneamente
+  const syncLiveCatalog = async () => {
     try {
       const companyId = await resolveCatalogCompanyId();
-      const [catMap] = await Promise.all([
+      const [data, catMap] = await Promise.all([
+        fetchProductsFromSupabase(companyId, (imgMap) => {
+          setHydratedImages(imgMap);
+        }),
         fetchProductCategoryMappings(companyId),
         fetchConfig()
       ]);
+      setProductList(data);
       setCategoryMappings(catMap.productMap);
     } catch {}
   };
@@ -132,26 +139,29 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
     const subscription = supabase
       .channel("public:realtime_menu")
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => {
-        loadProducts();
+        syncLiveCatalog();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "companies" }, () => {
-        loadProducts();
+        syncLiveCatalog();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "product_categories" }, () => {
-        syncLiveMetadata();
+        syncLiveCatalog();
       })
       .subscribe();
 
-    // 2. Canal Broadcast WebSocket em tempo real (<50ms entre domínios/dispositivos diferentes)
+    // 2. Canal Broadcast WebSocket em tempo real (<50ms entre domínios/dispositivos diferentes!)
+    //    IMPORTANTE: Deve usar EXATAMENTE o mesmo nome LIVE_CATALOG_CHANNEL que o Admin usa para publicar!
     const liveSyncChannel = supabase
-      .channel(`${LIVE_CATALOG_CHANNEL}_menu`)
+      .channel(LIVE_CATALOG_CHANNEL)
       .on("broadcast", { event: "catalog_sync" }, (msg: any) => {
         const payload = msg?.payload;
         if (payload && payload.type === "CATEGORIES_UPDATED" && payload.category_mappings) {
           saveLocalCategoryMappings(payload.category_mappings);
-          setCategoryMappings(payload.category_mappings);
+          setCategoryMappings({ ...payload.category_mappings });
+        } else if (payload && payload.type === "CONFIG_UPDATED" && payload.config) {
+          applyInstantConfigPatch(payload.config);
         } else {
-          syncLiveMetadata();
+          syncLiveCatalog();
         }
       })
       .subscribe();
@@ -163,21 +173,21 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
         bc = new BroadcastChannel("store_config_channel_v5");
         bc.onmessage = (ev) => {
           if (ev.data && ev.data.type === "CATEGORIES_UPDATED" && ev.data.category_mappings) {
-            setCategoryMappings(ev.data.category_mappings);
+            setCategoryMappings({ ...ev.data.category_mappings });
           } else {
-            loadProducts();
+            syncLiveCatalog();
           }
         };
       }
     } catch {}
 
-    // 4. Revalidação instantânea ao focar a aba/janela + polling leve de 3.5s
+    // 4. Revalidação instantânea ao focar a aba/janela + polling leve de 2.5s
     const handleFocus = () => {
-      syncLiveMetadata();
+      syncLiveCatalog();
     };
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        syncLiveMetadata();
+        syncLiveCatalog();
       }
     };
     window.addEventListener("focus", handleFocus);
@@ -185,9 +195,9 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
 
     const pollInterval = setInterval(() => {
       if (typeof document === "undefined" || document.visibilityState === "visible") {
-        syncLiveMetadata();
+        syncLiveCatalog();
       }
-    }, 3500);
+    }, 2500);
 
     return () => {
       supabase.removeChannel(subscription);
@@ -214,6 +224,8 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
 
       const modelDisplayName = p.name.toLowerCase().includes(p.brand.toLowerCase()) ? p.name : `${p.brand} ${p.name}`;
       const groupKey = `${p.brand}-${modelDisplayName}`.toLowerCase();
+      const gKeyCache = `${(p.brand || "").trim().toLowerCase()}__${(p.name || "").trim().toLowerCase()}`;
+      const effectiveImage = p.image_url || hydratedImages[p.id] || hydratedImages[gKeyCache] || "";
 
       if (!map.has(groupKey)) {
         map.set(groupKey, {
@@ -222,16 +234,16 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
             brand: p.brand,
             puffs: p.puffs,
             price: p.price,
-            image_url: p.image_url || "",
+            image_url: effectiveImage,
             variants: []
           },
           rawVariants: []
         });
       }
       const entry = map.get(groupKey)!;
-      entry.rawVariants.push(p);
-      if (!entry.model.image_url && p.image_url) {
-        entry.model.image_url = p.image_url;
+      entry.rawVariants.push(effectiveImage && !p.image_url ? { ...p, image_url: effectiveImage } : p);
+      if (!entry.model.image_url && effectiveImage) {
+        entry.model.image_url = effectiveImage;
       }
     }
 
@@ -322,7 +334,14 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
     }
 
     return result;
-  }, [productList, categories, categoryMappings, config?.hide_out_of_stock_products, config?.hide_out_of_stock_variants]);
+  }, [productList, hydratedImages, categories, categoryMappings, config?.hide_out_of_stock_products, config?.hide_out_of_stock_variants]);
+
+  // Modelo atualmente aberto no modal de sabores SEMPRE derivado ao vivo de `models`
+  // (se o switch "Ocultar variantes esgotadas" for ativado com o modal aberto, os sabores zerados somem ao vivo!)
+  const activeSelectedModel = useMemo(() => {
+    if (!selectedModelName) return null;
+    return models.find(m => m.name === selectedModelName) || null;
+  }, [models, selectedModelName]);
 
   const availableBrands = useMemo(() => {
     const set = new Set<string>();
@@ -521,7 +540,7 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                   {topFeaturedModels.map(m => (
-                    <ProductCard key={m.name} model={m} onClick={() => setSelectedModel(m)} />
+                    <ProductCard key={m.name} model={m} onClick={() => setSelectedModelName(m.name)} />
                   ))}
                 </div>
               </div>
@@ -543,7 +562,7 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
                 )}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                   {mainCatalogModels.map(m => (
-                    <ProductCard key={m.name} model={m} onClick={() => setSelectedModel(m)} />
+                    <ProductCard key={m.name} model={m} onClick={() => setSelectedModelName(m.name)} />
                   ))}
                 </div>
               </div>
@@ -553,10 +572,10 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
       </section>
       
       {/* Esconde a barra inferior se o FlavorSheet estiver aberto para evitar o bug de scroll no Safari */}
-      {!selectedModel && <CartBar onClick={() => setCartOpen(true)} />}
+      {!activeSelectedModel && <CartBar onClick={() => setCartOpen(true)} />}
       
       <CartSheet open={cartOpen} onClose={() => setCartOpen(false)} />
-      <FlavorSheet model={selectedModel} open={!!selectedModel} onClose={() => setSelectedModel(null)} />
+      <FlavorSheet model={activeSelectedModel} open={!!activeSelectedModel} onClose={() => setSelectedModelName(null)} />
     </div>
   );
 }

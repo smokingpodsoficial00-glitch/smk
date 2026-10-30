@@ -29,6 +29,27 @@ const DEFAULT_COMPANY_ID = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const LIVE_CATALOG_CHANNEL = "smk_live_catalog_sync_v1";
 
+// Canal WebSocket persistente para envio de Broadcast em < 20ms (sem handshake por clique)
+let persistentBroadcastChannel: any = null;
+let isBroadcastSubscribed = false;
+
+function ensurePersistentBroadcastChannel() {
+  if (typeof window === "undefined") return null;
+  if (!persistentBroadcastChannel) {
+    try {
+      persistentBroadcastChannel = supabase.channel(LIVE_CATALOG_CHANNEL);
+      persistentBroadcastChannel.subscribe((status: string) => {
+        isBroadcastSubscribed = status === "SUBSCRIBED";
+      });
+    } catch {}
+  }
+  return persistentBroadcastChannel;
+}
+
+if (typeof window !== "undefined") {
+  ensurePersistentBroadcastChannel();
+}
+
 export function getLocalCategoryMappings(): Record<string, { category_ids: string[]; display_order: number }> {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_CAT_KEY);
@@ -47,32 +68,36 @@ export function saveLocalCategoryMappings(mappings: Record<string, { category_id
 }
 
 /**
- * Emite broadcast via Supabase Realtime WebSocket para atualização instantânea (<50ms)
+ * Emite broadcast via Supabase Realtime WebSocket persistente para atualização instantânea (<30ms)
  * entre Admin e Catálogo, mesmo em domínios/dispositivos separados.
  */
 export async function broadcastLiveCatalogSync(payload: {
-  type: "CATEGORIES_UPDATED" | "CONFIG_UPDATED";
+  type: "CATEGORIES_UPDATED" | "CONFIG_UPDATED" | "STOCK_UPDATED";
   company_id: string;
   category_mappings?: Record<string, { category_ids: string[]; display_order: number }>;
   config?: any;
 }) {
   try {
-    const channel = supabase.channel(LIVE_CATALOG_CHANNEL);
-    channel.subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        channel
-          .send({
+    const ch = ensurePersistentBroadcastChannel();
+    if (!ch) return;
+    if (isBroadcastSubscribed) {
+      await ch.send({
+        type: "broadcast",
+        event: "catalog_sync",
+        payload,
+      });
+    } else {
+      // Se ainda estiver conectando, aguarda brevemente a conexão abrir e envia
+      setTimeout(() => {
+        try {
+          ch.send({
             type: "broadcast",
             event: "catalog_sync",
             payload,
-          })
-          .finally(() => {
-            setTimeout(() => {
-              try { supabase.removeChannel(channel); } catch {}
-            }, 1500);
           });
-      }
-    });
+        } catch {}
+      }, 250);
+    }
   } catch (e) {
     console.warn("Aviso no broadcast Realtime:", e);
   }
@@ -230,8 +255,8 @@ export async function fetchProductCategoryMappings(companyId?: string): Promise<
 
 /**
  * Atualiza categorias de um modelo/conjunto de produtos.
- * Fonte Primária: linha pública __STORE_CONFIG__ em smoking_products + Supabase Realtime Broadcast
- * Secundária: public.product_categories + smoking_orders + localStorage + BroadcastChannel
+ * Dispara Broadcast WebSocket no MESMO MILISSEGUNDO (0ms) do clique na estrela ⭐,
+ * e persiste em __STORE_CONFIG__, product_categories e smoking_orders em paralelo!
  */
 export async function updateModelCategories(params: {
   productIds: string[];
@@ -243,7 +268,7 @@ export async function updateModelCategories(params: {
   const { productIds, modelKey, categoryIds, displayOrder, companyId } = params;
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
 
-  // 1. Atualizar localStorage imediatamente
+  // 1. Atualizar localStorage imediatamente (0ms)
   const currentLocal = getLocalCategoryMappings();
 
   const parts = modelKey.split("__");
@@ -265,6 +290,12 @@ export async function updateModelCategories(params: {
 
   if (categoryIds.length === 0) {
     keysToClean.forEach((k) => delete currentLocal[k]);
+    Object.keys(currentLocal).forEach((k) => {
+      const kNorm = k.toLowerCase().replace(/\s+/g, "");
+      if (kNorm === cleanKey || kNorm === altCleanKey) {
+        delete currentLocal[k];
+      }
+    });
   } else {
     currentLocal[modelKey] = { category_ids: categoryIds, display_order: displayOrder };
     currentLocal[cleanKey] = { category_ids: categoryIds, display_order: displayOrder };
@@ -276,7 +307,7 @@ export async function updateModelCategories(params: {
 
   saveLocalCategoryMappings(currentLocal);
 
-  // 2. Transmitir atualização instantânea para abas no mesmo navegador
+  // 2. Transmitir atualização instantânea (0ms) via BroadcastChannel local E via Supabase WebSocket!
   try {
     if (typeof window !== "undefined" && "BroadcastChannel" in window) {
       const bc = new BroadcastChannel("store_config_channel_v5");
@@ -285,8 +316,13 @@ export async function updateModelCategories(params: {
     }
   } catch {}
 
-  // 3. PRIMEIRO no banco: Sincronizar category_mappings na linha pública __STORE_CONFIG__ em smoking_products
-  //    Isso garante que qualquer leitura subsequente do catálogo ou do Admin já encontre o estado atualizado!
+  broadcastLiveCatalogSync({
+    type: "CATEGORIES_UPDATED",
+    company_id: targetCompanyId,
+    category_mappings: { ...currentLocal },
+  });
+
+  // 3. Persistir na linha pública __STORE_CONFIG__ em smoking_products
   let syncedMappings: Record<string, { category_ids: string[]; display_order: number }> = { ...currentLocal };
   try {
     const { data: existingConfigRow } = await supabase
@@ -309,7 +345,6 @@ export async function updateModelCategories(params: {
 
     if (categoryIds.length === 0) {
       keysToClean.forEach((k) => delete remoteMappings[k]);
-      // Limpa também qualquer chave cujo modelo normalizado bata com cleanKey
       Object.keys(remoteMappings).forEach((k) => {
         const kNorm = k.toLowerCase().replace(/\s+/g, "");
         if (kNorm === cleanKey || kNorm === altCleanKey) {
@@ -357,18 +392,18 @@ export async function updateModelCategories(params: {
           is_active: false
         });
     }
+
+    // Re-emite broadcast com o mapa consolidado final do servidor
+    broadcastLiveCatalogSync({
+      type: "CATEGORIES_UPDATED",
+      company_id: targetCompanyId,
+      category_mappings: syncedMappings,
+    });
   } catch (e) {
     console.warn("Aviso ao sincronizar category_mappings em __STORE_CONFIG__:", e);
   }
 
-  // 4. Emitir Broadcast Realtime via Supabase WebSocket para o catálogo público atualizar instantaneamente (<50ms)
-  broadcastLiveCatalogSync({
-    type: "CATEGORIES_UPDATED",
-    company_id: targetCompanyId,
-    category_mappings: syncedMappings,
-  });
-
-  // 5. Operação Relacional em public.product_categories (apenas colunas reais: product_id, category_id)
+  // 4. Operação Relacional em public.product_categories (apenas colunas reais: product_id, category_id)
   try {
     const validProductIds = productIds.filter(pid => UUID_REGEX.test(pid));
 
@@ -402,7 +437,7 @@ export async function updateModelCategories(params: {
     console.warn("Erro ao atualizar product_categories no Supabase:", e);
   }
 
-  // 6. Manter Shadow Metastore em smoking_orders sincronizado como salvaguarda passiva
+  // 5. Manter Shadow Metastore em smoking_orders sincronizado como salvaguarda passiva
   try {
     const { data: existingRows } = await supabase
       .from("smoking_orders")

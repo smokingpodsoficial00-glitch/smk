@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { resolveCatalogCompanyId, getCatalogCompanyId } from "@/lib/products";
-import { LIVE_CATALOG_CHANNEL } from "@/lib/categories";
+import { resolveCatalogCompanyId } from "@/lib/products";
 
 export interface StoreConfig {
   id: string;
@@ -39,7 +38,6 @@ const DEFAULT_CONFIG: StoreConfig = {
   auto_hide_out_of_stock: false,
 };
 
-// Limpa chave legada não escopada que causava contaminação cruzada
 if (typeof window !== "undefined") {
   try {
     localStorage.removeItem("store_config_fallback_v4");
@@ -80,13 +78,24 @@ function notifyListeners() {
   listeners.forEach((fn) => fn());
 }
 
+/**
+ * Aplica atualização parcial imediata (0ms) de configuração recebida via Broadcast WebSocket ou BroadcastChannel.
+ */
+export function applyInstantConfigPatch(patch: Partial<StoreConfig>) {
+  cachedConfig = { ...(cachedConfig || getLocalFallback()), ...patch } as StoreConfig;
+  try {
+    localStorage.setItem(getCatalogStorageKey(cachedConfig.id), JSON.stringify(cachedConfig));
+  } catch {}
+  notifyListeners();
+}
+
 export async function fetchConfig(): Promise<StoreConfig> {
   let mainConfig: StoreConfig | null = null;
   let fallbackConfig: StoreConfig | null = null;
 
   const companyId = await resolveCatalogCompanyId();
 
-  // 1. Tentar ler da view pública `public_store_config` (compatível com blindagem de RLS v4) ou fallback para `store_config`
+  // 1. Tentar ler da view pública `public_store_config` ou fallback para `store_config`
   try {
     let { data, error } = await supabase
       .from("public_store_config")
@@ -115,7 +124,7 @@ export async function fetchConfig(): Promise<StoreConfig> {
   try {
     const { data, error } = await supabase
       .from("smoking_products")
-      .select("*")
+      .select("name, flavor, image_url")
       .eq("brand", "__STORE_CONFIG__")
       .eq("company_id", companyId)
       .limit(1);
@@ -223,7 +232,7 @@ export function useStoreConfig() {
 
   useEffect(() => {
     const onUpdate = () => {
-      if (cachedConfig) setConfig(cachedConfig);
+      if (cachedConfig) setConfig({ ...cachedConfig });
     };
     listeners.add(onUpdate);
 
@@ -231,51 +240,33 @@ export function useStoreConfig() {
       const handleBroadcast = (e: MessageEvent) => {
         if (e.data && typeof e.data === "object") {
           if ((e.data as any).type === "CATEGORIES_UPDATED") return;
-          // Mescla mensagens parciais (ex.: só as flags de visibilidade) sem apagar o resto da config
-          cachedConfig = { ...(cachedConfig || getLocalFallback()), ...(e.data as Partial<StoreConfig>) } as StoreConfig;
-          setConfig(cachedConfig);
-          try { localStorage.setItem(getCatalogStorageKey(cachedConfig.id), JSON.stringify(cachedConfig)); } catch {}
+          applyInstantConfigPatch(e.data as Partial<StoreConfig>);
         }
       };
       broadcastChannel.addEventListener("message", handleBroadcast);
     }
 
     let channel: any = null;
-    let liveSyncChannel: any = null;
     try {
       channel = supabase
         .channel(`front-cfg-${Math.random().toString(36).substring(2, 7)}`)
         .on(
           "postgres_changes" as any,
           { event: "*", schema: "public", table: "store_config" },
-          () => { fetchConfig().then(result => setConfig(result)); }
+          () => { fetchConfig(); }
         )
         .on(
           "postgres_changes" as any,
           { event: "*", schema: "public", table: "companies" },
-          () => { fetchConfig().then(result => setConfig(result)); }
+          () => { fetchConfig(); }
         )
         .on(
           "postgres_changes" as any,
           { event: "*", schema: "public", table: "smoking_products" },
-          () => { fetchConfig().then(result => setConfig(result)); }
+          () => { fetchConfig(); }
         );
 
       channel.subscribe();
-
-      // Canal Broadcast WebSocket em tempo real (<50ms entre domínios diferentes)
-      liveSyncChannel = supabase
-        .channel(LIVE_CATALOG_CHANNEL)
-        .on("broadcast", { event: "catalog_sync" }, (msg: any) => {
-          const payload = msg?.payload;
-          if (payload && payload.type === "CONFIG_UPDATED" && payload.config) {
-            cachedConfig = { ...(cachedConfig || getLocalFallback()), ...payload.config } as StoreConfig;
-            setConfig(cachedConfig);
-          } else {
-            fetchConfig().then(result => setConfig(result));
-          }
-        })
-        .subscribe();
     } catch (e) {
       console.warn("Erro ao registrar Supabase Realtime no frontend:", e);
     }
@@ -299,9 +290,6 @@ export function useStoreConfig() {
       listeners.delete(onUpdate);
       if (channel) {
         try { supabase.removeChannel(channel); } catch {}
-      }
-      if (liveSyncChannel) {
-        try { supabase.removeChannel(liveSyncChannel); } catch {}
       }
     };
   }, []);

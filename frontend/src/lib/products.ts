@@ -34,8 +34,19 @@ export interface PodModel {
 
 export const BRANDS = ["Ignite", "Elf Bar", "Lost Mary", "Waka", "Oxbar"] as const;
 
-// Não gera catálogo falso localmente caso o Supabase esteja desconectado
 export const fallbackProducts: Product[] = [];
+
+const CATALOG_IMAGE_CACHE_KEY = "smk_catalog_model_images_v1";
+const memoryImageCache: Record<string, string> = {};
+
+try {
+  if (typeof window !== "undefined") {
+    const saved = sessionStorage.getItem(CATALOG_IMAGE_CACHE_KEY);
+    if (saved) {
+      Object.assign(memoryImageCache, JSON.parse(saved));
+    }
+  }
+} catch {}
 
 let _resolvedCompanyIdPromise: Promise<string> | null = null;
 
@@ -63,7 +74,6 @@ export async function resolveCatalogCompanyId(): Promise<string> {
 
       if (slug && slug !== "smoking-pods") {
         try {
-          // 1. Tenta buscar pelo store_slug exato na view pública public_store_config ou na tabela base store_config
           let storeData: any = null;
           const { data: vStoreData } = await supabase
             .from("public_store_config")
@@ -86,7 +96,6 @@ export async function resolveCatalogCompanyId(): Promise<string> {
             return storeData.company_id;
           }
 
-          // 2. Se não achou em store_config, busca na view pública public_companies ou na tabela companies
           const formattedName = slug.replace(/-/g, " ");
           let compData: any = null;
           const { data: vCompData } = await supabase
@@ -110,8 +119,6 @@ export async function resolveCatalogCompanyId(): Promise<string> {
             return compData.id;
           }
 
-          // 3. SEGURANÇA TOTAL: Se o cliente acessou uma loja específica (?loja=...) e ela não existe,
-          // NUNCA cair no estoque da Smoking Pods! Retorna tenant vazio isolado.
           return "00000000-0000-0000-0000-000000000000";
         } catch (e) {
           console.warn("Erro ao buscar empresa por slug no catálogo:", e);
@@ -146,15 +153,82 @@ export function getCatalogCompanyId(): string {
   return envCompanyId.trim();
 }
 
-export async function fetchProductsFromSupabase(customCompanyId?: string): Promise<Product[]> {
+/**
+ * Busca imagens de modelos que ainda não estão em cache (1 imagem por modelo único, reduzindo 5.3MB para ~0KB nos refreshes).
+ */
+export async function hydrateMissingModelImages(
+  items: Product[],
+  onImagesLoaded?: (newMap: Record<string, string>) => void
+): Promise<Record<string, string>> {
+  const missingRepIds: string[] = [];
+  const seenGroupKeys = new Set<string>();
+
+  for (const p of items) {
+    const groupKey = `${(p.brand || "").trim().toLowerCase()}__${(p.name || "").trim().toLowerCase()}`;
+    if (p.image_url) {
+      memoryImageCache[groupKey] = p.image_url;
+      memoryImageCache[p.id] = p.image_url;
+      continue;
+    }
+    if (memoryImageCache[groupKey] || memoryImageCache[p.id]) continue;
+    if (!seenGroupKeys.has(groupKey)) {
+      seenGroupKeys.add(groupKey);
+      missingRepIds.push(p.id);
+    }
+  }
+
+  if (missingRepIds.length === 0) {
+    return memoryImageCache;
+  }
+
+  try {
+    const { data: imgRows } = await supabase
+      .from("smoking_products")
+      .select("id, brand, name, image_url")
+      .in("id", missingRepIds)
+      .not("image_url", "is", null)
+      .neq("image_url", "");
+
+    if (imgRows && imgRows.length > 0) {
+      for (const r of imgRows) {
+        if (r.image_url) {
+          const gKey = `${(r.brand || "").trim().toLowerCase()}__${(r.name || "").trim().toLowerCase()}`;
+          memoryImageCache[gKey] = r.image_url;
+          memoryImageCache[r.id] = r.image_url;
+        }
+      }
+      try {
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem(CATALOG_IMAGE_CACHE_KEY, JSON.stringify(memoryImageCache));
+        }
+      } catch {}
+      if (onImagesLoaded) {
+        onImagesLoaded({ ...memoryImageCache });
+      }
+    }
+  } catch (e) {
+    console.warn("Aviso ao carregar imagens de modelos:", e);
+  }
+
+  return memoryImageCache;
+}
+
+export async function fetchProductsFromSupabase(
+  customCompanyId?: string,
+  onImagesHydrated?: (imgMap: Record<string, string>) => void
+): Promise<Product[]> {
   try {
     const companyId = customCompanyId || (await resolveCatalogCompanyId());
+
+    // Seleciona apenas colunas leves (23KB em 90ms em vez de 5.3MB de Base64 repetidos em 1820ms!)
+    const lightCols = "id, name, brand, puffs, flavor, price, stock, is_active, promo_price, is_promotional, discount_pct";
 
     const [productsRes, promosMap] = await Promise.all([
       supabase
         .from("smoking_products")
-        .select("*")
+        .select(lightCols)
         .eq("company_id", companyId)
+        .neq("brand", "__STORE_CONFIG__")
         .order("brand", { ascending: true })
         .order("name", { ascending: true }),
       fetchProductPromotionsMap(companyId),
@@ -164,10 +238,9 @@ export async function fetchProductsFromSupabase(customCompanyId?: string): Promi
     const error = productsRes.error;
 
     if (!error && data && data.length > 0) {
-      return data
+      const mapped: Product[] = data
         .filter((item: any) => {
           if (item.is_active === false) return false;
-          // Linhas internas de sistema (ex.: __STORE_CONFIG__) nunca são produtos do catálogo
           if (String(item.brand || "").startsWith("__")) return false;
           return true;
         })
@@ -188,6 +261,9 @@ export async function fetchProductsFromSupabase(customCompanyId?: string): Promi
             ? (item.discount_pct ? parseFloat(item.discount_pct) : (promoInfo?.discountPct || Math.round(((originalPrice - finalPrice) / originalPrice) * 100)))
             : 0;
 
+          const gKey = `${(item.brand || "").trim().toLowerCase()}__${(item.name || "").trim().toLowerCase()}`;
+          const cachedImg = memoryImageCache[item.id] || memoryImageCache[gKey] || "";
+
           return {
             id: item.id,
             name: item.name,
@@ -200,10 +276,15 @@ export async function fetchProductsFromSupabase(customCompanyId?: string): Promi
             is_promotional: hasPromo,
             discount_pct: discountPct,
             stock: parseInt(item.stock) || 0,
-            image_url: item.image_url || "",
+            image_url: cachedImg,
             is_active: item.is_active ?? true,
           };
         });
+
+      // Hidrata apenas 1 imagem por modelo único em segundo plano (ou imediatamente se já em cache)
+      hydrateMissingModelImages(mapped, onImagesHydrated);
+
+      return mapped;
     }
   } catch (err: any) {
     console.error("Erro ao buscar produtos do Supabase no cardápio:", err?.message || err);

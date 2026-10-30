@@ -1119,6 +1119,7 @@ export default function SupplyChainDashboard() {
       }
       pendingStockChangesRef.current = {};
       setPendingStockChanges({});
+      broadcastLiveCatalogSync({ type: "STOCK_UPDATED", company_id: targetCompanyId });
       await fetchData();
       return true;
     } catch (err: any) {
@@ -1150,6 +1151,7 @@ export default function SupplyChainDashboard() {
     try {
       setProducts(prev => prev.map(p => ids.includes(p.id) ? { ...p, is_active: newActiveState } : p));
       await supabase.from("smoking_products").update({ is_active: newActiveState }).in("id", ids).eq("company_id", targetCompanyId);
+      broadcastLiveCatalogSync({ type: "STOCK_UPDATED", company_id: targetCompanyId });
     } catch (err) {
       console.error(err); fetchData();
     }
@@ -1556,6 +1558,7 @@ export default function SupplyChainDashboard() {
         setSelectedDrawerSKU((prev: any) => prev ? { ...prev, is_active: !currentStatus } : null);
       }
       await supabase.from("smoking_products").update({ is_active: !currentStatus }).eq("id", id).eq("company_id", targetCompanyId);
+      broadcastLiveCatalogSync({ type: "STOCK_UPDATED", company_id: targetCompanyId });
     } catch (err) { fetchData(); }
   };
 
@@ -1564,6 +1567,17 @@ export default function SupplyChainDashboard() {
     setHideOutOfStockProducts(nextValue);
     setIsSavingProductsVisibility(true);
     setSaveProductsFeedback(false);
+
+    // Broadcast instantâneo em 0ms para atualizar o catálogo ao vivo
+    broadcastLiveCatalogSync({
+      type: "CONFIG_UPDATED",
+      company_id: targetCompanyId,
+      config: {
+        hide_out_of_stock_products: nextValue,
+        hide_out_of_stock_variants: hideOutOfStockVariants,
+        auto_hide_out_of_stock: Boolean(nextValue || hideOutOfStockVariants)
+      }
+    });
 
     try {
       const { data: compData } = await supabase
@@ -1698,6 +1712,17 @@ export default function SupplyChainDashboard() {
     setHideOutOfStockVariants(nextValue);
     setIsSavingVariantsVisibility(true);
     setSaveVariantsFeedback(false);
+
+    // Broadcast instantâneo em 0ms para atualizar o catálogo ao vivo
+    broadcastLiveCatalogSync({
+      type: "CONFIG_UPDATED",
+      company_id: targetCompanyId,
+      config: {
+        hide_out_of_stock_products: hideOutOfStockProducts,
+        hide_out_of_stock_variants: nextValue,
+        auto_hide_out_of_stock: Boolean(hideOutOfStockProducts || nextValue)
+      }
+    });
 
     try {
       const { data: compData } = await supabase
