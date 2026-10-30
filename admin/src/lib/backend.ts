@@ -20,7 +20,7 @@ export function getBackendUrl(): string {
 
     // Se estiver rodando na Vercel em produção, conecta automaticamente ao túnel da loja
     if (window.location.hostname.endsWith('vercel.app')) {
-      return 'https://recorder-david-opinion-posters.trycloudflare.com';
+      return 'https://dated-waters-blackjack-means.trycloudflare.com';
     }
   }
 

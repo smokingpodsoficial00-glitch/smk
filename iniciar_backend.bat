@@ -19,7 +19,7 @@ if %errorlevel% neq 0 (
 
 echo.
 echo 2. Iniciando Tunel Cloudflare para Vercel...
-echo    Acesse: https://device-visible-chances-citations.trycloudflare.com
+echo    Acesse: https://dated-waters-blackjack-means.trycloudflare.com
 echo.
 cloudflared.exe tunnel --url http://127.0.0.1:3006 --no-autoupdate
 pause
