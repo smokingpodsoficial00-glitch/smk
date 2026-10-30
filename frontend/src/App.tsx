@@ -124,10 +124,30 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "companies" }, () => {
         loadProducts();
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "product_categories" }, () => {
+        loadProducts();
+      })
       .subscribe();
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+        bc = new BroadcastChannel("store_config_channel_v5");
+        bc.onmessage = (ev) => {
+          if (ev.data && ev.data.type === "CATEGORIES_UPDATED" && ev.data.category_mappings) {
+            setCategoryMappings(ev.data.category_mappings);
+          } else {
+            loadProducts();
+          }
+        };
+      }
+    } catch {}
 
     return () => {
       supabase.removeChannel(subscription);
+      if (bc) {
+        try { bc.close(); } catch {}
+      }
     };
   }, []);
 
@@ -195,17 +215,35 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
         ? baseVariants.filter(v => (v.stock || 0) > 0)
         : baseVariants;
 
-      // Identificar categorias do modelo
+      // Identificar categorias do modelo verificando chaves do modelo e TODAS as variantes (inclusive esgotadas)
       const firstVariant = rawVariants[0];
       const modelKeyStandard = `${m.brand.toLowerCase()}__${m.name.toLowerCase()}`;
       const modelKeyAlternative = firstVariant ? `${m.brand.toLowerCase()}__${firstVariant.name.toLowerCase()}` : '';
+      const modelKeyClean = `${m.brand.toLowerCase().replace(/\s+/g, '')}__${(firstVariant?.name || m.name).toLowerCase().replace(/\s+/g, '')}`;
 
-      const mapping = categoryMappings[modelKeyStandard] || 
-                      categoryMappings[modelKeyAlternative] || 
-                      (firstVariant ? categoryMappings[firstVariant.id] : null);
+      const collectedCatIds = new Set<string>();
+      let bestOrder = 99;
 
-      const modelCategoryIds = mapping?.category_ids || [];
-      const modelDisplayOrder = mapping?.display_order ?? 99;
+      const candidateKeys = [
+        modelKeyStandard,
+        modelKeyAlternative,
+        modelKeyClean,
+        ...rawVariants.map(rv => rv.id)
+      ];
+
+      for (const ck of candidateKeys) {
+        if (!ck) continue;
+        const entry = categoryMappings[ck];
+        if (entry && Array.isArray(entry.category_ids)) {
+          entry.category_ids.forEach(cid => collectedCatIds.add(cid));
+          if (typeof entry.display_order === "number" && entry.display_order < bestOrder) {
+            bestOrder = entry.display_order;
+          }
+        }
+      }
+
+      const modelCategoryIds = Array.from(collectedCatIds);
+      const modelDisplayOrder = bestOrder;
 
       const matchedCategories = categories.filter(c => modelCategoryIds.includes(c.id));
 
@@ -260,15 +298,17 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
     const MAIS_VENDIDOS_ID = "11111111-1111-4111-a111-111111111111";
 
     const isMaisVendido = (m: PodModel) => {
-      // 1. Checar por qualquer ID de variante individual no categoryMappings
-      const hasVariantMatch = m.variants.some(v => {
+      const allVarsToCheck = (m.allVariants && m.allVariants.length > 0) ? m.allVariants : m.variants;
+
+      // 1. Checar por qualquer ID de variante individual no categoryMappings (incluindo esgotadas)
+      const hasVariantMatch = allVarsToCheck.some(v => {
         const catIds = categoryMappings[v.id]?.category_ids || [];
         return catIds.includes(MAIS_VENDIDOS_ID);
       });
       if (hasVariantMatch) return true;
 
       // 2. Checar por variadas chaves do modelo (bruta, limpa, brand__name)
-      for (const v of m.variants) {
+      for (const v of allVarsToCheck) {
         const b = (v.brand || '').toLowerCase().trim();
         const n = (v.name || '').toLowerCase().trim();
         const bClean = b.replace(/\s+/g, '');

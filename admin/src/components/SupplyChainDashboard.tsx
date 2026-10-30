@@ -1633,16 +1633,22 @@ export default function SupplyChainDashboard() {
 
         const { data: existingConfigRow } = await supabase
           .from("smoking_products")
-          .select("id")
+          .select("id, flavor")
           .eq("brand", "__STORE_CONFIG__")
           .eq("company_id", targetCompanyId)
           .limit(1);
+
+        let existingParsed: any = {};
+        if (existingConfigRow && existingConfigRow.length > 0 && existingConfigRow[0].flavor) {
+          try { existingParsed = JSON.parse(existingConfigRow[0].flavor) || {}; } catch {}
+        }
+        const mergedPayload = { ...existingParsed, ...configPayload };
 
         if (existingConfigRow && existingConfigRow.length > 0) {
           await supabase
             .from("smoking_products")
             .update({
-              flavor: JSON.stringify(configPayload),
+              flavor: JSON.stringify(mergedPayload),
               is_active: false
             })
             .eq("id", existingConfigRow[0].id)
@@ -1752,16 +1758,22 @@ export default function SupplyChainDashboard() {
 
         const { data: existingConfigRow } = await supabase
           .from("smoking_products")
-          .select("id")
+          .select("id, flavor")
           .eq("brand", "__STORE_CONFIG__")
           .eq("company_id", targetCompanyId)
           .limit(1);
+
+        let existingParsed: any = {};
+        if (existingConfigRow && existingConfigRow.length > 0 && existingConfigRow[0].flavor) {
+          try { existingParsed = JSON.parse(existingConfigRow[0].flavor) || {}; } catch {}
+        }
+        const mergedPayload = { ...existingParsed, ...configPayload };
 
         if (existingConfigRow && existingConfigRow.length > 0) {
           await supabase
             .from("smoking_products")
             .update({
-              flavor: JSON.stringify(configPayload),
+              flavor: JSON.stringify(mergedPayload),
               is_active: false
             })
             .eq("id", existingConfigRow[0].id)

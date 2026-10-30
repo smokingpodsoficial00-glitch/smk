@@ -57,17 +57,20 @@ export async function fetchCategories(companyId?: string): Promise<Category[]> {
       .from("smoking_categories")
       .select("*")
       .eq("company_id", targetCompanyId)
-      .order("position", { ascending: true });
+      .order("display_order", { ascending: true });
 
     if (!error && data && data.length > 0) {
-      return data.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        slug: c.slug,
-        badge_text: c.badge_text || c.name,
-        position: c.position || 0,
-        company_id: c.company_id
-      }));
+      return data.map((c: any) => {
+        const defaultMatch = DEFAULT_CATEGORIES.find(dc => dc.id === c.id || dc.slug === c.slug);
+        return {
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+          badge_text: c.badge_text || defaultMatch?.badge_text || c.name,
+          position: c.display_order ?? c.position ?? defaultMatch?.position ?? 0,
+          company_id: c.company_id
+        };
+      });
     }
   } catch (e) {
     console.warn("Erro ao buscar categorias do Supabase:", e);
@@ -77,56 +80,77 @@ export async function fetchCategories(companyId?: string): Promise<Category[]> {
 
 /**
  * Busca o mapa de produtos vinculados a categorias.
- * Fonte Primária: public.product_categories
- * Fallback de Contingência: smoking_orders (Shadow Metastore)
- * Fallback Offline: localStorage
+ * Fonte 1: Linha pública __STORE_CONFIG__ em smoking_products (sincronizada pelo admin com display_order e modelKey)
+ * Fonte 2: Tabela relacional public.product_categories
+ * Fonte 3: smoking_orders (Shadow Metastore)
+ * Fonte 4: localStorage
  */
 export async function fetchProductCategoryMappings(companyId?: string): Promise<{
   productMap: Record<string, { category_ids: string[]; display_order: number }>;
 }> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const result: Record<string, { category_ids: string[]; display_order: number }> = {};
+  let hasServerData = false;
 
-  // 1. Fonte Primária Oficial: Tabela relacional public.product_categories
+  // 1. Ler mapeamentos sincronizados pelo admin na linha pública __STORE_CONFIG__ (contém modelKeys e display_order)
+  try {
+    const { data: cfgData, error: cfgErr } = await supabase
+      .from("smoking_products")
+      .select("flavor")
+      .eq("brand", "__STORE_CONFIG__")
+      .eq("company_id", targetCompanyId)
+      .limit(1);
+
+    if (!cfgErr && cfgData && cfgData.length > 0 && cfgData[0].flavor) {
+      try {
+        const parsed = JSON.parse(cfgData[0].flavor);
+        if (parsed && parsed.category_mappings && typeof parsed.category_mappings === "object") {
+          Object.entries(parsed.category_mappings).forEach(([k, v]: [string, any]) => {
+            if (v && Array.isArray(v.category_ids) && v.category_ids.length > 0) {
+              result[k] = {
+                category_ids: v.category_ids,
+                display_order: typeof v.display_order === "number" ? v.display_order : 1
+              };
+            }
+          });
+          hasServerData = true;
+        }
+      } catch {}
+    }
+  } catch {}
+
+  // 2. Ler da tabela relacional public.product_categories (sem colunas inexistentes display_order/company_id)
   try {
     const { data: catRows, error: catErr } = await supabase
       .from("product_categories")
-      .select("product_id, category_id, display_order, company_id")
-      .eq("company_id", targetCompanyId);
+      .select("product_id, category_id");
 
     if (!catErr && catRows && catRows.length > 0) {
-      const result: Record<string, { category_ids: string[]; display_order: number }> = {};
-      
+      hasServerData = true;
       catRows.forEach((row: any) => {
         const pid = row.product_id;
         const cid = row.category_id;
-        const order = row.display_order ?? 1;
+        if (!pid || !cid) return;
 
         if (!result[pid]) {
-          result[pid] = { category_ids: [cid], display_order: order };
+          result[pid] = { category_ids: [cid], display_order: 1 };
         } else {
           if (!result[pid].category_ids.includes(cid)) {
             result[pid].category_ids.push(cid);
           }
-          result[pid].display_order = Math.min(result[pid].display_order, order);
         }
       });
-
-      // Preservar chaves textuais de modelo do cache local para compatibilidade transitória
-      const local = getLocalCategoryMappings();
-      Object.keys(local).forEach(k => {
-        if (!k.includes('-') && !result[k]) {
-          result[k] = local[k];
-        }
-      });
-
-      saveLocalCategoryMappings(result);
-      return { productMap: result };
     }
   } catch (e) {
-    console.warn("Aviso ao buscar de product_categories, tentando contingência:", e);
+    console.warn("Aviso ao buscar de product_categories:", e);
   }
 
-  // 2. Fallback de Contingência: Shadow Metastore em smoking_orders
+  if (hasServerData) {
+    saveLocalCategoryMappings(result);
+    return { productMap: result };
+  }
+
+  // 3. Fallback de Contingência: Shadow Metastore em smoking_orders
   try {
     const { data: orderConfig, error: configErr } = await supabase
       .from("smoking_orders")
@@ -136,13 +160,12 @@ export async function fetchProductCategoryMappings(companyId?: string): Promise<
       .limit(1);
 
     if (!configErr && orderConfig && orderConfig.length > 0) {
-      const result: Record<string, { category_ids: string[]; display_order: number }> = {};
       const items = orderConfig[0].items;
 
       if (Array.isArray(items)) {
         items.forEach((item: any) => {
           const catIds = item.category_ids || (item.category_id ? [item.category_id] : ["11111111-1111-4111-a111-111111111111"]);
-          const order = item.display_order ?? item.displayOrder ?? 0;
+          const order = item.display_order ?? item.displayOrder ?? 1;
 
           if (item.product_id) {
             result[item.product_id] = { category_ids: catIds, display_order: order };
@@ -163,15 +186,15 @@ export async function fetchProductCategoryMappings(companyId?: string): Promise<
     console.warn("Erro ao buscar configuracao em smoking_orders:", e);
   }
 
-  // 3. Fallback Offline: Cache local
+  // 4. Fallback Offline: Cache local
   const localData = getLocalCategoryMappings();
   return { productMap: localData };
 }
 
 /**
  * Atualiza categorias de um modelo/conjunto de produtos.
- * Fonte Primária: public.product_categories (Upsert/Delete relacional)
- * Salvaguarda: Shadow Metastore em smoking_orders + localStorage
+ * Fonte Primária: public.product_categories + linha pública __STORE_CONFIG__ em smoking_products
+ * Salvaguarda: Shadow Metastore em smoking_orders + localStorage + BroadcastChannel
  */
 export async function updateModelCategories(params: {
   productIds: string[];
@@ -183,13 +206,13 @@ export async function updateModelCategories(params: {
   const { productIds, modelKey, categoryIds, displayOrder, companyId } = params;
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
 
-  // 1. Atualizar localStorage em segundo plano
+  // 1. Atualizar localStorage imediatamente
   const currentLocal = getLocalCategoryMappings();
-  
-  const parts = modelKey.split('__');
-  const bStr = (parts[0] || '').trim();
-  const nStr = (parts[1] || '').trim();
-  const cleanKey = `${bStr.toLowerCase().replace(/\s+/g, '')}__${nStr.toLowerCase().replace(/\s+/g, '')}`;
+
+  const parts = modelKey.split("__");
+  const bStr = (parts[0] || "").trim();
+  const nStr = (parts[1] || "").trim();
+  const cleanKey = `${bStr.toLowerCase().replace(/\s+/g, "")}__${nStr.toLowerCase().replace(/\s+/g, "")}`;
 
   if (categoryIds.length === 0) {
     delete currentLocal[modelKey];
@@ -205,44 +228,117 @@ export async function updateModelCategories(params: {
 
   saveLocalCategoryMappings(currentLocal);
 
-  // 2. Operação Relacional Primária: public.product_categories
+  // 2. Transmitir atualização instantânea para abas abertas do catálogo
+  try {
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      const bc = new BroadcastChannel("store_config_channel_v5");
+      bc.postMessage({ type: "CATEGORIES_UPDATED", category_mappings: currentLocal });
+      bc.close();
+    }
+  } catch {}
+
+  // 3. Operação Relacional em public.product_categories (apenas colunas reais: product_id, category_id)
   try {
     const validProductIds = productIds.filter(pid => UUID_REGEX.test(pid));
 
-    if (categoryIds.length === 0) {
-      if (validProductIds.length > 0) {
-        const { error: delErr } = await supabase
-          .from("product_categories")
-          .delete()
-          .in("product_id", validProductIds)
-          .eq("company_id", targetCompanyId);
-        if (delErr) console.warn("Aviso ao remover de product_categories:", delErr.message);
-      }
-    } else {
-      const upsertRows: any[] = [];
-      validProductIds.forEach(pid => {
-        categoryIds.forEach(cid => {
-          upsertRows.push({
-            company_id: targetCompanyId,
-            product_id: pid,
-            category_id: cid,
-            display_order: displayOrder
+    if (validProductIds.length > 0) {
+      // Sempre remove vínculos anteriores dessas variantes antes de inserir os novos
+      const { error: delErr } = await supabase
+        .from("product_categories")
+        .delete()
+        .in("product_id", validProductIds);
+      if (delErr) console.warn("Aviso ao limpar de product_categories:", delErr.message);
+
+      if (categoryIds.length > 0) {
+        const insertRows: any[] = [];
+        validProductIds.forEach(pid => {
+          categoryIds.forEach(cid => {
+            insertRows.push({
+              product_id: pid,
+              category_id: cid
+            });
           });
         });
-      });
 
-      if (upsertRows.length > 0) {
-        const { error: upsertErr } = await supabase
-          .from("product_categories")
-          .upsert(upsertRows, { onConflict: "product_id,category_id" });
-        if (upsertErr) console.warn("Aviso ao salvar em product_categories:", upsertErr.message);
+        if (insertRows.length > 0) {
+          const { error: insErr } = await supabase
+            .from("product_categories")
+            .insert(insertRows);
+          if (insErr) console.warn("Aviso ao inserir em product_categories:", insErr.message);
+        }
       }
     }
   } catch (e) {
     console.warn("Erro ao atualizar product_categories no Supabase:", e);
   }
 
-  // 3. Manter Shadow Metastore em smoking_orders sincronizado como salvaguarda passiva
+  // 4. Sincronizar category_mappings na linha pública __STORE_CONFIG__ em smoking_products
+  //    (garante que o catálogo público receba modelKey e display_order e dispare Realtime)
+  try {
+    const { data: existingConfigRow } = await supabase
+      .from("smoking_products")
+      .select("id, flavor")
+      .eq("brand", "__STORE_CONFIG__")
+      .eq("company_id", targetCompanyId)
+      .limit(1);
+
+    let existingPayload: any = {};
+    if (existingConfigRow && existingConfigRow.length > 0 && existingConfigRow[0].flavor) {
+      try {
+        existingPayload = JSON.parse(existingConfigRow[0].flavor) || {};
+      } catch {}
+    }
+
+    const remoteMappings = (existingPayload.category_mappings && typeof existingPayload.category_mappings === "object")
+      ? { ...existingPayload.category_mappings }
+      : { ...currentLocal };
+
+    if (categoryIds.length === 0) {
+      delete remoteMappings[modelKey];
+      delete remoteMappings[cleanKey];
+      productIds.forEach((pid) => delete remoteMappings[pid]);
+    } else {
+      remoteMappings[modelKey] = { category_ids: categoryIds, display_order: displayOrder };
+      remoteMappings[cleanKey] = { category_ids: categoryIds, display_order: displayOrder };
+      productIds.forEach((pid) => {
+        remoteMappings[pid] = { category_ids: categoryIds, display_order: displayOrder };
+      });
+    }
+
+    const updatedPayload = {
+      ...existingPayload,
+      category_mappings: remoteMappings,
+      updated_at: new Date().toISOString()
+    };
+
+    if (existingConfigRow && existingConfigRow.length > 0) {
+      await supabase
+        .from("smoking_products")
+        .update({
+          flavor: JSON.stringify(updatedPayload),
+          is_active: false
+        })
+        .eq("id", existingConfigRow[0].id)
+        .eq("company_id", targetCompanyId);
+    } else {
+      await supabase
+        .from("smoking_products")
+        .insert({
+          company_id: targetCompanyId,
+          brand: "__STORE_CONFIG__",
+          name: "STORE_CONFIG",
+          flavor: JSON.stringify(updatedPayload),
+          price: 0,
+          stock: 0,
+          puffs: 0,
+          is_active: false
+        });
+    }
+  } catch (e) {
+    console.warn("Aviso ao sincronizar category_mappings em __STORE_CONFIG__:", e);
+  }
+
+  // 5. Manter Shadow Metastore em smoking_orders sincronizado como salvaguarda passiva
   try {
     const { data: existingRows } = await supabase
       .from("smoking_orders")

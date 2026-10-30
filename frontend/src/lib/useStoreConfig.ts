@@ -229,6 +229,7 @@ export function useStoreConfig() {
     if (broadcastChannel) {
       const handleBroadcast = (e: MessageEvent) => {
         if (e.data && typeof e.data === "object") {
+          if ((e.data as any).type === "CATEGORIES_UPDATED") return;
           // Mescla mensagens parciais (ex.: só as flags de visibilidade) sem apagar o resto da config
           cachedConfig = { ...(cachedConfig || getLocalFallback()), ...(e.data as Partial<StoreConfig>) } as StoreConfig;
           setConfig(cachedConfig);
