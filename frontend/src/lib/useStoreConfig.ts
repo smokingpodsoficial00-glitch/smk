@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { resolveCatalogCompanyId, getCatalogCompanyId } from "@/lib/products";
+import { LIVE_CATALOG_CHANNEL } from "@/lib/categories";
 
 export interface StoreConfig {
   id: string;
@@ -79,7 +80,7 @@ function notifyListeners() {
   listeners.forEach((fn) => fn());
 }
 
-async function fetchConfig(): Promise<StoreConfig> {
+export async function fetchConfig(): Promise<StoreConfig> {
   let mainConfig: StoreConfig | null = null;
   let fallbackConfig: StoreConfig | null = null;
 
@@ -240,6 +241,7 @@ export function useStoreConfig() {
     }
 
     let channel: any = null;
+    let liveSyncChannel: any = null;
     try {
       channel = supabase
         .channel(`front-cfg-${Math.random().toString(36).substring(2, 7)}`)
@@ -260,6 +262,20 @@ export function useStoreConfig() {
         );
 
       channel.subscribe();
+
+      // Canal Broadcast WebSocket em tempo real (<50ms entre domínios diferentes)
+      liveSyncChannel = supabase
+        .channel(LIVE_CATALOG_CHANNEL)
+        .on("broadcast", { event: "catalog_sync" }, (msg: any) => {
+          const payload = msg?.payload;
+          if (payload && payload.type === "CONFIG_UPDATED" && payload.config) {
+            cachedConfig = { ...(cachedConfig || getLocalFallback()), ...payload.config } as StoreConfig;
+            setConfig(cachedConfig);
+          } else {
+            fetchConfig().then(result => setConfig(result));
+          }
+        })
+        .subscribe();
     } catch (e) {
       console.warn("Erro ao registrar Supabase Realtime no frontend:", e);
     }
@@ -283,6 +299,9 @@ export function useStoreConfig() {
       listeners.delete(onUpdate);
       if (channel) {
         try { supabase.removeChannel(channel); } catch {}
+      }
+      if (liveSyncChannel) {
+        try { supabase.removeChannel(liveSyncChannel); } catch {}
       }
     };
   }, []);

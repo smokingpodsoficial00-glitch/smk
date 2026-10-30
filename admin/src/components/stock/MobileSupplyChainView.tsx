@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef } from "react";
 import {
   PackageSearch, Plus, Minus, Search, Copy, Edit3, Check, X,
   Boxes, MoreVertical, Trash2, AlertCircle, Clock, Upload,
-  ImagePlus, Loader2, Sparkles, ChevronDown, CheckCircle2
+  ImagePlus, Loader2, Sparkles, ChevronDown, CheckCircle2, Star
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 
@@ -25,6 +25,8 @@ export interface MobileSKUGroup {
 interface MobileSupplyChainViewProps {
   products: any[];
   skuGroups: MobileSKUGroup[];
+  categoryMappings?: Record<string, { category_ids: string[]; display_order: number }>;
+  onToggleStar?: (group: MobileSKUGroup) => Promise<void> | void;
   totalProducts: number;
   totalStockUnits: number;
   searchQuery: string;
@@ -64,6 +66,8 @@ interface MobileSupplyChainViewProps {
 export function MobileSupplyChainView({
   products,
   skuGroups,
+  categoryMappings = {},
+  onToggleStar,
   totalProducts,
   totalStockUnits,
   searchQuery,
@@ -563,6 +567,32 @@ export function MobileSupplyChainView({
                         <Edit3 className="size-3.5 text-muted-foreground" />
                         <span>Editar</span>
                       </button>
+
+                      {onToggleStar && (() => {
+                        const MAIS_VENDIDOS_ID = "11111111-1111-4111-a111-111111111111";
+                        const cleanKey = `${group.brand.toLowerCase().replace(/\s+/g, '')}__${group.name.toLowerCase().replace(/\s+/g, '')}`;
+                        const isMaisVendido = group.flavors.some((f: any) => {
+                          const catIds = categoryMappings[f.id]?.category_ids || [];
+                          return catIds.includes(MAIS_VENDIDOS_ID);
+                        }) ||
+                        Boolean(categoryMappings[group.groupKey]?.category_ids?.includes(MAIS_VENDIDOS_ID)) ||
+                        Boolean(categoryMappings[cleanKey]?.category_ids?.includes(MAIS_VENDIDOS_ID));
+
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => onToggleStar(group)}
+                            className={`size-9 rounded-xl border flex items-center justify-center active:scale-[0.98] transition-all cursor-pointer ${
+                              isMaisVendido
+                                ? "bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_10px_rgba(251,191,36,0.3)]"
+                                : "bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-amber-400 border-white/10"
+                            }`}
+                            title={isMaisVendido ? "Remover dos Mais Vendidos" : "Destacar nos Mais Vendidos"}
+                          >
+                            <Star className={`size-4 ${isMaisVendido ? "fill-amber-400 text-amber-400" : ""}`} />
+                          </button>
+                        );
+                      })()}
 
                       <button
                         type="button"

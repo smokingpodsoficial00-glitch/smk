@@ -7,8 +7,8 @@ import { FlavorSheet } from "@/components/FlavorSheet";
 import { CartProvider } from "@/lib/cart";
 import type { SortOption } from "@/components/SortDropdown";
 import { fetchProductsFromSupabase, resolveCatalogCompanyId, getCatalogCompanyId, type Product, type PodModel } from "@/lib/products";
-import { fetchCategories, fetchProductCategoryMappings, DEFAULT_CATEGORIES, type Category } from "@/lib/categories";
-import { useStoreConfig } from "@/lib/useStoreConfig";
+import { fetchCategories, fetchProductCategoryMappings, saveLocalCategoryMappings, LIVE_CATALOG_CHANNEL, DEFAULT_CATEGORIES, type Category } from "@/lib/categories";
+import { useStoreConfig, fetchConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
 import { Loader2, Star } from "lucide-react";
 
@@ -104,7 +104,8 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
     const [data, cats, catMap] = await Promise.all([
       fetchProductsFromSupabase(companyId),
       fetchCategories(companyId),
-      fetchProductCategoryMappings(companyId)
+      fetchProductCategoryMappings(companyId),
+      fetchConfig()
     ]);
     setProductList(data);
     setCategories(cats);
@@ -112,10 +113,22 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
     setLoading(false);
   };
 
+  // Revalidação leve apenas de configurações e destaques (⭐) sem rebaixar imagens pesadas
+  const syncLiveMetadata = async () => {
+    try {
+      const companyId = await resolveCatalogCompanyId();
+      const [catMap] = await Promise.all([
+        fetchProductCategoryMappings(companyId),
+        fetchConfig()
+      ]);
+      setCategoryMappings(catMap.productMap);
+    } catch {}
+  };
+
   useEffect(() => {
     loadProducts();
 
-    // Inscrição em tempo real para atualizações no estoque, catálogo e configurações
+    // 1. Inscrição Postgres CDC para atualizações no estoque, catálogo e configurações
     const subscription = supabase
       .channel("public:realtime_menu")
       .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, () => {
@@ -125,10 +138,25 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
         loadProducts();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "product_categories" }, () => {
-        loadProducts();
+        syncLiveMetadata();
       })
       .subscribe();
 
+    // 2. Canal Broadcast WebSocket em tempo real (<50ms entre domínios/dispositivos diferentes)
+    const liveSyncChannel = supabase
+      .channel(`${LIVE_CATALOG_CHANNEL}_menu`)
+      .on("broadcast", { event: "catalog_sync" }, (msg: any) => {
+        const payload = msg?.payload;
+        if (payload && payload.type === "CATEGORIES_UPDATED" && payload.category_mappings) {
+          saveLocalCategoryMappings(payload.category_mappings);
+          setCategoryMappings(payload.category_mappings);
+        } else {
+          syncLiveMetadata();
+        }
+      })
+      .subscribe();
+
+    // 3. BroadcastChannel local (mesmo navegador)
     let bc: BroadcastChannel | null = null;
     try {
       if (typeof window !== "undefined" && "BroadcastChannel" in window) {
@@ -143,8 +171,30 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
       }
     } catch {}
 
+    // 4. Revalidação instantânea ao focar a aba/janela + polling leve de 3.5s
+    const handleFocus = () => {
+      syncLiveMetadata();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        syncLiveMetadata();
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    const pollInterval = setInterval(() => {
+      if (typeof document === "undefined" || document.visibilityState === "visible") {
+        syncLiveMetadata();
+      }
+    }, 3500);
+
     return () => {
       supabase.removeChannel(subscription);
+      supabase.removeChannel(liveSyncChannel);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      clearInterval(pollInterval);
       if (bc) {
         try { bc.close(); } catch {}
       }
@@ -510,4 +560,3 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
     </div>
   );
 }
-

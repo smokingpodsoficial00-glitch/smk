@@ -27,6 +27,7 @@ const LOCAL_STORAGE_CAT_KEY = "smk_product_categories_cache";
 const SYSTEM_KEY = "__SYSTEM_SMK_BEST_SELLERS__";
 const DEFAULT_COMPANY_ID = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const LIVE_CATALOG_CHANNEL = "smk_live_catalog_sync_v1";
 
 export function getLocalCategoryMappings(): Record<string, { category_ids: string[]; display_order: number }> {
   try {
@@ -42,6 +43,38 @@ export function saveLocalCategoryMappings(mappings: Record<string, { category_id
     localStorage.setItem(LOCAL_STORAGE_CAT_KEY, JSON.stringify(mappings));
   } catch (e) {
     console.warn("Erro ao salvar categorias no localStorage:", e);
+  }
+}
+
+/**
+ * Emite broadcast via Supabase Realtime WebSocket para atualização instantânea (<50ms)
+ * entre Admin e Catálogo, mesmo em domínios/dispositivos separados.
+ */
+export async function broadcastLiveCatalogSync(payload: {
+  type: "CATEGORIES_UPDATED" | "CONFIG_UPDATED";
+  company_id: string;
+  category_mappings?: Record<string, { category_ids: string[]; display_order: number }>;
+  config?: any;
+}) {
+  try {
+    const channel = supabase.channel(LIVE_CATALOG_CHANNEL);
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        channel
+          .send({
+            type: "broadcast",
+            event: "catalog_sync",
+            payload,
+          })
+          .finally(() => {
+            setTimeout(() => {
+              try { supabase.removeChannel(channel); } catch {}
+            }, 1500);
+          });
+      }
+    });
+  } catch (e) {
+    console.warn("Aviso no broadcast Realtime:", e);
   }
 }
 
@@ -80,8 +113,8 @@ export async function fetchCategories(companyId?: string): Promise<Category[]> {
 
 /**
  * Busca o mapa de produtos vinculados a categorias.
- * Fonte 1: Linha pública __STORE_CONFIG__ em smoking_products (sincronizada pelo admin com display_order e modelKey)
- * Fonte 2: Tabela relacional public.product_categories
+ * Fonte 1 (Soberana): Linha pública __STORE_CONFIG__ em smoking_products (sincronizada pelo admin com display_order e modelKey)
+ * Fonte 2: Tabela relacional public.product_categories (somente se Fonte 1 não tiver category_mappings definido)
  * Fonte 3: smoking_orders (Shadow Metastore)
  * Fonte 4: localStorage
  */
@@ -90,9 +123,10 @@ export async function fetchProductCategoryMappings(companyId?: string): Promise<
 }> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
   const result: Record<string, { category_ids: string[]; display_order: number }> = {};
-  let hasServerData = false;
 
-  // 1. Ler mapeamentos sincronizados pelo admin na linha pública __STORE_CONFIG__ (contém modelKeys e display_order)
+  // 1. Ler mapeamentos sincronizados pelo admin na linha pública __STORE_CONFIG__
+  //    Se `parsed.category_mappings` existir (mesmo que seja `{}` vazio quando todas as estrelas são desmarcadas),
+  //    ele é a fonte de verdade soberana e NÃO deve ser misturado com linhas órfãs de `product_categories`.
   try {
     const { data: cfgData, error: cfgErr } = await supabase
       .from("smoking_products")
@@ -104,7 +138,7 @@ export async function fetchProductCategoryMappings(companyId?: string): Promise<
     if (!cfgErr && cfgData && cfgData.length > 0 && cfgData[0].flavor) {
       try {
         const parsed = JSON.parse(cfgData[0].flavor);
-        if (parsed && parsed.category_mappings && typeof parsed.category_mappings === "object") {
+        if (parsed && parsed.category_mappings !== undefined && typeof parsed.category_mappings === "object" && parsed.category_mappings !== null) {
           Object.entries(parsed.category_mappings).forEach(([k, v]: [string, any]) => {
             if (v && Array.isArray(v.category_ids) && v.category_ids.length > 0) {
               result[k] = {
@@ -113,13 +147,16 @@ export async function fetchProductCategoryMappings(companyId?: string): Promise<
               };
             }
           });
-          hasServerData = true;
+          saveLocalCategoryMappings(result);
+          return { productMap: result };
         }
       } catch {}
     }
   } catch {}
 
-  // 2. Ler da tabela relacional public.product_categories (sem colunas inexistentes display_order/company_id)
+  let hasServerData = false;
+
+  // 2. Fallback: Ler da tabela relacional public.product_categories (apenas se __STORE_CONFIG__ ainda não tiver category_mappings)
   try {
     const { data: catRows, error: catErr } = await supabase
       .from("product_categories")
@@ -193,8 +230,8 @@ export async function fetchProductCategoryMappings(companyId?: string): Promise<
 
 /**
  * Atualiza categorias de um modelo/conjunto de produtos.
- * Fonte Primária: public.product_categories + linha pública __STORE_CONFIG__ em smoking_products
- * Salvaguarda: Shadow Metastore em smoking_orders + localStorage + BroadcastChannel
+ * Fonte Primária: linha pública __STORE_CONFIG__ em smoking_products + Supabase Realtime Broadcast
+ * Secundária: public.product_categories + smoking_orders + localStorage + BroadcastChannel
  */
 export async function updateModelCategories(params: {
   productIds: string[];
@@ -210,17 +247,28 @@ export async function updateModelCategories(params: {
   const currentLocal = getLocalCategoryMappings();
 
   const parts = modelKey.split("__");
-  const bStr = (parts[0] || "").trim();
-  const nStr = (parts[1] || "").trim();
-  const cleanKey = `${bStr.toLowerCase().replace(/\s+/g, "")}__${nStr.toLowerCase().replace(/\s+/g, "")}`;
+  const bStr = (parts[0] || "").trim().toLowerCase();
+  const nStr = (parts[1] || "").trim().toLowerCase();
+  const cleanKey = `${bStr.replace(/\s+/g, "")}__${nStr.replace(/\s+/g, "")}`;
+  const fullDisplayName = nStr.startsWith(bStr) ? nStr : `${bStr} ${nStr}`;
+  const altKey = `${bStr}__${fullDisplayName}`;
+  const altCleanKey = `${bStr.replace(/\s+/g, "")}__${fullDisplayName.replace(/\s+/g, "")}`;
+
+  const keysToClean = new Set<string>([
+    modelKey,
+    modelKey.toLowerCase(),
+    cleanKey,
+    altKey,
+    altCleanKey,
+    ...productIds,
+  ]);
 
   if (categoryIds.length === 0) {
-    delete currentLocal[modelKey];
-    delete currentLocal[cleanKey];
-    productIds.forEach((pid) => delete currentLocal[pid]);
+    keysToClean.forEach((k) => delete currentLocal[k]);
   } else {
     currentLocal[modelKey] = { category_ids: categoryIds, display_order: displayOrder };
     currentLocal[cleanKey] = { category_ids: categoryIds, display_order: displayOrder };
+    currentLocal[altKey] = { category_ids: categoryIds, display_order: displayOrder };
     productIds.forEach((pid) => {
       currentLocal[pid] = { category_ids: categoryIds, display_order: displayOrder };
     });
@@ -228,7 +276,7 @@ export async function updateModelCategories(params: {
 
   saveLocalCategoryMappings(currentLocal);
 
-  // 2. Transmitir atualização instantânea para abas abertas do catálogo
+  // 2. Transmitir atualização instantânea para abas no mesmo navegador
   try {
     if (typeof window !== "undefined" && "BroadcastChannel" in window) {
       const bc = new BroadcastChannel("store_config_channel_v5");
@@ -237,43 +285,9 @@ export async function updateModelCategories(params: {
     }
   } catch {}
 
-  // 3. Operação Relacional em public.product_categories (apenas colunas reais: product_id, category_id)
-  try {
-    const validProductIds = productIds.filter(pid => UUID_REGEX.test(pid));
-
-    if (validProductIds.length > 0) {
-      // Sempre remove vínculos anteriores dessas variantes antes de inserir os novos
-      const { error: delErr } = await supabase
-        .from("product_categories")
-        .delete()
-        .in("product_id", validProductIds);
-      if (delErr) console.warn("Aviso ao limpar de product_categories:", delErr.message);
-
-      if (categoryIds.length > 0) {
-        const insertRows: any[] = [];
-        validProductIds.forEach(pid => {
-          categoryIds.forEach(cid => {
-            insertRows.push({
-              product_id: pid,
-              category_id: cid
-            });
-          });
-        });
-
-        if (insertRows.length > 0) {
-          const { error: insErr } = await supabase
-            .from("product_categories")
-            .insert(insertRows);
-          if (insErr) console.warn("Aviso ao inserir em product_categories:", insErr.message);
-        }
-      }
-    }
-  } catch (e) {
-    console.warn("Erro ao atualizar product_categories no Supabase:", e);
-  }
-
-  // 4. Sincronizar category_mappings na linha pública __STORE_CONFIG__ em smoking_products
-  //    (garante que o catálogo público receba modelKey e display_order e dispare Realtime)
+  // 3. PRIMEIRO no banco: Sincronizar category_mappings na linha pública __STORE_CONFIG__ em smoking_products
+  //    Isso garante que qualquer leitura subsequente do catálogo ou do Admin já encontre o estado atualizado!
+  let syncedMappings: Record<string, { category_ids: string[]; display_order: number }> = { ...currentLocal };
   try {
     const { data: existingConfigRow } = await supabase
       .from("smoking_products")
@@ -294,16 +308,25 @@ export async function updateModelCategories(params: {
       : { ...currentLocal };
 
     if (categoryIds.length === 0) {
-      delete remoteMappings[modelKey];
-      delete remoteMappings[cleanKey];
-      productIds.forEach((pid) => delete remoteMappings[pid]);
+      keysToClean.forEach((k) => delete remoteMappings[k]);
+      // Limpa também qualquer chave cujo modelo normalizado bata com cleanKey
+      Object.keys(remoteMappings).forEach((k) => {
+        const kNorm = k.toLowerCase().replace(/\s+/g, "");
+        if (kNorm === cleanKey || kNorm === altCleanKey) {
+          delete remoteMappings[k];
+        }
+      });
     } else {
       remoteMappings[modelKey] = { category_ids: categoryIds, display_order: displayOrder };
       remoteMappings[cleanKey] = { category_ids: categoryIds, display_order: displayOrder };
+      remoteMappings[altKey] = { category_ids: categoryIds, display_order: displayOrder };
       productIds.forEach((pid) => {
         remoteMappings[pid] = { category_ids: categoryIds, display_order: displayOrder };
       });
     }
+
+    syncedMappings = remoteMappings;
+    saveLocalCategoryMappings(syncedMappings);
 
     const updatedPayload = {
       ...existingPayload,
@@ -338,7 +361,48 @@ export async function updateModelCategories(params: {
     console.warn("Aviso ao sincronizar category_mappings em __STORE_CONFIG__:", e);
   }
 
-  // 5. Manter Shadow Metastore em smoking_orders sincronizado como salvaguarda passiva
+  // 4. Emitir Broadcast Realtime via Supabase WebSocket para o catálogo público atualizar instantaneamente (<50ms)
+  broadcastLiveCatalogSync({
+    type: "CATEGORIES_UPDATED",
+    company_id: targetCompanyId,
+    category_mappings: syncedMappings,
+  });
+
+  // 5. Operação Relacional em public.product_categories (apenas colunas reais: product_id, category_id)
+  try {
+    const validProductIds = productIds.filter(pid => UUID_REGEX.test(pid));
+
+    if (validProductIds.length > 0) {
+      const { error: delErr } = await supabase
+        .from("product_categories")
+        .delete()
+        .in("product_id", validProductIds);
+      if (delErr) console.warn("Aviso ao limpar de product_categories:", delErr.message);
+
+      if (categoryIds.length > 0) {
+        const insertRows: any[] = [];
+        validProductIds.forEach(pid => {
+          categoryIds.forEach(cid => {
+            insertRows.push({
+              product_id: pid,
+              category_id: cid
+            });
+          });
+        });
+
+        if (insertRows.length > 0) {
+          const { error: insErr } = await supabase
+            .from("product_categories")
+            .insert(insertRows);
+          if (insErr) console.warn("Aviso ao inserir em product_categories:", insErr.message);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Erro ao atualizar product_categories no Supabase:", e);
+  }
+
+  // 6. Manter Shadow Metastore em smoking_orders sincronizado como salvaguarda passiva
   try {
     const { data: existingRows } = await supabase
       .from("smoking_orders")
@@ -358,7 +422,7 @@ export async function updateModelCategories(params: {
     }
 
     const preservedItems = currentItems.filter((item: any) => {
-      if (item.modelKey === modelKey || item.modelKey === cleanKey) return false;
+      if (item.modelKey && keysToClean.has(item.modelKey)) return false;
       if (productIds.includes(item.product_id) || productIds.includes(item.id)) return false;
       return true;
     });

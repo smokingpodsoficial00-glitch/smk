@@ -9,7 +9,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { formatBRL } from "@/lib/cart";
 import { useAuth } from "../contexts/AuthContext";
-import { fetchCategories, fetchProductCategoryMappings, updateModelCategories, DEFAULT_CATEGORIES, type Category } from "../lib/categories";
+import { fetchCategories, fetchProductCategoryMappings, updateModelCategories, broadcastLiveCatalogSync, DEFAULT_CATEGORIES, type Category } from "../lib/categories";
 import { fetchProductCostsMap, updateProductCost } from "../lib/productCosts";
 import { ManualSaleModal } from "./ManualSaleModal";
 import { ReplenishmentPlannerModal, loadSavedGoals, type FinancialGoals } from "./ReplenishmentPlannerModal";
@@ -509,6 +509,7 @@ export default function SupplyChainDashboard() {
   const isFetchingRef = useRef(false);
   const hasPendingFetchRef = useRef(false);
   const realtimeDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCategoryUpdateAtRef = useRef<number>(0);
 
   // Reidrata o cache em memória a partir do sessionStorage na montagem
   useEffect(() => {
@@ -700,7 +701,9 @@ export default function SupplyChainDashboard() {
       setTopSelling(realSalesList);
 
       setCategoriesList(cats || []);
-      setCategoryMappings(catMapRes?.productMap || {});
+      if (Date.now() - lastCategoryUpdateAtRef.current > 2500) {
+        setCategoryMappings(catMapRes?.productMap || {});
+      }
     } catch (err) {
       console.error("Erro ao carregar dados do Supabase:", err);
     } finally {
@@ -1671,6 +1674,15 @@ export default function SupplyChainDashboard() {
         console.warn("Aviso ao sincronizar linha pública __STORE_CONFIG__:", syncErr);
       }
 
+      broadcastLiveCatalogSync({
+        type: "CONFIG_UPDATED",
+        company_id: targetCompanyId,
+        config: {
+          hide_out_of_stock_products: nextValue,
+          hide_out_of_stock_variants: hideOutOfStockVariants,
+          auto_hide_out_of_stock: Boolean(nextValue || hideOutOfStockVariants)
+        }
+      });
       setSaveProductsFeedback(true);
       setTimeout(() => setSaveProductsFeedback(false), 3000);
     } catch (err: any) {
@@ -1796,6 +1808,15 @@ export default function SupplyChainDashboard() {
         console.warn("Aviso ao sincronizar linha pública __STORE_CONFIG__:", syncErr);
       }
 
+      broadcastLiveCatalogSync({
+        type: "CONFIG_UPDATED",
+        company_id: targetCompanyId,
+        config: {
+          hide_out_of_stock_products: hideOutOfStockProducts,
+          hide_out_of_stock_variants: nextValue,
+          auto_hide_out_of_stock: Boolean(hideOutOfStockProducts || nextValue)
+        }
+      });
       setSaveVariantsFeedback(true);
       setTimeout(() => setSaveVariantsFeedback(false), 3000);
     } catch (err: any) {
@@ -2759,6 +2780,7 @@ export default function SupplyChainDashboard() {
                             <button
                               type="button"
                               onClick={async () => {
+                                lastCategoryUpdateAtRef.current = Date.now();
                                 const targetCatIds = isMaisVendido ? [] : [MAIS_VENDIDOS_ID];
                                 const currentOrder = 1;
                                 const pIds = group.flavors.map((f: any) => f.id);
@@ -2887,6 +2909,42 @@ export default function SupplyChainDashboard() {
         <MobileSupplyChainView
           products={products}
           skuGroups={skuGroups}
+          categoryMappings={categoryMappings}
+          onToggleStar={async (group: any) => {
+            lastCategoryUpdateAtRef.current = Date.now();
+            const MAIS_VENDIDOS_ID = "11111111-1111-4111-a111-111111111111";
+            const cleanKey = `${group.brand.toLowerCase().replace(/\s+/g, '')}__${group.name.toLowerCase().replace(/\s+/g, '')}`;
+            const isMaisVendido = group.flavors.some((f: any) => {
+              const catIds = categoryMappings[f.id]?.category_ids || [];
+              return catIds.includes(MAIS_VENDIDOS_ID);
+            }) || 
+            (categoryMappings[group.groupKey]?.category_ids?.includes(MAIS_VENDIDOS_ID)) ||
+            (categoryMappings[cleanKey]?.category_ids?.includes(MAIS_VENDIDOS_ID));
+            const targetCatIds = isMaisVendido ? [] : [MAIS_VENDIDOS_ID];
+            const pIds = group.flavors.map((f: any) => f.id);
+            setCategoryMappings(prev => {
+              const next = { ...prev };
+              if (!isMaisVendido) {
+                next[group.groupKey] = { category_ids: [MAIS_VENDIDOS_ID], display_order: 1 };
+                next[cleanKey] = { category_ids: [MAIS_VENDIDOS_ID], display_order: 1 };
+                pIds.forEach((id: string) => {
+                  next[id] = { category_ids: [MAIS_VENDIDOS_ID], display_order: 1 };
+                });
+              } else {
+                delete next[group.groupKey];
+                delete next[cleanKey];
+                pIds.forEach((id: string) => delete next[id]);
+              }
+              return next;
+            });
+            await updateModelCategories({
+              productIds: pIds,
+              modelKey: group.groupKey,
+              categoryIds: targetCatIds,
+              displayOrder: 1,
+              companyId: company?.id
+            });
+          }}
           totalProducts={totalProducts}
           totalStockUnits={totalStockUnits}
           searchQuery={searchQuery}
