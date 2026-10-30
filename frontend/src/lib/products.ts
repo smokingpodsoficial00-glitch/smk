@@ -167,6 +167,8 @@ export async function fetchProductsFromSupabase(customCompanyId?: string): Promi
       return data
         .filter((item: any) => {
           if (item.is_active === false) return false;
+          // Linhas internas de sistema (ex.: __STORE_CONFIG__) nunca são produtos do catálogo
+          if (String(item.brand || "").startsWith("__")) return false;
           return true;
         })
         .map((item: any) => {

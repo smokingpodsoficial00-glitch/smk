@@ -1643,7 +1643,7 @@ export default function SupplyChainDashboard() {
             .from("smoking_products")
             .update({
               flavor: JSON.stringify(configPayload),
-              is_active: true
+              is_active: false
             })
             .eq("id", existingConfigRow[0].id)
             .eq("company_id", targetCompanyId);
@@ -1658,7 +1658,7 @@ export default function SupplyChainDashboard() {
               price: 0,
               stock: 0,
               puffs: 0,
-              is_active: true
+              is_active: false
             });
         }
       } catch (syncErr) {
@@ -1762,7 +1762,7 @@ export default function SupplyChainDashboard() {
             .from("smoking_products")
             .update({
               flavor: JSON.stringify(configPayload),
-              is_active: true
+              is_active: false
             })
             .eq("id", existingConfigRow[0].id)
             .eq("company_id", targetCompanyId);
@@ -1777,7 +1777,7 @@ export default function SupplyChainDashboard() {
               price: 0,
               stock: 0,
               puffs: 0,
-              is_active: true
+              is_active: false
             });
         }
       } catch (syncErr) {

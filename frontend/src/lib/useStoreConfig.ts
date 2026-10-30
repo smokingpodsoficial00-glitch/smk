@@ -185,7 +185,18 @@ async function fetchConfig(): Promise<StoreConfig> {
     };
   }
 
-  let finalConfig: StoreConfig = mainConfig || fallbackConfig || local;
+  let finalConfig: StoreConfig = { ...(mainConfig || fallbackConfig || local) };
+
+  // Flags de visibilidade publicadas pelo admin na linha pública __STORE_CONFIG__
+  if (fallbackConfig) {
+    if (typeof fallbackConfig.hide_out_of_stock_products === "boolean") {
+      finalConfig.hide_out_of_stock_products = fallbackConfig.hide_out_of_stock_products;
+    }
+    if (typeof fallbackConfig.hide_out_of_stock_variants === "boolean") {
+      finalConfig.hide_out_of_stock_variants = fallbackConfig.hide_out_of_stock_variants;
+    }
+  }
+  // companies.payment_gateway (fonte oficial, quando legível) tem prioridade final
   if (companyHideProducts !== undefined) {
     finalConfig.hide_out_of_stock_products = companyHideProducts;
   }
@@ -218,7 +229,8 @@ export function useStoreConfig() {
     if (broadcastChannel) {
       const handleBroadcast = (e: MessageEvent) => {
         if (e.data && typeof e.data === "object") {
-          cachedConfig = e.data as StoreConfig;
+          // Mescla mensagens parciais (ex.: só as flags de visibilidade) sem apagar o resto da config
+          cachedConfig = { ...(cachedConfig || getLocalFallback()), ...(e.data as Partial<StoreConfig>) } as StoreConfig;
           setConfig(cachedConfig);
           try { localStorage.setItem(getCatalogStorageKey(cachedConfig.id), JSON.stringify(cachedConfig)); } catch {}
         }
