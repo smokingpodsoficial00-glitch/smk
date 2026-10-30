@@ -248,60 +248,8 @@ export function DashboardLayout() {
           </button>
         </div>
 
-        {/* Rodapé Desktop: Conectar no Celular, Modo Claro, Tour, Configurações & Sair */}
+        {/* Rodapé Desktop: Configurações & Sair */}
         <div className={`p-3 border-t border-white/5 w-full flex flex-col gap-1.5 ${collapsed ? 'items-center' : ''}`}>
-          
-          {/* Botão Conectar Sistema no Celular */}
-          <button
-            type="button"
-            data-tour="sidebar-conectar-celular"
-            onClick={() => setMobilePushModalOpen(true)}
-            title={collapsed ? "Conectar Sistema no Celular" : undefined}
-            className={`flex items-center gap-2.5 py-2 transition-all cursor-pointer w-full text-xs font-extrabold rounded-xl text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-400/50 shadow-sm ${
-              collapsed ? 'justify-center px-3' : 'px-3'
-            }`}
-          >
-            <Smartphone className="size-4 shrink-0 text-emerald-400" />
-            {!collapsed && <span className="truncate">Conectar no Celular</span>}
-          </button>
-
-          {/* Botão Alternador Modo Claro / Modo Escuro */}
-          <button
-            type="button"
-            onClick={toggleTheme}
-            title={collapsed ? (theme === 'dark' ? "Ativar Modo Claro" : "Ativar Modo Escuro") : undefined}
-            className={`flex items-center gap-3 py-2 transition-all cursor-pointer w-full text-xs font-semibold rounded-xl text-white/70 hover:text-white hover:bg-white/5 border border-white/5 ${
-              collapsed ? 'justify-center px-3' : 'px-3'
-            }`}
-          >
-            {theme === 'dark' ? (
-              <>
-                <Sun className="size-4 shrink-0 text-amber-400" />
-                {!collapsed && <span className="truncate">Modo Claro</span>}
-              </>
-            ) : (
-              <>
-                <Moon className="size-4 shrink-0 text-sky-400" />
-                {!collapsed && <span className="truncate">Modo Escuro</span>}
-              </>
-            )}
-          </button>
-
-          {/* Botão de Tour do Sistema */}
-          <button
-            type="button"
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent('open-system-tour'));
-            }}
-            title={collapsed ? "Tour do Sistema" : undefined}
-            className={`flex items-center gap-3 py-2 transition-all cursor-pointer w-full text-xs font-semibold rounded-xl text-amber-300 hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 ${
-              collapsed ? 'justify-center px-3' : 'px-3'
-            }`}
-          >
-            <Compass className="size-4 shrink-0 text-amber-400 animate-spin-slow" />
-            {!collapsed && <span className="truncate">Tour do Sistema</span>}
-          </button>
-
           {canAccess('configuracoes') && (
             <NavLink 
               to="/configuracoes"

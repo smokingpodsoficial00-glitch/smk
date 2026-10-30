@@ -140,11 +140,11 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: "conectar_celular",
     badge: "Etapa 11 de 12 • App no Celular & Alertas",
-    route: "/financeiro",
+    route: "/configuracoes",
     title: "📱 Conectar Sistema no Seu Celular (App & Notificações)",
-    targetSelector: '[data-tour="sidebar-conectar-celular"]',
-    pointerText: "👉 CLIQUE AQUI: CONECTAR NO CELULAR 👈",
-    description: "Tenha o painel da sua loja na palma da mão! Clicando em 'Conectar no Celular' na barra lateral esquerda, você abre o QR Code e o passo a passo guiado para instalar o aplicativo no seu iPhone ou Android em 30 segundos. Você acompanha Financeiro, Estoque e Sócios de onde estiver e recebe notificações em tempo real na tela bloqueada a cada venda concluída na sua conta!",
+    targetSelector: '[data-tour="tab-system-settings"]',
+    pointerText: "👉 CLIQUE AQUI: SISTEMA & DISPOSITIVOS 👈",
+    description: "Tenha o painel da sua loja na palma da mão! Em Configurações > Sistema & Dispositivos, você abre o QR Code e o passo a passo guiado para instalar o aplicativo no seu iPhone ou Android em 30 segundos. Você acompanha Financeiro, Estoque e Sócios de onde estiver e recebe notificações em tempo real na tela bloqueada a cada venda!",
     tips: [
       "Escaneie o QR Code com a câmera do seu celular",
       "Adicione à Tela de Início (Safari no iPhone / Chrome no Android)",

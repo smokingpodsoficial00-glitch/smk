@@ -208,52 +208,8 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Barra de Ações Rápidas do Print (Conectar Celular, Tema, Tour do Sistema) + Salvar */}
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
-            
-            {/* 📱 Botão Conectar no Celular */}
-            <button
-              type="button"
-              onClick={() => setMobilePushModalOpen(true)}
-              title="Instalar aplicativo e receber notificações de vendas no celular"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-400/50 shadow-sm transition-all cursor-pointer active:scale-95"
-            >
-              <Smartphone className="size-3.5 text-emerald-400 shrink-0" />
-              <span>Conectar no Celular</span>
-            </button>
-
-            {/* ☀️ / 🌙 Botão Alternador Modo Claro / Escuro */}
-            <button
-              type="button"
-              onClick={toggleTheme}
-              title={theme === 'dark' ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white/80 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer active:scale-95"
-            >
-              {theme === 'dark' ? (
-                <>
-                  <Sun className="size-3.5 text-amber-400 shrink-0" />
-                  <span>Modo Claro</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="size-3.5 text-sky-400 shrink-0" />
-                  <span>Modo Escuro</span>
-                </>
-              )}
-            </button>
-
-            {/* 🧭 Botão Tour do Sistema */}
-            <button
-              type="button"
-              onClick={handleStartTour}
-              title="Iniciar tour guiado explicativo de todas as funções do painel"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/40 transition-all cursor-pointer active:scale-95"
-            >
-              <Compass className="size-3.5 text-amber-400 shrink-0" />
-              <span className="hidden sm:inline">Tour do Sistema</span>
-              <span className="sm:hidden">Tour</span>
-            </button>
-
+          {/* Ação do Topo: Salvar Alterações */}
+          <div className="flex items-center gap-2 shrink-0">
             {/* Botão Salvar Principal */}
             <button
               type="button"
@@ -309,6 +265,7 @@ export default function SettingsPage() {
 
           <button
             type="button"
+            data-tour="tab-system-settings"
             onClick={() => setActiveTab("system")}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
               activeTab === "system"
@@ -634,6 +591,7 @@ export default function SettingsPage() {
 
                 <button
                   type="button"
+                  data-tour="settings-conectar-celular"
                   onClick={() => setMobilePushModalOpen(true)}
                   className="px-5 py-3 rounded-2xl font-extrabold text-xs bg-emerald-500 hover:bg-emerald-400 text-black shadow-lg shadow-emerald-500/25 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-2 shrink-0"
                 >
