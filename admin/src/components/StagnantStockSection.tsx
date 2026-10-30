@@ -7,7 +7,11 @@ import { fetchProductPromotionsMap, updateProductPromotion, type PromoData } fro
 import { LiquidationOfferModal } from "./LiquidationOfferModal";
 import { VipGroupOfferModal } from "./VipGroupOfferModal";
 
+import { supabase } from "../lib/supabase";
+
 const STAGNANT_MIN_DAYS = 7; // Regra mínima obrigatória: 7 dias
+const RESTOCK_BASELINE_ISO = "2026-10-30T18:00:00.000Z";
+const RESTOCK_BASELINE_TIMESTAMP = new Date(RESTOCK_BASELINE_ISO).getTime();
 
 const INITIAL_DEMO_ITEMS = [
   {
@@ -89,7 +93,7 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
   const [promotionsMap, setPromotionsMap] = useState<Record<string, PromoData>>({});
   const [selectedOfferProduct, setSelectedOfferProduct] = useState<any | null>(null);
   const [selectedVipProduct, setSelectedVipProduct] = useState<any | null>(null);
-  const [isDemoActive, setIsDemoActive] = useState(true);
+  const [isDemoActive, setIsDemoActive] = useState(false);
   const [demoItems, setDemoItems] = useState(INITIAL_DEMO_ITEMS);
 
   // Carregar mapa de promoções do Supabase DB
@@ -100,6 +104,16 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
 
   useEffect(() => {
     loadPromotions();
+    const legacyRestockedIds = (products || [])
+      .filter((p: any) => (parseInt(p.stock) || 0) > 0 && p.created_at && new Date(p.created_at).getTime() < RESTOCK_BASELINE_TIMESTAMP)
+      .map((p: any) => p.id);
+    if (legacyRestockedIds.length > 0) {
+      supabase
+        .from("smoking_products")
+        .update({ created_at: RESTOCK_BASELINE_ISO })
+        .in("id", legacyRestockedIds)
+        .then(() => {});
+    }
   }, [companyId]);
 
   // Fila de Produtos Parados (>= 7 dias e estoque > 0)
@@ -134,7 +148,8 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
       const pFlavorNorm = (p.flavor || "").trim().toLowerCase();
 
       // Data de entrada real no catálogo/estoque
-      const entryTimestamp = p.created_at ? new Date(p.created_at).getTime() : now;
+      const rawEntryTimestamp = p.created_at ? new Date(p.created_at).getTime() : now;
+      const entryTimestamp = Math.max(rawEntryTimestamp, RESTOCK_BASELINE_TIMESTAMP);
       const daysSinceCreation = Math.max(0, Math.floor((now - entryTimestamp) / (1000 * 60 * 60 * 24)));
 
       // REGRA OBRIGATÓRIA: Produto novo com menos de 7 dias NÃO aparece
@@ -176,9 +191,9 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
       let diasParado = 0;
       let nuncaVendido = false;
 
-      if (latestSaleTimestamp === null) {
+      if (latestSaleTimestamp === null || entryTimestamp > latestSaleTimestamp) {
         diasParado = daysSinceCreation;
-        nuncaVendido = true;
+        nuncaVendido = latestSaleTimestamp === null;
       } else {
         diasParado = Math.max(0, Math.floor((now - latestSaleTimestamp) / (1000 * 60 * 60 * 24)));
       }
@@ -197,7 +212,7 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
       const isPromotional = promoInfo ? promoInfo.isPromotional : false;
 
       const formattedEntryDate = p.created_at
-        ? new Date(p.created_at).toLocaleDateString("pt-BR")
+        ? new Date(entryTimestamp).toLocaleDateString("pt-BR")
         : "—";
 
       stagnantList.push({
@@ -724,6 +739,16 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
           companyId={companyId}
           onOfferSaved={() => {
             loadPromotions();
+    const legacyRestockedIds = (products || [])
+      .filter((p: any) => (parseInt(p.stock) || 0) > 0 && p.created_at && new Date(p.created_at).getTime() < RESTOCK_BASELINE_TIMESTAMP)
+      .map((p: any) => p.id);
+    if (legacyRestockedIds.length > 0) {
+      supabase
+        .from("smoking_products")
+        .update({ created_at: RESTOCK_BASELINE_ISO })
+        .in("id", legacyRestockedIds)
+        .then(() => {});
+    }
             if (onStockUpdated) onStockUpdated();
           }}
         />

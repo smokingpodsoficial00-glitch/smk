@@ -835,6 +835,22 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
         return;
       }
 
+      // Atualizar data de entrada (created_at) dos itens que receberam reposição hoje para zerar "Dias Parado"
+      try {
+        const nowIso = new Date().toISOString();
+        for (const rItem of rpcItems) {
+          await supabase
+            .from("smoking_products")
+            .update({ created_at: nowIso })
+            .eq("company_id", targetCompanyId)
+            .ilike("brand", rItem.brand)
+            .ilike("name", rItem.model)
+            .ilike("flavor", rItem.flavor);
+        }
+      } catch (restockDateErr) {
+        console.warn("Aviso ao atualizar data de entrada dos produtos repostos:", restockDateErr);
+      }
+
       // 3. Limpeza do rascunho apenas após confirmação atômica com sucesso no banco
       try {
         localStorage.removeItem(LOCAL_STORAGE_ORDER_KEY);

@@ -1107,11 +1107,14 @@ export default function SupplyChainDashboard() {
     setIsSavingStock(true);
     try {
       for (const [id, stock] of entries) {
-        let query = supabase.from("smoking_products").update({ stock }).eq("id", id);
+        const existingProd = products.find((p: any) => p.id === id);
+        const prevStock = existingProd ? (parseInt(existingProd.stock) || 0) : 0;
+        const updatePayload: any = stock > prevStock ? { stock, created_at: new Date().toISOString() } : { stock };
+        let query = supabase.from("smoking_products").update(updatePayload).eq("id", id);
         if (company?.id) query = query.eq("company_id", company.id);
         const { data, error } = await query.select();
         if (error || !data || data.length === 0) {
-          const fallbackRes = await supabase.from("smoking_products").update({ stock }).eq("id", id);
+          const fallbackRes = await supabase.from("smoking_products").update(updatePayload).eq("id", id);
           if (fallbackRes.error) {
             throw fallbackRes.error;
           }
