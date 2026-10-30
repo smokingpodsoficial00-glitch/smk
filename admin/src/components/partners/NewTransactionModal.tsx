@@ -34,9 +34,11 @@ export function NewTransactionModal({
 }: NewTransactionModalProps) {
   const humanPartners = filterRealHumanPartners(partners);
 
-  // 3 Tipos solicitados: 'Custo da empresa' | 'Salário' | 'Retirada de sócio' (com suporte interno a APORTE se chamado por atalhos prévios)
-  const [selectedType, setSelectedType] = useState<'DESPESA_OPERACIONAL' | 'PRO_LABORE' | 'RETIRADA_CAPITAL'>(
-    defaultType === 'PRO_LABORE'
+  // Tipos disponíveis: 'Custo da empresa' | 'Entrada de sócio' | 'Salário' | 'Retirada de sócio'
+  const [selectedType, setSelectedType] = useState<'DESPESA_OPERACIONAL' | 'APORTE' | 'PRO_LABORE' | 'RETIRADA_CAPITAL'>(
+    defaultType === 'APORTE'
+      ? 'APORTE'
+      : defaultType === 'PRO_LABORE'
       ? 'PRO_LABORE'
       : defaultType === 'RETIRADA_CAPITAL'
       ? 'RETIRADA_CAPITAL'
@@ -55,7 +57,9 @@ export function NewTransactionModal({
 
   useEffect(() => {
     if (isOpen) {
-      if (defaultType === 'PRO_LABORE') {
+      if (defaultType === 'APORTE') {
+        setSelectedType('APORTE');
+      } else if (defaultType === 'PRO_LABORE') {
         setSelectedType('PRO_LABORE');
       } else if (defaultType === 'RETIRADA_CAPITAL') {
         setSelectedType('RETIRADA_CAPITAL');
@@ -98,7 +102,9 @@ export function NewTransactionModal({
     setErrorMsg(null);
 
     let defaultDesc = '';
-    if (selectedType === 'PRO_LABORE') {
+    if (selectedType === 'APORTE') {
+      defaultDesc = `Aporte de investimento - ${selectedPartner?.name || 'Sócio'}`;
+    } else if (selectedType === 'PRO_LABORE') {
       defaultDesc = `Salário / Pró-labore - ${selectedPartner?.name || 'Sócio'}`;
     } else if (selectedType === 'DESPESA_OPERACIONAL') {
       defaultDesc = 'Custo da empresa';
@@ -144,7 +150,7 @@ export function NewTransactionModal({
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/10 bg-[#0e0e11]">
           <div className="min-w-0">
             <h2 className="text-sm font-bold text-white tracking-tight truncate">
-              Lançar Custo / Despesa
+              {selectedType === 'APORTE' ? 'Entrada de Sócio (Investimento)' : 'Lançar Custo / Despesa'}
             </h2>
             <p className="text-[10px] text-white/40 truncate">
               Integrado ao Caixa Real e Financeiro
@@ -168,8 +174,8 @@ export function NewTransactionModal({
             </div>
           )}
 
-          {/* Segmented Control de 3 opções: [ Custo da empresa ] [ Salário ] [ Retirada de sócio ] */}
-          <div className="grid grid-cols-3 p-1 bg-black/60 border border-white/10 rounded-xl gap-1">
+          {/* Segmented Control de 4 opções: [ Custo da empresa ] [ Entrada de sócio ] [ Salário ] [ Retirada de sócio ] */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 p-1 bg-black/60 border border-white/10 rounded-xl gap-1">
             <button
               type="button"
               onClick={() => setSelectedType('DESPESA_OPERACIONAL')}
@@ -180,6 +186,18 @@ export function NewTransactionModal({
               }`}
             >
               Custo da empresa
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedType('APORTE')}
+              className={`py-2 px-1 text-center rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer truncate ${
+                selectedType === 'APORTE'
+                  ? 'bg-emerald-400 text-black font-extrabold shadow-sm'
+                  : 'text-emerald-400 hover:text-emerald-300'
+              }`}
+            >
+              Entrada de sócio
             </button>
 
             <button
@@ -207,11 +225,11 @@ export function NewTransactionModal({
             </button>
           </div>
 
-          {/* Campo Sócio (somente quando for Salário ou Retirada de sócio) */}
+          {/* Campo Sócio (somente quando for Entrada de sócio, Salário ou Retirada de sócio) */}
           {!isCompanyExpense && (
             <div className="space-y-1.5">
               <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider">
-                Sócio
+                {selectedType === 'APORTE' ? 'Sócio Investidor' : 'Sócio'}
               </label>
               <select
                 value={partnerId}
@@ -277,6 +295,8 @@ export function NewTransactionModal({
                 placeholder={
                   isCompanyExpense
                     ? "Ex: Sacolas, embalagem, sistema, transporte..."
+                    : selectedType === 'APORTE'
+                    ? "Ex: Aporte para compra de estoque, capital de giro..."
                     : "Ex: Observação..."
                 }
                 className="w-full bg-[#121215] border border-white/10 rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-white/30 transition-all"
@@ -291,7 +311,11 @@ export function NewTransactionModal({
               disabled={submitting}
               className="w-full py-2.5 sm:py-3 px-4 rounded-xl text-xs font-extrabold bg-emerald-500 hover:bg-emerald-400 text-black shadow-lg shadow-emerald-500/10 transition-all cursor-pointer active:scale-[0.99] disabled:opacity-50"
             >
-              {submitting ? 'Lançando...' : 'Lançar'}
+              {submitting
+                ? 'Lançando...'
+                : selectedType === 'APORTE'
+                ? 'Lançar Entrada de Sócio'
+                : 'Lançar'}
             </button>
           </div>
         </form>
