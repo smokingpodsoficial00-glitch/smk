@@ -723,18 +723,24 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
 
   // Gerador de Texto para WhatsApp do Fornecedor Baseado na Lista Real do Usuário
   const generatedWhatsAppMessage = useMemo(() => {
-    return `*PEDIDO DE REPOSIÇÃO DE ESTOQUE*
-*Origem:* São Bernardo do Campo / SP
-*Lote Total:* R$ ${totalSpentWithShipping.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+    const sections = orderItems
+      .filter(item => item.qty > 0)
+      .map(item => {
+        const b = (item.brand || "").trim();
+        const m = (item.model || "").trim();
+        const fullTitle = (!b ? m : !m ? b : m.toLowerCase().startsWith(b.toLowerCase()) ? m : `${b} ${m}`).toUpperCase();
+        const header = `*${fullTitle}*`;
 
-*LISTA DE MODELOS E QUANTIDADES:*
-${orderItems.map(item => `• ${item.qty}x ${item.brand} ${item.model} (${item.flavors || "Sabores a definir"})`).join("\n")}
+        const parsedFlavors = parseFlavorsString(item.flavors, item.qty);
+        const flavorLines = parsedFlavors.length > 0
+          ? parsedFlavors.map(f => `• ${f.qty}x ${f.flavor}`)
+          : [`• ${item.qty}x Sabores a definir`];
 
-*Total de Peças:* ${totalUnitsInOrder} unidades
-*Frete Estimado:* R$ ${supplierShippingFee.toFixed(2)} (Diluído: R$ ${dilutedShippingPerPod}/un)
+        return [header, ...flavorLines].join("\n");
+      });
 
-Por favor, me confirme a disponibilidade destes sabores e a chave Pix para faturarmos o pedido!`;
-  }, [orderItems, totalUnitsInOrder, totalSpentWithShipping, supplierShippingFee, dilutedShippingPerPod]);
+    return sections.join("\n\n");
+  }, [orderItems]);
 
   const handleCopyOrderText = () => {
     try {
