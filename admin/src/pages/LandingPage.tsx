@@ -538,159 +538,86 @@ export function LandingPage() {
             </p>
           </div>
 
-          {/* Grid: Explicação Técnica dos 4 Pilares do Catálogo */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-12 items-center">
-            
-            <div className="space-y-3 sm:space-y-6">
-              
-              {/* Pilar 1 */}
-              <div className="flex gap-3 sm:gap-4 p-3.5 sm:p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 transition-colors">
-                <div className="size-9 sm:size-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 font-bold font-mono text-xs sm:text-base">
-                  01
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm sm:text-base font-bold text-white">Cadastrou uma vez, tá pronto</h3>
-                  <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
-                    Cadastre produtos e variações uma única vez. Chegou reposição? Ative o sabor em 1 clique sem retrabalho.
-                  </p>
-                  <p className="hidden sm:block text-xs sm:text-sm text-white/60 leading-relaxed">
-                    Você cadastra o produto uma única vez e todas as variações ficam salvas no sistema. Quando chega um lote novo do fornecedor, você só clica em um botão para ativar a opção de volta no ar. Sem retrabalho.
-                  </p>
-                </div>
+          {/* Mockup Visual Centralizado do Catálogo no Smartphone */}
+          <div className="flex justify-center pt-2 sm:pt-4">
+            <div className="w-full max-w-[320px] sm:max-w-[360px] bg-[#0c0c0c] border-[6px] sm:border-[8px] border-[#222] rounded-[40px] sm:rounded-[48px] p-2 sm:p-3 shadow-[0_0_60px_rgba(255,255,255,0.12),0_25px_50px_rgba(0,0,0,0.85)] relative mx-auto select-none group ring-1 ring-white/10">
+              {/* Speaker notch */}
+              <div className="w-20 sm:w-24 h-3 sm:h-3.5 bg-[#1c1c1e] rounded-full mx-auto mb-2 flex items-center justify-center gap-1.5 shadow-inner">
+                <div className="size-1 rounded-full bg-white/20" />
+                <div className="w-5 sm:w-6 h-0.5 bg-white/10 rounded-full" />
               </div>
 
-              {/* Pilar 2 */}
-              <div className="flex gap-3 sm:gap-4 p-3.5 sm:p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 transition-colors">
-                <div className="size-9 sm:size-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 font-bold font-mono text-xs sm:text-base">
-                  02
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm sm:text-base font-bold text-white">Vendeu a última? Sai do ar sozinho</h3>
-                  <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
-                    Ao confirmar o pedido no Kanban, dá baixa no estoque. O cliente nunca mais pede o que acabou.
-                  </p>
-                  <p className="hidden sm:block text-xs sm:text-sm text-white/60 leading-relaxed">
-                    Cada vez que você aceita um pedido no Kanban, o sistema dá baixa imediata no estoque. O item esgotado desaparece ou fica marcado como indisponível no catálogo. O cliente nunca mais vai pedir o que não tem.
-                  </p>
-                </div>
-              </div>
+              {/* Tela do Celular com Print Real do Catálogo */}
+              <div className="rounded-[30px] sm:rounded-[34px] overflow-hidden border border-white/10 relative bg-black shadow-inner">
+                <ScreenshotOrFallback
+                  src="/prints/catalogo-mobile.png"
+                  alt="Catálogo Oficial no Celular"
+                  className="w-full h-auto object-cover object-top block transition-transform duration-500 group-hover:scale-[1.02]"
+                  fallback={
+                    <div className="p-3 space-y-2">
+                      {/* Catalog Header */}
+                      <div className="space-y-1.5 pb-2.5 border-b border-white/10 text-center">
+                        <div className="inline-flex items-center gap-1 text-[9px] text-white bg-white/10 border border-white/15 px-2 py-0.5 rounded-full font-bold">
+                          <span>⚡ Entrega Express em 25-35min</span>
+                        </div>
+                        <div className="font-extrabold text-xs text-white">Catálogo Oficial da Loja</div>
+                        <div className="text-[9px] text-white/50">Toque no produto para ver as opções disponíveis</div>
+                      </div>
 
-              {/* Pilar 3 */}
-              <div className="flex gap-3 sm:gap-4 p-3.5 sm:p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 transition-colors">
-                <div className="size-9 sm:size-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 font-bold font-mono text-xs sm:text-base">
-                  03
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm sm:text-base font-bold text-white">Visual premium com autoridade</h3>
-                  <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
-                    Fotos oficiais em alta definição. Seu cliente abre uma vitrine profissional de verdade no celular.
-                  </p>
-                  <p className="hidden sm:block text-xs sm:text-sm text-white/60 leading-relaxed">
-                    Fotos oficiais e limpas em alta definição. Seu cliente abre o link no celular e vê uma vitrine profissional de verdade, com visual atraente e navegação fluida.
-                  </p>
-                </div>
-              </div>
+                      {/* Filter Pills */}
+                      <div className="flex gap-1 py-1.5 overflow-x-auto text-[9px] font-bold no-scrollbar">
+                        <span className="px-2 py-0.5 rounded-md bg-white text-black shrink-0">Todos</span>
+                        <span className="px-2 py-0.5 rounded-md bg-[#1a1a1a] text-white/70 shrink-0">Ignite V50</span>
+                        <span className="px-2 py-0.5 rounded-md bg-[#1a1a1a] text-white/70 shrink-0">Lost Mary</span>
+                        <span className="px-2 py-0.5 rounded-md bg-[#1a1a1a] text-white/70 shrink-0">Elfbar</span>
+                      </div>
 
-              {/* Pilar 4 */}
-              <div className="flex gap-3 sm:gap-4 p-3.5 sm:p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-emerald-500/40 transition-colors">
-                <div className="size-9 sm:size-11 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shrink-0 font-bold font-mono text-xs sm:text-base">
-                  04
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm sm:text-base font-bold text-white">Pedido pronto no seu WhatsApp</h3>
-                  <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
-                    O cliente escolhe produtos, digita o endereço e finaliza. O zap abre com tudo calculado para despacho.
-                  </p>
-                  <p className="hidden sm:block text-xs sm:text-sm text-white/60 leading-relaxed">
-                    O cliente escolhe o produto, seleciona a variação, define a quantidade e digita o endereço. Ao clicar em finalizar, o WhatsApp dele abre com a mensagem pré-formatada com todos os dados. Você só confere o Pix e despacha.
-                  </p>
-                </div>
-              </div>
-
-            </div>
-
-            {/* MOCKUP VISUAL DO SMARTPHONE DO CATÁLOGO COM O PRINT REAL EMBUTIDO */}
-            <div className="flex justify-center">
-              <div className="w-full max-w-[320px] sm:max-w-[340px] bg-[#0c0c0c] border-[6px] sm:border-[8px] border-[#222] rounded-[40px] sm:rounded-[48px] p-2 sm:p-3 shadow-[0_0_60px_rgba(255,255,255,0.12),0_25px_50px_rgba(0,0,0,0.85)] relative mx-auto select-none group ring-1 ring-white/10">
-                {/* Speaker notch */}
-                <div className="w-20 sm:w-24 h-3 sm:h-3.5 bg-[#1c1c1e] rounded-full mx-auto mb-2 flex items-center justify-center gap-1.5 shadow-inner">
-                  <div className="size-1 rounded-full bg-white/20" />
-                  <div className="w-5 sm:w-6 h-0.5 bg-white/10 rounded-full" />
-                </div>
-
-                {/* Tela do Celular com Print Real do Catálogo */}
-                <div className="rounded-[30px] sm:rounded-[34px] overflow-hidden border border-white/10 relative bg-black shadow-inner">
-                  <ScreenshotOrFallback
-                    src="/prints/catalogo-mobile.png"
-                    alt="Catálogo Oficial no Celular"
-                    className="w-full h-auto object-cover object-top block transition-transform duration-500 group-hover:scale-[1.02]"
-                    fallback={
-                      <div className="p-3 space-y-2">
-                        {/* Catalog Header */}
-                        <div className="space-y-1.5 pb-2.5 border-b border-white/10 text-center">
-                          <div className="inline-flex items-center gap-1 text-[9px] text-white bg-white/10 border border-white/15 px-2 py-0.5 rounded-full font-bold">
-                            <span>⚡ Entrega Express em 25-35min</span>
+                      {/* Products List inside Phone */}
+                      <div className="space-y-2 pt-0.5">
+                        <div className="bg-[#141414] border border-[#262626] rounded-xl p-2 flex items-center justify-between">
+                          <div>
+                            <div className="text-[11px] font-bold text-white">Ignite V50</div>
+                            <div className="text-[9px] text-white/70 font-mono">5.000 Puffs • R$ 115,00</div>
                           </div>
-                          <div className="font-extrabold text-xs text-white">Catálogo Oficial da Loja</div>
-                          <div className="text-[9px] text-white/50">Toque no produto para ver as opções disponíveis</div>
+                          <span className="px-2 py-0.5 rounded-md bg-white/10 text-[9px] font-bold text-white border border-white/20">
+                            Escolher
+                          </span>
                         </div>
 
-                        {/* Filter Pills */}
-                        <div className="flex gap-1 py-1.5 overflow-x-auto text-[9px] font-bold no-scrollbar">
-                          <span className="px-2 py-0.5 rounded-md bg-white text-black shrink-0">Todos</span>
-                          <span className="px-2 py-0.5 rounded-md bg-[#1a1a1a] text-white/70 shrink-0">Ignite V50</span>
-                          <span className="px-2 py-0.5 rounded-md bg-[#1a1a1a] text-white/70 shrink-0">Lost Mary</span>
-                          <span className="px-2 py-0.5 rounded-md bg-[#1a1a1a] text-white/70 shrink-0">Elfbar</span>
-                        </div>
-
-                        {/* Products List inside Phone */}
-                        <div className="space-y-2 pt-0.5">
-                          <div className="bg-[#141414] border border-[#262626] rounded-xl p-2 flex items-center justify-between">
-                            <div>
-                              <div className="text-[11px] font-bold text-white">Ignite V50</div>
-                              <div className="text-[9px] text-white/70 font-mono">5.000 Puffs • R$ 115,00</div>
-                            </div>
-                            <span className="px-2 py-0.5 rounded-md bg-white/10 text-[9px] font-bold text-white border border-white/20">
-                              Escolher
-                            </span>
+                        <div className="bg-[#141414] border border-white/40 rounded-xl p-2 flex items-center justify-between">
+                          <div>
+                            <span className="text-[8px] bg-white text-black px-1 rounded font-black uppercase">Mais Vendido</span>
+                            <div className="text-[11px] font-bold text-white mt-0.5">Lost Mary MO20000 Pro</div>
+                            <div className="text-[9px] text-white/70 font-mono">20.000 Puffs • R$ 135,00</div>
                           </div>
-
-                          <div className="bg-[#141414] border border-white/40 rounded-xl p-2 flex items-center justify-between">
-                            <div>
-                              <span className="text-[8px] bg-white text-black px-1 rounded font-black uppercase">Mais Vendido</span>
-                              <div className="text-[11px] font-bold text-white mt-0.5">Lost Mary MO20000 Pro</div>
-                              <div className="text-[9px] text-white/70 font-mono">20.000 Puffs • R$ 135,00</div>
-                            </div>
-                            <span className="px-2 py-1 rounded-md bg-white text-[9px] font-bold text-black shadow">
-                              Escolher
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Floating Bottom Cart Bar */}
-                        <div className="mt-2.5 bg-white text-black font-extrabold p-2 rounded-xl text-center text-xs flex items-center justify-between shadow-lg">
-                          <div className="text-left">
-                            <span className="text-[8px] block text-black/70 uppercase">Sacola (1 item)</span>
-                            <span className="text-xs">R$ 135,00</span>
-                          </div>
-                          <span className="flex items-center gap-1 text-[10px] bg-black text-white px-2.5 py-1 rounded-lg">
-                            <span>Pedir no WhatsApp</span>
-                            <ArrowRight className="size-2.5" />
+                          <span className="px-2 py-1 rounded-md bg-white text-[9px] font-bold text-black shadow">
+                            Escolher
                           </span>
                         </div>
                       </div>
-                    }
-                  />
 
-                  {/* Reflexo sutil de vidro da tela */}
-                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.02] to-white/[0.06] pointer-events-none" />
-                </div>
+                      {/* Floating Bottom Cart Bar */}
+                      <div className="mt-2.5 bg-white text-black font-extrabold p-2 rounded-xl text-center text-xs flex items-center justify-between shadow-lg">
+                        <div className="text-left">
+                          <span className="text-[8px] block text-black/70 uppercase">Sacola (1 item)</span>
+                          <span className="text-xs">R$ 135,00</span>
+                        </div>
+                        <span className="flex items-center gap-1 text-[10px] bg-black text-white px-2.5 py-1 rounded-lg">
+                          <span>Pedir no WhatsApp</span>
+                          <ArrowRight className="size-2.5" />
+                        </span>
+                      </div>
+                    </div>
+                  }
+                />
 
-                {/* Home indicator bar at bottom */}
-                <div className="w-20 sm:w-24 h-1 bg-white/30 rounded-full mx-auto mt-2" />
+                {/* Reflexo sutil de vidro da tela */}
+                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.02] to-white/[0.06] pointer-events-none" />
               </div>
-            </div>
 
+              {/* Home indicator bar at bottom */}
+              <div className="w-20 sm:w-24 h-1 bg-white/30 rounded-full mx-auto mt-2" />
+            </div>
           </div>
 
           {/* Reforço do Catálogo com Print Desktop no Computador (Oculto no mobile para poupar scroll) */}
@@ -767,50 +694,19 @@ export function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-            
-            {/* Card 1 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3 hover:border-white/40 transition-colors">
-              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
-                <Package className="size-4 sm:size-5" />
+          {/* Card Único: Acompanhe Cada Motoboy */}
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-5 rounded-2xl flex items-start sm:items-center gap-3.5 sm:gap-4 hover:border-white/40 transition-colors">
+              <div className="size-10 sm:size-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0">
+                <Truck className="size-5" />
               </div>
-              <h3 className="text-sm sm:text-base font-bold text-white">Múltiplos Pedidos Sem Erro</h3>
-              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
-                Visualize pedidos em colunas: Novos, Separando e Em Rota. Ninguém confunde sabor nem esquece pedido na bancada.
-              </p>
-              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
-                Chegaram 4 pedidos no mesmo minuto? Você visualiza tudo na coluna de <strong>Novos Pedidos</strong>. Ao separar os itens do pedido, arrasta para <strong>Separando</strong>. Ninguém confunde produto, ninguém esquece pedido na bancada.
-              </p>
-            </div>
-
-            {/* Card 2 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3 hover:border-white/40 transition-colors">
-              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
-                <Truck className="size-4 sm:size-5" />
+              <div className="space-y-1">
+                <h3 className="text-sm sm:text-base font-bold text-white">Acompanhe Cada Motoboy em Tempo Real</h3>
+                <p className="text-xs text-white/70 leading-relaxed">
+                  A coluna <strong>Em Rota</strong> mostra exatamente os pedidos que já saíram com o Uber Flash ou entregador próprio. Você nunca mais esquece de avisar o cliente que o motoboy chegou.
+                </p>
               </div>
-              <h3 className="text-sm sm:text-base font-bold text-white">Acompanhe Cada Motoboy</h3>
-              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
-                Saiba os pedidos que estão em rota com entregador próprio ou Uber Flash. Avise o cliente no momento certo.
-              </p>
-              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
-                A coluna <strong>Em Rota</strong> mostra exatamente os pedidos que já saíram com o Uber Flash ou entregador próprio. Você nunca mais vai esquecer de avisar o cliente que o motoboy chegou no portão dele.
-              </p>
             </div>
-
-            {/* Card 3 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3 hover:border-white/40 transition-colors">
-              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
-                <TrendingUp className="size-4 sm:size-5" />
-              </div>
-              <h3 className="text-sm sm:text-base font-bold text-white">Mais Entregas = Mais Lucro</h3>
-              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
-                Endereço formatado em 1 clique para colar no app de entrega. Você despacha qualquer pedido em 2 minutos.
-              </p>
-              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
-                Com o endereço já formatado em 1 clique para colar no app de entrega, você despacha em 2 minutos. Seu cliente valoriza agilidade: quanto mais rápido você for, mais ele compra com você.
-              </p>
-            </div>
-
           </div>
 
           {/* Kanban Board Visual com Moldura de Aplicação Real */}
@@ -909,58 +805,9 @@ export function LandingPage() {
               </span>
             </h2>
 
-            <p className="sm:hidden text-xs text-white/70 leading-relaxed">
+            <p className="text-xs sm:text-base text-white/70 max-w-3xl mx-auto leading-relaxed">
               O CRM rastreia o ciclo de consumo de cada cliente para você entrar em contato na hora exata e vender antes do concorrente.
             </p>
-            <p className="hidden sm:block text-sm sm:text-base text-white/70 max-w-3xl mx-auto leading-relaxed">
-              Gerir vendas não é ficar esperando cliente cair do céu ou disputando preço centavo a centavo. Você sabe quanto cada cliente gasta com você por mês? Qual o tempo de vida dele? E o principal: <strong>quanto tempo falta para a próxima recompra dele?</strong> O CRM do SMK System rastreia o ciclo de consumo de cada cliente para você entrar em contato na hora exata e vender de novo antes que ele compre em outra loja.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-            
-            {/* Card 1 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3 hover:border-white/40 transition-colors">
-              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
-                <Store className="size-4 sm:size-5 text-white" />
-              </div>
-              <h3 className="text-sm sm:text-base font-bold text-white">Atendimento Estruturado</h3>
-              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
-                Histórico completo de compras e ticket médio de cada cliente organizado na sua tela sem planilhas.
-              </p>
-              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
-                Quem atende sem organização perde vendas por esquecimento e disputa clientes com concorrentes amadores. No SMK System, você tem a lista organizada de todos os seus clientes com histórico de compras e ticket médio.
-              </p>
-            </div>
-
-            {/* Card 2 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3 hover:border-white/40 transition-colors">
-              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
-                <Clock className="size-4 sm:size-5 text-white" />
-              </div>
-              <h3 className="text-sm sm:text-base font-bold text-white">Radar de Recompra Ativo</h3>
-              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
-                O sistema calcula o tempo de uso do cliente e avisa na tela o momento exato em que o pod dele vai acabar.
-              </p>
-              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
-                O sistema monitora o ciclo de reposição e o tempo de uso de cada cliente. Quando a janela ideal se aproxima, o radar acende o alerta de recompra na sua tela com a contagem regressiva e o timing perfeito para abordar.
-              </p>
-            </div>
-
-            {/* Card 3 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3 hover:border-white/40 transition-colors">
-              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-emerald-400">
-                <MessageCircle className="size-4 sm:size-5" />
-              </div>
-              <h3 className="text-sm sm:text-base font-bold text-white">Venda Proativa em 1 Clique</h3>
-              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
-                Abra o WhatsApp do cliente com mensagem personalizada pronta antes mesmo dele lembrar de procurar outra loja.
-              </p>
-              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
-                Com 1 clique no botão verde de "Recompra", você abre o WhatsApp do cliente na hora exata com a mensagem personalizada pronta. Antes mesmo dele pensar em procurar outra loja, seu atendimento proativo fecha a venda.
-              </p>
-            </div>
-
           </div>
 
           {/* CRM Desktop Window Mockup com o Print Real */}
@@ -1016,47 +863,19 @@ export function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-            
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3">
-              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold font-mono text-xs sm:text-base">
-                01
+          {/* Card Único: Localize o Dinheiro Preso */}
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-5 rounded-2xl flex items-start sm:items-center gap-3.5 sm:gap-4 hover:border-white/40 transition-colors">
+              <div className="size-10 sm:size-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 font-bold font-mono">
+                🏷️
               </div>
-              <h3 className="text-sm sm:text-base font-bold text-white">Proteja os Mais Vendidos</h3>
-              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
-                Seus campeões saem com margem cheia todos os dias. O sistema impede você de queimar margem neles à toa.
-              </p>
-              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
-                Seus campeões de venda saem todos os dias com margem cheia. O sistema te impede de cometer o erro de queimar margem nesses produtos à toa.
-              </p>
-            </div>
-
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3">
-              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold font-mono text-xs sm:text-base">
-                02
+              <div className="space-y-1">
+                <h3 className="text-sm sm:text-base font-bold text-white">Localize o Dinheiro Preso na Prateleira</h3>
+                <p className="text-xs text-white/70 leading-relaxed">
+                  Veja a lista de itens há mais de 15 dias sem saída e o valor total travado em dinheiro na prateleira para fazer liquidações cirúrgicas e recuperar seu capital de giro.
+                </p>
               </div>
-              <h3 className="text-sm sm:text-base font-bold text-white">Localize o Dinheiro Preso</h3>
-              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
-                Veja a lista de itens há +15 dias sem saída e o valor total travado em dinheiro na prateleira.
-              </p>
-              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
-                O painel lista os itens que estão há mais de 15 ou 20 dias ocupando espaço na prateleira. Você não precisa conferir item por item: o sistema mostra o valor total travado.
-              </p>
             </div>
-
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3">
-              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold font-mono text-xs sm:text-base">
-                03
-              </div>
-              <h3 className="text-sm sm:text-base font-bold text-white">Queima Cirúrgica de Estoque</h3>
-              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
-                Crie ofertas e combos direcionados para girar produtos encalhados e reinvestir nos mais procurados.
-              </p>
-              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
-                Crie combos e queimas de estoque exclusivamente para girar os produtos parados. Você recupera seu custo rápido e reinveste nos produtos que seus clientes estão pedindo.
-              </p>
-            </div>
-
           </div>
 
           {/* Screenshot Container para Estoque Parado */}
