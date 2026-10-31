@@ -319,17 +319,18 @@ export function LandingPage() {
       {/* ==================================================================== */}
       {/* 3. HERO PRINCIPAL                                                    */}
       {/* ==================================================================== */}
-      <section className="pt-16 pb-20 px-4 sm:px-6 relative overflow-hidden">
-        <div className="max-w-5xl mx-auto text-center space-y-6">
+      <section className="pt-10 pb-12 sm:pt-16 sm:pb-20 px-4 sm:px-6 relative overflow-hidden">
+        <div className="max-w-5xl mx-auto text-center space-y-4 sm:space-y-6">
           
           {/* Niche Pill Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold shadow-[0_0_20px_rgba(255,255,255,0.15)]">
-            <Zap className="size-3.5 fill-white text-white" />
-            <span>O 1º Sistema de Gestão & Catálogo Feito Sob Medida para Vendas Rápidas e Delivery</span>
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-[11px] sm:text-xs font-bold shadow-[0_0_20px_rgba(255,255,255,0.15)]">
+            <Zap className="size-3.5 fill-white text-white shrink-0" />
+            <span className="hidden sm:inline">O 1º Sistema de Gestão & Catálogo Feito Sob Medida para Vendas Rápidas e Delivery</span>
+            <span className="sm:hidden">Gestão & Catálogo Oficial para Vendas Rápidas</span>
           </div>
 
           {/* Main Giant Glowing Headline */}
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.12] max-w-4xl mx-auto">
+          <h1 className="text-2xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.15] max-w-4xl mx-auto">
             A ferramenta que separa quem improvisa nas vendas{' '}
             <span className="bg-gradient-to-r from-white via-slate-200 to-gray-400 bg-clip-text text-transparent underline decoration-white/30 decoration-2 underline-offset-8">
               de quem domina
@@ -337,18 +338,21 @@ export function LandingPage() {
             a própria cidade.
           </h1>
 
-          {/* Sub-headline Densa */}
-          <p className="text-sm sm:text-base lg:text-lg text-white/70 max-w-3xl mx-auto leading-relaxed font-normal">
+          {/* Sub-headline: concisa no mobile, detalhada no desktop */}
+          <p className="sm:hidden text-xs text-white/70 max-w-sm mx-auto leading-relaxed">
+            Troque mensagens manuais no WhatsApp por uma vitrine interativa na sua bio e despacho organizado que vende no piloto automático.
+          </p>
+          <p className="hidden sm:block text-sm sm:text-base lg:text-lg text-white/70 max-w-3xl mx-auto leading-relaxed font-normal">
             Seu cliente quer rapidez, confiança e atendimento impecável. Troque as mensagens amadoras por uma vitrine interativa na sua bio, sistema de despacho organizado e uma operação que venda mais com menos esforço!
           </p>
 
           {/* Hero CTAs */}
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 pt-2 sm:pt-4">
             <Link
               to="/checkout?plano=combo"
-              className="bg-white hover:bg-slate-100 text-black font-extrabold px-8 py-4 rounded-xl text-sm sm:text-base transition-all shadow-[0_0_35px_rgba(255,255,255,0.35)] hover:shadow-[0_0_45px_rgba(255,255,255,0.55)] flex items-center justify-center gap-2.5 active:scale-95 cursor-pointer text-center"
+              className="w-full sm:w-auto bg-white hover:bg-slate-100 text-black font-extrabold px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl text-xs sm:text-base transition-all shadow-[0_0_35px_rgba(255,255,255,0.35)] hover:shadow-[0_0_45px_rgba(255,255,255,0.55)] flex items-center justify-center gap-2 active:scale-95 cursor-pointer text-center"
             >
-              <span>Compre Agora e Pague Para Sempre o Preço de Lançamento</span>
+              <span>Garantir Preço de Lançamento</span>
               <ArrowRight className="size-4 shrink-0" />
             </Link>
 
@@ -356,27 +360,27 @@ export function LandingPage() {
               href={whatsappLink}
               target="_blank"
               rel="noreferrer"
-              className="bg-[#0e1713] hover:bg-[#13231c] border border-emerald-500/40 text-emerald-400 hover:text-emerald-300 font-bold px-6 py-4 rounded-xl text-sm sm:text-base transition-all flex items-center gap-2.5 active:scale-95"
+              className="w-full sm:w-auto bg-[#0e1713] hover:bg-[#13231c] border border-emerald-500/40 text-emerald-400 hover:text-emerald-300 font-bold px-5 sm:px-6 py-3.5 sm:py-4 rounded-xl text-xs sm:text-base transition-all flex items-center justify-center gap-2 active:scale-95"
             >
               <MessageCircle className="size-4 fill-emerald-400/20 text-emerald-400 shrink-0" />
               <span>Tirar Dúvidas no WhatsApp</span>
             </a>
           </div>
 
-          <div className="pt-2 text-xs text-white/40 flex items-center justify-center gap-4 font-medium flex-wrap">
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="size-4 text-emerald-400" />
+          <div className="pt-1 sm:pt-2 text-[10px] sm:text-xs text-white/40 flex items-center justify-center gap-2 sm:gap-4 font-medium flex-wrap">
+            <span className="flex items-center gap-1 sm:gap-1.5">
+              <ShieldCheck className="size-3.5 sm:size-4 text-emerald-400" />
               Garantia de 7 dias
             </span>
             <span>•</span>
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="size-4 text-emerald-400" />
-              Sem fidelidade ou multas
+            <span className="flex items-center gap-1 sm:gap-1.5">
+              <CheckCircle2 className="size-3.5 sm:size-4 text-emerald-400" />
+              Sem fidelidade
             </span>
             <span>•</span>
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="size-4 text-white" />
-              Preço vitalício congelado
+            <span className="flex items-center gap-1 sm:gap-1.5">
+              <Sparkles className="size-3.5 sm:size-4 text-white" />
+              Preço congelado
             </span>
           </div>
 
@@ -385,7 +389,7 @@ export function LandingPage() {
         {/* ==================================================================== */}
         {/* HERO MOCKUP: PRINT REAL DO PAINEL FINANCEIRO                        */}
         {/* ==================================================================== */}
-        <div className="max-w-6xl mx-auto mt-14 relative">
+        <div className="max-w-6xl mx-auto mt-8 sm:mt-14 relative">
           
           <div className="absolute -inset-1 bg-gradient-to-b from-white/20 via-white/5 to-transparent rounded-3xl blur-xl opacity-70 pointer-events-none" />
 
@@ -423,67 +427,79 @@ export function LandingPage() {
       {/* ==================================================================== */}
       {/* 4. AS 4 DORES DO LOJISTA (DIAGNÓSTICO BRUTAL)                       */}
       {/* ==================================================================== */}
-      <section id="dores" className="py-24 px-4 sm:px-6 border-t border-[#161616] bg-[#070707]">
-        <div className="max-w-6xl mx-auto space-y-12">
+      <section id="dores" className="py-12 sm:py-24 px-4 sm:px-6 border-t border-[#161616] bg-[#070707]">
+        <div className="max-w-6xl mx-auto space-y-8 sm:space-y-12">
           
-          <div className="text-center space-y-3 max-w-3xl mx-auto">
-            <span className="text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
+          <div className="text-center space-y-2 sm:space-y-3 max-w-3xl mx-auto">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
               O Custo Oculto do Amadorismo
             </span>
-            <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+            <h2 className="text-xl sm:text-4xl font-extrabold text-white tracking-tight">
               As 4 dores que travam o crescimento de qualquer loja e delivery
             </h2>
             <p className="text-xs sm:text-sm text-white/60">
-              Se você se identificar com pelo menos duas dessas situações, você não precisa trabalhar mais horas. Você só precisa de uma ferramenta feita para a sua realidade.
+              Se você se identificar com pelo menos duas dessas situações, você só precisa de uma ferramenta feita para a sua realidade.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             
             {/* Dor 1 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 p-6 sm:p-8 rounded-3xl transition-all duration-300 space-y-3 group shadow-lg">
-              <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
-                <MessageSquare className="size-6 text-white" />
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 p-4 sm:p-8 rounded-2xl sm:rounded-3xl transition-all duration-300 space-y-2 sm:space-y-3 group shadow-lg">
+              <div className="size-10 sm:size-12 rounded-xl sm:rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                <MessageSquare className="size-5 sm:size-6 text-white" />
               </div>
-              <span className="text-xs font-mono text-white/40 block">DOR #01</span>
-              <h3 className="text-lg font-bold text-white">O Inferno de Digitar Listas de Produtos Todo Santo Dia</h3>
-              <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
+              <span className="text-[10px] sm:text-xs font-mono text-white/40 block">DOR #01</span>
+              <h3 className="text-sm sm:text-lg font-bold text-white">O Inferno de Digitar Listas de Produtos Todo Santo Dia</h3>
+              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                Você perde 20 minutos digitando sabor por sabor no zap. O cliente pede o que já acabou e desiste irritado da compra.
+              </p>
+              <p className="hidden sm:block text-xs sm:text-sm text-white/60 leading-relaxed">
                 Você acorda, abre o WhatsApp e tem que ir lá escrever item por item, variação por variação manualmente. Encaminha a lista para 10 clientes. Quando um deles compra, você tem que voltar na mensagem e apagar o item na mão. Se esquecer de apagar, o próximo cliente pede o mesmo produto, você tem que avisar que acabou e ele desiste irritado da compra.
               </p>
             </div>
 
             {/* Dor 2 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 p-6 sm:p-8 rounded-3xl transition-all duration-300 space-y-3 group shadow-lg">
-              <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
-                <Truck className="size-6 text-white" />
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 p-4 sm:p-8 rounded-2xl sm:rounded-3xl transition-all duration-300 space-y-2 sm:space-y-3 group shadow-lg">
+              <div className="size-10 sm:size-12 rounded-xl sm:rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                <Truck className="size-5 sm:size-6 text-white" />
               </div>
-              <span className="text-xs font-mono text-white/40 block">DOR #02</span>
-              <h3 className="text-lg font-bold text-white">O Caos de Despachar Múltiplos Pedidos no Horário de Pico</h3>
-              <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
+              <span className="text-[10px] sm:text-xs font-mono text-white/40 block">DOR #02</span>
+              <h3 className="text-sm sm:text-lg font-bold text-white">O Caos de Despachar no Horário de Pico</h3>
+              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                Caem 4 ou 5 pedidos juntos e você se perde: não sabe se o motoboy saiu ou se entregou. O pedido atrasa e o cliente cancela.
+              </p>
+              <p className="hidden sm:block text-xs sm:text-sm text-white/60 leading-relaxed">
                 Sua loja começa a vender 5, 8 ou 10 pedidos por dia. De repente caem 3 ou 4 clientes de uma vez no horário de pico. Sem organização visual, você se perde: não sabe se o motoboy já saiu, se está em rota ou se já entregou. Esquece de despachar um pedido porque estava embalando outro, o cliente fica esperando, reclama, perde a paciência e cancela.
               </p>
             </div>
 
             {/* Dor 3 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 p-6 sm:p-8 rounded-3xl transition-all duration-300 space-y-3 group shadow-lg">
-              <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
-                <RefreshCw className="size-6 text-white" />
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 p-4 sm:p-8 rounded-2xl sm:rounded-3xl transition-all duration-300 space-y-2 sm:space-y-3 group shadow-lg">
+              <div className="size-10 sm:size-12 rounded-xl sm:rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                <RefreshCw className="size-5 sm:size-6 text-white" />
               </div>
-              <span className="text-xs font-mono text-white/40 block">DOR #03</span>
-              <h3 className="text-lg font-bold text-white">Ficar Postando Stories e Deixar o Cliente Comprar de Outra Loja</h3>
-              <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
+              <span className="text-[10px] sm:text-xs font-mono text-white/40 block">DOR #03</span>
+              <h3 className="text-sm sm:text-lg font-bold text-white">Postar Stories e Deixar o Cliente Comprar em Outra Loja</h3>
+              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                Sem saber o ciclo de recompra do cliente, você espera o pedido cair do céu e ele compra do concorrente que chamou antes.
+              </p>
+              <p className="hidden sm:block text-xs sm:text-sm text-white/60 leading-relaxed">
                 Produtos de alto giro têm ciclo de recompra frequente. Quando o produto acaba, o cliente quer repor rápido. Mas você tem uma base com dezenas de clientes e fica apenas postando stories esperando o pedido cair do céu. Como você não sabe quando o ciclo dele vai fechar e não entra em contato proativamente, ele entra no perfil da primeira loja que encontrar e compra lá.
               </p>
             </div>
 
             {/* Dor 4 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 p-6 sm:p-8 rounded-3xl transition-all duration-300 space-y-3 group shadow-lg">
-              <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
-                <Wallet className="size-6 text-white" />
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 p-4 sm:p-8 rounded-2xl sm:rounded-3xl transition-all duration-300 space-y-2 sm:space-y-3 group shadow-lg">
+              <div className="size-10 sm:size-12 rounded-xl sm:rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                <Wallet className="size-5 sm:size-6 text-white" />
               </div>
-              <span className="text-xs font-mono text-white/40 block">DOR #04</span>
-              <h3 className="text-lg font-bold text-white">Dar Desconto no Produto Errado e Prender Dinheiro em Itens Parados</h3>
-              <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
+              <span className="text-[10px] sm:text-xs font-mono text-white/40 block">DOR #04</span>
+              <h3 className="text-sm sm:text-lg font-bold text-white">Dar Desconto no Produto Errado e Prender Dinheiro</h3>
+              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                Queima margem nos campeões de venda que já sairiam com preço cheio, enquanto itens encalhados continuam travando seu caixa.
+              </p>
+              <p className="hidden sm:block text-xs sm:text-sm text-white/60 leading-relaxed">
                 Quando quer vender mais, você comete o erro clássico: dá desconto nos produtos que já venderiam com preço cheio e margem alta. Enquanto isso, aqueles itens que não saem ficam tomando espaço na prateleira, com o dinheiro da loja totalmente preso e sem ninguém saber quais são.
               </p>
             </div>
@@ -496,81 +512,96 @@ export function LandingPage() {
       {/* ==================================================================== */}
       {/* 5. [DESTAQUE MÁXIMO] CATÁLOGO DIGITAL OFICIAL NA BIO                */}
       {/* ==================================================================== */}
-      <section id="catalogo" className="py-24 px-4 sm:px-6 border-t border-[#161616] relative overflow-hidden bg-[#050505]">
+      <section id="catalogo" className="py-12 sm:py-24 px-4 sm:px-6 border-t border-[#161616] relative overflow-hidden bg-[#050505]">
         
-        <div className="max-w-6xl mx-auto space-y-16">
+        <div className="max-w-6xl mx-auto space-y-8 sm:space-y-16">
           
-          <div className="text-center space-y-4 max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold font-mono">
+          <div className="text-center space-y-2 sm:space-y-4 max-w-3xl mx-auto">
+            <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-[11px] sm:text-xs font-bold font-mono">
               <Sparkles className="size-3.5 text-white" />
-              <span>O Maior Diferencial Para Donos de Loja e Delivery</span>
+              <span>O Maior Diferencial Para Vendas</span>
             </div>
 
             {/* HEADLINE ÚNICA DO CATÁLOGO */}
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
-              Sua Vitrine Online na Bio do Instagram:{' '}
+            <h2 className="text-2xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
+              Sua Vitrine Online na Bio:{' '}
               <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
-                Chega de digitar lista de produtos todo santo dia.
+                Chega de digitar lista de produtos todo dia.
               </span>
             </h2>
 
-            <p className="text-sm sm:text-base text-white/70 leading-relaxed">
+            <p className="sm:hidden text-xs text-white/70 leading-relaxed">
+              O link da sua bio vira um cardápio interativo e profissional com fotos oficiais e estoque sincronizado em tempo real.
+            </p>
+            <p className="hidden sm:block text-sm sm:text-base text-white/70 leading-relaxed">
               O catálogo oficial do SMK System transforma o link da sua bio em um cardápio profissional, interativo e com estoque sincronizado em tempo real. Você nunca mais vai perder 20 minutos escrevendo texto no WhatsApp.
             </p>
           </div>
 
           {/* Grid: Explicação Técnica dos 4 Pilares do Catálogo */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-12 items-center">
             
-            <div className="space-y-6">
+            <div className="space-y-3 sm:space-y-6">
               
               {/* Pilar 1 */}
-              <div className="flex gap-4 p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 transition-colors">
-                <div className="size-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 font-bold font-mono">
+              <div className="flex gap-3 sm:gap-4 p-3.5 sm:p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 transition-colors">
+                <div className="size-9 sm:size-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 font-bold font-mono text-xs sm:text-base">
                   01
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-base font-bold text-white">Cadastrou os produtos uma única vez, tá pronto</h3>
-                  <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
+                  <h3 className="text-sm sm:text-base font-bold text-white">Cadastrou uma vez, tá pronto</h3>
+                  <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                    Cadastre produtos e variações uma única vez. Chegou reposição? Ative o sabor em 1 clique sem retrabalho.
+                  </p>
+                  <p className="hidden sm:block text-xs sm:text-sm text-white/60 leading-relaxed">
                     Você cadastra o produto uma única vez e todas as variações ficam salvas no sistema. Quando chega um lote novo do fornecedor, você só clica em um botão para ativar a opção de volta no ar. Sem retrabalho.
                   </p>
                 </div>
               </div>
 
               {/* Pilar 2 */}
-              <div className="flex gap-4 p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 transition-colors">
-                <div className="size-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 font-bold font-mono">
+              <div className="flex gap-3 sm:gap-4 p-3.5 sm:p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 transition-colors">
+                <div className="size-9 sm:size-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 font-bold font-mono text-xs sm:text-base">
                   02
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-base font-bold text-white">Vendeu a última unidade? Ela sai do ar sozinho</h3>
-                  <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
+                  <h3 className="text-sm sm:text-base font-bold text-white">Vendeu a última? Sai do ar sozinho</h3>
+                  <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                    Ao confirmar o pedido no Kanban, dá baixa no estoque. O cliente nunca mais pede o que acabou.
+                  </p>
+                  <p className="hidden sm:block text-xs sm:text-sm text-white/60 leading-relaxed">
                     Cada vez que você aceita um pedido no Kanban, o sistema dá baixa imediata no estoque. O item esgotado desaparece ou fica marcado como indisponível no catálogo. O cliente nunca mais vai pedir o que não tem.
                   </p>
                 </div>
               </div>
 
               {/* Pilar 3 */}
-              <div className="flex gap-4 p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 transition-colors">
-                <div className="size-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 font-bold font-mono">
+              <div className="flex gap-3 sm:gap-4 p-3.5 sm:p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/40 transition-colors">
+                <div className="size-9 sm:size-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 font-bold font-mono text-xs sm:text-base">
                   03
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-base font-bold text-white">Visual premium que passa respeito e autoridade</h3>
-                  <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
+                  <h3 className="text-sm sm:text-base font-bold text-white">Visual premium com autoridade</h3>
+                  <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                    Fotos oficiais em alta definição. Seu cliente abre uma vitrine profissional de verdade no celular.
+                  </p>
+                  <p className="hidden sm:block text-xs sm:text-sm text-white/60 leading-relaxed">
                     Fotos oficiais e limpas em alta definição. Seu cliente abre o link no celular e vê uma vitrine profissional de verdade, com visual atraente e navegação fluida.
                   </p>
                 </div>
               </div>
 
               {/* Pilar 4 */}
-              <div className="flex gap-4 p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-emerald-500/40 transition-colors">
-                <div className="size-11 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shrink-0 font-bold font-mono">
+              <div className="flex gap-3 sm:gap-4 p-3.5 sm:p-5 rounded-2xl bg-[#0b0b0b] border border-[#1f1f1f] hover:border-emerald-500/40 transition-colors">
+                <div className="size-9 sm:size-11 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shrink-0 font-bold font-mono text-xs sm:text-base">
                   04
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-base font-bold text-white">O pedido cai mastigado e pronto no seu WhatsApp</h3>
-                  <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
+                  <h3 className="text-sm sm:text-base font-bold text-white">Pedido pronto no seu WhatsApp</h3>
+                  <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                    O cliente escolhe produtos, digita o endereço e finaliza. O zap abre com tudo calculado para despacho.
+                  </p>
+                  <p className="hidden sm:block text-xs sm:text-sm text-white/60 leading-relaxed">
                     O cliente escolhe o produto, seleciona a variação, define a quantidade e digita o endereço. Ao clicar em finalizar, o WhatsApp dele abre com a mensagem pré-formatada com todos os dados. Você só confere o Pix e despacha.
                   </p>
                 </div>
@@ -580,15 +611,15 @@ export function LandingPage() {
 
             {/* MOCKUP VISUAL DO SMARTPHONE DO CATÁLOGO COM O PRINT REAL EMBUTIDO */}
             <div className="flex justify-center">
-              <div className="w-full max-w-[340px] bg-[#0c0c0c] border-[7px] sm:border-[8px] border-[#222] rounded-[46px] sm:rounded-[48px] p-2.5 sm:p-3 shadow-[0_0_60px_rgba(255,255,255,0.12),0_25px_50px_rgba(0,0,0,0.85)] relative mx-auto select-none group ring-1 ring-white/10">
+              <div className="w-full max-w-[320px] sm:max-w-[340px] bg-[#0c0c0c] border-[6px] sm:border-[8px] border-[#222] rounded-[40px] sm:rounded-[48px] p-2 sm:p-3 shadow-[0_0_60px_rgba(255,255,255,0.12),0_25px_50px_rgba(0,0,0,0.85)] relative mx-auto select-none group ring-1 ring-white/10">
                 {/* Speaker notch */}
-                <div className="w-24 h-3.5 bg-[#1c1c1e] rounded-full mx-auto mb-2 flex items-center justify-center gap-1.5 shadow-inner">
+                <div className="w-20 sm:w-24 h-3 sm:h-3.5 bg-[#1c1c1e] rounded-full mx-auto mb-2 flex items-center justify-center gap-1.5 shadow-inner">
                   <div className="size-1 rounded-full bg-white/20" />
-                  <div className="w-6 h-0.5 bg-white/10 rounded-full" />
+                  <div className="w-5 sm:w-6 h-0.5 bg-white/10 rounded-full" />
                 </div>
 
                 {/* Tela do Celular com Print Real do Catálogo */}
-                <div className="rounded-[34px] overflow-hidden border border-white/10 relative bg-black shadow-inner">
+                <div className="rounded-[30px] sm:rounded-[34px] overflow-hidden border border-white/10 relative bg-black shadow-inner">
                   <ScreenshotOrFallback
                     src="/prints/catalogo-mobile.png"
                     alt="Catálogo Oficial no Celular"
@@ -656,14 +687,14 @@ export function LandingPage() {
                 </div>
 
                 {/* Home indicator bar at bottom */}
-                <div className="w-24 h-1 bg-white/30 rounded-full mx-auto mt-2" />
+                <div className="w-20 sm:w-24 h-1 bg-white/30 rounded-full mx-auto mt-2" />
               </div>
             </div>
 
           </div>
 
-          {/* Reforço do Catálogo com Print Desktop no Computador */}
-          <div className="pt-14 border-t border-white/10 space-y-8">
+          {/* Reforço do Catálogo com Print Desktop no Computador (Oculto no mobile para poupar scroll) */}
+          <div className="hidden sm:block pt-14 border-t border-white/10 space-y-8">
             <div className="text-center space-y-4 max-w-4xl mx-auto">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold font-mono">
                 <Monitor className="size-3.5 text-white" />
@@ -715,58 +746,67 @@ export function LandingPage() {
       {/* ==================================================================== */}
       {/* 6. A CENTRAL DE PEDIDOS EM KANBAN (ADEUS CAOS NA ENTREGA)           */}
       {/* ==================================================================== */}
-      <section id="kanban" className="py-24 px-4 sm:px-6 border-t border-[#161616] bg-[#070707]">
-        <div className="max-w-6xl mx-auto space-y-12">
+      <section id="kanban" className="py-12 sm:py-24 px-4 sm:px-6 border-t border-[#161616] bg-[#070707]">
+        <div className="max-w-6xl mx-auto space-y-8 sm:space-y-12">
           
-          <div className="text-center space-y-3 max-w-3xl mx-auto">
-            <span className="text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
+          <div className="text-center space-y-2 sm:space-y-3 max-w-3xl mx-auto">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
               Operação de Entrega Blindada
             </span>
 
             {/* HEADLINE ÚNICA DO KANBAN */}
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
+            <h2 className="text-2xl sm:text-5xl font-extrabold text-white tracking-tight">
               Painel de Pedidos em Kanban:{' '}
               <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
-                Saiba exatamente onde cada motoboy está e nunca mais atrase uma entrega.
+                Saiba onde cada motoboy está e nunca mais atrase uma entrega.
               </span>
             </h2>
 
             <p className="text-xs sm:text-sm text-white/60">
-              Quando começam a cair 5 ou 10 pedidos ao mesmo tempo no fim de semana, a organização é o que separa uma loja lucrativa de uma loja cheia de reclamações e cancelamentos.
+              Quando começam a cair 5 ou 10 pedidos ao mesmo tempo no fim de semana, a organização é o que separa uma loja lucrativa de uma loja cheia de cancelamentos.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
             
             {/* Card 1 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
-              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
-                <Package className="size-5" />
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                <Package className="size-4 sm:size-5" />
               </div>
-              <h3 className="text-base font-bold text-white">Controle de Múltiplos Pedidos Sem Erro</h3>
-              <p className="text-xs text-white/60 leading-relaxed">
+              <h3 className="text-sm sm:text-base font-bold text-white">Múltiplos Pedidos Sem Erro</h3>
+              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                Visualize pedidos em colunas: Novos, Separando e Em Rota. Ninguém confunde sabor nem esquece pedido na bancada.
+              </p>
+              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
                 Chegaram 4 pedidos no mesmo minuto? Você visualiza tudo na coluna de <strong>Novos Pedidos</strong>. Ao separar os itens do pedido, arrasta para <strong>Separando</strong>. Ninguém confunde produto, ninguém esquece pedido na bancada.
               </p>
             </div>
 
             {/* Card 2 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
-              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
-                <Truck className="size-5" />
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                <Truck className="size-4 sm:size-5" />
               </div>
-              <h3 className="text-base font-bold text-white">Você Sabe Onde o Motoboy Está</h3>
-              <p className="text-xs text-white/60 leading-relaxed">
+              <h3 className="text-sm sm:text-base font-bold text-white">Acompanhe Cada Motoboy</h3>
+              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                Saiba os pedidos que estão em rota com entregador próprio ou Uber Flash. Avise o cliente no momento certo.
+              </p>
+              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
                 A coluna <strong>Em Rota</strong> mostra exatamente os pedidos que já saíram com o Uber Flash ou entregador próprio. Você nunca mais vai esquecer de avisar o cliente que o motoboy chegou no portão dele.
               </p>
             </div>
 
             {/* Card 3 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
-              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
-                <TrendingUp className="size-5" />
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                <TrendingUp className="size-4 sm:size-5" />
               </div>
-              <h3 className="text-base font-bold text-white">Mais Entregas Rápidas = Mais Faturamento</h3>
-              <p className="text-xs text-white/60 leading-relaxed">
+              <h3 className="text-sm sm:text-base font-bold text-white">Mais Entregas = Mais Lucro</h3>
+              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                Endereço formatado em 1 clique para colar no app de entrega. Você despacha qualquer pedido em 2 minutos.
+              </p>
+              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
                 Com o endereço já formatado em 1 clique para colar no app de entrega, você despacha em 2 minutos. Seu cliente valoriza agilidade: quanto mais rápido você for, mais ele compra com você.
               </p>
             </div>
@@ -851,60 +891,72 @@ export function LandingPage() {
       {/* ==================================================================== */}
       {/* 7. GESTÃO DE CLIENTES & CRM PREDITIVO                                */}
       {/* ==================================================================== */}
-      <section id="recompra" className="py-24 px-4 sm:px-6 border-t border-[#161616] relative bg-[#050505]">
+      <section id="recompra" className="py-12 sm:py-24 px-4 sm:px-6 border-t border-[#161616] relative bg-[#050505]">
         
-        <div className="max-w-6xl mx-auto space-y-12">
+        <div className="max-w-6xl mx-auto space-y-8 sm:space-y-12">
           
-          <div className="text-center space-y-4 max-w-4xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold font-mono">
+          <div className="text-center space-y-2 sm:space-y-4 max-w-4xl mx-auto">
+            <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-[11px] sm:text-xs font-bold font-mono">
               <Users className="size-3.5 text-white" />
               <span>Gestão de Clientes & CRM Preditivo</span>
             </div>
 
             {/* HEADLINE PRINCIPAL DO CRM */}
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
+            <h2 className="text-2xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
               Pare de atender como amador.{' '}
               <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
                 Transforme sua operação em um negócio profissional e escalável.
               </span>
             </h2>
 
-            <p className="text-sm sm:text-base text-white/70 max-w-3xl mx-auto leading-relaxed">
+            <p className="sm:hidden text-xs text-white/70 leading-relaxed">
+              O CRM rastreia o ciclo de consumo de cada cliente para você entrar em contato na hora exata e vender antes do concorrente.
+            </p>
+            <p className="hidden sm:block text-sm sm:text-base text-white/70 max-w-3xl mx-auto leading-relaxed">
               Gerir vendas não é ficar esperando cliente cair do céu ou disputando preço centavo a centavo. Você sabe quanto cada cliente gasta com você por mês? Qual o tempo de vida dele? E o principal: <strong>quanto tempo falta para a próxima recompra dele?</strong> O CRM do SMK System rastreia o ciclo de consumo de cada cliente para você entrar em contato na hora exata e vender de novo antes que ele compre em outra loja.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
             
             {/* Card 1 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
-              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
-                <Store className="size-5 text-white" />
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                <Store className="size-4 sm:size-5 text-white" />
               </div>
-              <h3 className="text-base font-bold text-white">Atendimento Estruturado e Ágil</h3>
-              <p className="text-xs text-white/60 leading-relaxed">
+              <h3 className="text-sm sm:text-base font-bold text-white">Atendimento Estruturado</h3>
+              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                Histórico completo de compras e ticket médio de cada cliente organizado na sua tela sem planilhas.
+              </p>
+              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
                 Quem atende sem organização perde vendas por esquecimento e disputa clientes com concorrentes amadores. No SMK System, você tem a lista organizada de todos os seus clientes com histórico de compras e ticket médio.
               </p>
             </div>
 
             {/* Card 2 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
-              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
-                <Clock className="size-5 text-white" />
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                <Clock className="size-4 sm:size-5 text-white" />
               </div>
-              <h3 className="text-base font-bold text-white">Radar Preditivo de Recompra</h3>
-              <p className="text-xs text-white/60 leading-relaxed">
+              <h3 className="text-sm sm:text-base font-bold text-white">Radar de Recompra Ativo</h3>
+              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                O sistema calcula o tempo de uso do cliente e avisa na tela o momento exato em que o pod dele vai acabar.
+              </p>
+              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
                 O sistema monitora o ciclo de reposição e o tempo de uso de cada cliente. Quando a janela ideal se aproxima, o radar acende o alerta de recompra na sua tela com a contagem regressiva e o timing perfeito para abordar.
               </p>
             </div>
 
             {/* Card 3 */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3 hover:border-white/40 transition-colors">
-              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-emerald-400">
-                <MessageCircle className="size-5" />
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3 hover:border-white/40 transition-colors">
+              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-emerald-400">
+                <MessageCircle className="size-4 sm:size-5" />
               </div>
-              <h3 className="text-base font-bold text-white">Aborde Antes da Concorrência</h3>
-              <p className="text-xs text-white/60 leading-relaxed">
+              <h3 className="text-sm sm:text-base font-bold text-white">Venda Proativa em 1 Clique</h3>
+              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                Abra o WhatsApp do cliente com mensagem personalizada pronta antes mesmo dele lembrar de procurar outra loja.
+              </p>
+              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
                 Com 1 clique no botão verde de "Recompra", você abre o WhatsApp do cliente na hora exata com a mensagem personalizada pronta. Antes mesmo dele pensar em procurar outra loja, seu atendimento proativo fecha a venda.
               </p>
             </div>
@@ -943,55 +995,64 @@ export function LandingPage() {
       {/* ==================================================================== */}
       {/* 8. RADAR DE ESTOQUE PARADO & QUEIMA INTELIGENTE                     */}
       {/* ==================================================================== */}
-      <section id="estoque" className="py-24 px-4 sm:px-6 border-t border-[#161616] bg-[#070707]">
-        <div className="max-w-6xl mx-auto space-y-12">
+      <section id="estoque" className="py-12 sm:py-24 px-4 sm:px-6 border-t border-[#161616] bg-[#070707]">
+        <div className="max-w-6xl mx-auto space-y-8 sm:space-y-12">
           
-          <div className="text-center space-y-3 max-w-3xl mx-auto">
-            <span className="text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
+          <div className="text-center space-y-2 sm:space-y-3 max-w-3xl mx-auto">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
               Destrave seu Capital de Giro
             </span>
 
             {/* HEADLINE ÚNICA DO ESTOQUE PARADO */}
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
+            <h2 className="text-2xl sm:text-5xl font-extrabold text-white tracking-tight">
               Radar de Estoque Parado:{' '}
               <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
-                Dê descontos inteligentes sem queimar o lucro dos produtos que mais vendem.
+                Descontos inteligentes sem queimar o lucro dos produtos que mais vendem.
               </span>
             </h2>
 
             <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              O maior erro dos lojistas é dar desconto em produtos que já vendem a preço cheio. O SMK System aponta o dedo exatamente para os itens que estão encalhados na prateleira para você fazer caixa rápido.
+              O maior erro é dar desconto em produtos que já vendem a preço cheio. O SMK System aponta exatamente os itens parados para você fazer caixa rápido.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
             
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3">
-              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold font-mono">
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3">
+              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold font-mono text-xs sm:text-base">
                 01
               </div>
-              <h3 className="text-base font-bold text-white">Proteja os Produtos Mais Vendidos</h3>
-              <p className="text-xs text-white/60 leading-relaxed">
+              <h3 className="text-sm sm:text-base font-bold text-white">Proteja os Mais Vendidos</h3>
+              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                Seus campeões saem com margem cheia todos os dias. O sistema impede você de queimar margem neles à toa.
+              </p>
+              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
                 Seus campeões de venda saem todos os dias com margem cheia. O sistema te impede de cometer o erro de queimar margem nesses produtos à toa.
               </p>
             </div>
 
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3">
-              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold font-mono">
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3">
+              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold font-mono text-xs sm:text-base">
                 02
               </div>
-              <h3 className="text-base font-bold text-white">Localize o Dinheiro Encalhado</h3>
-              <p className="text-xs text-white/60 leading-relaxed">
+              <h3 className="text-sm sm:text-base font-bold text-white">Localize o Dinheiro Preso</h3>
+              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                Veja a lista de itens há +15 dias sem saída e o valor total travado em dinheiro na prateleira.
+              </p>
+              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
                 O painel lista os itens que estão há mais de 15 ou 20 dias ocupando espaço na prateleira. Você não precisa conferir item por item: o sistema mostra o valor total travado.
               </p>
             </div>
 
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-6 rounded-2xl space-y-3">
-              <div className="size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold font-mono">
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] p-4 sm:p-6 rounded-2xl space-y-2 sm:space-y-3">
+              <div className="size-9 sm:size-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold font-mono text-xs sm:text-base">
                 03
               </div>
-              <h3 className="text-base font-bold text-white">Liquidação Cirúrgica e Caixa Destravado</h3>
-              <p className="text-xs text-white/60 leading-relaxed">
+              <h3 className="text-sm sm:text-base font-bold text-white">Queima Cirúrgica de Estoque</h3>
+              <p className="block sm:hidden text-xs text-white/70 leading-relaxed">
+                Crie ofertas e combos direcionados para girar produtos encalhados e reinvestir nos mais procurados.
+              </p>
+              <p className="hidden sm:block text-xs text-white/60 leading-relaxed">
                 Crie combos e queimas de estoque exclusivamente para girar os produtos parados. Você recupera seu custo rápido e reinveste nos produtos que seus clientes estão pedindo.
               </p>
             </div>
@@ -1011,52 +1072,55 @@ export function LandingPage() {
       {/* ==================================================================== */}
       {/* 9. GESTÃO SIMPLES PARA SÓCIOS & DINHEIRO DA LOJA                    */}
       {/* ==================================================================== */}
-      <section id="socios" className="py-24 px-4 sm:px-6 border-t border-[#161616] bg-[#050505]">
-        <div className="max-w-6xl mx-auto space-y-12">
+      <section id="socios" className="py-12 sm:py-24 px-4 sm:px-6 border-t border-[#161616] bg-[#050505]">
+        <div className="max-w-6xl mx-auto space-y-8 sm:space-y-12">
           
-          <div className="text-center space-y-3 max-w-3xl mx-auto">
-            <span className="text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
+          <div className="text-center space-y-2 sm:space-y-3 max-w-3xl mx-auto">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-white/50 font-mono">
               Clareza & Fim das Discussões
             </span>
 
             {/* HEADLINE ÚNICA DE SÓCIOS */}
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
+            <h2 className="text-2xl sm:text-5xl font-extrabold text-white tracking-tight">
               Divisão de Sócios Sem Complicação:{' '}
               <span className="bg-gradient-to-r from-white via-slate-200 to-gray-400 bg-clip-text text-transparent">
-                Saiba o que é dinheiro da empresa e quanto cada sócio pode retirar.
+                Saiba o que é dinheiro da empresa e quanto cada um pode retirar.
               </span>
             </h2>
 
             <p className="text-xs sm:text-sm text-white/60 leading-relaxed">
-              Muitos amigos abrem um negócio juntos e brigam achando que um tirou mais dinheiro que o outro. O SMK System mostra com números limpos o patrimônio real da loja, quanto tem em estoque e a fatia exata de cada um.
+              Números auditados do patrimônio real da loja, quanto tem em estoque e a fatia exata de cada sócio.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-center">
             
-            <div className="space-y-5 text-xs sm:text-sm text-white/70">
+            <div className="space-y-3 sm:space-y-5 text-xs sm:text-sm text-white/70">
               
               <div className="flex gap-3">
-                <CheckCircle2 className="size-5 text-white shrink-0 mt-0.5" />
+                <CheckCircle2 className="size-5 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
-                  <strong className="text-white block text-sm">O Dinheiro da Empresa é Intocável</strong>
-                  O sistema separa claramente o caixa de reposição (que tem que ficar na conta para comprar o próximo lote com o fornecedor) do lucro limpo disponível. Ninguém gasta o dinheiro da mercadoria.
+                  <strong className="text-white block text-sm">Caixa da Empresa Intocável</strong>
+                  <span className="block sm:hidden text-xs text-white/70">Separação automática entre reposição de fornecedor e lucro limpo disponível.</span>
+                  <span className="hidden sm:inline text-white/60">O sistema separa claramente o caixa de reposição (que tem que ficar na conta para comprar o próximo lote com o fornecedor) do lucro limpo disponível. Ninguém gasta o dinheiro da mercadoria.</span>
                 </div>
               </div>
 
               <div className="flex gap-3">
-                <CheckCircle2 className="size-5 text-white shrink-0 mt-0.5" />
+                <CheckCircle2 className="size-5 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
                   <strong className="text-white block text-sm">Patrimônio Real na Prateleira</strong>
-                  Quem investe quer saber onde o dinheiro está. O sistema calcula a soma do caixa líquido com todos os produtos físicos em estoque a preço de custo. Fica tudo visível e registrado.
+                  <span className="block sm:hidden text-xs text-white/70">Cálculo em tempo real do caixa somado ao estoque físico a preço de custo.</span>
+                  <span className="hidden sm:inline text-white/60">Quem investe quer saber onde o dinheiro está. O sistema calcula a soma do caixa líquido com todos os produtos físicos em estoque a preço de custo. Fica tudo visível e registrado.</span>
                 </div>
               </div>
 
               <div className="flex gap-3">
-                <CheckCircle2 className="size-5 text-white shrink-0 mt-0.5" />
+                <CheckCircle2 className="size-5 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
                   <strong className="text-white block text-sm">Fatia Automática por Sócio</strong>
-                  Se a divisão for 50/50, 60/40 ou 70/30, cada retirada fica registrada com data e valor. Acabou aquele clima chato de um sócio achar que o outro está com o dinheiro dele na mão.
+                  <span className="block sm:hidden text-xs text-white/70">Divisão percentual (50/50, 60/40) com registro de cada retirada para total transparência.</span>
+                  <span className="hidden sm:inline text-white/60">Se a divisão for 50/50, 60/40 ou 70/30, cada retirada fica registrada com data e valor. Acabou aquele clima chato de um sócio achar que o outro está com o dinheiro dele na mão.</span>
                 </div>
               </div>
 
@@ -1118,16 +1182,16 @@ export function LandingPage() {
       {/* ==================================================================== */}
       {/* 10. CASE REAL SMOKING PODS (PROVA SOCIAL NA PRÁTICA)                 */}
       {/* ==================================================================== */}
-      <section id="case" className="py-24 px-4 sm:px-6 border-t border-[#161616] bg-[#070707] relative">
-        <div className="max-w-5xl mx-auto space-y-10 text-center">
+      <section id="case" className="py-12 sm:py-24 px-4 sm:px-6 border-t border-[#161616] bg-[#070707] relative">
+        <div className="max-w-5xl mx-auto space-y-6 sm:space-y-10 text-center">
           
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/80 text-xs font-semibold">
-            <CheckCircle2 className="size-4 text-emerald-400" />
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-white/5 border border-white/10 text-white/80 text-[11px] sm:text-xs font-semibold">
+            <CheckCircle2 className="size-3.5 sm:size-4 text-emerald-400" />
             <span>Testado no Campo de Batalha Real</span>
           </div>
 
           {/* HEADLINE ÚNICA DO CASE REAL */}
-          <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight max-w-3xl mx-auto leading-tight">
+          <h2 className="text-2xl sm:text-5xl font-extrabold text-white tracking-tight max-w-3xl mx-auto leading-tight">
             Criado por quem vive o balcão:{' '}
             <span className="text-white underline decoration-white/30 decoration-2 underline-offset-8">
               O sistema testado na operação da Smoking Pods com +10.000 pedidos.
@@ -1135,34 +1199,34 @@ export function LandingPage() {
           </h2>
 
           <p className="text-xs sm:text-sm text-white/70 max-w-2xl mx-auto leading-relaxed">
-            O SMK System não foi desenhado por quem nunca pegou uma caixa de mercadoria na mão. Ele nasceu e foi lapidado dentro da nossa própria operação real, resolvendo os problemas diários de entregadores, estoque e clientes exigentes.
+            O SMK System nasceu e foi lapidado dentro da nossa própria operação diária de entregas, estoque e clientes exigentes.
           </p>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6">
-            <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-5 rounded-2xl">
-              <div className="text-2xl sm:text-4xl font-extrabold text-white">+10.000</div>
-              <div className="text-[11px] text-white/50 mt-1">Pedidos entregues com sucesso</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 pt-2 sm:pt-6">
+            <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-3.5 sm:p-5 rounded-xl sm:rounded-2xl">
+              <div className="text-xl sm:text-4xl font-extrabold text-white">+10.000</div>
+              <div className="text-[10px] sm:text-[11px] text-white/50 mt-1">Pedidos entregues</div>
             </div>
-            <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-5 rounded-2xl">
-              <div className="text-2xl sm:text-4xl font-extrabold text-white">0 minutos</div>
-              <div className="text-[11px] text-white/50 mt-1">Digitando listas de produtos no WhatsApp</div>
+            <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-3.5 sm:p-5 rounded-xl sm:rounded-2xl">
+              <div className="text-xl sm:text-4xl font-extrabold text-white">0 min</div>
+              <div className="text-[10px] sm:text-[11px] text-white/50 mt-1">Digitando lista no WhatsApp</div>
             </div>
-            <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-5 rounded-2xl">
-              <div className="text-2xl sm:text-4xl font-extrabold text-emerald-400">25.3%</div>
-              <div className="text-[11px] text-white/50 mt-1">Margem líquida média real</div>
+            <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-3.5 sm:p-5 rounded-xl sm:rounded-2xl">
+              <div className="text-xl sm:text-4xl font-extrabold text-emerald-400">25.3%</div>
+              <div className="text-[10px] sm:text-[11px] text-white/50 mt-1">Margem líquida real</div>
             </div>
-            <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-5 rounded-2xl">
-              <div className="text-2xl sm:text-4xl font-extrabold text-white">100%</div>
-              <div className="text-[11px] text-white/50 mt-1">Paz de espírito entre os sócios</div>
+            <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-3.5 sm:p-5 rounded-xl sm:rounded-2xl">
+              <div className="text-xl sm:text-4xl font-extrabold text-white">100%</div>
+              <div className="text-[10px] sm:text-[11px] text-white/50 mt-1">Alinhamento de sócios</div>
             </div>
           </div>
 
           {/* Print Real do Financeiro / Prova de Faturamento */}
-          <div className="pt-4">
+          <div className="pt-2 sm:pt-4">
             <ScreenshotOrFallback
               src="/prints/financeiro-dre.png"
               alt="Painel Financeiro Real da Smoking Pods"
-              className="w-full max-w-4xl mx-auto rounded-2xl border border-white/20 shadow-[0_0_50px_rgba(255,255,255,0.1)]"
+              className="w-full max-w-4xl mx-auto rounded-xl sm:rounded-2xl border border-white/20 shadow-[0_0_50px_rgba(255,255,255,0.1)]"
               fallback={<div className="hidden" />}
             />
           </div>
@@ -1173,42 +1237,42 @@ export function LandingPage() {
       {/* ==================================================================== */}
       {/* 11. TABELA DE PREÇOS (OFERTA DE LANÇAMENTO VITALÍCIA)               */}
       {/* ==================================================================== */}
-      <section id="planos" className="py-24 px-4 sm:px-6 border-t border-[#161616] relative bg-[#050505]">
-        <div className="max-w-5xl mx-auto space-y-12">
+      <section id="planos" className="py-12 sm:py-24 px-4 sm:px-6 border-t border-[#161616] relative bg-[#050505]">
+        <div className="max-w-5xl mx-auto space-y-8 sm:space-y-12">
           
-          <div className="text-center space-y-3 max-w-2xl mx-auto">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold font-mono">
+          <div className="text-center space-y-2 sm:space-y-3 max-w-2xl mx-auto">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-[11px] sm:text-xs font-bold font-mono">
               <Sparkles className="size-3.5 text-white" />
               <span>Condição Especial de Lançamento</span>
             </div>
 
             {/* HEADLINE ÚNICA DOS PLANOS */}
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
+            <h2 className="text-2xl sm:text-5xl font-extrabold text-white tracking-tight">
               Escolha o plano ideal para a sua loja
             </h2>
 
             <p className="text-xs sm:text-sm text-white/60">
-              Quem assinar nos primeiros 30 dias de lançamento garante esse valor de forma <strong className="text-white">VITALÍCIA</strong>. O preço nunca aumentará para você.
+              Assine no lançamento e garanta esse valor de forma <strong className="text-white">VITALÍCIA</strong> sem reajustes.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 max-w-4xl mx-auto items-stretch">
             
             {/* PLANO 1: SMK GESTÃO */}
-            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/30 rounded-3xl p-8 flex flex-col justify-between transition-all duration-300">
-              <div className="space-y-6">
+            <div className="bg-[#0b0b0b] border border-[#1f1f1f] hover:border-white/30 rounded-2xl sm:rounded-3xl p-5 sm:p-8 flex flex-col justify-between transition-all duration-300">
+              <div className="space-y-4 sm:space-y-6">
                 <div>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold text-white">SMK Gestão</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-white">SMK Gestão</h3>
                     <Store className="size-5 text-white/40" />
                   </div>
-                  <p className="text-xs text-white/50 mt-1">Para organizar pedidos, entregas e divisão de sócios.</p>
+                  <p className="text-xs text-white/50 mt-1">Organização de pedidos, motoboys e divisão de sócios.</p>
                 </div>
 
                 <div className="space-y-1">
                   <div className="text-xs text-white/40 line-through">De R$ 149,90/mês</div>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">R$ 97</span>
+                    <span className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">R$ 97</span>
                     <span className="text-white/50 text-sm font-semibold">,00 / mês</span>
                   </div>
                   <p className="text-[11px] text-emerald-400 font-semibold font-mono">
@@ -1216,26 +1280,26 @@ export function LandingPage() {
                   </p>
                 </div>
 
-                <div className="space-y-3 pt-4 border-t border-white/10 text-xs sm:text-sm text-white/80">
+                <div className="space-y-2.5 sm:space-y-3 pt-4 border-t border-white/10 text-xs sm:text-sm text-white/80">
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
                     <span>Painel Kanban de Pedidos em tempo real</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
-                    <span>Controle de produtos, marcas e variações com baixa automática</span>
+                    <span>Controle de estoque com baixa automática</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
-                    <span>Alerta de Recompra (aviso no WhatsApp no momento certo)</span>
+                    <span>Alerta de Recompra no WhatsApp</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
-                    <span>Radar de Estoque Parado para queimas inteligentes</span>
+                    <span>Radar de Estoque Parado para queimas</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
-                    <span>Divisão automática de lucros e fatias entre sócios</span>
+                    <span>Divisão automática de lucros e sócios</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
@@ -1244,7 +1308,7 @@ export function LandingPage() {
                 </div>
               </div>
 
-              <div className="pt-8">
+              <div className="pt-6 sm:pt-8">
                 <Link
                   to="/checkout?plano=gestao"
                   className="w-full bg-[#161616] hover:bg-[#202020] border border-[#2a2a2a] text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer"
@@ -1256,7 +1320,7 @@ export function LandingPage() {
             </div>
 
             {/* PLANO 2: SMK PRO COMBO (MAIS VENDIDO) */}
-            <div className="bg-[#0d0d0d] border-2 border-white/60 rounded-3xl p-8 flex flex-col justify-between relative shadow-[0_0_40px_rgba(255,255,255,0.15)] transition-all duration-300 group">
+            <div className="bg-[#0d0d0d] border-2 border-white/60 rounded-2xl sm:rounded-3xl p-5 sm:p-8 flex flex-col justify-between relative shadow-[0_0_40px_rgba(255,255,255,0.15)] transition-all duration-300 group">
               
               <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-white text-black text-xs font-black uppercase tracking-wider shadow-lg flex items-center gap-1.5">
                 <Star className="size-3 fill-black" />
@@ -1275,7 +1339,7 @@ export function LandingPage() {
                 <div className="space-y-1">
                   <div className="text-xs text-white/40 line-through">De R$ 167,90/mês</div>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">R$ 127</span>
+                    <span className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">R$ 127</span>
                     <span className="text-white/50 text-sm font-semibold">,90 / mês</span>
                   </div>
                   <p className="text-[11px] text-emerald-400 font-semibold font-mono">
@@ -1283,18 +1347,18 @@ export function LandingPage() {
                   </p>
                 </div>
 
-                <div className="space-y-3 pt-4 border-t border-white/10 text-xs sm:text-sm text-white/90">
+                <div className="space-y-2.5 sm:space-y-3 pt-4 border-t border-white/10 text-xs sm:text-sm text-white/90">
                   <div className="flex items-center gap-2.5 font-semibold text-white">
                     <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
                     <span>TUDO incluso no Plano Gestão</span>
                   </div>
                   <div className="flex items-center gap-2.5 font-semibold text-white">
                     <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
-                    <span>Catálogo Digital Oficial Próprio para a Bio</span>
+                    <span>Catálogo Digital Próprio para a Bio</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
-                    <span>Estoque e variações sincronizados em tempo real</span>
+                    <span>Estoque sincronizado em tempo real</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
@@ -1302,11 +1366,11 @@ export function LandingPage() {
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
-                    <span>Carrinho de compras que cai pronto no seu WhatsApp</span>
+                    <span>Carrinho de compras pronto no WhatsApp</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
-                    <span>Nunca mais digite lista de produtos no WhatsApp</span>
+                    <span>Nunca mais digite listas no WhatsApp</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Check className="size-4 text-emerald-400 shrink-0" />
@@ -1315,10 +1379,10 @@ export function LandingPage() {
                 </div>
               </div>
 
-              <div className="pt-8">
+              <div className="pt-6 sm:pt-8">
                 <Link
                   to="/checkout?plano=combo"
-                  className="w-full bg-white hover:bg-slate-100 text-black font-extrabold py-4 rounded-xl transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer"
+                  className="w-full bg-white hover:bg-slate-100 text-black font-extrabold py-3.5 sm:py-4 rounded-xl transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer"
                 >
                   <span>Garantir Combo com Catálogo →</span>
                 </Link>
@@ -1327,20 +1391,20 @@ export function LandingPage() {
 
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-6 text-center">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 pt-4 sm:pt-6 text-center">
             <span className="text-xs text-white/50">Dúvidas sobre o plano ideal para a sua loja?</span>
             <a
               href="https://wa.me/5511977300561?text=Ol%C3%A1!%20Tenho%20d%C3%BAvidas%20sobre%20os%20planos%20do%20sistema%20SMK%20System"
               target="_blank"
               rel="noreferrer"
-              className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1.5 transition-colors underline underline-offset-4"
+              className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center justify-center gap-1.5 transition-colors underline underline-offset-4"
             >
               <MessageCircle className="size-3.5" />
-              <span>Fale com nosso time de especialistas no WhatsApp</span>
+              <span>Fale com nosso time no WhatsApp</span>
             </a>
           </div>
 
-          <div className="text-center text-xs text-white/40 pt-4">
+          <div className="text-center text-[10px] sm:text-xs text-white/40 pt-2 sm:pt-4">
             Após os 30 dias de lançamento, os valores sobem para R$ 147,00 e R$ 167,90. Quem entrar agora tem o valor travado de forma vitalícia.
           </div>
 
@@ -1350,7 +1414,7 @@ export function LandingPage() {
       {/* ==================================================================== */}
       {/* 12. DÚVIDAS FREQUENTES (FAQ ACCORDION)                              */}
       {/* ==================================================================== */}
-      <section id="duvidas" className="py-20 px-4 sm:px-6 border-t border-[#161616] bg-[#070707]">
+      <section id="duvidas" className="py-12 sm:py-20 px-4 sm:px-6 border-t border-[#161616] bg-[#070707]">
         <div className="max-w-4xl mx-auto space-y-10">
           
           <div className="text-center space-y-2">
