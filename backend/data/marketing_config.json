@@ -50,7 +50,7 @@
       "createdAt": "2026-09-11T15:03:53.089535+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:04:44.094Z",
-      "lastRunDate": "28/09/2026"
+      "lastRunDate": "26/10/2026"
     },
     {
       "id": "4e4a393c-5a6b-44cf-9488-ec5e3c025937",
@@ -71,7 +71,7 @@
       "createdAt": "2026-09-11T15:03:53.192241+00:00",
       "frequencyDays": 14,
       "updatedAt": "2026-09-21T18:04:48.085Z",
-      "lastRunDate": "20/10/2026"
+      "lastRunDate": "23/10/2026"
     },
     {
       "id": "7374d4ba-9031-446f-9c7b-d001608641bf",
@@ -93,7 +93,7 @@
       "createdAt": "2026-09-11T15:03:53.290095+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:04:55.317Z",
-      "lastRunDate": "25/09/2026"
+      "lastRunDate": "23/10/2026"
     },
     {
       "id": "9ff7cae1-0689-4eec-bf4d-4142e2f78b76",
@@ -115,7 +115,7 @@
       "createdAt": "2026-09-11T15:03:53.397681+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:05:03.636Z",
-      "lastRunDate": "02/10/2026"
+      "lastRunDate": "23/10/2026"
     },
     {
       "id": "34f4e134-c7d8-4c41-8b5b-7dab1ab3a409",
@@ -136,7 +136,8 @@
       "startDate": "2026-09-21",
       "createdAt": "2026-09-11T15:03:53.485782+00:00",
       "frequencyDays": 7,
-      "updatedAt": "2026-09-21T18:05:12.003Z"
+      "updatedAt": "2026-09-21T18:05:12.003Z",
+      "lastRunDate": "23/10/2026"
     },
     {
       "id": "ccec49ef-56a2-45e5-92ce-a66e1749e275",
@@ -158,7 +159,7 @@
       "createdAt": "2026-09-11T15:03:53.589803+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:05:18.800Z",
-      "lastRunDate": "26/09/2026"
+      "lastRunDate": "24/10/2026"
     },
     {
       "id": "d4046bf1-b741-40cd-b330-6ab8afc72d3e",
@@ -180,7 +181,7 @@
       "createdAt": "2026-09-11T15:03:53.667722+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:05:28.671Z",
-      "lastRunDate": "26/09/2026"
+      "lastRunDate": "24/10/2026"
     },
     {
       "id": "28d26f94-c2ff-4268-b5ff-d7e65674dd62",
@@ -202,7 +203,7 @@
       "createdAt": "2026-09-11T15:03:53.754434+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-26T22:36:58.862Z",
-      "lastRunDate": "03/10/2026"
+      "lastRunDate": "24/10/2026"
     },
     {
       "id": "68573283-0eff-42fe-9a39-c6dc16f446c0",
@@ -223,7 +224,8 @@
       "startDate": "2026-08-26",
       "createdAt": "2026-09-11T15:03:53.84567+00:00",
       "frequencyDays": 7,
-      "updatedAt": "2026-09-21T18:05:42.337Z"
+      "updatedAt": "2026-09-21T18:05:42.337Z",
+      "lastRunDate": "25/10/2026"
     },
     {
       "id": "c3558551-5f8a-4aaf-8e75-fb1ca2a966d4",
@@ -245,7 +247,7 @@
       "createdAt": "2026-09-11T15:03:53.951877+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:05:50.039Z",
-      "lastRunDate": "18/10/2026"
+      "lastRunDate": "25/10/2026"
     },
     {
       "id": "a200c5bf-c667-4a05-bafd-bdf324195cdb",
@@ -267,7 +269,7 @@
       "createdAt": "2026-09-11T15:03:54.04839+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:05:57.406Z",
-      "lastRunDate": "20/10/2026"
+      "lastRunDate": "29/09/2026"
     },
     {
       "id": "a898626b-11df-4ea8-879c-185b88433a6e",
@@ -289,7 +291,7 @@
       "createdAt": "2026-09-11T15:03:54.136387+00:00",
       "frequencyDays": 7,
       "updatedAt": "2026-09-21T18:06:03.607Z",
-      "lastRunDate": "21/10/2026"
+      "lastRunDate": "23/09/2026"
     },
     {
       "id": "e939f055-0c27-4d5c-ab26-d26e04651b35",
@@ -344,58 +346,8 @@
       "totalRecipients": 62,
       "status": "active",
       "createdAt": "2026-10-18T21:54:12.981Z",
-      "updatedAt": "2026-10-18T21:54:12.981Z",
-      "lastRunDate": "22/10/2026"
-    },
-    {
-      "id": "camp_1792361104826",
-      "name": "CPM GRUPO VIP ( SORTEIO 5 CONTATOS )",
-      "message": "Fala família, beleza?\n\nSeparamos 2 Pods 100% lacrados (do sabor que você escolher) com entrega na faixa aqui no ABC pra sortear exclusivamente pra quem tá aqui no grupo.\n\nE pra participar é bem simples, sem burocracia nenhuma:\n\nMe dá um salve no privado.\nClica no clipezinho do WhatsApp 📎, vai em Contato e me manda o contato de 5 amigos seus que também fumam pod.\nMandou os 5 contatos, eu já te mando o seu número da sorte na hora.\n\nQuem quiser aumentar as chances: a cada 5 amigos que você mandar, ganha mais um número. Se mandar 10, são 2 chances de ganhar.\n\n📅 O sorteio vai rolar no dia 29 ao vivo aqui no grupo.\n\nSó me chamar no privado e mandar os contatos pra garantir sua vaga: https://wa.me/5511977300561?text=Gostaria%20de%20participar%20do%20sorteio!",
-      "variations": [],
-      "useVariations": false,
-      "targetType": "group",
-      "selectedListIds": [
-        "0d925499-da68-4a93-9591-f4b6f78744b1"
-      ],
-      "targetGroupId": "120363429733361752@g.us",
-      "targetGroupName": "Clientes Smoking Vip",
-      "frequencyDays": 0,
-      "scheduledTime": "11:00",
-      "startDate": "2026-10-18",
-      "batchSize": 5,
-      "batchIntervalMinutes": 35,
-      "isStockOffer": false,
-      "stockOfferCount": 1,
-      "totalRecipients": 62,
-      "status": "active",
-      "createdAt": "2026-10-18T22:05:05.233Z",
-      "updatedAt": "2026-10-18T22:05:05.233Z",
-      "lastRunDate": "22/10/2026"
-    },
-    {
-      "id": "camp_1792361244402",
-      "name": "CAMPANHA DIARIA SORTEIO 5 CONTATOS",
-      "message": "Rapaziada, 2 pods de graça + frete grátis no ABC dia 29 aqui no grupo.\n\nNão precisa pagar nada nem preencher nada: só abrir meu privado, clicar em Contato 📎 e mandar o contato de 5 amigos que você sabe que fumam pod.\n\nCoisa de 10 segundos pra garantir seu número:\n https://wa.me/5511977300561?text=Gostaria%20de%20participar%20do%20sorteio!",
-      "variations": [],
-      "useVariations": false,
-      "targetType": "group",
-      "selectedListIds": [
-        "0d925499-da68-4a93-9591-f4b6f78744b1"
-      ],
-      "targetGroupId": "120363429733361752@g.us",
-      "targetGroupName": "Clientes Smoking Vip",
-      "frequencyDays": 1,
-      "scheduledTime": "19:00",
-      "startDate": "2026-10-18",
-      "batchSize": 5,
-      "batchIntervalMinutes": 35,
-      "isStockOffer": false,
-      "stockOfferCount": 1,
-      "totalRecipients": 62,
-      "status": "active",
-      "createdAt": "2026-10-18T22:07:25.024Z",
-      "updatedAt": "2026-10-18T22:07:25.024Z",
-      "lastRunDate": "21/10/2026"
+      "updatedAt": "2026-10-20T00:13:39.981Z",
+      "lastRunDate": "26/10/2026"
     }
   ],
   "idempotencyKeys": [
@@ -450,52 +402,92 @@
       "campaignName": "AVISO SALVAR CONTATO"
     },
     {
-      "key": "camp_1792360452554_2026-10-20_slot2",
-      "timestamp": "2026-10-20T21:00:18.174Z",
+      "key": "7374d4ba-9031-446f-9c7b-d001608641bf_2026-10-23_slot1",
+      "timestamp": "2026-10-23T16:00:46.046Z",
+      "campaignName": "REATIVAÇÃO SEXTOU/ESCASSEZ"
+    },
+    {
+      "key": "4e4a393c-5a6b-44cf-9488-ec5e3c025937_2026-10-23_slot1",
+      "timestamp": "2026-10-23T18:00:46.643Z",
+      "campaignName": "CPM GRUPO INSTAGRAM"
+    },
+    {
+      "key": "camp_1792360452554_2026-10-23_slot1",
+      "timestamp": "2026-10-23T18:00:50.471Z",
       "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
     },
     {
-      "key": "camp_1792361244402_2026-10-20_slot1",
-      "timestamp": "2026-10-20T22:00:16.298Z",
-      "campaignName": "CAMPANHA DIARIA SORTEIO 5 CONTATOS"
+      "key": "9ff7cae1-0689-4eec-bf4d-4142e2f78b76_2026-10-23_slot1",
+      "timestamp": "2026-10-23T20:30:47.587Z",
+      "campaignName": "CPM SEXTOU 2"
     },
     {
-      "key": "camp_1792361104826_2026-10-21_slot1",
-      "timestamp": "2026-10-21T14:00:23.950Z",
-      "campaignName": "CPM GRUPO VIP ( SORTEIO 5 CONTATOS )"
-    },
-    {
-      "key": "camp_1792360452554_2026-10-21_slot1",
-      "timestamp": "2026-10-21T18:00:28.492Z",
+      "key": "camp_1792360452554_2026-10-23_slot2",
+      "timestamp": "2026-10-23T21:00:50.231Z",
       "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
     },
     {
-      "key": "a898626b-11df-4ea8-879c-185b88433a6e_2026-10-21_slot1",
-      "timestamp": "2026-10-21T19:00:25.919Z",
-      "campaignName": "CPM  LEMBRETE VIP: ANTECIPE SEU PEDIDO PRO FDS!"
+      "key": "34f4e134-c7d8-4c41-8b5b-7dab1ab3a409_2026-10-24_slot1",
+      "timestamp": "2026-10-24T00:30:49.603Z",
+      "campaignName": "CPM GRUPO SEXTOU NOTURNO 3"
     },
     {
-      "key": "camp_1792360452554_2026-10-21_slot2",
-      "timestamp": "2026-10-21T21:00:29.972Z",
+      "key": "ccec49ef-56a2-45e5-92ce-a66e1749e275_2026-10-24_slot1",
+      "timestamp": "2026-10-24T17:00:57.846Z",
+      "campaignName": "CPM SABADÃO 1"
+    },
+    {
+      "key": "camp_1792360452554_2026-10-24_slot1",
+      "timestamp": "2026-10-24T18:00:59.646Z",
       "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
     },
     {
-      "key": "camp_1792361244402_2026-10-21_slot1",
-      "timestamp": "2026-10-21T22:00:27.751Z",
-      "campaignName": "CAMPANHA DIARIA SORTEIO 5 CONTATOS"
+      "key": "d4046bf1-b741-40cd-b330-6ab8afc72d3e_2026-10-24_slot1",
+      "timestamp": "2026-10-24T20:30:59.113Z",
+      "campaignName": "CPM SABADÃO 2"
     },
     {
-      "key": "camp_1792361104826_2026-10-22_slot1",
-      "timestamp": "2026-10-22T14:00:35.433Z",
-      "campaignName": "CPM GRUPO VIP ( SORTEIO 5 CONTATOS )"
+      "key": "camp_1792360452554_2026-10-24_slot2",
+      "timestamp": "2026-10-24T21:01:01.422Z",
+      "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
     },
     {
-      "key": "camp_1792360452554_2026-10-22_slot1",
-      "timestamp": "2026-10-22T18:00:39.328Z",
+      "key": "28d26f94-c2ff-4268-b5ff-d7e65674dd62_2026-10-24_slot1",
+      "timestamp": "2026-10-24T22:31:00.111Z",
+      "campaignName": "CPM SABADÃO 3"
+    },
+    {
+      "key": "68573283-0eff-42fe-9a39-c6dc16f446c0_2026-10-25_slot1",
+      "timestamp": "2026-10-25T15:00:07.753Z",
+      "campaignName": "CPM DOMINGO 1"
+    },
+    {
+      "key": "camp_1792360452554_2026-10-25_slot1",
+      "timestamp": "2026-10-25T18:00:11.291Z",
+      "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
+    },
+    {
+      "key": "camp_1792360452554_2026-10-25_slot2",
+      "timestamp": "2026-10-25T21:00:12.402Z",
+      "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
+    },
+    {
+      "key": "c3558551-5f8a-4aaf-8e75-fb1ca2a966d4_2026-10-25_slot1",
+      "timestamp": "2026-10-25T22:30:11.546Z",
+      "campaignName": "CPM DOMINGO 2"
+    },
+    {
+      "key": "bdbc5c95-4770-4fba-8425-4dec704098bc_2026-10-26_slot1",
+      "timestamp": "2026-10-26T17:05:19.813Z",
+      "campaignName": "CPM GRUPO ESTOQUE SEMANAL"
+    },
+    {
+      "key": "camp_1792360452554_2026-10-26_slot1",
+      "timestamp": "2026-10-26T18:00:22.817Z",
       "campaignName": "CAMPANHA OFERTAS COM FOTOS DÍARIAS GRUPO VIP"
     }
   ],
-  "lastUpdated": "2026-10-22T18:00:39.328Z",
+  "lastUpdated": "2026-10-26T18:00:22.817Z",
   "lists": [
     {
       "id": "0d925499-da68-4a93-9591-f4b6f78744b1",
@@ -4642,7 +4634,7 @@
       "description": "Lista personalizada de contatos",
       "color": "#10b981",
       "createdAt": "2026-09-15T23:15:16.628587+00:00",
-      "updatedAt": "2026-09-15T23:15:16.628587+00:00",
+      "updatedAt": "2026-10-22T15:42:30.856Z",
       "contacts": [
         {
           "id": "dd1928bc-b03d-43c7-831b-820fae0adfd4",
@@ -4651,6 +4643,34 @@
           "cleanPhone": "5511951741181",
           "isSaved": true,
           "clientId": null
+        },
+        {
+          "id": "613297e0-7813-4b39-a069-92218d762758",
+          "name": "Agência Noma",
+          "phone": "5511948420071",
+          "cleanPhone": "5511948420071",
+          "isSaved": true
+        },
+        {
+          "id": "547ec137-04df-41c9-8ab9-cceba3c3059f",
+          "name": "léo pinheiro",
+          "phone": "5511946606068",
+          "cleanPhone": "5511946606068",
+          "isSaved": true
+        },
+        {
+          "id": "300ed0ae-ecb7-40c3-8113-522701bb5edb",
+          "name": "gui lima",
+          "phone": "5511978616226",
+          "cleanPhone": "5511978616226",
+          "isSaved": true
+        },
+        {
+          "id": "a2f32edd-6566-4dad-b32a-7f5c888267c2",
+          "name": "Gata",
+          "phone": "5511974861998",
+          "cleanPhone": "5511974861998",
+          "isSaved": true
         }
       ]
     }
@@ -5478,14 +5498,28 @@
     "2026-10-20": [
       "Ice king",
       "FROZEN 20K"
+    ],
+    "2026-10-23": [
+      "LUMA 40K",
+      "TE30K"
+    ],
+    "2026-10-24": [
+      "TE30K",
+      "LUMA 20K"
+    ],
+    "2026-10-25": [
+      "BC15K",
+      "V250"
+    ],
+    "2026-10-26": [
+      "V55 ULTRA THIN"
     ]
   },
   "stockOfferCycle": [
+    "TE30K",
+    "LUMA 20K",
     "BC15K",
     "V250",
-    "V55 ULTRA THIN",
-    "DURA 35K",
-    "Ice king",
-    "FROZEN 20K"
+    "V55 ULTRA THIN"
   ]
 }
