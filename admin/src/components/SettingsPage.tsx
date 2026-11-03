@@ -40,6 +40,7 @@ export const SMK_VIDEO_LESSONS: VideoLessonItem[] = [
       "Lançamento de venda manual no balcão (+ Nova Venda)",
       "Gestão de rotas de entrega e impressão de comprovantes",
     ],
+    videoUrl: "https://youtu.be/lrTwyR-hU2o",
   },
   {
     id: "aula-2-financeiro",
@@ -108,7 +109,7 @@ export function parseVideoSource(rawUrl?: string): { type: "youtube" | "drive" |
   if (ytMatch && ytMatch[1]) {
     return {
       type: "youtube",
-      embedUrl: `https://www.youtube-nocookie.com/embed/${ytMatch[1]}?autoplay=1&rel=0&modestbranding=1`,
+      embedUrl: `https://www.youtube-nocookie.com/embed/${ytMatch[1]}?rel=0&modestbranding=1&playsinline=1`,
     };
   }
 
