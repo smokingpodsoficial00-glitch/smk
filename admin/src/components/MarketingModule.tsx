@@ -2453,6 +2453,11 @@ export default function MarketingModule() {
                   </div>
                 </div>
 
+                <div className="p-3 bg-black/40 border border-white/5 rounded-xl text-center font-mono text-[10px] text-white/50 truncate">
+                  <span>URL Backend: </span>
+                  <code className="text-emerald-400 font-bold">{getBackendUrl()}</code>
+                </div>
+
                 <div className="pt-2 flex justify-center gap-2">
                   <button
                     type="button"
