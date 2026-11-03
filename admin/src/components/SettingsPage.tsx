@@ -70,6 +70,7 @@ export const SMK_VIDEO_LESSONS: VideoLessonItem[] = [
       "Entrada de novos lotes e atualização do custo médio",
       "Identificação de produtos parados para criar promoções relâmpago",
     ],
+    videoUrl: "https://youtu.be/qmT5Cs_O1Kw",
   },
   {
     id: "aula-4-crm",
@@ -84,6 +85,7 @@ export const SMK_VIDEO_LESSONS: VideoLessonItem[] = [
       "Previsão de término de pod e timing perfeito de contato",
       "Recuperação de clientes inativos direto pelo WhatsApp",
     ],
+    videoUrl: "https://youtu.be/THaaLje5B-c",
   },
   {
     id: "aula-5-marketing",
@@ -98,6 +100,7 @@ export const SMK_VIDEO_LESSONS: VideoLessonItem[] = [
       "Modelos de ofertas diárias com fotos e sabores disponíveis",
       "Cadência segura e intervalos anti-banimento no WhatsApp",
     ],
+    videoUrl: "https://youtu.be/G_R4iCmF-Yk",
   },
 ];
 
