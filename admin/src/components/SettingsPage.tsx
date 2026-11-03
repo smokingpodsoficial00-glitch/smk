@@ -407,43 +407,45 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Ação do Topo: Salvar Alterações */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Botão Salvar Principal */}
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || !hasChanges()}
-              className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 cursor-pointer shrink-0 ${
-                saveStatus === "success"
-                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                  : saveStatus === "error"
-                  ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                  : hasChanges()
-                  ? "bg-white hover:bg-white/90 text-black shadow-[0_0_20px_rgba(255,255,255,0.25)] active:scale-95"
-                  : "bg-white/5 text-white/30 border border-white/10 cursor-not-allowed"
-              }`}
-            >
-              {saving ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : saveStatus === "success" ? (
-                <CheckCircle2 className="size-3.5" />
-              ) : saveStatus === "error" ? (
-                <AlertCircle className="size-3.5" />
-              ) : (
-                <Save className="size-3.5" />
-              )}
-              <span>
-                {saving
-                  ? "Salvando..."
-                  : saveStatus === "success"
-                  ? "Salvo!"
-                  : saveStatus === "error"
-                  ? "Erro!"
-                  : "Salvar"}
-              </span>
-            </button>
-          </div>
+          {/* Ação do Topo: Salvar Alterações (Oculto na aba de Videoaulas que são permanentes) */}
+          {activeTab !== "tutorials" && (
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Botão Salvar Principal */}
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving || !hasChanges()}
+                className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 cursor-pointer shrink-0 ${
+                  saveStatus === "success"
+                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                    : saveStatus === "error"
+                    ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                    : hasChanges()
+                    ? "bg-white hover:bg-white/90 text-black shadow-[0_0_20px_rgba(255,255,255,0.25)] active:scale-95"
+                    : "bg-white/5 text-white/30 border border-white/10 cursor-not-allowed"
+                }`}
+              >
+                {saving ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : saveStatus === "success" ? (
+                  <CheckCircle2 className="size-3.5" />
+                ) : saveStatus === "error" ? (
+                  <AlertCircle className="size-3.5" />
+                ) : (
+                  <Save className="size-3.5" />
+                )}
+                <span>
+                  {saving
+                    ? "Salvando..."
+                    : saveStatus === "success"
+                    ? "Salvo!"
+                    : saveStatus === "error"
+                    ? "Erro!"
+                    : "Salvar"}
+                </span>
+              </button>
+            </div>
+          )}
 
         </div>
 
@@ -945,7 +947,7 @@ export default function SettingsPage() {
                       <span>Videoaulas e tutoriais</span>
                     </h2>
                     <p className="text-xs text-white/50 mt-1">
-                      Treinamento prático da operação Smoking Pods: 5 aulas passo a passo.
+                      Treinamento prático da operação do sistema em 5 aulas passo a passo.
                     </p>
                   </div>
 
@@ -960,42 +962,62 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Card de Apresentação / Capa do Curso */}
-                <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#141414] via-[#0c0c0c] to-black p-8 sm:p-12 text-center shadow-2xl flex flex-col items-center justify-center min-h-[380px]">
+                <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#141414] via-[#0c0c0c] to-black p-6 sm:p-10 text-center shadow-2xl flex flex-col items-center justify-center min-h-[360px]">
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(251,191,36,0.08),transparent_70%)] pointer-events-none" />
                   
-                  <div className="relative z-10 max-w-xl mx-auto space-y-6 flex flex-col items-center">
-                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/25 text-amber-300 text-xs font-bold">
+                  <div className="relative z-10 max-w-4xl mx-auto space-y-6 flex flex-col items-center w-full">
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/25 text-amber-300 text-xs font-semibold">
                       <GraduationCap className="size-4" />
-                      <span>Academia de Operação • 5 Aulas (~50 min)</span>
+                      <span>Treinamento Operacional Completo</span>
                     </div>
 
-                    <div className="size-20 rounded-3xl bg-white/5 border border-white/15 flex items-center justify-center shadow-xl backdrop-blur-sm group hover:scale-105 transition-transform">
-                      <div className="size-12 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center">
-                        <Play className="size-6 text-amber-400 fill-amber-400 translate-x-0.5" />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                    <div className="space-y-2 max-w-xl">
+                      <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
                         Videoaulas e tutoriais
                       </h3>
-                      <p className="text-xs sm:text-sm text-white/60 leading-relaxed max-w-lg">
-                        Aprenda em detalhes como operar cada engrenagem da sua loja: desde o controle de pedidos e caixa até reposição de estoque e disparos de marketing.
+                      <p className="text-sm text-white/60 leading-relaxed font-normal">
+                        Aprenda em detalhes como operar cada engrenagem da sua loja: pedidos no Kanban, controle financeiro, reposição de estoque, fidelização e disparos no WhatsApp.
                       </p>
                     </div>
 
-                    {/* Resumo das 5 Aulas */}
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 w-full pt-1">
-                      {SMK_VIDEO_LESSONS.map((l) => (
-                        <div key={l.id} className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 text-center space-y-1">
-                          <span className="text-[10px] font-mono text-amber-400/80 font-bold block">Aula {l.lessonNumber}</span>
-                          <span className="text-[11px] font-bold text-white block truncate">{l.category.split("&")[0].trim()}</span>
-                          <span className="text-[10px] text-white/40 block font-mono">⏱️ {l.duration}</span>
-                        </div>
+                    {/* Resumo do Conteúdo de Cada Aula (Rápido, Direto e Sem Poluição) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 w-full pt-2">
+                      {[
+                        { num: 1, title: "Pedidos & Kanban", summary: "Esteira de pedidos, separação e envio" },
+                        { num: 2, title: "Finanças & Caixa", summary: "Fluxo de caixa, despesas e lucro líquido" },
+                        { num: 3, title: "Estoque & Lotes", summary: "Cadastro de produtos, lotes e reposição" },
+                        { num: 4, title: "CRM & Clientes", summary: "Previsão de término do pod e fidelização" },
+                        { num: 5, title: "Marketing WhatsApp", summary: "Listas de transmissão e disparos seguros" },
+                      ].map((item, idx) => (
+                        <button
+                          key={item.num}
+                          type="button"
+                          onClick={() => {
+                            setSelectedLessonIndex(idx);
+                            setTutorialsView("classroom");
+                          }}
+                          className="p-3.5 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-amber-400/40 text-left transition-all duration-200 group cursor-pointer flex flex-col justify-between space-y-2 hover:-translate-y-0.5 shadow-sm"
+                        >
+                          <div>
+                            <span className="text-[11px] font-bold text-amber-400 block tracking-wider">
+                              Aula {item.num}
+                            </span>
+                            <h4 className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors mt-0.5 leading-snug">
+                              {item.title}
+                            </h4>
+                            <p className="text-[11px] text-white/50 leading-relaxed mt-1 line-clamp-2">
+                              {item.summary}
+                            </p>
+                          </div>
+                          <span className="text-[10px] text-white/40 group-hover:text-amber-400 transition-colors font-semibold flex items-center gap-1 pt-1 border-t border-white/5">
+                            <Play className="size-2.5 fill-current" />
+                            Assistir
+                          </span>
+                        </button>
                       ))}
                     </div>
 
-                    {/* Botão Iniciar Tutorial */}
+                    {/* Único Botão de Iniciar Tutorial */}
                     <div className="pt-2">
                       <button
                         type="button"
@@ -1003,9 +1025,9 @@ export default function SettingsPage() {
                           setTutorialsView("classroom");
                           setSelectedLessonIndex(0);
                         }}
-                        className="inline-flex items-center gap-2.5 px-9 py-4 rounded-2xl bg-white hover:bg-white/90 text-black font-extrabold text-sm shadow-[0_0_30px_rgba(255,255,255,0.25)] hover:scale-105 transition-all cursor-pointer active:scale-95"
+                        className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-2xl bg-white hover:bg-white/90 text-black font-extrabold text-sm shadow-[0_0_25px_rgba(255,255,255,0.2)] hover:scale-105 transition-all cursor-pointer active:scale-95"
                       >
-                        <Play className="size-4.5 fill-black" />
+                        <Play className="size-4 fill-black" />
                         <span>Iniciar tutorial</span>
                       </button>
                     </div>
@@ -1016,298 +1038,175 @@ export default function SettingsPage() {
               /* MODO SALA DE AULA / VÍDEOS (Classroom) */
               <div className="space-y-6 animate-in fade-in duration-200">
                 {/* Barra de Topo da Sala de Aula com Botão Voltar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+                <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => setTutorialsView("cover")}
-                      className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition-all cursor-pointer active:scale-95 flex items-center gap-2 text-xs font-bold"
+                      className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition-all cursor-pointer active:scale-95 flex items-center gap-2 text-xs font-bold"
                     >
                       <ArrowLeft className="size-4" />
-                      <span>Voltar</span>
+                      <span>Voltar ao início</span>
                     </button>
-                    <div>
-                      <h2 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
-                        <span>Central de Videoaulas</span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-300 border border-amber-400/25">
-                          Aula {selectedLessonIndex + 1} de {SMK_VIDEO_LESSONS.length}
-                        </span>
-                      </h2>
-                      <p className="text-xs text-white/50">
-                        {SMK_VIDEO_LESSONS[selectedLessonIndex].title}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">Central de Videoaulas</span>
+                      <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-400/10 text-amber-300 border border-amber-400/25">
+                        Aula {selectedLessonIndex + 1} de {SMK_VIDEO_LESSONS.length}
+                      </span>
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-white/40 font-mono">
-                      ⏱️ Duração: {SMK_VIDEO_LESSONS[selectedLessonIndex].duration}
-                    </span>
                   </div>
                 </div>
 
-                {/* Grade Principal: Player à Esquerda/Topo + Playlist de Aulas à Direita/Abaixo */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Grade Principal: Detalhes & Player à Esquerda + Grade de Aulas Minimalista à Direita */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                   
-                  {/* Coluna 1 e 2: Player de Vídeo e Detalhes da Aula Atual */}
+                  {/* Coluna 1 e 2: Sobre Esta Aula no Topo + Player de Vídeo Logo Abaixo */}
                   <div className="lg:col-span-2 space-y-4">
-                    {/* Input invisível para seleção de arquivo(s) local(is) */}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      accept="video/mp4,video/webm,video/quicktime,video/*"
-                      onChange={(e) => {
-                        handleFilesSelect(e.target.files);
-                        e.target.value = "";
-                      }}
-                      className="hidden"
-                    />
-
-                    {/* Container do Player (Proporção 16:9) */}
                     {(() => {
                       const curLesson = SMK_VIDEO_LESSONS[selectedLessonIndex];
-                      const activeUrl = localVideoUrls[curLesson.id] || customVideoUrls[curLesson.id] || curLesson.videoUrl || "";
+                      const activeUrl = curLesson.videoUrl || "";
                       const vSource = parseVideoSource(activeUrl);
 
                       return (
-                        <div
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={handleDropFiles}
-                          className="relative aspect-video w-full rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-[#141414] via-[#0a0a0a] to-black shadow-2xl flex flex-col items-center justify-center group"
-                        >
-                          {vSource.type === "youtube" ? (
-                            <iframe
-                              key={curLesson.id}
-                              src={vSource.embedUrl}
-                              title={curLesson.title}
-                              className="w-full h-full border-0"
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                              allowFullScreen
-                            />
-                          ) : vSource.type === "drive" ? (
-                            <iframe
-                              key={curLesson.id}
-                              src={vSource.embedUrl}
-                              title={curLesson.title}
-                              className="w-full h-full border-0"
-                              allow="autoplay"
-                              allowFullScreen
-                            />
-                          ) : vSource.type === "direct" ? (
-                            <video
-                              key={vSource.embedUrl}
-                              src={vSource.embedUrl}
-                              controls
-                              autoPlay
-                              className="w-full h-full object-contain bg-black"
-                            >
-                              Seu navegador não suporta a reprodução deste vídeo.
-                            </video>
-                          ) : (
-                            <div className="p-6 sm:p-8 text-center space-y-4 max-w-lg">
-                              <div className="size-16 rounded-2xl bg-amber-400/10 border border-amber-400/30 text-amber-400 flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(251,191,36,0.2)]">
-                                <Play className="size-8 fill-amber-400 translate-x-0.5" />
-                              </div>
+                        <>
+                          {/* 1. SOBRE ESTA AULA NO TOPO (Explicação, Resumo e Navegação Rápida) */}
+                          <div className="bg-[#0e0e0e] border border-white/10 rounded-2xl p-5 sm:p-6 space-y-4 shadow-xl">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                               <div>
-                                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400/80 font-bold block mb-1">
-                                  {curLesson.category}
+                                <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block">
+                                  Sobre esta aula • {curLesson.category}
                                 </span>
-                                <h3 className="text-lg font-bold text-white">
+                                <h3 className="text-lg sm:text-xl font-extrabold text-white mt-0.5">
                                   {curLesson.title}
                                 </h3>
-                                <p className="text-xs text-white/50 mt-1">
-                                  Arquivo no seu computador: <code className="text-amber-300 font-mono bg-white/5 px-2 py-0.5 rounded">{curLesson.fileName}</code>
-                                </p>
                               </div>
 
-                              <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2">
+                              {/* Navegação Rápida entre Aulas no Topo */}
+                              <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
                                 <button
                                   type="button"
-                                  onClick={() => fileInputRef.current?.click()}
-                                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-extrabold text-xs transition-all shadow-lg shadow-amber-400/20 active:scale-95 cursor-pointer"
+                                  disabled={selectedLessonIndex === 0}
+                                  onClick={() => setSelectedLessonIndex((prev) => Math.max(0, prev - 1))}
+                                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                    selectedLessonIndex === 0
+                                      ? "opacity-30 cursor-not-allowed text-white/40 bg-white/5"
+                                      : "bg-white/5 hover:bg-white/10 text-white cursor-pointer active:scale-95 border border-white/10"
+                                  }`}
                                 >
-                                  <FolderOpen className="size-4" />
-                                  <span>Carregar Vídeo do Computador</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingUrlLessonId(curLesson.id);
-                                    setTempUrlInput(customVideoUrls[curLesson.id] || "");
-                                  }}
-                                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs transition-all active:scale-95 cursor-pointer"
-                                >
-                                  <Link2 className="size-4 text-white/70" />
-                                  <span>Colar Link (YouTube / Drive)</span>
-                                </button>
-                              </div>
-
-                              <p className="text-[11px] text-white/40 pt-1">
-                                💡 Toque no botão acima e selecione o arquivo correspondente para assistir agora mesmo em alta qualidade!
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Barra superior de status do vídeo */}
-                          {vSource.type !== "none" && (
-                            <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/10 text-xs shadow-xl">
-                              <div className="flex items-center gap-2 text-white/90 font-medium truncate">
-                                <span className="size-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                                <span className="truncate">
-                                  {localVideoUrls[curLesson.id]
-                                    ? "Reproduzindo arquivo local do seu computador"
-                                    : "Reproduzindo link online configurado"}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-2 pointer-events-auto shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => fileInputRef.current?.click()}
-                                  title="Carregar outro arquivo de vídeo do computador"
-                                  className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold text-white transition-all cursor-pointer flex items-center gap-1.5"
-                                >
-                                  <FolderOpen className="size-3 text-amber-400" />
-                                  <span>Trocar Arquivo</span>
+                                  ← Anterior
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setEditingUrlLessonId(curLesson.id);
-                                    setTempUrlInput(customVideoUrls[curLesson.id] || "");
-                                  }}
-                                  title="Configurar Link Online (YouTube ou Google Drive)"
-                                  className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold text-white transition-all cursor-pointer flex items-center gap-1.5"
+                                  disabled={selectedLessonIndex === SMK_VIDEO_LESSONS.length - 1}
+                                  onClick={() => setSelectedLessonIndex((prev) => Math.min(SMK_VIDEO_LESSONS.length - 1, prev + 1))}
+                                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                    selectedLessonIndex === SMK_VIDEO_LESSONS.length - 1
+                                      ? "opacity-30 cursor-not-allowed text-white/40 bg-white/5"
+                                      : "bg-amber-400 hover:bg-amber-300 text-black cursor-pointer active:scale-95 shadow-md shadow-amber-400/20"
+                                  }`}
                                 >
-                                  <Link2 className="size-3 text-white/70" />
-                                  <span>Link Online</span>
+                                  Próxima Aula →
                                 </button>
                               </div>
                             </div>
-                          )}
-                        </div>
+
+                            <p className="text-sm text-white/70 leading-relaxed font-normal">
+                              {curLesson.description}
+                            </p>
+
+                            <div className="pt-3 border-t border-white/5 space-y-2">
+                              <span className="text-xs font-bold text-white/80 block">
+                                Principais tópicos abordados no vídeo:
+                              </span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {curLesson.keyTopics.map((topic, i) => (
+                                  <div key={i} className="flex items-start gap-2 text-xs text-white/70 bg-white/[0.02] p-2.5 rounded-xl border border-white/5">
+                                    <CheckCircle2 className="size-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                                    <span>{topic}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 2. PLAYER DE VÍDEO (16:9 Limpo e Integrado no Código) */}
+                          <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-white/10 bg-black shadow-2xl">
+                            {vSource.type === "youtube" ? (
+                              <iframe
+                                key={curLesson.id}
+                                src={vSource.embedUrl}
+                                title={curLesson.title}
+                                className="w-full h-full border-0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowFullScreen
+                              />
+                            ) : vSource.type === "drive" ? (
+                              <iframe
+                                key={curLesson.id}
+                                src={vSource.embedUrl}
+                                title={curLesson.title}
+                                className="w-full h-full border-0"
+                                allow="autoplay"
+                                allowFullScreen
+                              />
+                            ) : (
+                              <video
+                                key={vSource.embedUrl}
+                                src={vSource.embedUrl}
+                                controls
+                                className="w-full h-full object-contain bg-black"
+                              >
+                                Seu navegador não suporta a reprodução deste vídeo.
+                              </video>
+                            )}
+                          </div>
+                        </>
                       );
                     })()}
-
-                    {/* Descrição e Tópicos Chave da Aula Selecionada */}
-                    <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-5 space-y-3">
-                      <div>
-                        <span className="text-[10px] font-mono text-amber-400 uppercase tracking-wider font-bold">
-                          Sobre esta aula
-                        </span>
-                        <h4 className="text-base font-bold text-white mt-0.5">
-                          {SMK_VIDEO_LESSONS[selectedLessonIndex].title}
-                        </h4>
-                        <p className="text-xs text-white/60 mt-1 leading-relaxed">
-                          {SMK_VIDEO_LESSONS[selectedLessonIndex].description}
-                        </p>
-                      </div>
-
-                      <div className="pt-2 border-t border-white/5 space-y-1.5">
-                        <span className="text-[11px] font-bold text-white/80 block">
-                          Principais tópicos abordados no vídeo:
-                        </span>
-                        <div className="space-y-1">
-                          {SMK_VIDEO_LESSONS[selectedLessonIndex].keyTopics.map((topic, i) => (
-                            <div key={i} className="flex items-start gap-2 text-xs text-white/70">
-                              <CheckCircle2 className="size-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                              <span>{topic}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Botões de Navegação entre Aulas */}
-                      <div className="pt-3 border-t border-white/5 flex items-center justify-between">
-                        <button
-                          type="button"
-                          disabled={selectedLessonIndex === 0}
-                          onClick={() => setSelectedLessonIndex(prev => Math.max(0, prev - 1))}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                            selectedLessonIndex === 0
-                              ? "opacity-30 cursor-not-allowed text-white/40"
-                              : "bg-white/5 hover:bg-white/10 text-white cursor-pointer active:scale-95"
-                          }`}
-                        >
-                          ← Aula Anterior
-                        </button>
-
-                        <button
-                          type="button"
-                          disabled={selectedLessonIndex === SMK_VIDEO_LESSONS.length - 1}
-                          onClick={() => setSelectedLessonIndex(prev => Math.min(SMK_VIDEO_LESSONS.length - 1, prev + 1))}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                            selectedLessonIndex === SMK_VIDEO_LESSONS.length - 1
-                              ? "opacity-30 cursor-not-allowed text-white/40"
-                              : "bg-amber-400 hover:bg-amber-300 text-black cursor-pointer active:scale-95 shadow-md shadow-amber-400/20"
-                          }`}
-                        >
-                          Próxima Aula →
-                        </button>
-                      </div>
-                    </div>
                   </div>
 
-                  {/* Coluna 3: Playlist de Todas as Aulas */}
+                  {/* Coluna 3: Grade do Treinamento (Minimalista, Limpa e sem Poluição Visual) */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between px-1">
                       <span className="text-xs font-bold text-white flex items-center gap-1.5">
                         <Film className="size-3.5 text-amber-400" />
-                        <span>Grade do Treinamento</span>
+                        <span>Grade de Aulas</span>
                       </span>
-                      <span className="text-[10px] font-mono text-white/50">
-                        {SMK_VIDEO_LESSONS.length} Aulas
+                      <span className="text-xs text-white/40">
+                        {selectedLessonIndex + 1} de {SMK_VIDEO_LESSONS.length}
                       </span>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       {SMK_VIDEO_LESSONS.map((lesson, idx) => {
                         const isCurrent = idx === selectedLessonIndex;
-                        const hasVideo = Boolean(localVideoUrls[lesson.id] || customVideoUrls[lesson.id] || lesson.videoUrl);
                         return (
-                          <div
+                          <button
                             key={lesson.id}
+                            type="button"
                             onClick={() => setSelectedLessonIndex(idx)}
-                            className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                            className={`w-full text-left p-3 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
                               isCurrent
-                                ? "bg-amber-500/10 border-amber-400/40 shadow-lg shadow-amber-500/10 ring-1 ring-amber-400/30"
-                                : "bg-[#0a0a0a] border-white/10 hover:border-white/20 hover:bg-white/[0.02]"
+                                ? "bg-amber-400/10 border-amber-400/40 text-white shadow-sm ring-1 ring-amber-400/20"
+                                : "bg-[#0c0c0c] border-white/5 hover:border-white/15 hover:bg-white/[0.02] text-white/70"
                             }`}
                           >
-                            <div className="flex items-start gap-3">
-                              <div className={`size-8 rounded-xl flex items-center justify-center shrink-0 font-mono text-xs font-bold ${
-                                isCurrent
-                                  ? "bg-amber-400 text-black"
-                                  : "bg-white/5 text-white/60 border border-white/10"
-                              }`}>
-                                {isCurrent ? <Play className="size-3.5 fill-black" /> : `0${lesson.lessonNumber}`}
-                              </div>
-
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center justify-between gap-1 mb-0.5">
-                                  <span className="text-[10px] font-mono uppercase tracking-wider text-white/40 font-bold truncate">
-                                    {lesson.category}
-                                  </span>
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    {hasVideo && (
-                                      <span className="size-1.5 rounded-full bg-emerald-400" title="Vídeo pronto para assistir" />
-                                    )}
-                                    <span className="text-[10px] font-mono text-white/50">
-                                      ⏱️ {lesson.duration}
-                                    </span>
-                                  </div>
-                                </div>
-                                <h5 className={`text-xs font-bold truncate ${isCurrent ? "text-amber-300" : "text-white"}`}>
-                                  {lesson.title}
-                                </h5>
-                                <p className="text-[10px] text-white/40 truncate mt-0.5 font-mono">
-                                  {hasVideo ? "🟢 Pronto para assistir" : lesson.fileName}
-                                </p>
-                              </div>
+                            <span
+                              className={`text-xs font-bold size-7 rounded-lg flex items-center justify-center shrink-0 ${
+                                isCurrent ? "bg-amber-400 text-black font-extrabold" : "bg-white/5 text-white/50"
+                              }`}
+                            >
+                              0{lesson.lessonNumber}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className={`text-xs font-semibold truncate ${isCurrent ? "text-white" : "text-white/80"}`}>
+                                {lesson.title.replace(/^Aula \d+:\s*/, "")}
+                              </p>
+                              <span className="text-[11px] text-white/40 truncate block mt-0.5">
+                                {lesson.category}
+                              </span>
                             </div>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
@@ -1319,45 +1218,47 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* ─── Barra Inferior de Ação (Salvar Alterações) ─── */}
-        <div className="pt-4 border-t border-white/10 flex items-center justify-between flex-wrap gap-4 pb-12">
-          <div className="flex items-center gap-2 text-xs text-white/50">
-            <Sparkles className="size-4 text-white/70" />
-            <span>
-              {hasChanges() ? "Você possui alterações não salvas." : "Todas as configurações estão sincronizadas no banco."}
-            </span>
-          </div>
+        {/* ─── Barra Inferior de Ação (Salvar Alterações - Oculto na aba de Videoaulas) ─── */}
+        {activeTab !== "tutorials" && (
+          <div className="pt-4 border-t border-white/10 flex items-center justify-between flex-wrap gap-4 pb-12">
+            <div className="flex items-center gap-2 text-xs text-white/50">
+              <Sparkles className="size-4 text-white/70" />
+              <span>
+                {hasChanges() ? "Você possui alterações não salvas." : "Todas as configurações estão sincronizadas no banco."}
+              </span>
+            </div>
 
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving || !hasChanges()}
-            className={`flex items-center gap-2 px-7 py-3.5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer ${
-              saveStatus === "success"
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                : saveStatus === "error"
-                ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                : hasChanges()
-                ? "bg-white hover:bg-white/90 text-black shadow-[0_0_30px_rgba(255,255,255,0.35)] active:scale-[0.98]"
-                : "bg-white/5 text-white/30 border border-white/10 cursor-not-allowed"
-            }`}
-          >
-            {saving ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : saveStatus === "success" ? (
-              <CheckCircle2 className="size-4" />
-            ) : (
-              <Save className="size-4" />
-            )}
-            <span>
-              {saving
-                ? "Salvando alterações..."
-                : saveStatus === "success"
-                ? "Configurações salvas!"
-                : "Salvar Alterações"}
-            </span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || !hasChanges()}
+              className={`flex items-center gap-2 px-7 py-3.5 rounded-2xl font-extrabold text-sm transition-all duration-300 cursor-pointer ${
+                saveStatus === "success"
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                  : saveStatus === "error"
+                  ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                  : hasChanges()
+                  ? "bg-white hover:bg-white/90 text-black shadow-[0_0_30px_rgba(255,255,255,0.35)] active:scale-[0.98]"
+                  : "bg-white/5 text-white/30 border border-white/10 cursor-not-allowed"
+              }`}
+            >
+              {saving ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : saveStatus === "success" ? (
+                <CheckCircle2 className="size-4" />
+              ) : (
+                <Save className="size-4" />
+              )}
+              <span>
+                {saving
+                  ? "Salvando alterações..."
+                  : saveStatus === "success"
+                  ? "Configurações salvas!"
+                  : "Salvar Alterações"}
+              </span>
+            </button>
+          </div>
+        )}
 
       </div>
 
