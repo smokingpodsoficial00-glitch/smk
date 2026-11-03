@@ -595,22 +595,38 @@ export default function SupplyChainDashboard() {
       // eliminando ~3.7 MB de Base64 duplicados que travavam o carregamento inicial (redução de 99.1%)
       const productsSelectCols = "id, name, brand, flavor, price, cost_price, stock, puffs, is_active, created_at, company_id";
 
+      const isOfficialStore = !targetCompanyId || targetCompanyId === 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+
+      let productsQuery = supabase
+        .from("smoking_products")
+        .select(productsSelectCols)
+        .neq("brand", "__STORE_CONFIG__")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true });
+
+      if (isOfficialStore) {
+        productsQuery = productsQuery.or(`company_id.eq.${targetCompanyId},company_id.is.null`);
+      } else {
+        productsQuery = productsQuery.eq("company_id", targetCompanyId);
+      }
+
+      let ordersQuery = supabase
+        .from("smoking_orders")
+        .select("items, delivery_status, client_phone, client_name, created_at")
+        .neq("delivery_status", "CANCELADO");
+
+      if (isOfficialStore) {
+        ordersQuery = ordersQuery.or(`company_id.eq.${targetCompanyId},company_id.is.null`);
+      } else {
+        ordersQuery = ordersQuery.eq("company_id", targetCompanyId);
+      }
+
       // Executa todas as consultas ao Supabase em paralelo para carregamento ultrarrápido
       const [prodRes, ordersRes, costsMap, cats, catMapRes, compRes] = await Promise.all([
-        supabase
-          .from("smoking_products")
-          .select(productsSelectCols)
-          .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
-          .neq("brand", "__STORE_CONFIG__")
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: true }),
-        supabase
-          .from("smoking_orders")
-          .select("items, delivery_status, client_phone, client_name, created_at")
-          .or(`company_id.eq.${targetCompanyId},company_id.is.null`)
-          .neq("delivery_status", "CANCELADO"),
+        productsQuery,
+        ordersQuery,
         fetchProductCostsMap(targetCompanyId),
-        fetchCategories(),
+        fetchCategories(targetCompanyId),
         fetchProductCategoryMappings(targetCompanyId),
         supabase
           .from("companies")

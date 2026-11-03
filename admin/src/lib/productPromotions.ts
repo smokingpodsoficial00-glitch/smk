@@ -11,18 +11,20 @@ export interface PromoData {
   discountPct?: number;
 }
 
-export function getLocalProductPromotions(): Record<string, PromoData> {
+export function getLocalProductPromotions(companyId?: string): Record<string, PromoData> {
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_PROMO_KEY);
+    const key = companyId ? `${LOCAL_STORAGE_PROMO_KEY}_${companyId}` : LOCAL_STORAGE_PROMO_KEY;
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : {};
   } catch (e) {
     return {};
   }
 }
 
-export function saveLocalProductPromotions(promos: Record<string, PromoData>) {
+export function saveLocalProductPromotions(promos: Record<string, PromoData>, companyId?: string) {
   try {
-    localStorage.setItem(LOCAL_STORAGE_PROMO_KEY, JSON.stringify(promos));
+    const key = companyId ? `${LOCAL_STORAGE_PROMO_KEY}_${companyId}` : LOCAL_STORAGE_PROMO_KEY;
+    localStorage.setItem(key, JSON.stringify(promos));
   } catch (e) {
     console.warn("Erro ao salvar promoções no cache local:", e);
   }
@@ -53,7 +55,7 @@ export async function fetchProductPromotionsMap(companyId?: string): Promise<Rec
           discountPct: parseFloat(p.discount_pct) || 0,
         };
       });
-      saveLocalProductPromotions(result);
+      saveLocalProductPromotions(result, targetCompanyId);
       return result;
     }
 
@@ -77,7 +79,7 @@ export async function fetchProductPromotionsMap(companyId?: string): Promise<Rec
           };
         }
       });
-      saveLocalProductPromotions(result);
+      saveLocalProductPromotions(result, targetCompanyId);
       return result;
     }
   } catch (e) {
@@ -85,7 +87,7 @@ export async function fetchProductPromotionsMap(companyId?: string): Promise<Rec
   }
 
   console.warn("Aviso: Operando com cache local de promoções.");
-  return getLocalProductPromotions();
+  return getLocalProductPromotions(targetCompanyId);
 }
 
 /**
@@ -103,7 +105,7 @@ export async function updateProductPromotion(params: {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
 
   // 1. Atualizar cache local
-  const currentLocal = getLocalProductPromotions();
+  const currentLocal = getLocalProductPromotions(targetCompanyId);
   if (isPromotional) {
     currentLocal[productId] = {
       productId,
@@ -114,7 +116,7 @@ export async function updateProductPromotion(params: {
   } else {
     delete currentLocal[productId];
   }
-  saveLocalProductPromotions(currentLocal);
+  saveLocalProductPromotions(currentLocal, targetCompanyId);
 
   // 2. Persistir no Supabase na tabela oficial smoking_products (FONTE PRIMÁRIA)
   try {

@@ -50,18 +50,20 @@ if (typeof window !== "undefined") {
   ensurePersistentBroadcastChannel();
 }
 
-export function getLocalCategoryMappings(): Record<string, { category_ids: string[]; display_order: number }> {
+export function getLocalCategoryMappings(companyId?: string): Record<string, { category_ids: string[]; display_order: number }> {
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_CAT_KEY);
+    const key = companyId ? `${LOCAL_STORAGE_CAT_KEY}_${companyId}` : LOCAL_STORAGE_CAT_KEY;
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : {};
   } catch (e) {
     return {};
   }
 }
 
-export function saveLocalCategoryMappings(mappings: Record<string, { category_ids: string[]; display_order: number }>) {
+export function saveLocalCategoryMappings(mappings: Record<string, { category_ids: string[]; display_order: number }>, companyId?: string) {
   try {
-    localStorage.setItem(LOCAL_STORAGE_CAT_KEY, JSON.stringify(mappings));
+    const key = companyId ? `${LOCAL_STORAGE_CAT_KEY}_${companyId}` : LOCAL_STORAGE_CAT_KEY;
+    localStorage.setItem(key, JSON.stringify(mappings));
   } catch (e) {
     console.warn("Erro ao salvar categorias no localStorage:", e);
   }
@@ -269,7 +271,7 @@ export async function updateModelCategories(params: {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
 
   // 1. Atualizar localStorage imediatamente (0ms)
-  const currentLocal = getLocalCategoryMappings();
+  const currentLocal = getLocalCategoryMappings(targetCompanyId);
 
   const parts = modelKey.split("__");
   const bStr = (parts[0] || "").trim().toLowerCase();
@@ -305,7 +307,7 @@ export async function updateModelCategories(params: {
     });
   }
 
-  saveLocalCategoryMappings(currentLocal);
+  saveLocalCategoryMappings(currentLocal, targetCompanyId);
 
   // 2. Transmitir atualização instantânea (0ms) via BroadcastChannel local E via Supabase WebSocket!
   try {

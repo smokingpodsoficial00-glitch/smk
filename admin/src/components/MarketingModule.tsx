@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Megaphone, Send, Users, ShieldAlert, Sparkles, Clock, CheckCircle2, 
   AlertTriangle, RefreshCw, MessageSquare, Play, Pause, ExternalLink,
@@ -148,11 +148,17 @@ export default function MarketingModule() {
   const [backendOnline, setBackendOnline] = useState<boolean>(true);
   const [qrLoading, setQrLoading] = useState<boolean>(false);
 
-  // Consulta status sem disparar geração contínua de QR
+  // Consulta status sem disparar geração contínua de QR (com trava de concorrência e tolerância a instabilidade do túnel)
+  const isCheckingStatusRef = useRef(false);
+  const consecutiveFailuresRef = useRef(0);
+
   const checkWhatsAppStatus = async () => {
+    if (isCheckingStatusRef.current) return;
+    isCheckingStatusRef.current = true;
     try {
       const res = await legacyFetch(`/api/qr`);
       if (res.ok) {
+        consecutiveFailuresRef.current = 0;
         setBackendOnline(true);
         const data = await res.json();
         setWhatsAppSessionStatus(data.status || 'DISCONNECTED');
@@ -171,10 +177,18 @@ export default function MarketingModule() {
           }
         }
       } else {
-        setBackendOnline(false);
+        consecutiveFailuresRef.current += 1;
+        if (consecutiveFailuresRef.current >= 3) {
+          setBackendOnline(false);
+        }
       }
     } catch (e) {
-      setBackendOnline(false);
+      consecutiveFailuresRef.current += 1;
+      if (consecutiveFailuresRef.current >= 3) {
+        setBackendOnline(false);
+      }
+    } finally {
+      isCheckingStatusRef.current = false;
     }
   };
 
@@ -188,20 +202,29 @@ export default function MarketingModule() {
     }
   }, [company?.id]);
 
-  // Polling ativo APENAS enquanto o modal de conexão estiver aberto e não conectado
+  // Polling ativo APENAS enquanto o modal de conexão estiver aberto e não conectado (intervalo suave de 2.5s)
   useEffect(() => {
     if (!isQrModalOpen || whatsAppConnected) return;
-    const interval = setInterval(checkWhatsAppStatus, 1200);
+    const interval = setInterval(checkWhatsAppStatus, 2500);
     return () => clearInterval(interval);
   }, [isQrModalOpen, whatsAppConnected]);
 
-  // Ação explícita do usuário: "Conectar WhatsApp"
+  // Ação explícita do usuário: "Conectar WhatsApp" (com tolerância a oscilação de túnel)
   const handleStartConnectWhatsApp = async () => {
     setIsQrModalOpen(true);
     setQrLoading(true);
+    consecutiveFailuresRef.current = 0;
     try {
-      const res = await legacyFetch(`/api/whatsapp/connect`, { method: 'POST' });
+      let res;
+      try {
+        res = await legacyFetch(`/api/whatsapp/connect`, { method: 'POST' });
+      } catch (firstErr) {
+        await new Promise(r => setTimeout(r, 1000));
+        res = await legacyFetch(`/api/whatsapp/connect`, { method: 'POST' });
+      }
+
       if (res.ok) {
+        setBackendOnline(true);
         const data = await res.json();
         setWhatsAppSessionStatus(data.status || 'CONNECTING');
         setHasSavedSession(!!data.hasSavedSession);

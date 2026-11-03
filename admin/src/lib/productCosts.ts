@@ -4,18 +4,20 @@ const SYSTEM_COST_KEY = "__SYSTEM_SMK_PRODUCT_COSTS__";
 const DEFAULT_COMPANY_ID = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
 const LOCAL_STORAGE_COST_KEY = "smk_product_costs_cache";
 
-export function getLocalProductCosts(): Record<string, number> {
+export function getLocalProductCosts(companyId?: string): Record<string, number> {
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_COST_KEY);
+    const key = companyId ? `${LOCAL_STORAGE_COST_KEY}_${companyId}` : LOCAL_STORAGE_COST_KEY;
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : {};
   } catch (e) {
     return {};
   }
 }
 
-export function saveLocalProductCosts(costs: Record<string, number>) {
+export function saveLocalProductCosts(costs: Record<string, number>, companyId?: string) {
   try {
-    localStorage.setItem(LOCAL_STORAGE_COST_KEY, JSON.stringify(costs));
+    const key = companyId ? `${LOCAL_STORAGE_COST_KEY}_${companyId}` : LOCAL_STORAGE_COST_KEY;
+    localStorage.setItem(key, JSON.stringify(costs));
   } catch (e) {
     console.warn("Erro ao salvar custos no localStorage:", e);
   }
@@ -54,7 +56,7 @@ export async function fetchProductCostsMap(companyId?: string): Promise<Record<s
       });
 
       if (populatedFromProducts > 0) {
-        saveLocalProductCosts(result);
+        saveLocalProductCosts(result, targetCompanyId);
         return result;
       }
     }
@@ -80,7 +82,7 @@ export async function fetchProductCostsMap(companyId?: string): Promise<Record<s
           }
         }
       });
-      saveLocalProductCosts(result);
+      saveLocalProductCosts(result, targetCompanyId);
       return result;
     }
   } catch (e) {
@@ -89,7 +91,7 @@ export async function fetchProductCostsMap(companyId?: string): Promise<Record<s
 
   // Fallback secundário (com warning explícito, sem inventar custos fictícios)
   console.warn("Aviso: Operando com cache local secundário de custos.");
-  return getLocalProductCosts();
+  return getLocalProductCosts(targetCompanyId);
 }
 
 export async function updateProductCost(params: {
@@ -109,11 +111,11 @@ export async function updateProductCost(params: {
   const cleanKey = `${bStr.toLowerCase().replace(/\s+/g, '')}__${nStr.toLowerCase().replace(/\s+/g, '')}`;
 
   // 1. Atualizar cache local imediatamente
-  const currentLocal = getLocalProductCosts();
+  const currentLocal = getLocalProductCosts(targetCompanyId);
   currentLocal[modelKey] = costPrice;
   currentLocal[cleanKey] = costPrice;
   productIds.forEach(pid => { currentLocal[pid] = costPrice; });
-  saveLocalProductCosts(currentLocal);
+  saveLocalProductCosts(currentLocal, targetCompanyId);
 
   // 2. Persistir no Supabase na tabela oficial smoking_products (FONTE PRIMÁRIA)
   try {
