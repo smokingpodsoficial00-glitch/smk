@@ -285,7 +285,14 @@ export default function MarketingModule() {
   const [campaignFormImageUrl, setCampaignFormImageUrl] = useState<string>('');
   const [campaignFormIsStockOffer, setCampaignFormIsStockOffer] = useState<boolean>(false);
   const [campaignFormStockOfferCount, setCampaignFormStockOfferCount] = useState<number>(1);
-  const [cardapioUrl] = useState('https://smoking-pods.vercel.app');
+  
+  // Link dinâmico do cardápio/catálogo para o multitenant
+  const isOfficialStore = !company?.id || company.id === 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+  const companySlug = (company?.name || "").toLowerCase().trim().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+  const defaultCatalogUrl = isOfficialStore 
+    ? 'https://smoking-pods-catalogo.vercel.app' 
+    : `https://tabeladevalores-pods.vercel.app/?loja=${companySlug || 'loja'}`;
+  const [cardapioUrl] = useState(defaultCatalogUrl);
   const [grupoVipUrl] = useState('');
 
   // Execução de Disparo & Controle de Pausa Real

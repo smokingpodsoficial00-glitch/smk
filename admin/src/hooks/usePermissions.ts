@@ -3,7 +3,7 @@ import type { UserRole } from '../contexts/AuthContext';
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   admin:      ['pedidos', 'financeiro', 'estoque', 'clientes', 'marketing', 'socios', 'configuracoes', 'usuarios'],
-  gerente:    ['pedidos', 'estoque', 'clientes'],
+  gerente:    ['pedidos', 'estoque', 'clientes', 'marketing'],
   atendente:  ['pedidos'],
   financeiro: ['financeiro', 'socios'],
   estoquista: ['estoque'],
@@ -12,7 +12,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
 export function usePermissions() {
   const { role, isSuperAdmin, user, company, companyUser } = useAuth();
 
-  // Verifica se o usuário logado é da conta proprietária da Smoking Pods
+  // Verifica se o usuário logado é da conta proprietária da Smoking Pods (Master)
   const isSmokingPodsOfficial = 
     user?.email?.toLowerCase() === 'smokingpodsoficial00@gmail.com' ||
     companyUser?.email?.toLowerCase() === 'smokingpodsoficial00@gmail.com' ||
@@ -21,12 +21,7 @@ export function usePermissions() {
     isSuperAdmin;
 
   const canAccess = (tabOrRoute: string): boolean => {
-    // Rota de marketing/disparos é 100% restrita à conta oficial da Smoking Pods
-    if (tabOrRoute === 'marketing') {
-      return isSmokingPodsOfficial;
-    }
-
-    // Rota de Gestão e Vendas do SaaS é 100% restrita à conta oficial da Smoking Pods
+    // Rota de Gestão e Vendas do SaaS é 100% restrita à conta oficial da Smoking Pods (Master)
     if (tabOrRoute === 'gestao-saas') {
       return isSmokingPodsOfficial;
     }
