@@ -553,12 +553,171 @@ function getTenantSession(companyId = OFFICIAL_COMPANY_ID) {
       isWhatsAppReady: false,
       sock: null,
       detectedGroups: {},
+      cachedGroups: [],
+      lastGroupFetchAt: 0,
+      contactsMap: new Map(),
+      lidToPhoneMap: new Map(),
       whatsAppSessionState: 'DISCONNECTED',
       activeConnectPromise: null,
       idleDisconnectTimeout: null
     });
   }
   return tenantSessions.get(cid);
+}
+
+function formatReadableBrPhone(clean55) {
+  const without55 = String(clean55).startsWith('55') ? String(clean55).slice(2) : String(clean55);
+  const ddd = without55.slice(0, 2);
+  const body = without55.slice(2);
+  if (body.length === 9) {
+    return `(${ddd}) ${body.slice(0, 5)}-${body.slice(5)}`;
+  }
+  return `(${ddd}) ${body.slice(0, 4)}-${body.slice(4)}`;
+}
+
+function resolveLidToPhone(companyId, rawId) {
+  if (!rawId) return null;
+  const cid = sanitizeTenantId(companyId);
+  const session = getTenantSession(cid);
+  const cleanLid = String(rawId).split('@')[0].split(':')[0].replace(/\D/g, '');
+  if (!cleanLid) return null;
+
+  if (session.lidToPhoneMap.has(cleanLid)) {
+    return session.lidToPhoneMap.get(cleanLid);
+  }
+
+  try {
+    const authDir = getAuthDir(cid);
+    const reverseFile = path.join(authDir, `lid-mapping-${cleanLid}_reverse.json`);
+    if (fs.existsSync(reverseFile)) {
+      const val = JSON.parse(fs.readFileSync(reverseFile, 'utf-8'));
+      if (val) {
+        const phoneDigits = String(val).replace(/\D/g, '');
+        session.lidToPhoneMap.set(cleanLid, phoneDigits);
+        return phoneDigits;
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+function isGenericContactName(name) {
+  if (!name) return true;
+  const trimmed = String(name).trim();
+  if (!trimmed) return true;
+  if (/^Contato WhatsApp/i.test(trimmed)) return true;
+  if (/^Cliente \d+$/i.test(trimmed)) return true;
+  if (/^[\d\s()+\-]+$/.test(trimmed)) return true;
+  return false;
+}
+
+function registerDiscoveredContact(companyId, rawPhoneOrJid, rawName = '') {
+  if (!rawPhoneOrJid) return null;
+  const cid = sanitizeTenantId(companyId);
+  const session = getTenantSession(cid);
+  const str = String(rawPhoneOrJid).trim();
+  if (str.endsWith('@g.us') || str.endsWith('@broadcast') || str === 'status@broadcast') return null;
+
+  let candidateDigits = '';
+  if (str.endsWith('@lid')) {
+    const resolved = resolveLidToPhone(cid, str);
+    if (resolved) candidateDigits = resolved;
+  } else {
+    const bare = str.split('@')[0].split(':')[0].replace(/\D/g, '');
+    if (bare.length > 13) {
+      const resolved = resolveLidToPhone(cid, bare);
+      if (resolved) candidateDigits = resolved;
+    } else {
+      candidateDigits = bare;
+    }
+  }
+
+  if (!candidateDigits) return null;
+  const structural = validateStructuralPhone(candidateDigits);
+  if (!structural.valid || structural.isGroup) return null;
+
+  const norm = structural.cleanPhone;
+  const existing = session.contactsMap.get(norm);
+  const incomingName = rawName ? String(rawName).trim() : '';
+  const defaultName = `Contato WhatsApp ${formatReadableBrPhone(norm)}`;
+
+  if (!existing) {
+    const entry = {
+      id: `${norm}@s.whatsapp.net`,
+      name: (!isGenericContactName(incomingName)) ? incomingName : defaultName,
+      phone: norm,
+      cleanPhone: norm,
+      isSaved: true
+    };
+    session.contactsMap.set(norm, entry);
+    return entry;
+  } else if (!isGenericContactName(incomingName) && isGenericContactName(existing.name)) {
+    existing.name = incomingName;
+    session.contactsMap.set(norm, existing);
+  }
+  return existing;
+}
+
+function scanAuthDirContacts(companyId = OFFICIAL_COMPANY_ID) {
+  const cid = sanitizeTenantId(companyId);
+  const session = getTenantSession(cid);
+  const authDir = getAuthDir(cid);
+
+  // 1. Reidrata contatos já persistidos no marketing_config da loja
+  try {
+    const cfg = loadMarketingConfig(cid);
+    if (Array.isArray(cfg.whatsappContacts)) {
+      cfg.whatsappContacts.forEach(c => {
+        if (c && (c.cleanPhone || c.phone)) {
+          registerDiscoveredContact(cid, c.cleanPhone || c.phone, c.name);
+        }
+      });
+    }
+  } catch (e) {}
+
+  // 2. Varre todos os arquivos lid-mapping-* da pasta baileys_auth da loja
+  if (!fs.existsSync(authDir)) return session.contactsMap;
+  try {
+    const files = fs.readdirSync(authDir);
+    for (const f of files) {
+      if (f.startsWith('lid-mapping-') && f.endsWith('_reverse.json')) {
+        try {
+          const lidPart = f.replace('lid-mapping-', '').replace('_reverse.json', '');
+          const val = JSON.parse(fs.readFileSync(path.join(authDir, f), 'utf-8'));
+          if (val) {
+            const digits = String(val).replace(/\D/g, '');
+            if (lidPart && digits) session.lidToPhoneMap.set(lidPart, digits);
+            registerDiscoveredContact(cid, digits, '');
+          }
+        } catch (e) {}
+      } else if (f.startsWith('lid-mapping-') && f.endsWith('.json')) {
+        const m = f.match(/^lid-mapping-(\d+)\.json$/);
+        if (m && m[1]) {
+          registerDiscoveredContact(cid, m[1], '');
+        }
+      }
+    }
+  } catch (e) {
+    console.warn(`⚠️ [${cid}] Erro ao varrer contatos em ${authDir}:`, e.message);
+  }
+
+  return session.contactsMap;
+}
+
+function persistDiscoveredWhatsAppData(companyId = OFFICIAL_COMPANY_ID) {
+  const cid = sanitizeTenantId(companyId);
+  const session = getTenantSession(cid);
+  try {
+    const cfg = loadMarketingConfig(cid);
+    const allContacts = Array.from(session.contactsMap.values());
+    if (allContacts.length > 0) {
+      cfg.whatsappContacts = allContacts;
+    }
+    if (session.cachedGroups && session.cachedGroups.length > 0) {
+      cfg.whatsappGroups = session.cachedGroups;
+    }
+    saveMarketingConfig(cfg, cid);
+  } catch (e) {}
 }
 
 // Helper: Verificar se existem credenciais salvas em disco para a loja
@@ -665,12 +824,78 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
         auth: state,
         printQRInTerminal: false,
         browser: ['Smoking Pods SaaS', 'Desktop', '1.0.0'],
-        syncFullHistory: false,
+        syncFullHistory: true,
         generateHighQualityLinkPreview: true
       });
 
       session.sock = sockInstance;
       sockInstance.ev.on('creds.update', saveCreds);
+
+      // Helper interno para ingerir lotes de contatos e chats do Baileys
+      const ingestContactsBatch = (items = []) => {
+        if (!Array.isArray(items)) return;
+        for (const c of items) {
+          if (!c) continue;
+          const name = c.name || c.notify || c.verifiedName || c.subject || '';
+          if (c.id && String(c.id).endsWith('@g.us')) {
+            session.detectedGroups[c.id] = {
+              id: c.id,
+              name: c.subject || c.name || session.detectedGroups[c.id]?.name || 'Grupo WhatsApp',
+              participantsCount: Array.isArray(c.participants) ? c.participants.length : (session.detectedGroups[c.id]?.participantsCount || 0)
+            };
+            continue;
+          }
+          if (c.lid && c.id && !String(c.id).endsWith('@lid')) {
+            const lidClean = String(c.lid).split('@')[0].split(':')[0].replace(/\D/g, '');
+            const phoneClean = String(c.id).split('@')[0].split(':')[0].replace(/\D/g, '');
+            if (lidClean && phoneClean) session.lidToPhoneMap.set(lidClean, phoneClean);
+          }
+          if (c.phoneNumber) registerDiscoveredContact(cid, c.phoneNumber, name);
+          if (c.jid) registerDiscoveredContact(cid, c.jid, name);
+          if (c.id) registerDiscoveredContact(cid, c.id, name);
+        }
+      };
+
+      sockInstance.ev.on('messaging-history.set', ({ chats = [], contacts = [], messages = [] }) => {
+        console.log(`📥 [HistorySync][${cid}] Recebidos ${contacts.length} contatos, ${chats.length} conversas e ${messages.length} mensagens.`);
+        scanAuthDirContacts(cid);
+        ingestContactsBatch(contacts);
+        ingestContactsBatch(chats);
+        for (const msg of messages) {
+          if (!msg || !msg.key) continue;
+          const pName = msg.pushName || '';
+          if (msg.key.senderPn) registerDiscoveredContact(cid, msg.key.senderPn, pName);
+          if (msg.key.participantAlt) registerDiscoveredContact(cid, msg.key.participantAlt, pName);
+          if (msg.key.remoteJid && !String(msg.key.remoteJid).endsWith('@g.us')) {
+            registerDiscoveredContact(cid, msg.key.remoteJid, pName);
+          }
+        }
+        persistDiscoveredWhatsAppData(cid);
+      });
+
+      sockInstance.ev.on('contacts.upsert', (contacts) => {
+        scanAuthDirContacts(cid);
+        ingestContactsBatch(contacts);
+        persistDiscoveredWhatsAppData(cid);
+      });
+
+      sockInstance.ev.on('contacts.update', (updates) => {
+        ingestContactsBatch(updates);
+        persistDiscoveredWhatsAppData(cid);
+      });
+
+      sockInstance.ev.on('chats.upsert', (chats) => {
+        ingestContactsBatch(chats);
+        persistDiscoveredWhatsAppData(cid);
+      });
+
+      sockInstance.ev.on('groups.upsert', (groups) => {
+        ingestContactsBatch(groups);
+      });
+
+      sockInstance.ev.on('groups.update', (groups) => {
+        ingestContactsBatch(groups);
+      });
 
       return await new Promise((resolve) => {
         let isResolved = false;
@@ -721,6 +946,7 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
           if (connection === 'close') {
             const statusCode = (lastDisconnect?.error)?.output?.statusCode;
             const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+            const isRestartRequired = statusCode === DisconnectReason.restartRequired || statusCode === 515;
             console.log(`⚠️ [${cid}] Conexão Baileys fechada (código ${statusCode}). Deslogado: ${isLoggedOut}`);
 
             session.isWhatsAppReady = false;
@@ -733,6 +959,12 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
                 fs.rmSync(authDir, { recursive: true, force: true });
                 console.log(`🧹 [${cid}] Pasta de sessão removida por logout/invalidação.`);
               } catch (e) {}
+            } else if (isRestartRequired || (hasSavedWhatsAppSession(cid) && session.whatsAppSessionState !== 'DISCONNECTING')) {
+              console.log(`🔄 [${cid}] Reconectando socket automaticamente após código ${statusCode}...`);
+              session.whatsAppSessionState = 'CONNECTING';
+              setTimeout(() => {
+                requestWhatsAppConnection(cid, false).catch(() => {});
+              }, 800);
             } else {
               if (session.whatsAppSessionState !== 'DISCONNECTING') {
                 session.whatsAppSessionState = 'DISCONNECTED';
@@ -758,6 +990,11 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
             session.whatsAppSessionState = 'CONNECTED';
             touchWhatsAppActivity(cid);
 
+            setTimeout(() => {
+              scanAuthDirContacts(cid);
+              persistDiscoveredWhatsAppData(cid);
+            }, 1500);
+
             if (!isResolved) {
               isResolved = true;
               clearTimeout(connectionTimeout);
@@ -773,7 +1010,10 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
           const jid = msg.key.remoteJid;
           if (!jid) return;
 
-          if (jid.endsWith('@g.us')) {
+          if (msg.key.senderPn) registerDiscoveredContact(cid, msg.key.senderPn, msg.pushName || '');
+          if (!jid.endsWith('@g.us')) {
+            registerDiscoveredContact(cid, jid, msg.pushName || '');
+          } else {
             if (!session.detectedGroups[jid]) {
               session.detectedGroups[jid] = {
                 id: jid,
@@ -1189,48 +1429,76 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
       }
     }
 
-    if (!session.isWhatsAppReady || !session.sock) {
-      return res.status(503).json({
-        companyId,
-        error: 'WhatsApp da loja não está conectado.',
-        isReady: false,
-        contacts: [],
-        groups: []
-      });
-    }
+    // 1. Varre os contatos sincronizados na pasta baileys_auth_<companyId> e em memória
+    scanAuthDirContacts(companyId);
 
+    const cfg = loadMarketingConfig(companyId);
     const contactsMap = new Map();
-    const groups = [];
 
-    // 1. Grupos sincronizados do WhatsApp desta loja
-    try {
-      const rawGroups = await session.sock.groupFetchAllParticipating();
-      Object.values(rawGroups || {}).forEach(g => {
-        if (g && g.id) {
-          groups.push({
-            id: g.id,
-            name: g.subject || 'Grupo VIP',
-            participantsCount: Array.isArray(g.participants) ? g.participants.length : 0
-          });
-        }
-      });
-    } catch (e) {
-      console.warn(`⚠️ [${companyId}] Falha ao buscar grupos no Baileys:`, e.message);
+    // Popula inicialmente com todos os contatos descobertos da sessão do WhatsApp desta loja
+    for (const [norm, c] of session.contactsMap.entries()) {
+      contactsMap.set(norm, { ...c });
     }
 
-    // 2. Contatos das listas desta loja
+    // 2. Grupos sincronizados do WhatsApp desta loja (com cache anti rate-overlimit de 60s)
+    let groups = [];
+    const nowMs = Date.now();
+    if (session.isWhatsAppReady && session.sock && (nowMs - (session.lastGroupFetchAt || 0) > 60000 || session.cachedGroups.length === 0)) {
+      try {
+        session.lastGroupFetchAt = nowMs;
+        const rawGroups = await session.sock.groupFetchAllParticipating();
+        const fetchedGroups = [];
+        Object.values(rawGroups || {}).forEach(g => {
+          if (g && g.id) {
+            fetchedGroups.push({
+              id: g.id,
+              name: g.subject || 'Grupo VIP',
+              participantsCount: Array.isArray(g.participants) ? g.participants.length : 0
+            });
+            // Extrai também participantes dos grupos da loja para o pool de contatos
+            if (Array.isArray(g.participants)) {
+              g.participants.forEach(p => {
+                if (!p) return;
+                const pPhone = p.phoneNumber || p.jid || p.id;
+                const pName = p.notify || p.name || '';
+                const entry = registerDiscoveredContact(companyId, pPhone, pName);
+                if (entry && !contactsMap.has(entry.cleanPhone)) {
+                  contactsMap.set(entry.cleanPhone, { ...entry });
+                }
+              });
+            }
+          }
+        });
+        if (fetchedGroups.length > 0) {
+          session.cachedGroups = fetchedGroups;
+        }
+      } catch (e) {
+        console.warn(`⚠️ [${companyId}] Aviso ao buscar grupos no Baileys (usando cache):`, e.message);
+      }
+    }
+
+    if (session.cachedGroups && session.cachedGroups.length > 0) {
+      groups = [...session.cachedGroups];
+    } else if (Array.isArray(cfg.whatsappGroups) && cfg.whatsappGroups.length > 0) {
+      groups = [...cfg.whatsappGroups];
+    } else if (Object.keys(session.detectedGroups || {}).length > 0) {
+      groups = Object.values(session.detectedGroups);
+    }
+
+    // 3. Contatos já existentes nas listas desta loja
     try {
-      const cfg = loadMarketingConfig(companyId);
       (cfg.lists || []).forEach(l => {
+        if (l.id === 'list-demo-vip') return;
         (l.contacts || []).forEach(c => {
           const raw = c.cleanPhone || c.phone;
           const structural = validateStructuralPhone(raw);
           if (structural.valid && !structural.isGroup) {
             const norm = structural.cleanPhone;
-            if (!contactsMap.has(norm)) {
+            const existing = contactsMap.get(norm);
+            if (!existing || (isGenericContactName(existing.name) && !isGenericContactName(c.name))) {
               contactsMap.set(norm, {
                 id: c.id || `${norm}@s.whatsapp.net`,
-                name: c.name || `Cliente ${norm.slice(-4)}`,
+                name: c.name || existing?.name || `Contato WhatsApp ${formatReadableBrPhone(norm)}`,
                 phone: c.phone || norm,
                 cleanPhone: norm,
                 isSaved: true
@@ -1241,7 +1509,7 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
       });
     } catch (e) {}
 
-    // 3. Contatos do Supabase filtrados estritamente por company_id desta loja
+    // 4. Contatos do CRM Supabase filtrados estritamente por company_id desta loja
     try {
       const { data: dbClients } = await supabase
         .from('smoking_clients')
@@ -1254,10 +1522,11 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
         const structural = validateStructuralPhone(cl.phone);
         if (structural.valid && !structural.isGroup) {
           const norm = structural.cleanPhone;
-          if (!contactsMap.has(norm)) {
+          const existing = contactsMap.get(norm);
+          if (!existing || (isGenericContactName(existing.name) && !isGenericContactName(cl.name))) {
             contactsMap.set(norm, {
               id: cl.id || `${norm}@s.whatsapp.net`,
-              name: cl.name || `Cliente ${norm.slice(-4)}`,
+              name: cl.name || existing?.name || `Cliente ${norm.slice(-4)}`,
               phone: cl.phone,
               cleanPhone: norm,
               isSaved: true
@@ -1269,13 +1538,42 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
 
     const contacts = Array.from(contactsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
+    // Salva contatos e grupos sincronizados no arquivo isolado da loja
+    cfg.whatsappContacts = contacts;
+    if (groups.length > 0) cfg.whatsappGroups = groups;
+
+    // Se a loja (tenant) ainda não tem listas reais (ou só tem a lista demo) e sincronizou contatos do WhatsApp,
+    // cria/atualiza automaticamente a lista oficial "📲 Contatos Sincronizados do WhatsApp" para uso imediato!
+    if (companyId !== OFFICIAL_COMPANY_ID && contacts.length > 0) {
+      const realLists = (cfg.lists || []).filter(l => l.id !== 'list-demo-vip');
+      const autoListId = 'list_whatsapp_sincronizados';
+      const existingAutoIdx = realLists.findIndex(l => l.id === autoListId);
+      const autoListObj = {
+        id: autoListId,
+        name: '📲 Contatos Sincronizados do WhatsApp',
+        description: `Base sincronizada automaticamente do WhatsApp da loja (${contacts.length} contatos).`,
+        color: '#10b981',
+        createdAt: new Date().toISOString(),
+        contacts
+      };
+      if (realLists.length === 0) {
+        cfg.lists = [autoListObj];
+      } else if (existingAutoIdx !== -1) {
+        realLists[existingAutoIdx] = autoListObj;
+        cfg.lists = realLists;
+      }
+    }
+
+    saveMarketingConfig(cfg, companyId);
+
     return res.json({
       companyId,
-      isReady: true,
+      isReady: Boolean(session.isWhatsAppReady || contacts.length > 0),
       contactsCount: contacts.length,
       groupsCount: groups.length,
       contacts,
-      groups
+      groups,
+      lists: cfg.lists || []
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -1283,8 +1581,19 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
 });
 
 app.post('/api/marketing/scan-chats', async (req, res) => {
-  const companyId = getRequestCompanyId(req);
-  return res.json({ success: true, companyId, message: 'Varredura concluída.' });
+  try {
+    const companyId = getRequestCompanyId(req);
+    const map = scanAuthDirContacts(companyId);
+    persistDiscoveredWhatsAppData(companyId);
+    return res.json({
+      success: true,
+      companyId,
+      contactsCount: map.size,
+      message: `Varredura concluída: ${map.size} contatos sincronizados.`
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.post('/api/marketing/stock-offer-preview', async (req, res) => {

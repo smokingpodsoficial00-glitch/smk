@@ -432,6 +432,12 @@ export default function MarketingModule() {
           if (data && Array.isArray(data.groups)) {
             fetchedGroups = data.groups;
           }
+          if (data && Array.isArray(data.lists) && data.lists.length > 0) {
+            setBroadcastLists(data.lists);
+            try {
+              localStorage.setItem(tenantCacheKey(LOCAL_STORAGE_LISTS), JSON.stringify(data.lists));
+            } catch {}
+          }
         }
       } catch (backendErr) {
         console.info('Backend local indisponível, buscando do CRM Supabase...');
@@ -466,6 +472,13 @@ export default function MarketingModule() {
       setLoadingSync(false);
     }
   };
+
+  // Sincroniza automaticamente contatos e listas assim que o WhatsApp conectar
+  useEffect(() => {
+    if (whatsAppConnected && company?.id && allContacts.length === 0 && !loadingSync) {
+      syncWhatsAppContactsAndGroups();
+    }
+  }, [whatsAppConnected, company?.id]);
 
   // Carrega contatos e grupos do cache ao iniciar
   useEffect(() => {
