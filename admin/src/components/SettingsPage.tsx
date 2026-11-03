@@ -4,7 +4,7 @@ import {
   Save, CheckCircle2, AlertCircle, Loader2,
   Type, Smartphone, Copy, Check, Sparkles, Lock, ExternalLink, Sun, Moon,
   Compass, Play, BookOpen, GraduationCap, Video, Laptop, HelpCircle, ChevronRight,
-  ArrowLeft, Clock, Film
+  ArrowLeft, Clock, Film, FolderOpen, Link2, Upload, RotateCcw, FileVideo, X
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
@@ -99,6 +99,34 @@ export const SMK_VIDEO_LESSONS: VideoLessonItem[] = [
   },
 ];
 
+export function parseVideoSource(rawUrl?: string): { type: "youtube" | "drive" | "direct" | "none"; embedUrl: string } {
+  if (!rawUrl || !rawUrl.trim()) return { type: "none", embedUrl: "" };
+  const trimmed = rawUrl.trim();
+
+  // YouTube (watch?v=, youtu.be/, embed/)
+  const ytMatch = trimmed.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+  if (ytMatch && ytMatch[1]) {
+    return {
+      type: "youtube",
+      embedUrl: `https://www.youtube-nocookie.com/embed/${ytMatch[1]}?autoplay=1&rel=0&modestbranding=1`,
+    };
+  }
+
+  // Google Drive preview
+  const driveMatch = trimmed.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
+  if (driveMatch && driveMatch[1]) {
+    return {
+      type: "drive",
+      embedUrl: `https://drive.google.com/file/d/${driveMatch[1]}/preview`,
+    };
+  }
+
+  return {
+    type: "direct",
+    embedUrl: trimmed,
+  };
+}
+
 export default function SettingsPage() {
   const { theme, toggleTheme, setTheme } = useTheme();
   const { config, loading, saving, saveStatus, updateConfig, updateStoreWhatsApp } = useStoreConfig();
@@ -110,6 +138,82 @@ export default function SettingsPage() {
   // Visualização da Área de Videoaulas (capa de apresentação ou sala de aula)
   const [tutorialsView, setTutorialsView] = useState<"cover" | "classroom">("cover");
   const [selectedLessonIndex, setSelectedLessonIndex] = useState<number>(0);
+
+  // URLs de arquivos locais (.mp4 carregados da máquina)
+  const [localVideoUrls, setLocalVideoUrls] = useState<Record<string, string>>({});
+
+  // URLs personalizadas online (YouTube, Drive ou CDN) salvas no navegador
+  const [customVideoUrls, setCustomVideoUrls] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem("smk_custom_lesson_urls_v1");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Modal para colar link do YouTube/Drive
+  const [editingUrlLessonId, setEditingUrlLessonId] = useState<string | null>(null);
+  const [tempUrlInput, setTempUrlInput] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Carregamento de arquivos locais com match inteligente
+  const handleFilesSelect = (filesList: FileList | File[] | null) => {
+    if (!filesList || filesList.length === 0) return;
+    const files = Array.from(filesList);
+    const updated = { ...localVideoUrls };
+
+    files.forEach((file) => {
+      const lower = file.name.toLowerCase();
+      const objUrl = URL.createObjectURL(file);
+
+      const matched = SMK_VIDEO_LESSONS.find((lesson) => {
+        const lFile = lesson.fileName.toLowerCase();
+        return (
+          lower === lFile ||
+          lower.includes(`aula ${lesson.lessonNumber}`) ||
+          lower.includes(`aula${lesson.lessonNumber}`) ||
+          (lesson.lessonNumber === 1 && lower.includes("pedidos")) ||
+          (lesson.lessonNumber === 2 && lower.includes("financeiro")) ||
+          (lesson.lessonNumber === 3 && lower.includes("aula 3")) ||
+          (lesson.lessonNumber === 4 && lower.includes("crm")) ||
+          (lesson.lessonNumber === 5 && lower.includes("marketing"))
+        );
+      });
+
+      if (matched) {
+        updated[matched.id] = objUrl;
+      } else if (files.length === 1) {
+        updated[SMK_VIDEO_LESSONS[selectedLessonIndex].id] = objUrl;
+      }
+    });
+
+    setLocalVideoUrls(updated);
+  };
+
+  const handleDropFiles = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFilesSelect(e.dataTransfer.files);
+    }
+  };
+
+  const handleSaveCustomUrl = (lessonId: string, url: string) => {
+    const trimmed = url.trim();
+    const updated = { ...customVideoUrls };
+    if (trimmed) {
+      updated[lessonId] = trimmed;
+    } else {
+      delete updated[lessonId];
+    }
+    setCustomVideoUrls(updated);
+    try {
+      localStorage.setItem("smk_custom_lesson_urls_v1", JSON.stringify(updated));
+    } catch (err) {
+      console.warn("Erro ao salvar URLs de aulas no localStorage:", err);
+    }
+    setEditingUrlLessonId(null);
+  };
 
   // Modais integrados
   const [mobilePushModalOpen, setMobilePushModalOpen] = useState(false);
@@ -942,37 +1046,143 @@ export default function SettingsPage() {
                   
                   {/* Coluna 1 e 2: Player de Vídeo e Detalhes da Aula Atual */}
                   <div className="lg:col-span-2 space-y-4">
+                    {/* Input invisível para seleção de arquivo(s) local(is) */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      accept="video/mp4,video/webm,video/quicktime,video/*"
+                      onChange={(e) => {
+                        handleFilesSelect(e.target.files);
+                        e.target.value = "";
+                      }}
+                      className="hidden"
+                    />
+
                     {/* Container do Player (Proporção 16:9) */}
-                    <div className="relative aspect-video w-full rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-[#141414] via-[#0a0a0a] to-black shadow-2xl flex flex-col items-center justify-center">
-                      {SMK_VIDEO_LESSONS[selectedLessonIndex].videoUrl ? (
-                        <video
-                          src={SMK_VIDEO_LESSONS[selectedLessonIndex].videoUrl}
-                          controls
-                          className="w-full h-full object-contain"
-                        />
-                      ) : (
-                        <div className="p-8 text-center space-y-4 max-w-md">
-                          <div className="size-16 rounded-2xl bg-amber-400/10 border border-amber-400/30 text-amber-400 flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(251,191,36,0.2)]">
-                            <Play className="size-8 fill-amber-400 translate-x-0.5" />
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400/80 font-bold block mb-1">
-                              {SMK_VIDEO_LESSONS[selectedLessonIndex].category}
-                            </span>
-                            <h3 className="text-lg font-bold text-white">
-                              {SMK_VIDEO_LESSONS[selectedLessonIndex].title}
-                            </h3>
-                            <p className="text-xs text-white/50 mt-1">
-                              Arquivo: <code className="text-amber-300 font-mono">{SMK_VIDEO_LESSONS[selectedLessonIndex].fileName}</code>
-                            </p>
-                          </div>
-                          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white/70 text-xs font-medium">
-                            <Clock className="size-3.5 text-amber-400" />
-                            <span>Duração: {SMK_VIDEO_LESSONS[selectedLessonIndex].duration}</span>
-                          </div>
+                    {(() => {
+                      const curLesson = SMK_VIDEO_LESSONS[selectedLessonIndex];
+                      const activeUrl = localVideoUrls[curLesson.id] || customVideoUrls[curLesson.id] || curLesson.videoUrl || "";
+                      const vSource = parseVideoSource(activeUrl);
+
+                      return (
+                        <div
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={handleDropFiles}
+                          className="relative aspect-video w-full rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-[#141414] via-[#0a0a0a] to-black shadow-2xl flex flex-col items-center justify-center group"
+                        >
+                          {vSource.type === "youtube" ? (
+                            <iframe
+                              src={vSource.embedUrl}
+                              title={curLesson.title}
+                              className="w-full h-full border-0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                              allowFullScreen
+                            />
+                          ) : vSource.type === "drive" ? (
+                            <iframe
+                              src={vSource.embedUrl}
+                              title={curLesson.title}
+                              className="w-full h-full border-0"
+                              allow="autoplay"
+                              allowFullScreen
+                            />
+                          ) : vSource.type === "direct" ? (
+                            <video
+                              key={vSource.embedUrl}
+                              src={vSource.embedUrl}
+                              controls
+                              autoPlay
+                              className="w-full h-full object-contain bg-black"
+                            >
+                              Seu navegador não suporta a reprodução deste vídeo.
+                            </video>
+                          ) : (
+                            <div className="p-6 sm:p-8 text-center space-y-4 max-w-lg">
+                              <div className="size-16 rounded-2xl bg-amber-400/10 border border-amber-400/30 text-amber-400 flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(251,191,36,0.2)]">
+                                <Play className="size-8 fill-amber-400 translate-x-0.5" />
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400/80 font-bold block mb-1">
+                                  {curLesson.category}
+                                </span>
+                                <h3 className="text-lg font-bold text-white">
+                                  {curLesson.title}
+                                </h3>
+                                <p className="text-xs text-white/50 mt-1">
+                                  Arquivo no seu computador: <code className="text-amber-300 font-mono bg-white/5 px-2 py-0.5 rounded">{curLesson.fileName}</code>
+                                </p>
+                              </div>
+
+                              <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => fileInputRef.current?.click()}
+                                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-extrabold text-xs transition-all shadow-lg shadow-amber-400/20 active:scale-95 cursor-pointer"
+                                >
+                                  <FolderOpen className="size-4" />
+                                  <span>Carregar Vídeo do Computador</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingUrlLessonId(curLesson.id);
+                                    setTempUrlInput(customVideoUrls[curLesson.id] || "");
+                                  }}
+                                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs transition-all active:scale-95 cursor-pointer"
+                                >
+                                  <Link2 className="size-4 text-white/70" />
+                                  <span>Colar Link (YouTube / Drive)</span>
+                                </button>
+                              </div>
+
+                              <p className="text-[11px] text-white/40 pt-1">
+                                💡 Toque no botão acima e selecione o arquivo correspondente para assistir agora mesmo em alta qualidade!
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Barra superior de status do vídeo */}
+                          {vSource.type !== "none" && (
+                            <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/10 text-xs shadow-xl">
+                              <div className="flex items-center gap-2 text-white/90 font-medium truncate">
+                                <span className="size-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                                <span className="truncate">
+                                  {localVideoUrls[curLesson.id]
+                                    ? "Reproduzindo arquivo local do seu computador"
+                                    : "Reproduzindo link online configurado"}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2 pointer-events-auto shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => fileInputRef.current?.click()}
+                                  title="Carregar outro arquivo de vídeo do computador"
+                                  className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold text-white transition-all cursor-pointer flex items-center gap-1.5"
+                                >
+                                  <FolderOpen className="size-3 text-amber-400" />
+                                  <span>Trocar Arquivo</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingUrlLessonId(curLesson.id);
+                                    setTempUrlInput(customVideoUrls[curLesson.id] || "");
+                                  }}
+                                  title="Configurar Link Online (YouTube ou Google Drive)"
+                                  className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold text-white transition-all cursor-pointer flex items-center gap-1.5"
+                                >
+                                  <Link2 className="size-3 text-white/70" />
+                                  <span>Link Online</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      );
+                    })()}
 
                     {/* Descrição e Tópicos Chave da Aula Selecionada */}
                     <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-5 space-y-3">
@@ -1048,6 +1258,7 @@ export default function SettingsPage() {
                     <div className="space-y-2">
                       {SMK_VIDEO_LESSONS.map((lesson, idx) => {
                         const isCurrent = idx === selectedLessonIndex;
+                        const hasVideo = Boolean(localVideoUrls[lesson.id] || customVideoUrls[lesson.id] || lesson.videoUrl);
                         return (
                           <div
                             key={lesson.id}
@@ -1072,15 +1283,20 @@ export default function SettingsPage() {
                                   <span className="text-[10px] font-mono uppercase tracking-wider text-white/40 font-bold truncate">
                                     {lesson.category}
                                   </span>
-                                  <span className="text-[10px] font-mono text-white/50 shrink-0">
-                                    ⏱️ {lesson.duration}
-                                  </span>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {hasVideo && (
+                                      <span className="size-1.5 rounded-full bg-emerald-400" title="Vídeo pronto para assistir" />
+                                    )}
+                                    <span className="text-[10px] font-mono text-white/50">
+                                      ⏱️ {lesson.duration}
+                                    </span>
+                                  </div>
                                 </div>
                                 <h5 className={`text-xs font-bold truncate ${isCurrent ? "text-amber-300" : "text-white"}`}>
                                   {lesson.title}
                                 </h5>
                                 <p className="text-[10px] text-white/40 truncate mt-0.5 font-mono">
-                                  {lesson.fileName}
+                                  {hasVideo ? "🟢 Pronto para assistir" : lesson.fileName}
                                 </p>
                               </div>
                             </div>
@@ -1145,6 +1361,77 @@ export default function SettingsPage() {
         companyId={company?.id}
         storeName={storeName || "Smoking Pods"}
       />
+
+      {/* Modal para configurar Link Online (YouTube / Google Drive) */}
+      {editingUrlLessonId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-lg bg-[#0d0d0d] border border-white/15 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-400/10 text-amber-400 border border-amber-400/20">
+                  <Link2 className="size-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Configurar Link da Videoaula</h3>
+                  <p className="text-[11px] text-white/50">
+                    {SMK_VIDEO_LESSONS.find(l => l.id === editingUrlLessonId)?.title}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingUrlLessonId(null)}
+                className="p-1.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-white/80 block">
+                Link do Vídeo (YouTube, Google Drive ou URL direta .mp4):
+              </label>
+              <input
+                type="url"
+                value={tempUrlInput}
+                onChange={(e) => setTempUrlInput(e.target.value)}
+                placeholder="Ex: https://www.youtube.com/watch?v=... ou drive.google.com/..."
+                className="w-full px-3.5 py-2.5 rounded-xl bg-black border border-white/15 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                autoFocus
+              />
+              <p className="text-[11px] text-white/40 leading-relaxed">
+                💡 Para vídeos do YouTube, recomendamos subir como <strong>"Não Listado"</strong> para manter o conteúdo exclusivo para quem usa o sistema.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+              {customVideoUrls[editingUrlLessonId] && (
+                <button
+                  type="button"
+                  onClick={() => handleSaveCustomUrl(editingUrlLessonId, "")}
+                  className="px-3 py-2 rounded-xl text-xs font-bold text-red-400 hover:bg-red-500/10 transition-colors mr-auto cursor-pointer"
+                >
+                  Remover Link
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setEditingUrlLessonId(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white/70 hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveCustomUrl(editingUrlLessonId, tempUrlInput)}
+                className="px-5 py-2 rounded-xl text-xs font-extrabold bg-amber-400 hover:bg-amber-300 text-black transition-all shadow-md shadow-amber-400/20 active:scale-95 cursor-pointer"
+              >
+                Salvar Link
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Detalhado de Vídeo Aula & Tutorial */}
       <TutorialDetailModal
