@@ -113,7 +113,7 @@ export function parseVideoSource(rawUrl?: string): { type: "youtube" | "drive" |
   if (ytMatch && ytMatch[1]) {
     return {
       type: "youtube",
-      embedUrl: `https://www.youtube-nocookie.com/embed/${ytMatch[1]}?rel=0&modestbranding=1&playsinline=1`,
+      embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}?rel=0&modestbranding=1&playsinline=1`,
     };
   }
 
@@ -1078,6 +1078,7 @@ export default function SettingsPage() {
                         >
                           {vSource.type === "youtube" ? (
                             <iframe
+                              key={curLesson.id}
                               src={vSource.embedUrl}
                               title={curLesson.title}
                               className="w-full h-full border-0"
@@ -1086,6 +1087,7 @@ export default function SettingsPage() {
                             />
                           ) : vSource.type === "drive" ? (
                             <iframe
+                              key={curLesson.id}
                               src={vSource.embedUrl}
                               title={curLesson.title}
                               className="w-full h-full border-0"
