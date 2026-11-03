@@ -60,7 +60,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id']
 };
 
 app.use((req, res, next) => {
@@ -200,34 +200,69 @@ app.post('/api/crm/update-client', async (req, res) => {
 });
 
 // ============================================================
-// MARKETING PERSISTÊNCIA DE CAMPANHAS E LISTAS
+// MULTITENANT RESOLVER & PERSISTÊNCIA DE CAMPANHAS E LISTAS POR LOJA
 // ============================================================
-const MARKETING_CONFIG_PATH = path.join(__dirname, 'data', 'marketing_config.json');
+const OFFICIAL_COMPANY_ID = 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+const DATA_DIR = path.join(__dirname, 'data');
 
-function loadMarketingConfig() {
+function sanitizeTenantId(rawId) {
+  if (!rawId) return OFFICIAL_COMPANY_ID;
+  const cleaned = String(rawId).trim().replace(/[^a-zA-Z0-9_-]/g, '');
+  return cleaned || OFFICIAL_COMPANY_ID;
+}
+
+function getRequestCompanyId(req) {
+  const raw = req.headers['x-company-id'] || req.query?.companyId || req.body?.companyId || '';
+  return sanitizeTenantId(raw);
+}
+
+function getMarketingConfigPath(companyId) {
+  const cid = sanitizeTenantId(companyId);
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  if (cid === OFFICIAL_COMPANY_ID) {
+    return path.join(DATA_DIR, 'marketing_config.json');
+  }
+  return path.join(DATA_DIR, `marketing_config_${cid}.json`);
+}
+
+function loadMarketingConfig(companyId = OFFICIAL_COMPANY_ID) {
+  const cid = sanitizeTenantId(companyId);
+  const configPath = getMarketingConfigPath(cid);
   try {
-    if (!fs.existsSync(MARKETING_CONFIG_PATH)) {
-      const defaultConfig = { campaigns: [], lists: [], sentHistory: { globalSent: [] }, idempotencyKeys: [], lastUpdated: null };
-      fs.writeFileSync(MARKETING_CONFIG_PATH, JSON.stringify(defaultConfig, null, 2), 'utf-8');
+    if (!fs.existsSync(configPath)) {
+      const defaultConfig = {
+        companyId: cid,
+        campaigns: [],
+        lists: [],
+        sentHistory: { globalSent: [] },
+        idempotencyKeys: [],
+        lastUpdated: null
+      };
+      fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), 'utf-8');
       return defaultConfig;
     }
-    const raw = fs.readFileSync(MARKETING_CONFIG_PATH, 'utf-8');
+    const raw = fs.readFileSync(configPath, 'utf-8');
     const parsed = JSON.parse(raw);
     if (!parsed.sentHistory) parsed.sentHistory = { globalSent: [] };
     return parsed;
   } catch (err) {
-    console.error('❌ [Marketing] Erro ao carregar config:', err.message);
-    return { campaigns: [], lists: [], sentHistory: { globalSent: [] }, idempotencyKeys: [], lastUpdated: null };
+    console.error(`❌ [Marketing][${cid}] Erro ao carregar config:`, err.message);
+    return { companyId: cid, campaigns: [], lists: [], sentHistory: { globalSent: [] }, idempotencyKeys: [], lastUpdated: null };
   }
 }
 
-function saveMarketingConfig(config) {
+function saveMarketingConfig(config, companyId = OFFICIAL_COMPANY_ID) {
+  const cid = sanitizeTenantId(companyId);
+  const configPath = getMarketingConfigPath(cid);
   try {
+    config.companyId = cid;
     config.lastUpdated = new Date().toISOString();
     if (!config.sentHistory) config.sentHistory = { globalSent: [] };
-    fs.writeFileSync(MARKETING_CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
   } catch (err) {
-    console.error('❌ [Marketing] Erro ao salvar config:', err.message);
+    console.error(`❌ [Marketing][${cid}] Erro ao salvar config:`, err.message);
   }
 }
 
@@ -238,10 +273,32 @@ function normalizeMarketingPhone(phone) {
   return digits.startsWith('55') ? digits : `55${digits}`;
 }
 
+function isPhoneAlreadySent(campaignId, cleanPhone, config) {
+  if (!config || !config.sentHistory) return false;
+  const globalSent = Array.isArray(config.sentHistory.globalSent) ? config.sentHistory.globalSent : [];
+  const byCamp = Array.isArray(config.sentHistory[campaignId]) ? config.sentHistory[campaignId] : [];
+  return globalSent.includes(cleanPhone) || byCamp.includes(cleanPhone);
+}
+
+function markPhoneAsSent(campaignId, cleanPhone, config) {
+  if (!config.sentHistory) config.sentHistory = { globalSent: [] };
+  if (!Array.isArray(config.sentHistory.globalSent)) config.sentHistory.globalSent = [];
+  if (!config.sentHistory.globalSent.includes(cleanPhone)) {
+    config.sentHistory.globalSent.push(cleanPhone);
+  }
+  if (campaignId) {
+    if (!Array.isArray(config.sentHistory[campaignId])) config.sentHistory[campaignId] = [];
+    if (!config.sentHistory[campaignId].includes(cleanPhone)) {
+      config.sentHistory[campaignId].push(cleanPhone);
+    }
+  }
+}
+
 app.get('/api/marketing/campaigns', (req, res) => {
   try {
-    const config = loadMarketingConfig();
-    return res.json({ success: true, campaigns: config.campaigns || [] });
+    const companyId = getRequestCompanyId(req);
+    const config = loadMarketingConfig(companyId);
+    return res.json({ success: true, companyId, campaigns: config.campaigns || [] });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -249,14 +306,15 @@ app.get('/api/marketing/campaigns', (req, res) => {
 
 app.post('/api/marketing/campaigns', (req, res) => {
   try {
+    const companyId = getRequestCompanyId(req);
     const { campaigns: newCampaigns } = req.body;
     if (!Array.isArray(newCampaigns)) {
       return res.status(400).json({ error: 'O campo "campaigns" deve ser um array.' });
     }
-    const config = loadMarketingConfig();
+    const config = loadMarketingConfig(companyId);
     config.campaigns = newCampaigns;
-    saveMarketingConfig(config);
-    return res.json({ success: true, saved: newCampaigns.length });
+    saveMarketingConfig(config, companyId);
+    return res.json({ success: true, companyId, saved: newCampaigns.length });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -264,8 +322,9 @@ app.post('/api/marketing/campaigns', (req, res) => {
 
 app.get('/api/marketing/lists', (req, res) => {
   try {
-    const config = loadMarketingConfig();
-    return res.json({ success: true, lists: config.lists || [] });
+    const companyId = getRequestCompanyId(req);
+    const config = loadMarketingConfig(companyId);
+    return res.json({ success: true, companyId, lists: config.lists || [] });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -273,14 +332,15 @@ app.get('/api/marketing/lists', (req, res) => {
 
 app.post('/api/marketing/lists', (req, res) => {
   try {
+    const companyId = getRequestCompanyId(req);
     const { lists: newLists } = req.body;
     if (!Array.isArray(newLists)) {
       return res.status(400).json({ error: 'O campo "lists" deve ser um array.' });
     }
-    const config = loadMarketingConfig();
+    const config = loadMarketingConfig(companyId);
     config.lists = newLists;
-    saveMarketingConfig(config);
-    return res.json({ success: true, saved: newLists.length });
+    saveMarketingConfig(config, companyId);
+    return res.json({ success: true, companyId, saved: newLists.length });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -288,8 +348,9 @@ app.post('/api/marketing/lists', (req, res) => {
 
 app.get('/api/marketing/sent-history', (req, res) => {
   try {
-    const config = loadMarketingConfig();
-    return res.json({ success: true, sentHistory: config.sentHistory || { globalSent: [] } });
+    const companyId = getRequestCompanyId(req);
+    const config = loadMarketingConfig(companyId);
+    return res.json({ success: true, companyId, sentHistory: config.sentHistory || { globalSent: [] } });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -297,10 +358,12 @@ app.get('/api/marketing/sent-history', (req, res) => {
 
 app.get('/api/marketing/stock-cycle-status', async (req, res) => {
   try {
-    const config = loadMarketingConfig();
+    const companyId = getRequestCompanyId(req);
+    const config = loadMarketingConfig(companyId);
     const { data: products } = await supabase
       .from('smoking_products')
       .select('name')
+      .eq('company_id', companyId)
       .gt('stock', 0)
       .eq('is_active', true);
 
@@ -329,6 +392,7 @@ app.get('/api/marketing/stock-cycle-status', async (req, res) => {
 
     return res.json({
       success: true,
+      companyId,
       totalModelsInStock: allModels.length,
       allModels,
       offeredInCurrentCycle: cycleOffered,
@@ -344,7 +408,8 @@ app.get('/api/marketing/stock-cycle-status', async (req, res) => {
 
 app.get('/api/marketing/lists-diagnostic', (req, res) => {
   try {
-    const config = loadMarketingConfig();
+    const companyId = getRequestCompanyId(req);
+    const config = loadMarketingConfig(companyId);
     const lists = config.lists || [];
     const globalSent = config.sentHistory?.globalSent || [];
 
@@ -362,6 +427,7 @@ app.get('/api/marketing/lists-diagnostic', (req, res) => {
 
     return res.json({
       success: true,
+      companyId,
       totalContactsRaw: totalContactsRaw || totalUnique,
       totalUnique,
       duplicateCount: 0,
@@ -377,7 +443,8 @@ app.get('/api/marketing/lists-diagnostic', (req, res) => {
 
 app.post('/api/marketing/clean-and-deduplicate-lists', (req, res) => {
   try {
-    const config = loadMarketingConfig();
+    const companyId = getRequestCompanyId(req);
+    const config = loadMarketingConfig(companyId);
     const lists = config.lists || [];
     const globalSent = config.sentHistory?.globalSent || [];
 
@@ -473,10 +540,11 @@ app.post('/api/marketing/clean-and-deduplicate-lists', (req, res) => {
     }
 
     config.lists = sanitizedLists;
-    saveMarketingConfig(config);
+    saveMarketingConfig(config, companyId);
 
     return res.json({
       success: true,
+      companyId,
       totalOriginal,
       totalUnique: uniqueContacts.length,
       duplicatesRemoved: totalOriginal - uniqueContacts.length,
@@ -490,129 +558,147 @@ app.post('/api/marketing/clean-and-deduplicate-lists', (req, res) => {
 });
 
 // =============================================
-// WHATSAPP MOTOR (BAILEYS) - CICLO DE VIDA LAZY / SOB DEMANDA
+// WHATSAPP MOTOR MULTITENANT (BAILEYS) - SESSÃO ISOLADA POR LOJA (COMPANY_ID)
 // =============================================
-let latestQr = null;
-let latestQrDataUrl = null;
-let isWhatsAppReady = false;
-let sock = null;
-const detectedGroups = {};
-
-// Estados formais do ciclo de vida:
-// 'IDLE' | 'DISCONNECTED' | 'CONNECTING' | 'QR_AVAILABLE' | 'AUTHENTICATING' | 'CONNECTED' | 'DISCONNECTING' | 'SESSION_INVALID' | 'ERROR'
-let whatsAppSessionState = 'DISCONNECTED';
-let activeConnectPromise = null;
-let idleDisconnectTimeout = null;
 const IDLE_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutos de inatividade antes de desligar socket limpo
+const tenantSessions = new Map();
 
-// Helper: Verificar se existem credenciais salvas em disco
-function hasSavedWhatsAppSession() {
-  const authDir = path.join(__dirname, 'baileys_auth');
+function getAuthDir(companyId = OFFICIAL_COMPANY_ID) {
+  const cid = sanitizeTenantId(companyId);
+  if (cid === OFFICIAL_COMPANY_ID) {
+    return path.join(__dirname, 'baileys_auth');
+  }
+  return path.join(__dirname, `baileys_auth_${cid}`);
+}
+
+function getTenantSession(companyId = OFFICIAL_COMPANY_ID) {
+  const cid = sanitizeTenantId(companyId);
+  if (!tenantSessions.has(cid)) {
+    tenantSessions.set(cid, {
+      companyId: cid,
+      latestQr: null,
+      latestQrDataUrl: null,
+      isWhatsAppReady: false,
+      sock: null,
+      detectedGroups: {},
+      whatsAppSessionState: 'DISCONNECTED',
+      activeConnectPromise: null,
+      idleDisconnectTimeout: null
+    });
+  }
+  return tenantSessions.get(cid);
+}
+
+// Helper: Verificar se existem credenciais salvas em disco para a loja
+function hasSavedWhatsAppSession(companyId = OFFICIAL_COMPANY_ID) {
+  const authDir = getAuthDir(companyId);
   if (!fs.existsSync(authDir)) return false;
   try {
     const credsPath = path.join(authDir, 'creds.json');
     if (!fs.existsSync(credsPath)) return false;
     const stats = fs.statSync(credsPath);
-    return stats.size > 20; // Contém credenciais válidas gravadas
+    return stats.size > 20;
   } catch (e) {
     return false;
   }
 }
 
-// Helper: Resetar o timer de inatividade (mantém o socket vivo enquanto houver uso)
-function touchWhatsAppActivity() {
-  if (idleDisconnectTimeout) {
-    clearTimeout(idleDisconnectTimeout);
-    idleDisconnectTimeout = null;
+// Helper: Resetar o timer de inatividade da loja
+function touchWhatsAppActivity(companyId = OFFICIAL_COMPANY_ID) {
+  const session = getTenantSession(companyId);
+  if (session.idleDisconnectTimeout) {
+    clearTimeout(session.idleDisconnectTimeout);
+    session.idleDisconnectTimeout = null;
   }
-  // Só agenda idle timeout se estiver conectado
-  if (isWhatsAppReady && sock) {
-    idleDisconnectTimeout = setTimeout(async () => {
-      console.log('💤 [WhatsApp Idle] Inatividade detectada. Desconectando socket de forma limpa (preservando credenciais)...');
-      await disconnectWhatsAppSocketCleanly('IDLE');
+  if (session.isWhatsAppReady && session.sock) {
+    session.idleDisconnectTimeout = setTimeout(async () => {
+      console.log(`💤 [WhatsApp Idle][${session.companyId}] Inatividade detectada. Desconectando socket de forma limpa...`);
+      await disconnectWhatsAppSocketCleanly(session.companyId, 'IDLE');
     }, IDLE_TIMEOUT_MS);
   }
 }
 
-// Helper: Desconectar o socket de forma limpa SEM destruir a pasta de autenticação
-async function disconnectWhatsAppSocketCleanly(newState = 'DISCONNECTED') {
-  if (idleDisconnectTimeout) {
-    clearTimeout(idleDisconnectTimeout);
-    idleDisconnectTimeout = null;
+// Helper: Desconectar o socket da loja de forma limpa SEM destruir a pasta de autenticação
+async function disconnectWhatsAppSocketCleanly(companyId = OFFICIAL_COMPANY_ID, newState = 'DISCONNECTED') {
+  const session = getTenantSession(companyId);
+  if (session.idleDisconnectTimeout) {
+    clearTimeout(session.idleDisconnectTimeout);
+    session.idleDisconnectTimeout = null;
   }
-  whatsAppSessionState = 'DISCONNECTING';
-  isWhatsAppReady = false;
-  latestQr = null;
-  latestQrDataUrl = null;
+  session.whatsAppSessionState = 'DISCONNECTING';
+  session.isWhatsAppReady = false;
+  session.latestQr = null;
+  session.latestQrDataUrl = null;
 
-  if (sock) {
+  if (session.sock) {
     try {
-      sock.ev.removeAllListeners('connection.update');
-      sock.ev.removeAllListeners('creds.update');
-      sock.ev.removeAllListeners('messages.upsert');
-      sock.end(undefined);
+      session.sock.ev.removeAllListeners('connection.update');
+      session.sock.ev.removeAllListeners('creds.update');
+      session.sock.ev.removeAllListeners('messages.upsert');
+      session.sock.end(undefined);
     } catch (e) {
-      console.warn('⚠️ Aviso ao encerrar socket Baileys:', e.message);
+      console.warn(`⚠️ [${session.companyId}] Aviso ao encerrar socket Baileys:`, e.message);
     }
-    sock = null;
+    session.sock = null;
   }
 
-  whatsAppSessionState = newState;
-  console.log(`🔌 [WhatsApp Socket] Desconectado limpo. Estado: ${whatsAppSessionState}`);
+  session.whatsAppSessionState = newState;
+  console.log(`🔌 [WhatsApp Socket][${session.companyId}] Desconectado limpo. Estado: ${session.whatsAppSessionState}`);
 }
 
-// Inicializar Baileys SOB DEMANDA (com controle de QR sob requisição explícita)
-async function requestWhatsAppConnection(allowQrGeneration = false) {
-  if (isWhatsAppReady && sock) {
-    whatsAppSessionState = 'CONNECTED';
-    touchWhatsAppActivity();
-    return { success: true, status: 'CONNECTED', isReady: true };
+// Inicializar Baileys SOB DEMANDA por loja (companyId)
+async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQrGeneration = false) {
+  const cid = sanitizeTenantId(companyId);
+  const session = getTenantSession(cid);
+
+  if (session.isWhatsAppReady && session.sock) {
+    session.whatsAppSessionState = 'CONNECTED';
+    touchWhatsAppActivity(cid);
+    return { success: true, companyId: cid, status: 'CONNECTED', isReady: true };
   }
 
-  // Se já houver uma tentativa em andamento, reaproveita a mesma promessa
-  if (activeConnectPromise) {
-    return activeConnectPromise;
+  if (session.activeConnectPromise) {
+    return session.activeConnectPromise;
   }
 
-  const hasSession = hasSavedWhatsAppSession();
+  const hasSession = hasSavedWhatsAppSession(cid);
 
-  // Se não houver sessão salva e NÃO for permitida a geração de QR (ex: disparos autônomos de scheduler):
   if (!hasSession && !allowQrGeneration) {
-    whatsAppSessionState = 'DISCONNECTED';
-    console.log('ℹ️ [WhatsApp Lazy] Nenhuma sessão salva em disco e geração automática de QR desativada.');
-    return { success: false, status: 'WHATSAPP_NOT_CONNECTED', isReady: false, error: 'WHATSAPP_NOT_CONNECTED' };
+    session.whatsAppSessionState = 'DISCONNECTED';
+    console.log(`ℹ️ [WhatsApp Lazy][${cid}] Nenhuma sessão salva em disco e geração automática de QR desativada.`);
+    return { success: false, companyId: cid, status: 'WHATSAPP_NOT_CONNECTED', isReady: false, error: 'WHATSAPP_NOT_CONNECTED' };
   }
 
-  activeConnectPromise = (async () => {
+  session.activeConnectPromise = (async () => {
     try {
-      whatsAppSessionState = 'CONNECTING';
-      const authDir = path.join(__dirname, 'baileys_auth');
+      session.whatsAppSessionState = 'CONNECTING';
+      const authDir = getAuthDir(cid);
       const { state, saveCreds } = await useMultiFileAuthState(authDir);
       const { version, isLatest } = await fetchLatestBaileysVersion();
-      console.log(`⚡ [WhatsApp Lazy] Iniciando Baileys v${version.join('.')}, isLatest: ${isLatest}, hasSavedSession: ${hasSession}`);
+      console.log(`⚡ [WhatsApp Lazy][${cid}] Iniciando Baileys v${version.join('.')}, isLatest: ${isLatest}, hasSavedSession: ${hasSession}`);
 
-      // Se já houver um socket pendente, limpa antes
-      if (sock) {
+      if (session.sock) {
         try {
-          sock.ev.removeAllListeners('connection.update');
-          sock.ev.removeAllListeners('creds.update');
-          sock.ev.removeAllListeners('messages.upsert');
-          sock.end(undefined);
+          session.sock.ev.removeAllListeners('connection.update');
+          session.sock.ev.removeAllListeners('creds.update');
+          session.sock.ev.removeAllListeners('messages.upsert');
+          session.sock.end(undefined);
         } catch (e) {}
-        sock = null;
+        session.sock = null;
       }
 
-      sock = makeWASocket({
+      const sockInstance = makeWASocket({
         version,
         logger: pino({ level: 'silent' }),
         auth: state,
         printQRInTerminal: false,
-        browser: ['Smoking Pods OS', 'Desktop', '1.0.0'],
+        browser: ['Smoking Pods SaaS', 'Desktop', '1.0.0'],
         syncFullHistory: false,
         generateHighQualityLinkPreview: true
       });
 
-      sock.ev.on('creds.update', saveCreds);
+      session.sock = sockInstance;
+      sockInstance.ev.on('creds.update', saveCreds);
 
       return await new Promise((resolve) => {
         let isResolved = false;
@@ -620,43 +706,42 @@ async function requestWhatsAppConnection(allowQrGeneration = false) {
         const connectionTimeout = setTimeout(() => {
           if (!isResolved) {
             isResolved = true;
-            if (isWhatsAppReady) {
-              resolve({ success: true, status: 'CONNECTED', isReady: true });
-            } else if (latestQr && allowQrGeneration) {
-              resolve({ success: true, status: 'QR_AVAILABLE', isReady: false, qr: latestQr, qrImageUrl: latestQrDataUrl });
+            if (session.isWhatsAppReady) {
+              resolve({ success: true, companyId: cid, status: 'CONNECTED', isReady: true });
+            } else if (session.latestQr && allowQrGeneration) {
+              resolve({ success: true, companyId: cid, status: 'QR_AVAILABLE', isReady: false, qr: session.latestQr, qrImageUrl: session.latestQrDataUrl });
             } else {
-              resolve({ success: false, status: whatsAppSessionState, isReady: false, error: 'TIMEOUT' });
+              resolve({ success: false, companyId: cid, status: session.whatsAppSessionState, isReady: false, error: 'TIMEOUT' });
             }
           }
         }, 12000);
 
-        sock.ev.on('connection.update', async (update) => {
+        sockInstance.ev.on('connection.update', async (update) => {
           const { connection, lastDisconnect, qr } = update;
 
           if (qr) {
             if (allowQrGeneration) {
-              latestQr = qr;
-              isWhatsAppReady = false;
-              whatsAppSessionState = 'QR_AVAILABLE';
+              session.latestQr = qr;
+              session.isWhatsAppReady = false;
+              session.whatsAppSessionState = 'QR_AVAILABLE';
               try {
-                latestQrDataUrl = await QRCodeImage.toDataURL(qr, { width: 400, margin: 2 });
+                session.latestQrDataUrl = await QRCodeImage.toDataURL(qr, { width: 400, margin: 2 });
               } catch (e) {
-                console.warn('⚠️ Erro ao converter QR para DataURL:', e.message);
+                console.warn(`⚠️ [${cid}] Erro ao converter QR para DataURL:`, e.message);
               }
-              console.log('📱 [WhatsApp QR Code Sob Demanda] QR gerado com sucesso!');
+              console.log(`📱 [WhatsApp QR Code][${cid}] QR gerado com sucesso!`);
               if (!isResolved) {
                 isResolved = true;
                 clearTimeout(connectionTimeout);
-                resolve({ success: true, status: 'QR_AVAILABLE', isReady: false, qr: latestQr, qrImageUrl: latestQrDataUrl });
+                resolve({ success: true, companyId: cid, status: 'QR_AVAILABLE', isReady: false, qr: session.latestQr, qrImageUrl: session.latestQrDataUrl });
               }
             } else {
-              // Scheduler ou chamada silenciosa: NÃO deve gerar QR
-              console.log('🛑 [WhatsApp Lazy] QR recebido mas geração não autorizada (modo silencioso). Encerrando socket.');
-              await disconnectWhatsAppSocketCleanly('DISCONNECTED');
+              console.log(`🛑 [WhatsApp Lazy][${cid}] QR recebido mas geração não autorizada (modo silencioso). Encerrando socket.`);
+              await disconnectWhatsAppSocketCleanly(cid, 'DISCONNECTED');
               if (!isResolved) {
                 isResolved = true;
                 clearTimeout(connectionTimeout);
-                resolve({ success: false, status: 'WHATSAPP_NOT_CONNECTED', isReady: false, error: 'WHATSAPP_NOT_CONNECTED' });
+                resolve({ success: false, companyId: cid, status: 'WHATSAPP_NOT_CONNECTED', isReady: false, error: 'WHATSAPP_NOT_CONNECTED' });
               }
             }
           }
@@ -664,21 +749,21 @@ async function requestWhatsAppConnection(allowQrGeneration = false) {
           if (connection === 'close') {
             const statusCode = (lastDisconnect?.error)?.output?.statusCode;
             const isLoggedOut = statusCode === DisconnectReason.loggedOut;
-            console.log(`⚠️ Conexão Baileys fechada (código ${statusCode}). Deslogado: ${isLoggedOut}`);
+            console.log(`⚠️ [${cid}] Conexão Baileys fechada (código ${statusCode}). Deslogado: ${isLoggedOut}`);
 
-            isWhatsAppReady = false;
-            latestQr = null;
-            latestQrDataUrl = null;
+            session.isWhatsAppReady = false;
+            session.latestQr = null;
+            session.latestQrDataUrl = null;
 
             if (isLoggedOut) {
-              whatsAppSessionState = 'SESSION_INVALID';
+              session.whatsAppSessionState = 'SESSION_INVALID';
               try {
                 fs.rmSync(authDir, { recursive: true, force: true });
-                console.log('🧹 Pasta de sessão baileys_auth removida por logout/invalidação.');
+                console.log(`🧹 [${cid}] Pasta de sessão removida por logout/invalidação.`);
               } catch (e) {}
             } else {
-              if (whatsAppSessionState !== 'DISCONNECTING') {
-                whatsAppSessionState = 'DISCONNECTED';
+              if (session.whatsAppSessionState !== 'DISCONNECTING') {
+                session.whatsAppSessionState = 'DISCONNECTED';
               }
             }
 
@@ -687,37 +772,38 @@ async function requestWhatsAppConnection(allowQrGeneration = false) {
               clearTimeout(connectionTimeout);
               resolve({
                 success: false,
-                status: whatsAppSessionState,
+                companyId: cid,
+                status: session.whatsAppSessionState,
                 isReady: false,
                 error: isLoggedOut ? 'SESSION_INVALID' : 'CONNECTION_CLOSED'
               });
             }
           } else if (connection === 'open') {
-            console.log('✅ WhatsApp CONECTADO com sucesso via Baileys WebSocket!');
-            isWhatsAppReady = true;
-            latestQr = null;
-            latestQrDataUrl = null;
-            whatsAppSessionState = 'CONNECTED';
-            touchWhatsAppActivity();
+            console.log(`✅ [${cid}] WhatsApp CONECTADO com sucesso via Baileys WebSocket!`);
+            session.isWhatsAppReady = true;
+            session.latestQr = null;
+            session.latestQrDataUrl = null;
+            session.whatsAppSessionState = 'CONNECTED';
+            touchWhatsAppActivity(cid);
 
             if (!isResolved) {
               isResolved = true;
               clearTimeout(connectionTimeout);
-              resolve({ success: true, status: 'CONNECTED', isReady: true });
+              resolve({ success: true, companyId: cid, status: 'CONNECTED', isReady: true });
             }
           }
         });
 
-        sock.ev.on('messages.upsert', async (m) => {
-          touchWhatsAppActivity();
+        sockInstance.ev.on('messages.upsert', async (m) => {
+          touchWhatsAppActivity(cid);
           const msg = m.messages?.[0];
           if (!msg || !msg.key) return;
           const jid = msg.key.remoteJid;
           if (!jid) return;
 
           if (jid.endsWith('@g.us')) {
-            if (!detectedGroups[jid]) {
-              detectedGroups[jid] = {
+            if (!session.detectedGroups[jid]) {
+              session.detectedGroups[jid] = {
                 id: jid,
                 name: 'Grupo VIP WhatsApp',
                 unreadCount: 0,
@@ -728,15 +814,15 @@ async function requestWhatsAppConnection(allowQrGeneration = false) {
         });
       });
     } catch (err) {
-      console.error('❌ Erro no requestWhatsAppConnection:', err.message);
-      whatsAppSessionState = 'ERROR';
-      return { success: false, status: 'ERROR', isReady: false, error: err.message };
+      console.error(`❌ [${cid}] Erro no requestWhatsAppConnection:`, err.message);
+      session.whatsAppSessionState = 'ERROR';
+      return { success: false, companyId: cid, status: 'ERROR', isReady: false, error: err.message };
     } finally {
-      activeConnectPromise = null;
+      session.activeConnectPromise = null;
     }
   })();
 
-  return activeConnectPromise;
+  return session.activeConnectPromise;
 }
 
 // Helper: Formatar telefone/JID para Baileys
@@ -801,8 +887,11 @@ function validateStructuralPhone(rawPhone) {
   };
 }
 
-// Helper: Resolver JID Canônico na rede do WhatsApp
-async function resolveCanonicalWhatsAppJid(rawPhone) {
+// Helper: Resolver JID Canônico na rede do WhatsApp usando a sessão da loja
+async function resolveCanonicalWhatsAppJid(rawPhone, companyId = OFFICIAL_COMPANY_ID) {
+  const cid = sanitizeTenantId(companyId);
+  const session = getTenantSession(cid);
+
   const structural = validateStructuralPhone(rawPhone);
   if (!structural.valid) {
     return structural;
@@ -812,11 +901,11 @@ async function resolveCanonicalWhatsAppJid(rawPhone) {
     return { valid: true, isGroup: true, jid: rawPhone };
   }
 
-  if (!sock || !isWhatsAppReady) {
+  if (!session.sock || !session.isWhatsAppReady) {
     return {
       valid: false,
       error: 'WHATSAPP_OFFLINE',
-      message: 'O WhatsApp não está conectado no backend. Conecte pelo QR Code na aba Marketing.'
+      message: 'O WhatsApp da sua loja não está conectado. Conecte pelo QR Code na aba Marketing.'
     };
   }
 
@@ -827,8 +916,8 @@ async function resolveCanonicalWhatsAppJid(rawPhone) {
   const jidWithout9 = `55${ddd}${phoneWithout9}@s.whatsapp.net`;
 
   try {
-    touchWhatsAppActivity();
-    const checkResults = await sock.onWhatsApp(jidWith9, jidWithout9);
+    touchWhatsAppActivity(cid);
+    const checkResults = await session.sock.onWhatsApp(jidWith9, jidWithout9);
     const match = (checkResults || []).find(r => r && (r.exists || r.jid));
 
     if (match && match.jid) {
@@ -857,17 +946,20 @@ async function resolveCanonicalWhatsAppJid(rawPhone) {
   }
 }
 
-// Enviar mensagem via Baileys com suporte opcional a imagem e presença "digitando"
-async function sendBaileysMessage(target, text, options = {}) {
-  if (!sock || !isWhatsAppReady) {
-    throw new Error('WhatsApp não está conectado.');
+// Enviar mensagem via Baileys da loja (companyId)
+async function sendBaileysMessage(target, text, options = {}, companyId = OFFICIAL_COMPANY_ID) {
+  const cid = sanitizeTenantId(companyId);
+  const session = getTenantSession(cid);
+
+  if (!session.sock || !session.isWhatsAppReady) {
+    throw new Error('WhatsApp da loja não está conectado.');
   }
 
-  touchWhatsAppActivity();
+  touchWhatsAppActivity(cid);
 
   let jid = target;
   if (!String(target).includes('@g.us') && !String(target).includes('chat.whatsapp.com/')) {
-    const probe = await resolveCanonicalWhatsAppJid(target);
+    const probe = await resolveCanonicalWhatsAppJid(target, cid);
     if (!probe.valid) {
       throw new Error(`[${probe.error}] ${probe.message}`);
     }
@@ -875,54 +967,54 @@ async function sendBaileysMessage(target, text, options = {}) {
   }
 
   try {
-    await sock.sendPresenceUpdate('composing', jid);
+    await session.sock.sendPresenceUpdate('composing', jid);
   } catch (e) {}
 
   if (options && options.imageUrl) {
     try {
-      return await sock.sendMessage(jid, {
+      return await session.sock.sendMessage(jid, {
         image: { url: options.imageUrl },
         caption: String(text)
       });
     } catch (imgErr) {
-      console.warn(`⚠️ [Baileys] Falha ao enviar imagem (${options.imageUrl}), enviando como texto:`, imgErr.message);
-      return await sock.sendMessage(jid, { text: String(text) });
+      console.warn(`⚠️ [Baileys][${cid}] Falha ao enviar imagem (${options.imageUrl}), enviando como texto:`, imgErr.message);
+      return await session.sock.sendMessage(jid, { text: String(text) });
     }
   }
 
-  return await sock.sendMessage(jid, { text: String(text) });
+  return await session.sock.sendMessage(jid, { text: String(text) });
 }
 
-// Construtor dinâmico de Oferta do Dia integrada ao estoque real (Leitura estrita)
-async function buildStockOfferMessage(options = {}) {
+// Construtor dinâmico de Oferta do Dia integrada ao estoque real da loja (companyId)
+async function buildStockOfferMessage(options = {}, companyId = OFFICIAL_COMPANY_ID) {
+  const cid = sanitizeTenantId(companyId);
   try {
     const cardapioUrl = options.cardapioUrl || 'https://smoking-pods.vercel.app';
-    const count = Math.min(Math.max(Number(options.count) || 1, 1), 2); // 1 ou 2 pods
+    const count = Math.min(Math.max(Number(options.count) || 1, 1), 2);
 
     const { data: products, error } = await supabase
       .from('smoking_products')
       .select('name, brand, flavor, price, stock, image_url, is_active')
+      .eq('company_id', cid)
       .gt('stock', 0)
       .eq('is_active', true);
 
     if (error || !products || products.length === 0) {
-      console.warn('⚠️ [StockOffer] Nenhum produto ativo com estoque positivo encontrado.');
+      console.warn(`⚠️ [StockOffer][${cid}] Nenhum produto ativo com estoque positivo encontrado.`);
       return null;
     }
 
-    // Agrupa sabores e menor preço por modelo normalizado (CASE-INSENSITIVE)
     const modelMap = new Map();
     products.forEach(p => {
       const rawName = p.name ? p.name.trim() : '';
       if (!rawName) return;
 
-      // Normalização em caixa alta para nunca separar "Ice king" de "ICE KING"
       const modelUpper = rawName.toUpperCase();
-      if (modelUpper === 'TESTE') return; // ignora dados de teste
+      if (modelUpper === 'TESTE') return;
 
       if (!modelMap.has(modelUpper)) {
         modelMap.set(modelUpper, {
-          name: rawName, // mantém o nome para exibição
+          name: rawName,
           upperKey: modelUpper,
           brand: p.brand || '',
           price: Number(p.price) || 0,
@@ -946,11 +1038,10 @@ async function buildStockOfferMessage(options = {}) {
     const allModels = Array.from(modelMap.values()).filter(m => m.flavors.length > 0);
     if (allModels.length === 0) return null;
 
-    // Data de hoje no fuso horário de São Paulo
     const nowSP = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
     const todayStr = nowSP.toISOString().split('T')[0];
 
-    const config = loadMarketingConfig();
+    const config = loadMarketingConfig(cid);
     if (!config.dailyStockOffers || typeof config.dailyStockOffers !== 'object') {
       config.dailyStockOffers = {};
     }
@@ -958,40 +1049,31 @@ async function buildStockOfferMessage(options = {}) {
       config.stockOfferCycle = [];
     }
 
-    // Normaliza os históricos em UPPERCASE para comparação 100% segura
     const todayOfferedUpper = (config.dailyStockOffers[todayStr] || []).map(n => String(n).trim().toUpperCase());
     const cycleOfferedUpper = config.stockOfferCycle.map(n => String(n).trim().toUpperCase());
 
-    // 1. Modelos prioritários: AINDA NÃO OFERTADOS NO CICLO e NÃO OFERTADOS HOJE
-    let unofferedInCycle = allModels.filter(m => 
+    let unofferedInCycle = allModels.filter(m =>
       !cycleOfferedUpper.includes(m.upperKey) && !todayOfferedUpper.includes(m.upperKey)
     );
 
-    // 2. Se todos os modelos do catálogo já foram ofertados no ciclo (ou restarem menos que o count):
     if (unofferedInCycle.length < count) {
-      console.log(`🔄 [StockOffer] Ciclo completo atingido! Todos os modelos com estoque já foram divulgados. Reiniciando novo ciclo...`);
-      // Reinicia o ciclo para começar tudo de novo
+      console.log(`🔄 [StockOffer][${cid}] Ciclo completo atingido! Reiniciando novo ciclo...`);
       config.stockOfferCycle = [];
-
-      // Candidatos para a nova rodada: todos os modelos ativos, exceto os que JÁ saíram HOJE
       unofferedInCycle = allModels.filter(m => !todayOfferedUpper.includes(m.upperKey));
       if (unofferedInCycle.length === 0) {
         unofferedInCycle = allModels;
       }
     }
 
-    // 3. Embaralha aleatoriamente dentre os modelos que ainda não foram ofertados
     const shuffled = unofferedInCycle.sort(() => 0.5 - Math.random());
     const selected = shuffled.slice(0, count);
 
-    // 4. Registra os modelos no ciclo atual (evitando duplicatas case-insensitive)
     selected.forEach(m => {
       if (!config.stockOfferCycle.some(c => c.toUpperCase() === m.upperKey)) {
         config.stockOfferCycle.push(m.name);
       }
     });
 
-    // 5. Registra os modelos na trava diária de hoje (evitando duplicatas case-insensitive)
     if (!config.dailyStockOffers[todayStr]) config.dailyStockOffers[todayStr] = [];
     selected.forEach(m => {
       if (!config.dailyStockOffers[todayStr].some(c => c.toUpperCase() === m.upperKey)) {
@@ -999,18 +1081,16 @@ async function buildStockOfferMessage(options = {}) {
       }
     });
 
-    // Limpeza de histórico diário antigo: mantém apenas os últimos 7 dias
     const allDates = Object.keys(config.dailyStockOffers).sort();
     if (allDates.length > 7) {
       const datesToRemove = allDates.slice(0, allDates.length - 7);
       datesToRemove.forEach(d => delete config.dailyStockOffers[d]);
     }
 
-    saveMarketingConfig(config);
+    saveMarketingConfig(config, cid);
 
-    // Monta as ofertas formatadas com a copy oficial do usuário
     const offers = selected.map(model => {
-      const formattedPrice = model.price > 0 
+      const formattedPrice = model.price > 0
         ? model.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : '0,00';
 
@@ -1027,58 +1107,63 @@ async function buildStockOfferMessage(options = {}) {
 
     return offers;
   } catch (err) {
-    console.error('❌ [StockOffer] Erro ao construir oferta de estoque:', err.message);
+    console.error(`❌ [StockOffer][${cid}] Erro ao construir oferta de estoque:`, err.message);
     return null;
   }
 }
 
 
 // =============================================
-// ROTAS DE MARKETING & CONEXÃO WHATSAPP SOB DEMANDA
+// ROTAS DE MARKETING & CONEXÃO WHATSAPP MULTITENANT SOB DEMANDA
 // =============================================
 
-// Endpoint para consultar status atual da conexão
+// Endpoint para consultar status atual da conexão da loja
 app.get('/api/qr', (req, res) => {
-  const hasSaved = hasSavedWhatsAppSession();
-  const fallbackUrl = latestQr
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(latestQr)}`
+  const companyId = getRequestCompanyId(req);
+  const session = getTenantSession(companyId);
+  const hasSaved = hasSavedWhatsAppSession(companyId);
+  const fallbackUrl = session.latestQr
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(session.latestQr)}`
     : null;
 
-  let state = whatsAppSessionState;
-  if (isWhatsAppReady) state = 'CONNECTED';
-  else if (latestQr) state = 'QR_AVAILABLE';
+  let state = session.whatsAppSessionState;
+  if (session.isWhatsAppReady) state = 'CONNECTED';
+  else if (session.latestQr) state = 'QR_AVAILABLE';
   else if (state === 'SESSION_INVALID') state = 'SESSION_INVALID';
-  else if (hasSaved) state = 'DISCONNECTED'; // Salvo mas socket parado
+  else if (hasSaved) state = 'DISCONNECTED';
 
   res.json({
+    companyId,
     status: state,
-    qr: latestQr,
-    isReady: isWhatsAppReady,
+    qr: session.latestQr,
+    isReady: session.isWhatsAppReady,
     hasSavedSession: hasSaved,
-    qrImageUrl: latestQrDataUrl || fallbackUrl
+    qrImageUrl: session.latestQrDataUrl || fallbackUrl
   });
 });
 
-// Endpoint explícito acionado pelo botão "Conectar WhatsApp"
+// Endpoint explícito acionado pelo botão "Conectar WhatsApp" da loja
 app.post('/api/whatsapp/connect', async (req, res) => {
   try {
-    const hasSession = hasSavedWhatsAppSession();
-    console.log(`📲 [API /connect] Ação do usuário: Conectar WhatsApp (hasSavedSession: ${hasSession})`);
+    const companyId = getRequestCompanyId(req);
+    const hasSession = hasSavedWhatsAppSession(companyId);
+    console.log(`📲 [API /connect][${companyId}] Ação do usuário: Conectar WhatsApp (hasSavedSession: ${hasSession})`);
 
-    // Inicia a conexão permitindo gerar QR apenas se não houver sessão válida salva
-    const connResult = await requestWhatsAppConnection(true);
+    const connResult = await requestWhatsAppConnection(companyId, true);
+    const session = getTenantSession(companyId);
 
-    const fallbackUrl = latestQr
-      ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(latestQr)}`
+    const fallbackUrl = session.latestQr
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(session.latestQr)}`
       : null;
 
     return res.json({
+      companyId,
       success: connResult.success,
-      status: whatsAppSessionState,
-      isReady: isWhatsAppReady,
+      status: session.whatsAppSessionState,
+      isReady: session.isWhatsAppReady,
       hasSavedSession: hasSession,
-      qr: latestQr,
-      qrImageUrl: latestQrDataUrl || fallbackUrl,
+      qr: session.latestQr,
+      qrImageUrl: session.latestQrDataUrl || fallbackUrl,
       error: connResult.error
     });
   } catch (err) {
@@ -1087,32 +1172,34 @@ app.post('/api/whatsapp/connect', async (req, res) => {
   }
 });
 
-// Endpoint explícito para cancelar tentativa ou fechar socket de forma limpa
+// Endpoint explícito para cancelar tentativa ou fechar socket da loja de forma limpa
 app.post('/api/whatsapp/disconnect', async (req, res) => {
   try {
-    console.log('🔌 [API /disconnect] Fechando socket temporariamente (preservando credenciais em disco)...');
-    await disconnectWhatsAppSocketCleanly('DISCONNECTED');
-    return res.json({ success: true, message: 'Socket desconectado de forma limpa.', status: 'DISCONNECTED' });
+    const companyId = getRequestCompanyId(req);
+    console.log(`🔌 [API /disconnect][${companyId}] Fechando socket temporariamente (preservando credenciais em disco)...`);
+    await disconnectWhatsAppSocketCleanly(companyId, 'DISCONNECTED');
+    return res.json({ success: true, companyId, message: 'Socket desconectado de forma limpa.', status: 'DISCONNECTED' });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 });
 
-// Logout definitivo: encerra socket e apaga credenciais em disco
+// Logout definitivo da loja: encerra socket e apaga apenas a pasta de credenciais desta loja
 app.post('/api/logout', async (req, res) => {
   try {
-    console.log('🔴 [API /logout] Recebido comando de LOGOUT DEFINITIVO do WhatsApp...');
-    await disconnectWhatsAppSocketCleanly('SESSION_INVALID');
+    const companyId = getRequestCompanyId(req);
+    console.log(`🔴 [API /logout][${companyId}] Recebido comando de LOGOUT DEFINITIVO do WhatsApp...`);
+    await disconnectWhatsAppSocketCleanly(companyId, 'SESSION_INVALID');
 
-    const authPath = path.join(__dirname, 'baileys_auth');
+    const authPath = getAuthDir(companyId);
     if (fs.existsSync(authPath)) {
       try {
         fs.rmSync(authPath, { recursive: true, force: true });
-        console.log('🧹 Pasta baileys_auth removida.');
+        console.log(`🧹 [${companyId}] Pasta de sessão removida.`);
       } catch (e) {}
     }
 
-    return res.json({ success: true, message: 'Sessão do WhatsApp destruída com sucesso.', status: 'SESSION_INVALID' });
+    return res.json({ success: true, companyId, message: 'Sessão do WhatsApp da loja destruída com sucesso.', status: 'SESSION_INVALID' });
   } catch (err) {
     console.error('Erro no logout:', err);
     return res.status(500).json({ error: 'Falha ao desconectar.' });
@@ -1121,15 +1208,19 @@ app.post('/api/logout', async (req, res) => {
 
 app.get('/api/marketing/whatsapp-data', async (req, res) => {
   try {
-    if (!isWhatsAppReady || !sock) {
-      if (hasSavedWhatsAppSession()) {
-        await requestWhatsAppConnection(false);
+    const companyId = getRequestCompanyId(req);
+    const session = getTenantSession(companyId);
+
+    if (!session.isWhatsAppReady || !session.sock) {
+      if (hasSavedWhatsAppSession(companyId)) {
+        await requestWhatsAppConnection(companyId, false);
       }
     }
 
-    if (!isWhatsAppReady || !sock) {
+    if (!session.isWhatsAppReady || !session.sock) {
       return res.status(503).json({
-        error: 'WhatsApp não está conectado.',
+        companyId,
+        error: 'WhatsApp da loja não está conectado.',
         isReady: false,
         contacts: [],
         groups: []
@@ -1139,9 +1230,9 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
     const contactsMap = new Map();
     const groups = [];
 
-    // 1. Grupos sincronizados
+    // 1. Grupos sincronizados do WhatsApp desta loja
     try {
-      const rawGroups = await sock.groupFetchAllParticipating();
+      const rawGroups = await session.sock.groupFetchAllParticipating();
       Object.values(rawGroups || {}).forEach(g => {
         if (g && g.id) {
           groups.push({
@@ -1152,12 +1243,12 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
         }
       });
     } catch (e) {
-      console.warn('⚠️ Falha ao buscar grupos no Baileys:', e.message);
+      console.warn(`⚠️ [${companyId}] Falha ao buscar grupos no Baileys:`, e.message);
     }
 
-    // 2. Contatos das listas locais
+    // 2. Contatos das listas desta loja
     try {
-      const cfg = loadMarketingConfig();
+      const cfg = loadMarketingConfig(companyId);
       (cfg.lists || []).forEach(l => {
         (l.contacts || []).forEach(c => {
           const raw = c.cleanPhone || c.phone;
@@ -1178,11 +1269,12 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
       });
     } catch (e) {}
 
-    // 3. Contatos do Supabase
+    // 3. Contatos do Supabase filtrados estritamente por company_id desta loja
     try {
       const { data: dbClients } = await supabase
         .from('smoking_clients')
         .select('id, name, phone')
+        .eq('company_id', companyId)
         .limit(2000);
 
       (dbClients || []).forEach(cl => {
@@ -1206,6 +1298,7 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
     const contacts = Array.from(contactsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
     return res.json({
+      companyId,
       isReady: true,
       contactsCount: contacts.length,
       groupsCount: groups.length,
@@ -1218,14 +1311,16 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
 });
 
 app.post('/api/marketing/scan-chats', async (req, res) => {
-  return res.json({ success: true, message: 'Varredura concluída.' });
+  const companyId = getRequestCompanyId(req);
+  return res.json({ success: true, companyId, message: 'Varredura concluída.' });
 });
 
 app.post('/api/marketing/stock-offer-preview', async (req, res) => {
   try {
+    const companyId = getRequestCompanyId(req);
     const count = Number(req.query.count) || 1;
-    const offers = await buildStockOfferMessage({ count });
-    return res.json({ success: true, offers: offers || [] });
+    const offers = await buildStockOfferMessage({ count }, companyId);
+    return res.json({ success: true, companyId, offers: offers || [] });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -1233,6 +1328,8 @@ app.post('/api/marketing/stock-offer-preview', async (req, res) => {
 
 app.post('/api/marketing/send-direct', async (req, res) => {
   try {
+    const companyId = getRequestCompanyId(req);
+    const session = getTenantSession(companyId);
     const { phone, name, text, campaignId, force, imageUrl, isStockOffer, stockOfferCount } = req.body;
 
     if (!phone) {
@@ -1251,17 +1348,17 @@ app.post('/api/marketing/send-direct', async (req, res) => {
       });
     }
 
-    if (!isWhatsAppReady || !sock) {
-      if (hasSavedWhatsAppSession()) {
-        await requestWhatsAppConnection(false);
+    if (!session.isWhatsAppReady || !session.sock) {
+      if (hasSavedWhatsAppSession(companyId)) {
+        await requestWhatsAppConnection(companyId, false);
       }
     }
 
-    if (!isWhatsAppReady || !sock) {
+    if (!session.isWhatsAppReady || !session.sock) {
       return res.status(503).json({
         success: false,
         error: 'WHATSAPP_OFFLINE',
-        message: 'WhatsApp não está conectado no servidor backend. Conecte pelo QR Code na aba Marketing.'
+        message: 'O WhatsApp da sua loja não está conectado. Conecte pelo QR Code na aba Marketing.'
       });
     }
 
@@ -1269,7 +1366,7 @@ app.post('/api/marketing/send-direct', async (req, res) => {
     if (String(phone).includes('chat.whatsapp.com/')) {
       try {
         const inviteCode = String(phone).split('chat.whatsapp.com/')[1].trim().split('?')[0];
-        const groupChat = await sock.groupAcceptInvite(inviteCode);
+        const groupChat = await session.sock.groupAcceptInvite(inviteCode);
         targetJid = groupChat || `${inviteCode}@g.us`;
       } catch (invErr) {
         targetJid = phone;
@@ -1277,7 +1374,7 @@ app.post('/api/marketing/send-direct', async (req, res) => {
     } else if (String(phone).includes('@g.us')) {
       targetJid = String(phone);
     } else {
-      const probeDetails = await resolveCanonicalWhatsAppJid(phone);
+      const probeDetails = await resolveCanonicalWhatsAppJid(phone, companyId);
       if (!probeDetails.valid) {
         return res.status(422).json({
           success: false,
@@ -1289,7 +1386,7 @@ app.post('/api/marketing/send-direct', async (req, res) => {
       targetJid = probeDetails.jid;
     }
 
-    const config = loadMarketingConfig();
+    const config = loadMarketingConfig(companyId);
     const cleanDigits = targetJid.replace(/\D/g, '');
     const isTestCampaign = force || (campaignId && String(campaignId).toLowerCase().includes('teste'));
 
@@ -1301,34 +1398,35 @@ app.post('/api/marketing/send-direct', async (req, res) => {
       });
     }
 
-    console.log(`📢 [Marketing] Enviando mensagem para ${targetJid} (${name || 'Cliente'})...`);
-    
+    console.log(`📢 [Marketing][${companyId}] Enviando mensagem para ${targetJid} (${name || 'Cliente'})...`);
+
     let sentResult;
     if (isStockOffer) {
       const count = Number(stockOfferCount) || 1;
-      const offers = await buildStockOfferMessage({ count });
+      const offers = await buildStockOfferMessage({ count }, companyId);
       if (offers && offers.length > 0) {
         for (let idx = 0; idx < offers.length; idx++) {
           const offer = offers[idx];
-          sentResult = await sendBaileysMessage(targetJid, offer.messageText, { imageUrl: offer.imageUrl });
+          sentResult = await sendBaileysMessage(targetJid, offer.messageText, { imageUrl: offer.imageUrl }, companyId);
           if (idx < offers.length - 1) {
             await new Promise(r => setTimeout(r, 4000));
           }
         }
       } else {
-        return res.status(400).json({ success: false, message: 'Nenhum pod disponível com estoque positivo no momento.' });
+        return res.status(400).json({ success: false, message: 'Nenhum pod disponível com estoque positivo na sua loja no momento.' });
       }
     } else {
-      sentResult = await sendBaileysMessage(targetJid, text, { imageUrl });
+      sentResult = await sendBaileysMessage(targetJid, text, { imageUrl }, companyId);
     }
 
     if (campaignId && !isTestCampaign) {
       markPhoneAsSent(campaignId, cleanDigits, config);
-      saveMarketingConfig(config);
+      saveMarketingConfig(config, companyId);
     }
 
     return res.json({
       success: true,
+      companyId,
       targetJid,
       messageId: sentResult?.key?.id,
       timestamp: new Date().toISOString()
@@ -1341,19 +1439,21 @@ app.post('/api/marketing/send-direct', async (req, res) => {
 
 app.post('/api/marketing/test-dispatch', async (req, res) => {
   try {
+    const companyId = getRequestCompanyId(req);
+    const session = getTenantSession(companyId);
     const { campaignId } = req.body;
     if (!campaignId) {
       return res.status(400).json({ error: 'campaignId é obrigatório.' });
     }
 
-    const config = loadMarketingConfig();
-    const camp = config.campaigns.find(c => c.id === campaignId);
+    const config = loadMarketingConfig(companyId);
+    const camp = (config.campaigns || []).find(c => c.id === campaignId);
     if (!camp) {
       return res.status(404).json({ error: 'Campanha não encontrada.' });
     }
 
-    if (!isWhatsAppReady || !sock) {
-      return res.status(503).json({ error: 'WhatsApp não está conectado.' });
+    if (!session.isWhatsAppReady || !session.sock) {
+      return res.status(503).json({ error: 'O WhatsApp da sua loja não está conectado.' });
     }
 
     const trace = [];
@@ -1362,12 +1462,12 @@ app.post('/api/marketing/test-dispatch', async (req, res) => {
     if (camp.targetType === 'group' && camp.targetGroupId) {
       if (camp.isStockOffer) {
         const count = Number(camp.stockOfferCount) || 1;
-        const offers = await buildStockOfferMessage({ count });
+        const offers = await buildStockOfferMessage({ count }, companyId);
         if (offers && offers.length > 0) {
           for (let idx = 0; idx < offers.length; idx++) {
             const offer = offers[idx];
             trace.push(`Enviando oferta do modelo "${offer.modelName}" com foto para o grupo ${camp.targetGroupId}...`);
-            await sendBaileysMessage(camp.targetGroupId, offer.messageText, { imageUrl: offer.imageUrl });
+            await sendBaileysMessage(camp.targetGroupId, offer.messageText, { imageUrl: offer.imageUrl }, companyId);
             if (idx < offers.length - 1) await new Promise(r => setTimeout(r, 4000));
           }
           trace.push(`✅ Ofertas disparadas com sucesso no grupo.`);
@@ -1381,12 +1481,12 @@ app.post('/api/marketing/test-dispatch', async (req, res) => {
           .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
 
         trace.push(`Enviando mensagem para o grupo ${camp.targetGroupId}...`);
-        await sendBaileysMessage(camp.targetGroupId, formattedMsg, { imageUrl: camp.imageUrl });
+        await sendBaileysMessage(camp.targetGroupId, formattedMsg, { imageUrl: camp.imageUrl }, companyId);
         trace.push(`✅ Mensagem de texto enviada com sucesso ao grupo.`);
       }
     }
 
-    return res.json({ success: true, trace });
+    return res.json({ success: true, companyId, trace });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -1395,19 +1495,21 @@ app.post('/api/marketing/test-dispatch', async (req, res) => {
 app.post('/api/marketing/test-lab-dispatch', async (req, res) => {
   const trace = [];
   try {
+    const companyId = getRequestCompanyId(req);
+    const session = getTenantSession(companyId);
     const { phone, text, name } = req.body;
-    trace.push({ step: 1, title: 'Recepção dos Dados', status: 'OK', details: { phone, name: name || 'Teste' } });
+    trace.push({ step: 1, title: 'Recepção dos Dados', status: 'OK', details: { phone, name: name || 'Teste', companyId } });
 
     if (!phone || !text) {
       trace.push({ step: 2, title: 'Validação', status: 'ERROR', message: 'Telefone ou mensagem vazia.' });
       return res.status(400).json({ success: false, trace, error: 'Telefone e mensagem são obrigatórios.' });
     }
 
-    if (!isWhatsAppReady || !sock) {
-      trace.push({ step: 2, title: 'Status do WhatsApp', status: 'ERROR', message: 'WhatsApp desconectado.' });
+    if (!session.isWhatsAppReady || !session.sock) {
+      trace.push({ step: 2, title: 'Status do WhatsApp', status: 'ERROR', message: 'WhatsApp da loja desconectado.' });
       return res.status(503).json({ success: false, trace, error: 'WhatsApp offline. Conecte pelo QR Code.' });
     }
-    trace.push({ step: 2, title: 'Status do WhatsApp', status: 'OK', message: 'WhatsApp conectado via WebSocket.' });
+    trace.push({ step: 2, title: 'Status do WhatsApp', status: 'OK', message: 'WhatsApp da loja conectado via WebSocket.' });
 
     const structural = validateStructuralPhone(phone);
     if (!structural.valid) {
@@ -1416,7 +1518,7 @@ app.post('/api/marketing/test-lab-dispatch', async (req, res) => {
     }
     trace.push({ step: 3, title: 'Validação Estrutural', status: 'OK', details: { ddd: structural.ddd, digits: structural.cleanPhone } });
 
-    const probe = await resolveCanonicalWhatsAppJid(phone);
+    const probe = await resolveCanonicalWhatsAppJid(phone, companyId);
     if (!probe.valid) {
       trace.push({ step: 4, title: 'Verificação no Servidor', status: 'ERROR', message: probe.message });
       return res.status(422).json({ success: false, trace, error: probe.error, message: probe.message });
@@ -1424,11 +1526,12 @@ app.post('/api/marketing/test-lab-dispatch', async (req, res) => {
     trace.push({ step: 4, title: 'Verificação no Servidor', status: 'OK', message: `Conta ativa: ${probe.jid}` });
 
     trace.push({ step: 5, title: 'Envio da Mensagem', status: 'IN_PROGRESS', target: probe.jid });
-    const result = await sock.sendMessage(probe.jid, { text });
+    const result = await session.sock.sendMessage(probe.jid, { text });
     trace.push({ step: 5, title: 'Envio da Mensagem', status: 'OK', messageId: result.key.id });
 
     return res.json({
       success: true,
+      companyId,
       trace,
       canonicalJid: probe.jid,
       messageId: result.key.id
@@ -1440,7 +1543,7 @@ app.post('/api/marketing/test-lab-dispatch', async (req, res) => {
 });
 
 // =============================================
-// MOTOR SCHEDULER DE MARKETING (setInterval 60s)
+// MOTOR SCHEDULER MULTITENANT DE MARKETING (setInterval 60s)
 // =============================================
 const WEEKDAY_MAP = {
   'DOMINGO': 0,
@@ -1464,23 +1567,40 @@ function cleanOldIdempotencyKeys(config) {
   }
 }
 
+function getAllConfiguredTenantIds() {
+  const ids = new Set([OFFICIAL_COMPANY_ID]);
+  try {
+    if (fs.existsSync(DATA_DIR)) {
+      const files = fs.readdirSync(DATA_DIR);
+      files.forEach(file => {
+        const m = file.match(/^marketing_config_(.+)\.json$/);
+        if (m && m[1]) ids.add(m[1]);
+      });
+    }
+  } catch (e) {}
+  for (const cid of tenantSessions.keys()) {
+    ids.add(cid);
+  }
+  return Array.from(ids);
+}
+
 const runningListCampaigns = new Set();
 
-async function marketingSchedulerTick() {
+async function runSchedulerForCompany(companyId) {
+  const cid = sanitizeTenantId(companyId);
   try {
-    const config = loadMarketingConfig();
+    const config = loadMarketingConfig(cid);
     if (!config.campaigns || config.campaigns.length === 0) return;
 
-    // Se WhatsApp não estiver conectado, tenta restaurar sessão salva silenciosamente (sem gerar QR)
-    if (!isWhatsAppReady || !sock) {
-      if (hasSavedWhatsAppSession()) {
-        console.log('🔄 [Marketing Scheduler] Tentando restaurar sessão Baileys salva em disco...');
-        await requestWhatsAppConnection(false); // allowQrGeneration = false
+    const session = getTenantSession(cid);
+    if (!session.isWhatsAppReady || !session.sock) {
+      if (hasSavedWhatsAppSession(cid)) {
+        console.log(`🔄 [Marketing Scheduler][${cid}] Tentando restaurar sessão Baileys salva em disco...`);
+        await requestWhatsAppConnection(cid, false);
       }
     }
 
-    if (!isWhatsAppReady || !sock) {
-      // Nenhuma sessão ativa ou restaurável silenciosamente
+    if (!session.isWhatsAppReady || !session.sock) {
       return;
     }
 
@@ -1529,24 +1649,23 @@ async function marketingSchedulerTick() {
         }
       }
 
-      const idempKey = `${camp.id}_${todayStr}_${matchedSlot}`;
+      const idempKey = `${cid}_${camp.id}_${todayStr}_${matchedSlot}`;
       const alreadyFired = (config.idempotencyKeys || []).some(entry => entry.key === idempKey);
       if (alreadyFired) continue;
 
       if (camp.targetType === 'group' && camp.targetGroupId) {
         try {
           if (camp.isStockOffer) {
-            // Se tiver 2 horários separados, cada horário dispara 1 pod sorteado
             const count = isTwoSlots ? 1 : (Number(camp.stockOfferCount) || 1);
-            const offers = await buildStockOfferMessage({ count });
+            const offers = await buildStockOfferMessage({ count }, cid);
             if (offers && offers.length > 0) {
               for (let idx = 0; idx < offers.length; idx++) {
                 const offer = offers[idx];
-                await sendBaileysMessage(camp.targetGroupId, offer.messageText, { imageUrl: offer.imageUrl });
+                await sendBaileysMessage(camp.targetGroupId, offer.messageText, { imageUrl: offer.imageUrl }, cid);
                 if (idx < offers.length - 1) await new Promise(r => setTimeout(r, 4000));
               }
             } else {
-              console.warn(`⚠️ [Scheduler Grupo] Campanha "${camp.name}" (${matchedSlot}): Nenhum pod disponível com estoque positivo no momento.`);
+              console.warn(`⚠️ [Scheduler Grupo][${cid}] Campanha "${camp.name}" (${matchedSlot}): Nenhum pod disponível com estoque positivo.`);
             }
           } else {
             const formattedMsg = (camp.message || '')
@@ -1554,10 +1673,10 @@ async function marketingSchedulerTick() {
               .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods.vercel.app')
               .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
 
-            await sendBaileysMessage(camp.targetGroupId, formattedMsg, { imageUrl: camp.imageUrl });
+            await sendBaileysMessage(camp.targetGroupId, formattedMsg, { imageUrl: camp.imageUrl }, cid);
           }
 
-          const freshConfig = loadMarketingConfig();
+          const freshConfig = loadMarketingConfig(cid);
           if (!freshConfig.idempotencyKeys) freshConfig.idempotencyKeys = [];
           freshConfig.idempotencyKeys.push({ key: idempKey, timestamp: new Date().toISOString(), campaignName: camp.name });
 
@@ -1565,23 +1684,24 @@ async function marketingSchedulerTick() {
           if (campIndex !== -1) {
             freshConfig.campaigns[campIndex].lastRunDate = nowSP.toLocaleDateString('pt-BR');
           }
-          saveMarketingConfig(freshConfig);
-          console.log(`✅ [Scheduler Grupo] Campanha "${camp.name}" (${matchedSlot}) disparada com sucesso às ${currentTimeStr}.`);
+          saveMarketingConfig(freshConfig, cid);
+          console.log(`✅ [Scheduler Grupo][${cid}] Campanha "${camp.name}" (${matchedSlot}) disparada com sucesso às ${currentTimeStr}.`);
         } catch (e) {
-          console.error(`❌ [Scheduler Grupo] Erro:`, e.message);
+          console.error(`❌ [Scheduler Grupo][${cid}] Erro:`, e.message);
         }
       }
 
-      if (camp.targetType === 'lists' && !runningListCampaigns.has(camp.id)) {
+      const runLockKey = `${cid}_${camp.id}`;
+      if (camp.targetType === 'lists' && !runningListCampaigns.has(runLockKey)) {
         if (!config.idempotencyKeys) config.idempotencyKeys = [];
         config.idempotencyKeys.push({ key: idempKey, timestamp: new Date().toISOString(), campaignName: camp.name });
-        saveMarketingConfig(config);
+        saveMarketingConfig(config, cid);
 
-        runningListCampaigns.add(camp.id);
+        runningListCampaigns.add(runLockKey);
 
         (async () => {
           try {
-            console.log(`🚀 [Scheduler 1-a-1] Disparando campanha autônoma: "${camp.name}"`);
+            console.log(`🚀 [Scheduler 1-a-1][${cid}] Disparando campanha autônoma: "${camp.name}"`);
             const lists = config.lists || [];
             const targetLists = lists.filter(l => (camp.selectedListIds || []).includes(l.id));
             const contactMap = new Map();
@@ -1593,7 +1713,7 @@ async function marketingSchedulerTick() {
             const effectiveBatchInterval = camp.batchIntervalMinutes || 35;
 
             for (let i = 0; i < targetContacts.length; i++) {
-              const currentConfig = loadMarketingConfig();
+              const currentConfig = loadMarketingConfig(cid);
               const currentCamp = (currentConfig.campaigns || []).find(c => c.id === camp.id);
               if (!currentCamp || currentCamp.status !== 'active') break;
 
@@ -1617,13 +1737,13 @@ async function marketingSchedulerTick() {
 
               const formattedNumber = formatToBaileysJid(cleanPhone);
               try {
-                await sendBaileysMessage(formattedNumber, formattedMsg);
+                await sendBaileysMessage(formattedNumber, formattedMsg, {}, cid);
               } catch (e) {
-                console.warn(`⚠️ Erro ao enviar para ${formattedNumber}:`, e.message);
+                console.warn(`⚠️ [${cid}] Erro ao enviar para ${formattedNumber}:`, e.message);
               }
 
               markPhoneAsSent(camp.id, cleanPhone, currentConfig);
-              saveMarketingConfig(currentConfig);
+              saveMarketingConfig(currentConfig, cid);
               batchCounter++;
 
               const randomDelay = Math.floor(Math.random() * 10000) + 10000;
@@ -1631,27 +1751,34 @@ async function marketingSchedulerTick() {
 
               if (batchCounter >= effectiveBatchSize && (i + 1) < targetContacts.length) {
                 batchCounter = 0;
-                console.log(`⏸️ [Scheduler 1-a-1] Lote de ${effectiveBatchSize} enviado. Pausa de ${effectiveBatchInterval} min...`);
+                console.log(`⏸️ [Scheduler 1-a-1][${cid}] Lote de ${effectiveBatchSize} enviado. Pausa de ${effectiveBatchInterval} min...`);
                 await new Promise(r => setTimeout(r, effectiveBatchInterval * 60 * 1000));
               }
             }
 
-            const finalConfig = loadMarketingConfig();
+            const finalConfig = loadMarketingConfig(cid);
             const cIdx = (finalConfig.campaigns || []).findIndex(c => c.id === camp.id);
             if (cIdx !== -1) {
               finalConfig.campaigns[cIdx].lastRunDate = nowSP.toLocaleDateString('pt-BR');
-              saveMarketingConfig(finalConfig);
+              saveMarketingConfig(finalConfig, cid);
             }
           } catch (e) {
-            console.error(`❌ [Scheduler] Erro em "${camp.name}":`, e.message);
+            console.error(`❌ [Scheduler][${cid}] Erro em "${camp.name}":`, e.message);
           } finally {
-            runningListCampaigns.delete(camp.id);
+            runningListCampaigns.delete(runLockKey);
           }
         })();
       }
     }
   } catch (err) {
-    console.error('❌ [Scheduler] Erro tick:', err.message);
+    console.error(`❌ [Scheduler][${cid}] Erro tick:`, err.message);
+  }
+}
+
+async function marketingSchedulerTick() {
+  const tenantIds = getAllConfiguredTenantIds();
+  for (const cid of tenantIds) {
+    await runSchedulerForCompany(cid);
   }
 }
 

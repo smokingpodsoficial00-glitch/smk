@@ -177,10 +177,15 @@ export default function MarketingModule() {
     }
   };
 
-  // Checa status inicial no mount
+  // Checa status inicial no mount e sempre que a empresa ativa mudar
   useEffect(() => {
-    checkWhatsAppStatus();
-  }, []);
+    setWhatsAppConnected(false);
+    setQrCodeImageUrl(null);
+    setWhatsAppSessionStatus('DISCONNECTED');
+    if (company?.id) {
+      checkWhatsAppStatus();
+    }
+  }, [company?.id]);
 
   // Polling ativo APENAS enquanto o modal de conexão estiver aberto e não conectado
   useEffect(() => {
@@ -469,9 +474,13 @@ export default function MarketingModule() {
       const savedGroups = localStorage.getItem(tenantCacheKey('SP_MARKETING_GROUPS'));
       if (savedContacts) {
         setAllContacts(JSON.parse(savedContacts));
+      } else {
+        setAllContacts([]);
       }
       if (savedGroups) {
         setWhatsAppGroups(JSON.parse(savedGroups));
+      } else {
+        setWhatsAppGroups([]);
       }
     } catch (e) {
       console.warn('Erro ao carregar cache do marketing:', e);
