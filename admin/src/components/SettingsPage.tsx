@@ -3,7 +3,8 @@ import {
   Store, Phone, Globe,
   Save, CheckCircle2, AlertCircle, Loader2,
   Type, Smartphone, Copy, Check, Sparkles, Lock, ExternalLink, Sun, Moon,
-  Compass, Play, BookOpen, GraduationCap, Video, Laptop, HelpCircle, ChevronRight
+  Compass, Play, BookOpen, GraduationCap, Video, Laptop, HelpCircle, ChevronRight,
+  ArrowLeft, Clock, Film
 } from "lucide-react";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { supabase } from "@/lib/supabase";
@@ -13,6 +14,91 @@ import { validateAndNormalizeBrazilianPhone, formatBrazilianPhone } from "@/lib/
 import { MobilePushSetupModal } from "./MobilePushSetupModal";
 import { SYSTEM_TUTORIALS, TutorialDetailModal, type TutorialItem } from "./TutorialsModal";
 
+export interface VideoLessonItem {
+  id: string;
+  lessonNumber: number;
+  fileName: string;
+  title: string;
+  category: string;
+  duration: string;
+  description: string;
+  keyTopics: string[];
+  videoUrl?: string;
+}
+
+export const SMK_VIDEO_LESSONS: VideoLessonItem[] = [
+  {
+    id: "aula-1-pedidos",
+    lessonNumber: 1,
+    fileName: "AULA 1 PEDIDOS EDITADA.mp4",
+    title: "Aula 1: Gestão de Pedidos & Operação no Kanban",
+    category: "Pedidos & Vendas",
+    duration: "7m 24s",
+    description: "Aprenda a operar a esteira de pedidos: desde a entrada no cardápio digital, conferência de sabores, separação, envio com motoboy e baixa rápida.",
+    keyTopics: [
+      "Fluxo de colunas no Kanban (Novo, Em Separação, Em Rota, Entregue)",
+      "Lançamento de venda manual no balcão (+ Nova Venda)",
+      "Gestão de rotas de entrega e impressão de comprovantes",
+    ],
+  },
+  {
+    id: "aula-2-financeiro",
+    lessonNumber: 2,
+    fileName: "AULA 2 EDITADA FINANCEIRO.mp4",
+    title: "Aula 2: Controle Financeiro, DRE & Fluxo de Caixa",
+    category: "Finanças & Caixa",
+    duration: "11m 30s",
+    description: "Domine as finanças da sua loja: fluxo de caixa diário, entradas de pagamentos (PIX, Cartão, Dinheiro), despesas operacionais, taxa de motoboy e lucro líquido real.",
+    keyTopics: [
+      "Leitura do Fluxo de Caixa e faturamento bruto vs líquido",
+      "Lançamento de despesas operacionais e custos fixos",
+      "Cálculo automático de margem de lucro e DRE em tempo real",
+    ],
+  },
+  {
+    id: "aula-3-estoque",
+    lessonNumber: 3,
+    fileName: "AULA 3 EDITADA.mp4",
+    title: "Aula 3: Gestão de Estoque, Lotes & Produtos Parados",
+    category: "Estoque & Suprimentos",
+    duration: "12m 10s",
+    description: "Controle absoluto de estoque: cadastro de novos pods e marcas, gerenciamento de sabores, entrada de lotes com custo unitário e monitoramento de produtos parados.",
+    keyTopics: [
+      "Cadastro rápido de produtos, sabores e fotos",
+      "Entrada de novos lotes e atualização do custo médio",
+      "Identificação de produtos parados para criar promoções relâmpago",
+    ],
+  },
+  {
+    id: "aula-4-crm",
+    lessonNumber: 4,
+    fileName: "aula 4 editada crm.mp4",
+    title: "Aula 4: CRM, Recompra Preditiva & Fidelização",
+    category: "CRM & Clientes",
+    duration: "7m 13s",
+    description: "Transforme compradores eventuais em clientes fiéis: acompanhamento de hábitos de compra, matriz RFM e previsão de quando o pod do cliente vai acabar.",
+    keyTopics: [
+      "Base de clientes organizada por ticket médio e frequência",
+      "Previsão de término de pod e timing perfeito de contato",
+      "Recuperação de clientes inativos direto pelo WhatsApp",
+    ],
+  },
+  {
+    id: "aula-5-marketing",
+    lessonNumber: 5,
+    fileName: "aula 5 de Marketing Editada.mp4",
+    title: "Aula 5: Marketing, Listas & Disparos no WhatsApp",
+    category: "Marketing & Campanhas",
+    duration: "11m 12s",
+    description: "Alavanque suas vendas com campanhas de WhatsApp: criação de listas de transmissão segmentadas, modelos de mensagens de alta conversão e disparos seguros.",
+    keyTopics: [
+      "Segmentação de listas (Compradores VIP, Clientes Antigos, Grupo)",
+      "Modelos de ofertas diárias com fotos e sabores disponíveis",
+      "Cadência segura e intervalos anti-banimento no WhatsApp",
+    ],
+  },
+];
+
 export default function SettingsPage() {
   const { theme, toggleTheme, setTheme } = useTheme();
   const { config, loading, saving, saveStatus, updateConfig, updateStoreWhatsApp } = useStoreConfig();
@@ -20,6 +106,10 @@ export default function SettingsPage() {
 
   // Aba ativa nas configurações
   const [activeTab, setActiveTab] = useState<"store" | "system" | "tutorials">("store");
+
+  // Visualização da Área de Videoaulas (capa de apresentação ou sala de aula)
+  const [tutorialsView, setTutorialsView] = useState<"cover" | "classroom">("cover");
+  const [selectedLessonIndex, setSelectedLessonIndex] = useState<number>(0);
 
   // Modais integrados
   const [mobilePushModalOpen, setMobilePushModalOpen] = useState(false);
@@ -732,82 +822,277 @@ export default function SettingsPage() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════════════════════
-            ABA 3: VIDEOAULAS E TUTORIAIS (Espaço preparado para receber os vídeos)
+            ABA 3: VIDEOAULAS E TUTORIAIS (Capa e Central de Aulas)
            ═══════════════════════════════════════════════════════════════════════════ */}
         {activeTab === "tutorials" && (
           <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
-            
-            {/* Header da Seção */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
-                  <Video className="size-6 text-amber-400" />
-                  <span>Videoaulas e tutoriais</span>
-                </h2>
-                <p className="text-xs text-white/50 mt-1">
-                  Espaço reservado para as videoaulas e tutoriais práticos da operação.
-                </p>
-              </div>
+            {tutorialsView === "cover" ? (
+              <>
+                {/* Header da Seção */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
+                      <Video className="size-6 text-amber-400" />
+                      <span>Videoaulas e tutoriais</span>
+                    </h2>
+                    <p className="text-xs text-white/50 mt-1">
+                      Treinamento prático da operação Smoking Pods: 5 aulas passo a passo.
+                    </p>
+                  </div>
 
-              <button
-                type="button"
-                onClick={handleStartTour}
-                className="px-4 py-2 rounded-xl font-bold text-xs bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-2 self-start sm:self-auto"
-              >
-                <Compass className="size-3.5 text-amber-400" />
-                <span>Tour do Sistema</span>
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    onClick={handleStartTour}
+                    className="px-4 py-2 rounded-xl font-bold text-xs bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-2 self-start sm:self-auto"
+                  >
+                    <Compass className="size-3.5 text-amber-400" />
+                    <span>Tour do Sistema</span>
+                  </button>
+                </div>
 
-            {/* Container Principal de Vídeo (Player Placeholder) */}
-            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#141414] via-[#0c0c0c] to-black p-8 sm:p-14 text-center shadow-2xl flex flex-col items-center justify-center min-h-[380px]">
-              
-              {/* Efeito de iluminação de fundo */}
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(251,191,36,0.07),transparent_70%)] pointer-events-none" />
-              
-              <div className="relative z-10 max-w-md mx-auto space-y-6 flex flex-col items-center">
-                
-                {/* Ícone Play em Destaque */}
-                <div className="size-20 rounded-3xl bg-white/5 border border-white/15 flex items-center justify-center shadow-xl backdrop-blur-sm group hover:scale-105 transition-transform">
-                  <div className="size-12 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center">
-                    <Play className="size-6 text-amber-400 fill-amber-400 translate-x-0.5" />
+                {/* Card de Apresentação / Capa do Curso */}
+                <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#141414] via-[#0c0c0c] to-black p-8 sm:p-12 text-center shadow-2xl flex flex-col items-center justify-center min-h-[380px]">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(251,191,36,0.08),transparent_70%)] pointer-events-none" />
+                  
+                  <div className="relative z-10 max-w-xl mx-auto space-y-6 flex flex-col items-center">
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/25 text-amber-300 text-xs font-bold">
+                      <GraduationCap className="size-4" />
+                      <span>Academia de Operação • 5 Aulas (~50 min)</span>
+                    </div>
+
+                    <div className="size-20 rounded-3xl bg-white/5 border border-white/15 flex items-center justify-center shadow-xl backdrop-blur-sm group hover:scale-105 transition-transform">
+                      <div className="size-12 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center">
+                        <Play className="size-6 text-amber-400 fill-amber-400 translate-x-0.5" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                        Videoaulas e tutoriais
+                      </h3>
+                      <p className="text-xs sm:text-sm text-white/60 leading-relaxed max-w-lg">
+                        Aprenda em detalhes como operar cada engrenagem da sua loja: desde o controle de pedidos e caixa até reposição de estoque e disparos de marketing.
+                      </p>
+                    </div>
+
+                    {/* Resumo das 5 Aulas */}
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 w-full pt-1">
+                      {SMK_VIDEO_LESSONS.map((l) => (
+                        <div key={l.id} className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 text-center space-y-1">
+                          <span className="text-[10px] font-mono text-amber-400/80 font-bold block">Aula {l.lessonNumber}</span>
+                          <span className="text-[11px] font-bold text-white block truncate">{l.category.split("&")[0].trim()}</span>
+                          <span className="text-[10px] text-white/40 block font-mono">⏱️ {l.duration}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Botão Iniciar Tutorial */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTutorialsView("classroom");
+                          setSelectedLessonIndex(0);
+                        }}
+                        className="inline-flex items-center gap-2.5 px-9 py-4 rounded-2xl bg-white hover:bg-white/90 text-black font-extrabold text-sm shadow-[0_0_30px_rgba(255,255,255,0.25)] hover:scale-105 transition-all cursor-pointer active:scale-95"
+                      >
+                        <Play className="size-4.5 fill-black" />
+                        <span>Iniciar tutorial</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* MODO SALA DE AULA / VÍDEOS (Classroom) */
+              <div className="space-y-6 animate-in fade-in duration-200">
+                {/* Barra de Topo da Sala de Aula com Botão Voltar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setTutorialsView("cover")}
+                      className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition-all cursor-pointer active:scale-95 flex items-center gap-2 text-xs font-bold"
+                    >
+                      <ArrowLeft className="size-4" />
+                      <span>Voltar</span>
+                    </button>
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
+                        <span>Central de Videoaulas</span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-300 border border-amber-400/25">
+                          Aula {selectedLessonIndex + 1} de {SMK_VIDEO_LESSONS.length}
+                        </span>
+                      </h2>
+                      <p className="text-xs text-white/50">
+                        {SMK_VIDEO_LESSONS[selectedLessonIndex].title}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-white/40 font-mono">
+                      ⏱️ Duração: {SMK_VIDEO_LESSONS[selectedLessonIndex].duration}
+                    </span>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <h3 className="text-xl font-bold text-white tracking-tight">
-                    Videoaulas e tutoriais
-                  </h3>
-                  <p className="text-xs text-white/50 leading-relaxed">
-                    Área reservada para as videoaulas da loja. Quando você enviar os vídeos, eles serão adicionados aqui para reprodução direta.
-                  </p>
-                </div>
-
-                {/* Botão Principal Iniciar Vídeo */}
-                <div className="pt-2 flex flex-col items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setVideoStartedNotice(true);
-                      setTimeout(() => setVideoStartedNotice(false), 5000);
-                    }}
-                    className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-2xl bg-white hover:bg-white/90 text-black font-extrabold text-sm shadow-[0_0_25px_rgba(255,255,255,0.2)] hover:scale-105 transition-all cursor-pointer active:scale-95"
-                  >
-                    <Play className="size-4 fill-black" />
-                    <span>Iniciar vídeo</span>
-                  </button>
-
-                  {videoStartedNotice && (
-                    <div className="animate-in fade-in slide-in-from-top-2 duration-200 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/25 px-4 py-2.5 rounded-xl flex items-center gap-2">
-                      <Sparkles className="size-3.5 shrink-0 text-amber-400" />
-                      <span>Área pronta! Os vídeos enviados serão vinculados diretamente neste player.</span>
+                {/* Grade Principal: Player à Esquerda/Topo + Playlist de Aulas à Direita/Abaixo */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  
+                  {/* Coluna 1 e 2: Player de Vídeo e Detalhes da Aula Atual */}
+                  <div className="lg:col-span-2 space-y-4">
+                    {/* Container do Player (Proporção 16:9) */}
+                    <div className="relative aspect-video w-full rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-[#141414] via-[#0a0a0a] to-black shadow-2xl flex flex-col items-center justify-center">
+                      {SMK_VIDEO_LESSONS[selectedLessonIndex].videoUrl ? (
+                        <video
+                          src={SMK_VIDEO_LESSONS[selectedLessonIndex].videoUrl}
+                          controls
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="p-8 text-center space-y-4 max-w-md">
+                          <div className="size-16 rounded-2xl bg-amber-400/10 border border-amber-400/30 text-amber-400 flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(251,191,36,0.2)]">
+                            <Play className="size-8 fill-amber-400 translate-x-0.5" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400/80 font-bold block mb-1">
+                              {SMK_VIDEO_LESSONS[selectedLessonIndex].category}
+                            </span>
+                            <h3 className="text-lg font-bold text-white">
+                              {SMK_VIDEO_LESSONS[selectedLessonIndex].title}
+                            </h3>
+                            <p className="text-xs text-white/50 mt-1">
+                              Arquivo: <code className="text-amber-300 font-mono">{SMK_VIDEO_LESSONS[selectedLessonIndex].fileName}</code>
+                            </p>
+                          </div>
+                          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white/70 text-xs font-medium">
+                            <Clock className="size-3.5 text-amber-400" />
+                            <span>Duração: {SMK_VIDEO_LESSONS[selectedLessonIndex].duration}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
+
+                    {/* Descrição e Tópicos Chave da Aula Selecionada */}
+                    <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-5 space-y-3">
+                      <div>
+                        <span className="text-[10px] font-mono text-amber-400 uppercase tracking-wider font-bold">
+                          Sobre esta aula
+                        </span>
+                        <h4 className="text-base font-bold text-white mt-0.5">
+                          {SMK_VIDEO_LESSONS[selectedLessonIndex].title}
+                        </h4>
+                        <p className="text-xs text-white/60 mt-1 leading-relaxed">
+                          {SMK_VIDEO_LESSONS[selectedLessonIndex].description}
+                        </p>
+                      </div>
+
+                      <div className="pt-2 border-t border-white/5 space-y-1.5">
+                        <span className="text-[11px] font-bold text-white/80 block">
+                          Principais tópicos abordados no vídeo:
+                        </span>
+                        <div className="space-y-1">
+                          {SMK_VIDEO_LESSONS[selectedLessonIndex].keyTopics.map((topic, i) => (
+                            <div key={i} className="flex items-start gap-2 text-xs text-white/70">
+                              <CheckCircle2 className="size-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                              <span>{topic}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Botões de Navegação entre Aulas */}
+                      <div className="pt-3 border-t border-white/5 flex items-center justify-between">
+                        <button
+                          type="button"
+                          disabled={selectedLessonIndex === 0}
+                          onClick={() => setSelectedLessonIndex(prev => Math.max(0, prev - 1))}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                            selectedLessonIndex === 0
+                              ? "opacity-30 cursor-not-allowed text-white/40"
+                              : "bg-white/5 hover:bg-white/10 text-white cursor-pointer active:scale-95"
+                          }`}
+                        >
+                          ← Aula Anterior
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={selectedLessonIndex === SMK_VIDEO_LESSONS.length - 1}
+                          onClick={() => setSelectedLessonIndex(prev => Math.min(SMK_VIDEO_LESSONS.length - 1, prev + 1))}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                            selectedLessonIndex === SMK_VIDEO_LESSONS.length - 1
+                              ? "opacity-30 cursor-not-allowed text-white/40"
+                              : "bg-amber-400 hover:bg-amber-300 text-black cursor-pointer active:scale-95 shadow-md shadow-amber-400/20"
+                          }`}
+                        >
+                          Próxima Aula →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Coluna 3: Playlist de Todas as Aulas */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <Film className="size-3.5 text-amber-400" />
+                        <span>Grade do Treinamento</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-white/50">
+                        {SMK_VIDEO_LESSONS.length} Aulas
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {SMK_VIDEO_LESSONS.map((lesson, idx) => {
+                        const isCurrent = idx === selectedLessonIndex;
+                        return (
+                          <div
+                            key={lesson.id}
+                            onClick={() => setSelectedLessonIndex(idx)}
+                            className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                              isCurrent
+                                ? "bg-amber-500/10 border-amber-400/40 shadow-lg shadow-amber-500/10 ring-1 ring-amber-400/30"
+                                : "bg-[#0a0a0a] border-white/10 hover:border-white/20 hover:bg-white/[0.02]"
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`size-8 rounded-xl flex items-center justify-center shrink-0 font-mono text-xs font-bold ${
+                                isCurrent
+                                  ? "bg-amber-400 text-black"
+                                  : "bg-white/5 text-white/60 border border-white/10"
+                              }`}>
+                                {isCurrent ? <Play className="size-3.5 fill-black" /> : `0${lesson.lessonNumber}`}
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-1 mb-0.5">
+                                  <span className="text-[10px] font-mono uppercase tracking-wider text-white/40 font-bold truncate">
+                                    {lesson.category}
+                                  </span>
+                                  <span className="text-[10px] font-mono text-white/50 shrink-0">
+                                    ⏱️ {lesson.duration}
+                                  </span>
+                                </div>
+                                <h5 className={`text-xs font-bold truncate ${isCurrent ? "text-amber-300" : "text-white"}`}>
+                                  {lesson.title}
+                                </h5>
+                                <p className="text-[10px] text-white/40 truncate mt-0.5 font-mono">
+                                  {lesson.fileName}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                 </div>
-
               </div>
-            </div>
-
+            )}
           </div>
         )}
 
