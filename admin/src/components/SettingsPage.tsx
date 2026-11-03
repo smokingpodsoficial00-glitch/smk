@@ -55,6 +55,7 @@ export const SMK_VIDEO_LESSONS: VideoLessonItem[] = [
       "Lançamento de despesas operacionais e custos fixos",
       "Cálculo automático de margem de lucro e DRE em tempo real",
     ],
+    videoUrl: "https://youtu.be/z6c8ayGob98",
   },
   {
     id: "aula-3-estoque",
