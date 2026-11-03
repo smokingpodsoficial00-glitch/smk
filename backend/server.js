@@ -30,37 +30,9 @@ const defaultDevOrigins = [
 ];
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-
-    if (
-      origin.endsWith('.vercel.app') ||
-      origin.startsWith('http://localhost') ||
-      origin.startsWith('http://127.0.0.1')
-    ) {
-      return callback(null, true);
-    }
-
-    if (configuredOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    const matchesPattern = configuredOrigins.some(pattern => {
-      if (!pattern.includes('*')) return false;
-      const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
-      return regex.test(origin);
-    });
-    if (matchesPattern) return callback(null, true);
-
-    if (defaultDevOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error(`CORS bloqueado: Origem '${origin}' não autorizada pelo servidor.`));
-  },
+  origin: true,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
 };
 
 app.use((req, res, next) => {
