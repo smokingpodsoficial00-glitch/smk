@@ -161,6 +161,7 @@ export default function MarketingModule() {
         if (data.isReady || data.status === 'CONNECTED') {
           setWhatsAppConnected(true);
           setQrCodeImageUrl(null);
+          setIsQrModalOpen(false);
         } else {
           setWhatsAppConnected(false);
           if (data.status === 'QR_AVAILABLE' && data.qrImageUrl) {
@@ -190,7 +191,7 @@ export default function MarketingModule() {
   // Polling ativo APENAS enquanto o modal de conexão estiver aberto e não conectado
   useEffect(() => {
     if (!isQrModalOpen || whatsAppConnected) return;
-    const interval = setInterval(checkWhatsAppStatus, 2500);
+    const interval = setInterval(checkWhatsAppStatus, 1200);
     return () => clearInterval(interval);
   }, [isQrModalOpen, whatsAppConnected]);
 
@@ -221,10 +222,10 @@ export default function MarketingModule() {
     }
   };
 
-  // Ação de cancelamento da conexão pelo usuário
+  // Ação de cancelamento da conexão pelo usuário (preserva pareamento em andamento se já leu o QR)
   const handleCancelConnect = async () => {
     setIsQrModalOpen(false);
-    if (!whatsAppConnected) {
+    if (!whatsAppConnected && !hasSavedSession && whatsAppSessionStatus !== 'CONNECTING') {
       try {
         await legacyFetch(`/api/whatsapp/disconnect`, { method: 'POST' });
       } catch (e) {}
@@ -313,8 +314,42 @@ export default function MarketingModule() {
 
   const handleStopCampaign = () => {
     isAbortingRef.current = true;
-    setDispatchProgress(prev => prev ? { ...prev, status: 'Interrompendo disparos... aguarde o contato atual.' } : null);
+    setDispatchProgress(prev => prev ? { ...prev, status: '🛑 Interrompendo disparos a pedido do usuário...' } : null);
+    legacyFetch(`/api/marketing/campaigns/stop-dispatch`, { method: 'POST' }).catch(() => {});
   };
+
+  // Sincroniza status de disparos contínuos rodando em background no servidor ("Até Segunda Ordem")
+  useEffect(() => {
+    if (!company?.id) return;
+    let active = true;
+
+    const checkServerDispatch = async () => {
+      try {
+        const res = await legacyFetch(`/api/marketing/campaigns/dispatch-status`);
+        if (!res.ok || !active) return;
+        const data = await res.json();
+        const d = data?.dispatch;
+        if (d && d.isRunning) {
+          setExecutingCampaignId(d.campaignId);
+          setDispatchProgress({
+            current: d.current || 0,
+            total: d.total || 1,
+            status: d.status || 'Disparo contínuo em andamento no servidor...'
+          });
+        } else if (d && !d.isRunning && executingCampaignId === d.campaignId && isAbortingRef.current) {
+          setExecutingCampaignId(null);
+          setDispatchProgress(null);
+        }
+      } catch {}
+    };
+
+    checkServerDispatch();
+    const timer = setInterval(checkServerDispatch, 2500);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [company?.id, executingCampaignId]);
 
   const handleCleanAndDeduplicateLists = async () => {
     if (!confirm('⚡ Executar Higienização & Desduplicação Automática?\n\nO sistema vai:\n1. Analisar todas as listas e remover contatos duplicados cruzados.\n2. Preservar contatos únicos sem repetição.\n3. Proteger a base para disparos seguros.\n\nDeseja continuar?')) return;
@@ -875,6 +910,45 @@ export default function MarketingModule() {
 
     try {
       if (camp.targetType === 'lists') {
+        // Tenta iniciar o motor de disparo contínuo 24/7 direto no servidor (continua mesmo fechando a aba)
+        try {
+          const bgRes = await legacyFetch(`/api/marketing/campaigns/start-dispatch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              campaign: camp,
+              contacts: targetContacts,
+              forceSend,
+              cardapioUrl,
+              grupoVipUrl
+            })
+          });
+          if (bgRes.ok) {
+            const bgData = await bgRes.json();
+            if (bgData?.success && bgData?.dispatch) {
+              // Acompanha em tempo real até finalizar ou ser interrompido pelo usuário
+              while (!isAbortingRef.current) {
+                await new Promise(r => setTimeout(r, 2000));
+                const stRes = await legacyFetch(`/api/marketing/campaigns/dispatch-status`);
+                if (!stRes.ok) continue;
+                const stData = await stRes.json();
+                const d = stData?.dispatch;
+                if (!d) break;
+                setDispatchProgress({
+                  current: d.current || 0,
+                  total: d.total || targetContacts.length || 1,
+                  status: d.status || 'Disparando no servidor...'
+                });
+                if (!d.isRunning) {
+                  sentInThisSession = d.sentInSession || 0;
+                  break;
+                }
+              }
+              return;
+            }
+          }
+        } catch {}
+
         let batchCounter = 0;
         const effectiveBatchSize = (camp.batchSize && camp.batchSize <= 5) ? camp.batchSize : 5;
         const effectiveBatchIntervalMinutes = (camp.batchIntervalMinutes && camp.batchIntervalMinutes >= 35) ? camp.batchIntervalMinutes : 35;

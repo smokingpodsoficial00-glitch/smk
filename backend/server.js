@@ -531,9 +531,22 @@ app.post('/api/marketing/clean-and-deduplicate-lists', (req, res) => {
 
 // =============================================
 // WHATSAPP MOTOR MULTITENANT (BAILEYS) - SESSÃO ISOLADA POR LOJA (COMPANY_ID)
+// CONEXÃO PERMANENTE 24/7 (SEM DESCONEXÃO POR INATIVIDADE) & PARING RÁPIDO
 // =============================================
-const IDLE_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutos de inatividade antes de desligar socket limpo
 const tenantSessions = new Map();
+const activeCampaignDispatches = new Map(); // companyId -> { campaignId, campaignName, current, total, status, isRunning, abortRequested, startedAt }
+
+// Cache global de versão do Baileys para eliminar atraso de 2-4s ao gerar QR Code
+let cachedBaileysVersion = [2, 3000, 1015901307];
+(async () => {
+  try {
+    const { version } = await fetchLatestBaileysVersion();
+    if (Array.isArray(version) && version.length === 3) {
+      cachedBaileysVersion = version;
+      console.log(`⚡ [Baileys] Versão protocolo em cache: v${version.join('.')}`);
+    }
+  } catch (e) {}
+})();
 
 function getAuthDir(companyId = OFFICIAL_COMPANY_ID) {
   const cid = sanitizeTenantId(companyId);
@@ -555,6 +568,8 @@ function getTenantSession(companyId = OFFICIAL_COMPANY_ID) {
       detectedGroups: {},
       cachedGroups: [],
       lastGroupFetchAt: 0,
+      nextAllowedGroupFetchAt: 0,
+      groupRetryTimer: null,
       contactsMap: new Map(),
       lidToPhoneMap: new Map(),
       whatsAppSessionState: 'DISCONNECTED',
@@ -663,7 +678,7 @@ function scanAuthDirContacts(companyId = OFFICIAL_COMPANY_ID) {
   const session = getTenantSession(cid);
   const authDir = getAuthDir(cid);
 
-  // 1. Reidrata contatos já persistidos no marketing_config da loja
+  // 1. Reidrata contatos e grupos já persistidos no marketing_config da loja
   try {
     const cfg = loadMarketingConfig(cid);
     if (Array.isArray(cfg.whatsappContacts)) {
@@ -673,9 +688,15 @@ function scanAuthDirContacts(companyId = OFFICIAL_COMPANY_ID) {
         }
       });
     }
+    if (Array.isArray(cfg.whatsappGroups) && cfg.whatsappGroups.length > 0 && session.cachedGroups.length === 0) {
+      session.cachedGroups = [...cfg.whatsappGroups];
+      cfg.whatsappGroups.forEach(g => {
+        if (g && g.id) session.detectedGroups[g.id] = g;
+      });
+    }
   } catch (e) {}
 
-  // 2. Varre todos os arquivos lid-mapping-* da pasta baileys_auth da loja
+  // 2. Varre todos os arquivos lid-mapping-* e sender-key-*@g.us* da pasta baileys_auth da loja
   if (!fs.existsSync(authDir)) return session.contactsMap;
   try {
     const files = fs.readdirSync(authDir);
@@ -695,6 +716,17 @@ function scanAuthDirContacts(companyId = OFFICIAL_COMPANY_ID) {
         if (m && m[1]) {
           registerDiscoveredContact(cid, m[1], '');
         }
+      } else if (f.startsWith('sender-key-') && f.includes('@g.us')) {
+        // Extrai JID do grupo diretamente do arquivo sender-key-<groupId>@g.us--...
+        const afterPrefix = f.slice('sender-key-'.length);
+        const gJid = afterPrefix.split('--')[0];
+        if (gJid && gJid.endsWith('@g.us') && !session.detectedGroups[gJid]) {
+          session.detectedGroups[gJid] = {
+            id: gJid,
+            name: 'Grupo VIP WhatsApp',
+            participantsCount: 0
+          };
+        }
       }
     }
   } catch (e) {
@@ -702,6 +734,111 @@ function scanAuthDirContacts(companyId = OFFICIAL_COMPANY_ID) {
   }
 
   return session.contactsMap;
+}
+
+// Sincronização inteligente de grupos da loja:
+// 1. Resolve metadados individuais (groupMetadata) para grupos detectados em sender-key / mensagens (NUNCA sofre rate-limit de @g.us!)
+// 2. Consulta groupFetchAllParticipating com controle de cooldown anti rate-overlimit e retry automático em background
+async function syncTenantGroupsSmart(companyId = OFFICIAL_COMPANY_ID, forceAttempt = false) {
+  const cid = sanitizeTenantId(companyId);
+  const session = getTenantSession(cid);
+  scanAuthDirContacts(cid);
+
+  if (!session.isWhatsAppReady || !session.sock) {
+    return session.cachedGroups.length > 0 ? session.cachedGroups : Object.values(session.detectedGroups);
+  }
+
+  // Passo A: Resolver nomes reais e participantes de quaisquer grupos detectados (via groupMetadata individual, que não dá rate-overlimit)
+  const detectedIds = Object.keys(session.detectedGroups || {});
+  for (const gJid of detectedIds) {
+    const current = session.detectedGroups[gJid];
+    const needsMetadata = !current || !current.name || current.name === 'Grupo VIP WhatsApp' || current.name === 'Grupo WhatsApp' || !current.participantsCount;
+    if (needsMetadata && session.sock) {
+      try {
+        const meta = await session.sock.groupMetadata(gJid);
+        if (meta && meta.id) {
+          session.detectedGroups[meta.id] = {
+            id: meta.id,
+            name: meta.subject || current?.name || 'Grupo VIP',
+            participantsCount: Number(meta.size) || (Array.isArray(meta.participants) ? meta.participants.length : 0)
+          };
+          if (Array.isArray(meta.participants)) {
+            meta.participants.forEach(p => {
+              if (!p) return;
+              registerDiscoveredContact(cid, p.phoneNumber || p.jid || p.id, p.notify || p.name || '');
+            });
+          }
+        }
+      } catch (metaErr) {}
+    }
+  }
+
+  // Passo B: Buscar lista completa de grupos participantes respeitando janela de cooldown do WhatsApp
+  const nowMs = Date.now();
+  const canCallParticipating = nowMs >= (session.nextAllowedGroupFetchAt || 0) &&
+    (forceAttempt || session.cachedGroups.length <= 1 || (nowMs - (session.lastGroupFetchAt || 0) > 90000));
+
+  if (canCallParticipating && session.sock) {
+    session.lastGroupFetchAt = nowMs;
+    session.nextAllowedGroupFetchAt = nowMs + 25000;
+    try {
+      const rawGroups = await session.sock.groupFetchAllParticipating();
+      const fetchedGroups = [];
+      Object.values(rawGroups || {}).forEach(g => {
+        if (g && g.id) {
+          const groupObj = {
+            id: g.id,
+            name: g.subject || session.detectedGroups[g.id]?.name || 'Grupo VIP',
+            participantsCount: Number(g.size) || (Array.isArray(g.participants) ? g.participants.length : 0)
+          };
+          fetchedGroups.push(groupObj);
+          session.detectedGroups[g.id] = groupObj;
+          if (Array.isArray(g.participants)) {
+            g.participants.forEach(p => {
+              if (!p) return;
+              registerDiscoveredContact(cid, p.phoneNumber || p.jid || p.id, p.notify || p.name || '');
+            });
+          }
+        }
+      });
+      if (fetchedGroups.length > 0) {
+        session.cachedGroups = fetchedGroups;
+        console.log(`✅ [GroupsSync][${cid}] ${fetchedGroups.length} grupos sincronizados com sucesso!`);
+      }
+    } catch (e) {
+      // Se o WhatsApp retornar rate-overlimit, aguarda 45s sem martelar a API e agenda 1 retry silencioso
+      session.nextAllowedGroupFetchAt = Date.now() + 45000;
+      console.warn(`⚠️ [${cid}] Cooldown do WhatsApp ao listar todos os grupos (${e.message}). Retentativa automática agendada em 45s.`);
+      if (!session.groupRetryTimer) {
+        session.groupRetryTimer = setTimeout(async () => {
+          session.groupRetryTimer = null;
+          session.nextAllowedGroupFetchAt = 0;
+          await syncTenantGroupsSmart(cid, true);
+          persistDiscoveredWhatsAppData(cid);
+        }, 46000);
+      }
+    }
+  }
+
+  // Mescla cachedGroups com detectedGroups sem duplicatas
+  const mergedMap = new Map();
+  (session.cachedGroups || []).forEach(g => {
+    if (g && g.id) mergedMap.set(g.id, g);
+  });
+  Object.values(session.detectedGroups || {}).forEach(g => {
+    if (g && g.id) {
+      const ex = mergedMap.get(g.id);
+      if (!ex || ex.name === 'Grupo VIP WhatsApp') {
+        mergedMap.set(g.id, g);
+      }
+    }
+  });
+
+  const finalGroups = Array.from(mergedMap.values());
+  if (finalGroups.length > 0) {
+    session.cachedGroups = finalGroups;
+  }
+  return finalGroups;
 }
 
 function persistDiscoveredWhatsAppData(companyId = OFFICIAL_COMPANY_ID) {
@@ -734,18 +871,12 @@ function hasSavedWhatsAppSession(companyId = OFFICIAL_COMPANY_ID) {
   }
 }
 
-// Helper: Resetar o timer de inatividade da loja
+// Conexão 24/7 ativa: NUNCA desconecta por inatividade (garante disparos contínuos de madrugada e pausas de 35 min)
 function touchWhatsAppActivity(companyId = OFFICIAL_COMPANY_ID) {
   const session = getTenantSession(companyId);
   if (session.idleDisconnectTimeout) {
     clearTimeout(session.idleDisconnectTimeout);
     session.idleDisconnectTimeout = null;
-  }
-  if (session.isWhatsAppReady && session.sock) {
-    session.idleDisconnectTimeout = setTimeout(async () => {
-      console.log(`💤 [WhatsApp Idle][${session.companyId}] Inatividade detectada. Desconectando socket de forma limpa...`);
-      await disconnectWhatsAppSocketCleanly(session.companyId, 'IDLE');
-    }, IDLE_TIMEOUT_MS);
   }
 }
 
@@ -755,6 +886,10 @@ async function disconnectWhatsAppSocketCleanly(companyId = OFFICIAL_COMPANY_ID, 
   if (session.idleDisconnectTimeout) {
     clearTimeout(session.idleDisconnectTimeout);
     session.idleDisconnectTimeout = null;
+  }
+  if (session.groupRetryTimer) {
+    clearTimeout(session.groupRetryTimer);
+    session.groupRetryTimer = null;
   }
   session.whatsAppSessionState = 'DISCONNECTING';
   session.isWhatsAppReady = false;
@@ -777,14 +912,13 @@ async function disconnectWhatsAppSocketCleanly(companyId = OFFICIAL_COMPANY_ID, 
   console.log(`🔌 [WhatsApp Socket][${session.companyId}] Desconectado limpo. Estado: ${session.whatsAppSessionState}`);
 }
 
-// Inicializar Baileys SOB DEMANDA por loja (companyId)
+// Inicializar Baileys por loja (companyId) com pareamento rápido e reconexão automática
 async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQrGeneration = false) {
   const cid = sanitizeTenantId(companyId);
   const session = getTenantSession(cid);
 
   if (session.isWhatsAppReady && session.sock) {
     session.whatsAppSessionState = 'CONNECTED';
-    touchWhatsAppActivity(cid);
     return { success: true, companyId: cid, status: 'CONNECTED', isReady: true };
   }
 
@@ -796,7 +930,6 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
 
   if (!hasSession && !allowQrGeneration) {
     session.whatsAppSessionState = 'DISCONNECTED';
-    console.log(`ℹ️ [WhatsApp Lazy][${cid}] Nenhuma sessão salva em disco e geração automática de QR desativada.`);
     return { success: false, companyId: cid, status: 'WHATSAPP_NOT_CONNECTED', isReady: false, error: 'WHATSAPP_NOT_CONNECTED' };
   }
 
@@ -805,8 +938,8 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
       session.whatsAppSessionState = 'CONNECTING';
       const authDir = getAuthDir(cid);
       const { state, saveCreds } = await useMultiFileAuthState(authDir);
-      const { version, isLatest } = await fetchLatestBaileysVersion();
-      console.log(`⚡ [WhatsApp Lazy][${cid}] Iniciando Baileys v${version.join('.')}, isLatest: ${isLatest}, hasSavedSession: ${hasSession}`);
+      const version = cachedBaileysVersion;
+      console.log(`⚡ [WhatsApp][${cid}] Iniciando Baileys v${version.join('.')} (hasSavedSession: ${hasSession})`);
 
       if (session.sock) {
         try {
@@ -823,10 +956,26 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
         logger: pino({ level: 'silent' }),
         auth: state,
         printQRInTerminal: false,
-        browser: ['Smoking Pods SaaS', 'Desktop', '1.0.0'],
-        syncFullHistory: true,
+        browser: ['Smoking Pods SaaS', 'Chrome', '122.0.0'],
+        syncFullHistory: false,
+        markOnlineOnConnect: true,
+        keepAliveIntervalMs: 25000,
+        connectTimeoutMs: 20000,
+        defaultQueryTimeoutMs: 30000,
         generateHighQualityLinkPreview: true
       });
+
+      // Remove listener interno do Baileys que dispara groupFetchAllParticipating no ms 0 e causa rate-overlimit
+      try {
+        if (sockInstance.ws && typeof sockInstance.ws.removeAllListeners === 'function') {
+          sockInstance.ws.removeAllListeners('CB:ib,,dirty');
+          sockInstance.ws.on('CB:ib,,dirty', async () => {
+            try {
+              await sockInstance.cleanDirtyBits('groups');
+            } catch (e) {}
+          });
+        }
+      } catch (e) {}
 
       session.sock = sockInstance;
       sockInstance.ev.on('creds.update', saveCreds);
@@ -838,11 +987,12 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
           if (!c) continue;
           const name = c.name || c.notify || c.verifiedName || c.subject || '';
           if (c.id && String(c.id).endsWith('@g.us')) {
-            session.detectedGroups[c.id] = {
+            const gObj = {
               id: c.id,
-              name: c.subject || c.name || session.detectedGroups[c.id]?.name || 'Grupo WhatsApp',
-              participantsCount: Array.isArray(c.participants) ? c.participants.length : (session.detectedGroups[c.id]?.participantsCount || 0)
+              name: c.subject || c.name || session.detectedGroups[c.id]?.name || 'Grupo VIP WhatsApp',
+              participantsCount: Number(c.size) || (Array.isArray(c.participants) ? c.participants.length : (session.detectedGroups[c.id]?.participantsCount || 0))
             };
+            session.detectedGroups[c.id] = gObj;
             continue;
           }
           if (c.lid && c.id && !String(c.id).endsWith('@lid')) {
@@ -868,6 +1018,10 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
           if (msg.key.participantAlt) registerDiscoveredContact(cid, msg.key.participantAlt, pName);
           if (msg.key.remoteJid && !String(msg.key.remoteJid).endsWith('@g.us')) {
             registerDiscoveredContact(cid, msg.key.remoteJid, pName);
+          } else if (msg.key.remoteJid && String(msg.key.remoteJid).endsWith('@g.us')) {
+            if (!session.detectedGroups[msg.key.remoteJid]) {
+              session.detectedGroups[msg.key.remoteJid] = { id: msg.key.remoteJid, name: 'Grupo VIP WhatsApp', participantsCount: 0 };
+            }
           }
         }
         persistDiscoveredWhatsAppData(cid);
@@ -891,10 +1045,12 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
 
       sockInstance.ev.on('groups.upsert', (groups) => {
         ingestContactsBatch(groups);
+        persistDiscoveredWhatsAppData(cid);
       });
 
       sockInstance.ev.on('groups.update', (groups) => {
         ingestContactsBatch(groups);
+        persistDiscoveredWhatsAppData(cid);
       });
 
       return await new Promise((resolve) => {
@@ -911,7 +1067,7 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
               resolve({ success: false, companyId: cid, status: session.whatsAppSessionState, isReady: false, error: 'TIMEOUT' });
             }
           }
-        }, 12000);
+        }, 10000);
 
         sockInstance.ev.on('connection.update', async (update) => {
           const { connection, lastDisconnect, qr } = update;
@@ -922,18 +1078,17 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
               session.isWhatsAppReady = false;
               session.whatsAppSessionState = 'QR_AVAILABLE';
               try {
-                session.latestQrDataUrl = await QRCodeImage.toDataURL(qr, { width: 400, margin: 2 });
+                session.latestQrDataUrl = await QRCodeImage.toDataURL(qr, { width: 360, margin: 1 });
               } catch (e) {
                 console.warn(`⚠️ [${cid}] Erro ao converter QR para DataURL:`, e.message);
               }
-              console.log(`📱 [WhatsApp QR Code][${cid}] QR gerado com sucesso!`);
+              console.log(`📱 [WhatsApp QR Code][${cid}] QR gerado instantaneamente!`);
               if (!isResolved) {
                 isResolved = true;
                 clearTimeout(connectionTimeout);
                 resolve({ success: true, companyId: cid, status: 'QR_AVAILABLE', isReady: false, qr: session.latestQr, qrImageUrl: session.latestQrDataUrl });
               }
             } else {
-              console.log(`🛑 [WhatsApp Lazy][${cid}] QR recebido mas geração não autorizada (modo silencioso). Encerrando socket.`);
               await disconnectWhatsAppSocketCleanly(cid, 'DISCONNECTED');
               if (!isResolved) {
                 isResolved = true;
@@ -960,11 +1115,12 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
                 console.log(`🧹 [${cid}] Pasta de sessão removida por logout/invalidação.`);
               } catch (e) {}
             } else if (isRestartRequired || (hasSavedWhatsAppSession(cid) && session.whatsAppSessionState !== 'DISCONNECTING')) {
-              console.log(`🔄 [${cid}] Reconectando socket automaticamente após código ${statusCode}...`);
+              const delayMs = isRestartRequired ? 150 : 1500;
+              console.log(`🔄 [${cid}] Reconectando socket automaticamente em ${delayMs}ms (código ${statusCode})...`);
               session.whatsAppSessionState = 'CONNECTING';
               setTimeout(() => {
                 requestWhatsAppConnection(cid, false).catch(() => {});
-              }, 800);
+              }, delayMs);
             } else {
               if (session.whatsAppSessionState !== 'DISCONNECTING') {
                 session.whatsAppSessionState = 'DISCONNECTED';
@@ -988,12 +1144,13 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
             session.latestQr = null;
             session.latestQrDataUrl = null;
             session.whatsAppSessionState = 'CONNECTED';
-            touchWhatsAppActivity(cid);
 
-            setTimeout(() => {
+            // Sincroniza contatos da pasta imediatamente e agenda sincronização de grupos após 4s (após app-state-sync)
+            setTimeout(async () => {
               scanAuthDirContacts(cid);
+              await syncTenantGroupsSmart(cid, false);
               persistDiscoveredWhatsAppData(cid);
-            }, 1500);
+            }, 4000);
 
             if (!isResolved) {
               isResolved = true;
@@ -1004,7 +1161,6 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
         });
 
         sockInstance.ev.on('messages.upsert', async (m) => {
-          touchWhatsAppActivity(cid);
           const msg = m.messages?.[0];
           if (!msg || !msg.key) return;
           const jid = msg.key.remoteJid;
@@ -1014,13 +1170,25 @@ async function requestWhatsAppConnection(companyId = OFFICIAL_COMPANY_ID, allowQ
           if (!jid.endsWith('@g.us')) {
             registerDiscoveredContact(cid, jid, msg.pushName || '');
           } else {
-            if (!session.detectedGroups[jid]) {
+            if (!session.detectedGroups[jid] || session.detectedGroups[jid].name === 'Grupo VIP WhatsApp') {
               session.detectedGroups[jid] = {
                 id: jid,
-                name: 'Grupo VIP WhatsApp',
-                unreadCount: 0,
-                participantsCount: 0
+                name: session.detectedGroups[jid]?.name || 'Grupo VIP WhatsApp',
+                participantsCount: session.detectedGroups[jid]?.participantsCount || 0
               };
+              // Busca nome real do grupo individualmente sem rate-limit
+              if (session.sock) {
+                session.sock.groupMetadata(jid).then(meta => {
+                  if (meta && meta.id) {
+                    session.detectedGroups[meta.id] = {
+                      id: meta.id,
+                      name: meta.subject || 'Grupo VIP',
+                      participantsCount: Number(meta.size) || (Array.isArray(meta.participants) ? meta.participants.length : 0)
+                    };
+                    persistDiscoveredWhatsAppData(cid);
+                  }
+                }).catch(() => {});
+              }
             }
           }
         });
@@ -1158,16 +1326,32 @@ async function resolveCanonicalWhatsAppJid(rawPhone, companyId = OFFICIAL_COMPAN
   }
 }
 
-// Enviar mensagem via Baileys da loja (companyId)
+// Helper: Garantir que o socket da loja esteja conectado (aguarda reconexão automática se necessário)
+async function ensureTenantWhatsAppConnected(companyId = OFFICIAL_COMPANY_ID, maxWaitMs = 12000) {
+  const cid = sanitizeTenantId(companyId);
+  const session = getTenantSession(cid);
+  if (session.isWhatsAppReady && session.sock) return true;
+
+  if (hasSavedWhatsAppSession(cid)) {
+    await requestWhatsAppConnection(cid, false).catch(() => {});
+    const start = Date.now();
+    while (Date.now() - start < maxWaitMs) {
+      if (session.isWhatsAppReady && session.sock) return true;
+      await new Promise(r => setTimeout(r, 400));
+    }
+  }
+  return Boolean(session.isWhatsAppReady && session.sock);
+}
+
+// Enviar mensagem via Baileys da loja (companyId) com auto-reconexão resiliente
 async function sendBaileysMessage(target, text, options = {}, companyId = OFFICIAL_COMPANY_ID) {
   const cid = sanitizeTenantId(companyId);
   const session = getTenantSession(cid);
 
-  if (!session.sock || !session.isWhatsAppReady) {
+  const ready = await ensureTenantWhatsAppConnected(cid, 12000);
+  if (!ready || !session.sock) {
     throw new Error('WhatsApp da loja não está conectado.');
   }
-
-  touchWhatsAppActivity(cid);
 
   let jid = target;
   if (!String(target).includes('@g.us') && !String(target).includes('chat.whatsapp.com/')) {
@@ -1423,69 +1607,20 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
     const companyId = getRequestCompanyId(req);
     const session = getTenantSession(companyId);
 
-    if (!session.isWhatsAppReady || !session.sock) {
-      if (hasSavedWhatsAppSession(companyId)) {
-        await requestWhatsAppConnection(companyId, false);
-      }
-    }
+    await ensureTenantWhatsAppConnected(companyId, 6000);
 
-    // 1. Varre os contatos sincronizados na pasta baileys_auth_<companyId> e em memória
+    // 1. Varre contatos sincronizados e grupos inteligentes (com groupMetadata individual sem rate-limit!)
     scanAuthDirContacts(companyId);
+    const groups = await syncTenantGroupsSmart(companyId, false);
 
     const cfg = loadMarketingConfig(companyId);
     const contactsMap = new Map();
 
-    // Popula inicialmente com todos os contatos descobertos da sessão do WhatsApp desta loja
     for (const [norm, c] of session.contactsMap.entries()) {
       contactsMap.set(norm, { ...c });
     }
 
-    // 2. Grupos sincronizados do WhatsApp desta loja (com cache anti rate-overlimit de 60s)
-    let groups = [];
-    const nowMs = Date.now();
-    if (session.isWhatsAppReady && session.sock && (nowMs - (session.lastGroupFetchAt || 0) > 60000 || session.cachedGroups.length === 0)) {
-      try {
-        session.lastGroupFetchAt = nowMs;
-        const rawGroups = await session.sock.groupFetchAllParticipating();
-        const fetchedGroups = [];
-        Object.values(rawGroups || {}).forEach(g => {
-          if (g && g.id) {
-            fetchedGroups.push({
-              id: g.id,
-              name: g.subject || 'Grupo VIP',
-              participantsCount: Array.isArray(g.participants) ? g.participants.length : 0
-            });
-            // Extrai também participantes dos grupos da loja para o pool de contatos
-            if (Array.isArray(g.participants)) {
-              g.participants.forEach(p => {
-                if (!p) return;
-                const pPhone = p.phoneNumber || p.jid || p.id;
-                const pName = p.notify || p.name || '';
-                const entry = registerDiscoveredContact(companyId, pPhone, pName);
-                if (entry && !contactsMap.has(entry.cleanPhone)) {
-                  contactsMap.set(entry.cleanPhone, { ...entry });
-                }
-              });
-            }
-          }
-        });
-        if (fetchedGroups.length > 0) {
-          session.cachedGroups = fetchedGroups;
-        }
-      } catch (e) {
-        console.warn(`⚠️ [${companyId}] Aviso ao buscar grupos no Baileys (usando cache):`, e.message);
-      }
-    }
-
-    if (session.cachedGroups && session.cachedGroups.length > 0) {
-      groups = [...session.cachedGroups];
-    } else if (Array.isArray(cfg.whatsappGroups) && cfg.whatsappGroups.length > 0) {
-      groups = [...cfg.whatsappGroups];
-    } else if (Object.keys(session.detectedGroups || {}).length > 0) {
-      groups = Object.values(session.detectedGroups);
-    }
-
-    // 3. Contatos já existentes nas listas desta loja
+    // 2. Contatos já existentes nas listas desta loja
     try {
       (cfg.lists || []).forEach(l => {
         if (l.id === 'list-demo-vip') return;
@@ -1509,7 +1644,7 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
       });
     } catch (e) {}
 
-    // 4. Contatos do CRM Supabase filtrados estritamente por company_id desta loja
+    // 3. Contatos do CRM Supabase filtrados estritamente por company_id desta loja
     try {
       const { data: dbClients } = await supabase
         .from('smoking_clients')
@@ -1538,12 +1673,9 @@ app.get('/api/marketing/whatsapp-data', async (req, res) => {
 
     const contacts = Array.from(contactsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
-    // Salva contatos e grupos sincronizados no arquivo isolado da loja
     cfg.whatsappContacts = contacts;
     if (groups.length > 0) cfg.whatsappGroups = groups;
 
-    // Se a loja (tenant) ainda não tem listas reais (ou só tem a lista demo) e sincronizou contatos do WhatsApp,
-    // cria/atualiza automaticamente a lista oficial "📲 Contatos Sincronizados do WhatsApp" para uso imediato!
     if (companyId !== OFFICIAL_COMPANY_ID && contacts.length > 0) {
       const realLists = (cfg.lists || []).filter(l => l.id !== 'list-demo-vip');
       const autoListId = 'list_whatsapp_sincronizados';
@@ -1584,12 +1716,229 @@ app.post('/api/marketing/scan-chats', async (req, res) => {
   try {
     const companyId = getRequestCompanyId(req);
     const map = scanAuthDirContacts(companyId);
+    const groups = await syncTenantGroupsSmart(companyId, true);
     persistDiscoveredWhatsAppData(companyId);
     return res.json({
       success: true,
       companyId,
       contactsCount: map.size,
-      message: `Varredura concluída: ${map.size} contatos sincronizados.`
+      groupsCount: groups.length,
+      groups,
+      message: `Varredura concluída: ${map.size} contatos e ${groups.length} grupos sincronizados.`
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================
+// MOTOR DE DISPARO CONTÍNUO EM BACKGROUND ("ATÉ SEGUNDA ORDEM")
+// Roda 100% no servidor Node.js: mesmo fechando o navegador, o disparo continua!
+// ============================================================
+app.get('/api/marketing/campaigns/dispatch-status', (req, res) => {
+  const companyId = getRequestCompanyId(req);
+  const state = activeCampaignDispatches.get(companyId) || null;
+  return res.json({
+    success: true,
+    companyId,
+    dispatch: state
+  });
+});
+
+app.post('/api/marketing/campaigns/stop-dispatch', (req, res) => {
+  const companyId = getRequestCompanyId(req);
+  const state = activeCampaignDispatches.get(companyId);
+  if (state && state.isRunning) {
+    state.abortRequested = true;
+    state.status = '🛑 Interrompendo disparo a pedido do usuário...';
+  }
+  return res.json({
+    success: true,
+    companyId,
+    stopped: Boolean(state)
+  });
+});
+
+app.post('/api/marketing/campaigns/start-dispatch', async (req, res) => {
+  try {
+    const companyId = getRequestCompanyId(req);
+    const { campaign, contacts, forceSend, cardapioUrl, grupoVipUrl } = req.body;
+
+    if (!campaign || !campaign.id) {
+      return res.status(400).json({ success: false, error: 'Campanha inválida.' });
+    }
+
+    const existing = activeCampaignDispatches.get(companyId);
+    if (existing && existing.isRunning) {
+      return res.json({
+        success: true,
+        companyId,
+        alreadyRunning: true,
+        dispatch: existing
+      });
+    }
+
+    const ready = await ensureTenantWhatsAppConnected(companyId, 10000);
+    if (!ready) {
+      return res.status(503).json({
+        success: false,
+        error: 'WHATSAPP_OFFLINE',
+        message: 'O WhatsApp da sua loja não está conectado. Conecte pelo QR Code primeiro.'
+      });
+    }
+
+    const targetContacts = Array.isArray(contacts) ? contacts : [];
+    const config = loadMarketingConfig(companyId);
+    const alreadySentCount = forceSend
+      ? 0
+      : targetContacts.filter(c => {
+          const norm = normalizeMarketingPhone(c.cleanPhone || c.phone);
+          return norm && isPhoneAlreadySent(campaign.id, norm, config);
+        }).length;
+
+    const dispatchState = {
+      companyId,
+      campaignId: campaign.id,
+      campaignName: campaign.name,
+      current: alreadySentCount,
+      total: targetContacts.length || 1,
+      sentInSession: 0,
+      failedCount: 0,
+      status: '🚀 Disparo contínuo iniciado no servidor (continua mesmo se fechar a aba)...',
+      isRunning: true,
+      abortRequested: false,
+      startedAt: new Date().toISOString(),
+      finishedAt: null
+    };
+
+    activeCampaignDispatches.set(companyId, dispatchState);
+
+    // Executa em background no servidor até terminar todos os contatos ou até segunda ordem (stop-dispatch)
+    (async () => {
+      try {
+        let batchCounter = 0;
+        const effectiveBatchSize = (campaign.batchSize && Number(campaign.batchSize) <= 5) ? Number(campaign.batchSize) : 5;
+        const effectiveBatchIntervalMinutes = (campaign.batchIntervalMinutes && Number(campaign.batchIntervalMinutes) >= 35) ? Number(campaign.batchIntervalMinutes) : 35;
+
+        for (let i = 0; i < targetContacts.length; i++) {
+          if (dispatchState.abortRequested) {
+            dispatchState.status = `🛑 Disparo interrompido pelo usuário (${dispatchState.sentInSession} enviados nesta sessão).`;
+            break;
+          }
+
+          const contact = targetContacts[i];
+          const rawPhone = contact.cleanPhone || contact.phone;
+          const normalizedPhone = normalizeMarketingPhone(rawPhone);
+          if (!normalizedPhone) continue;
+
+          const currentCfg = loadMarketingConfig(companyId);
+          if (!forceSend && isPhoneAlreadySent(campaign.id, normalizedPhone, currentCfg)) {
+            continue;
+          }
+
+          let chosenText = campaign.message || '';
+          if (campaign.useVariations && Array.isArray(campaign.variations) && campaign.variations.length > 0) {
+            const allTexts = [campaign.message, ...campaign.variations.filter(v => v && v.trim().length > 0)];
+            chosenText = allTexts[batchCounter % allTexts.length];
+          }
+
+          const formattedMsg = chosenText
+            .replace(/\[Nome\]/gi, contact.name || 'Cliente')
+            .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, cardapioUrl || 'https://smoking-pods.vercel.app')
+            .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, grupoVipUrl || '');
+
+          dispatchState.status = `📤 Enviando para ${contact.name || normalizedPhone}...`;
+
+          try {
+            if (campaign.isStockOffer) {
+              const count = Number(campaign.stockOfferCount) || 1;
+              const offers = await buildStockOfferMessage({ count, cardapioUrl }, companyId);
+              if (offers && offers.length > 0) {
+                for (let idx = 0; idx < offers.length; idx++) {
+                  const offer = offers[idx];
+                  await sendBaileysMessage(normalizedPhone, offer.messageText, { imageUrl: offer.imageUrl }, companyId);
+                  if (idx < offers.length - 1) await new Promise(r => setTimeout(r, 4000));
+                }
+              }
+            } else {
+              await sendBaileysMessage(normalizedPhone, formattedMsg, { imageUrl: campaign.imageUrl }, companyId);
+            }
+
+            markPhoneAsSent(campaign.id, normalizedPhone, currentCfg);
+            saveMarketingConfig(currentCfg, companyId);
+            dispatchState.sentInSession++;
+            dispatchState.current = Math.min(dispatchState.total, dispatchState.current + 1);
+            batchCounter++;
+
+            dispatchState.status = `✅ Entregue (${dispatchState.current}/${dispatchState.total}) para ${contact.name || normalizedPhone}.`;
+          } catch (sendErr) {
+            console.warn(`⚠️ [Dispatch][${companyId}] Erro ao enviar para ${normalizedPhone}:`, sendErr.message);
+            dispatchState.failedCount++;
+            markPhoneAsSent(campaign.id, normalizedPhone, currentCfg);
+            saveMarketingConfig(currentCfg, companyId);
+            dispatchState.current = Math.min(dispatchState.total, dispatchState.current + 1);
+            dispatchState.status = `⚠️ Falha em ${contact.name || normalizedPhone} (${sendErr.message}). Avançando...`;
+            continue;
+          }
+
+          // Verifica se ainda há contatos pendentes
+          const hasMorePending = targetContacts.slice(i + 1).some(c => {
+            const np = normalizeMarketingPhone(c.cleanPhone || c.phone);
+            return np && (forceSend || !isPhoneAlreadySent(campaign.id, np, currentCfg));
+          });
+          if (!hasMorePending) break;
+
+          // Delay anti-ban individual (20 a 35s)
+          const randomDelay = Math.floor(Math.random() * 15000) + 20000;
+          for (let elapsed = 0; elapsed < randomDelay; elapsed += 1000) {
+            if (dispatchState.abortRequested) break;
+            const remSec = Math.max(0, Math.ceil((randomDelay - elapsed) / 1000));
+            dispatchState.status = `⏳ Intervalo de proteção anti-ban: aguardando ${remSec}s antes do próximo contato (${dispatchState.current}/${dispatchState.total})...`;
+            await new Promise(r => setTimeout(r, 1000));
+          }
+
+          if (dispatchState.abortRequested) break;
+
+          // Pausa entre lotes (a cada 5 envios, pausa de 35 min mantendo o WhatsApp conectado!)
+          if (batchCounter >= effectiveBatchSize) {
+            batchCounter = 0;
+            const pauseDurationMs = effectiveBatchIntervalMinutes * 60 * 1000;
+            const targetEndTime = Date.now() + pauseDurationMs;
+
+            while (Date.now() < targetEndTime) {
+              if (dispatchState.abortRequested) break;
+              const remSeconds = Math.max(0, Math.ceil((targetEndTime - Date.now()) / 1000));
+              const mins = Math.floor(remSeconds / 60);
+              const secs = remSeconds % 60;
+              dispatchState.status = `⏸️ Lote de ${effectiveBatchSize} enviado! Pausa anti-ban no servidor: ${mins}m ${secs < 10 ? '0' : ''}${secs}s restantes (${dispatchState.current}/${dispatchState.total})...`;
+              await new Promise(r => setTimeout(r, 1000));
+            }
+          }
+        }
+
+        if (!dispatchState.abortRequested) {
+          const finalCfg = loadMarketingConfig(companyId);
+          const cIdx = (finalCfg.campaigns || []).findIndex(c => c.id === campaign.id);
+          if (cIdx !== -1) {
+            const nowSP = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+            finalCfg.campaigns[cIdx].lastRunDate = nowSP.toLocaleDateString('pt-BR');
+            saveMarketingConfig(finalCfg, companyId);
+          }
+          dispatchState.status = `🎉 Campanha "${campaign.name}" concluída! (${dispatchState.sentInSession} enviados nesta sessão).`;
+        }
+      } catch (loopErr) {
+        console.error(`❌ [Dispatch][${companyId}] Erro fatal no loop:`, loopErr.message);
+        dispatchState.status = `❌ Erro no disparo: ${loopErr.message}`;
+      } finally {
+        dispatchState.isRunning = false;
+        dispatchState.finishedAt = new Date().toISOString();
+      }
+    })();
+
+    return res.json({
+      success: true,
+      companyId,
+      dispatch: dispatchState
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -1629,13 +1978,8 @@ app.post('/api/marketing/send-direct', async (req, res) => {
       });
     }
 
-    if (!session.isWhatsAppReady || !session.sock) {
-      if (hasSavedWhatsAppSession(companyId)) {
-        await requestWhatsAppConnection(companyId, false);
-      }
-    }
-
-    if (!session.isWhatsAppReady || !session.sock) {
+    const ready = await ensureTenantWhatsAppConnected(companyId, 12000);
+    if (!ready || !session.sock) {
       return res.status(503).json({
         success: false,
         error: 'WHATSAPP_OFFLINE',
@@ -1721,7 +2065,6 @@ app.post('/api/marketing/send-direct', async (req, res) => {
 app.post('/api/marketing/test-dispatch', async (req, res) => {
   try {
     const companyId = getRequestCompanyId(req);
-    const session = getTenantSession(companyId);
     const { campaignId } = req.body;
     if (!campaignId) {
       return res.status(400).json({ error: 'campaignId é obrigatório.' });
@@ -1733,7 +2076,8 @@ app.post('/api/marketing/test-dispatch', async (req, res) => {
       return res.status(404).json({ error: 'Campanha não encontrada.' });
     }
 
-    if (!session.isWhatsAppReady || !session.sock) {
+    const ready = await ensureTenantWhatsAppConnected(companyId, 10000);
+    if (!ready) {
       return res.status(503).json({ error: 'O WhatsApp da sua loja não está conectado.' });
     }
 
@@ -1786,7 +2130,8 @@ app.post('/api/marketing/test-lab-dispatch', async (req, res) => {
       return res.status(400).json({ success: false, trace, error: 'Telefone e mensagem são obrigatórios.' });
     }
 
-    if (!session.isWhatsAppReady || !session.sock) {
+    const ready = await ensureTenantWhatsAppConnected(companyId, 10000);
+    if (!ready || !session.sock) {
       trace.push({ step: 2, title: 'Status do WhatsApp', status: 'ERROR', message: 'WhatsApp da loja desconectado.' });
       return res.status(503).json({ success: false, trace, error: 'WhatsApp offline. Conecte pelo QR Code.' });
     }
@@ -2068,9 +2413,43 @@ setInterval(marketingSchedulerTick, 60 * 1000);
 // =============================================
 // SERVER START
 // =============================================
+// ============================================================
+// AUTO-RESTORE DE SESSÕES NO BOOT & WATCHDOG KEEP-ALIVE (30s)
+// Garante que nenhuma loja caia e que todos os disparos continuem até segunda ordem!
+// ============================================================
+function discoverAllSavedAuthTenants() {
+  const ids = new Set(getAllConfiguredTenantIds());
+  try {
+    const rootFiles = fs.readdirSync(__dirname);
+    rootFiles.forEach(f => {
+      if (f === 'baileys_auth') {
+        ids.add(OFFICIAL_COMPANY_ID);
+      } else if (f.startsWith('baileys_auth_')) {
+        const cid = f.replace('baileys_auth_', '').trim();
+        if (cid && !cid.includes('test-')) ids.add(cid);
+      }
+    });
+  } catch (e) {}
+  return Array.from(ids);
+}
+
+async function restoreAndKeepAliveAllSessions() {
+  const allTenants = discoverAllSavedAuthTenants();
+  for (const cid of allTenants) {
+    if (!hasSavedWhatsAppSession(cid)) continue;
+    const session = getTenantSession(cid);
+    if (!session.isWhatsAppReady && !session.activeConnectPromise && session.whatsAppSessionState !== 'SESSION_INVALID' && session.whatsAppSessionState !== 'DISCONNECTING') {
+      console.log(`🔄 [Watchdog 24/7][${cid}] Restaurando sessão WhatsApp ativa automaticamente...`);
+      requestWhatsAppConnection(cid, false).catch(() => {});
+    }
+  }
+}
+
+setInterval(restoreAndKeepAliveAllSessions, 30 * 1000);
+
 app.listen(port, () => {
-  console.log(`🚀 Servidor backend rodando na porta ${port}`);
-  console.log(`💡 [WhatsApp Lifecycle] Modo Sob Demanda ativo. Baileys será inicializado sob solicitação ou restauração silenciosa.`);
+  console.log(`🚀 Servidor backend Multitenant 24/7 rodando na porta ${port}`);
+  setTimeout(restoreAndKeepAliveAllSessions, 1500);
 });
 
 process.on('uncaughtException', (err) => {
