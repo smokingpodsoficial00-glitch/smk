@@ -7,7 +7,7 @@ import {
 } from"lucide-react";
 import { supabase } from"@/lib/supabase";
 import { useAuth } from"../contexts/AuthContext";
-import { getBackendUrl } from"@/lib/backend";
+import { legacyFetch, setActiveBackendCompany } from "@/lib/backend";
 import { ManualSaleModal } from"./ManualSaleModal";
 import { MobilePushSetupModal } from"./MobilePushSetupModal";
 import { MobileOrdersLogisticsView } from "./orders/MobileOrdersLogisticsView";
@@ -49,6 +49,7 @@ const saveCompletedIds = (ids: string[]) => {
 
 export default function KanbanBoard() {
  const { company } = useAuth();
+ setActiveBackendCompany(company?.id);
  const [orders, setOrders] = useState<AdminOrder[]>([]);
  const [loading, setLoading] = useState(true);
  const [selectedOrderForDispatch, setSelectedOrderForDispatch] = useState<string | null>(null);
@@ -252,7 +253,7 @@ export default function KanbanBoard() {
  // Disparar Webhook caso despache para Rota com validação e segurança reforçada
  if (isForwardFromPreparing && !isNationalOrder && shouldNotify) {
  if (currentOrder && currentOrder.phone) {
- fetch(`${getBackendUrl()}/api/webhook/dispatch`, {
+ legacyFetch(`/api/webhook/dispatch`, {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({

@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { getBackendUrl } from '@/lib/backend';
+import { legacyFetch, tenantCacheKey, setActiveBackendCompany, isLegacyBackendAllowed } from '@/lib/backend';
 import { fetchLiveClients, type RealClient } from '@/lib/crm';
 import { 
   fetchMarketingLists, 
@@ -119,6 +119,10 @@ function sanitizeBroadcastLists(lists: BroadcastList[]): { lists: BroadcastList[
 
 export default function MarketingModule() {
   const { company } = useAuth();
+  // Trava multitenant: registra a empresa logada antes de qualquer chamada ao backend legado
+  setActiveBackendCompany(company?.id);
+  // O motor de WhatsApp atual pertence exclusivamente à conta oficial (Smoking Pods)
+  const canUseWhatsAppEngine = isLegacyBackendAllowed(company?.id ?? null);
   
   // Abas do Módulo: 'campaigns' | 'broadcast_lists'
   const [activeTab, setActiveTab] = useState<'campaigns' | 'broadcast_lists'>('campaigns');
@@ -147,7 +151,7 @@ export default function MarketingModule() {
   // Consulta status sem disparar geração contínua de QR
   const checkWhatsAppStatus = async () => {
     try {
-      const res = await fetch(`${getBackendUrl()}/api/qr`);
+      const res = await legacyFetch(`/api/qr`);
       if (res.ok) {
         setBackendOnline(true);
         const data = await res.json();
@@ -190,7 +194,7 @@ export default function MarketingModule() {
     setIsQrModalOpen(true);
     setQrLoading(true);
     try {
-      const res = await fetch(`${getBackendUrl()}/api/whatsapp/connect`, { method: 'POST' });
+      const res = await legacyFetch(`/api/whatsapp/connect`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         setWhatsAppSessionStatus(data.status || 'CONNECTING');
@@ -217,7 +221,7 @@ export default function MarketingModule() {
     setIsQrModalOpen(false);
     if (!whatsAppConnected) {
       try {
-        await fetch(`${getBackendUrl()}/api/whatsapp/disconnect`, { method: 'POST' });
+        await legacyFetch(`/api/whatsapp/disconnect`, { method: 'POST' });
       } catch (e) {}
       setQrCodeImageUrl(null);
       setWhatsAppSessionStatus('DISCONNECTED');
@@ -227,7 +231,7 @@ export default function MarketingModule() {
   const handleRefreshQr = async () => {
     setQrLoading(true);
     try {
-      await fetch(`${getBackendUrl()}/api/whatsapp/connect`, { method: 'POST' });
+      await legacyFetch(`/api/whatsapp/connect`, { method: 'POST' });
       await checkWhatsAppStatus();
     } finally {
       setQrLoading(false);
@@ -240,7 +244,7 @@ export default function MarketingModule() {
     }
     setQrLoading(true);
     try {
-      const res = await fetch(`${getBackendUrl()}/api/logout`, { method: 'POST' });
+      const res = await legacyFetch(`/api/logout`, { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       setWhatsAppConnected(false);
       setQrCodeImageUrl(null);
@@ -312,18 +316,18 @@ export default function MarketingModule() {
 
     setLoadingSanitize(true);
     try {
-      const res = await fetch(`${getBackendUrl()}/api/marketing/clean-and-deduplicate-lists`, { method: 'POST' });
+      const res = await legacyFetch(`/api/marketing/clean-and-deduplicate-lists`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         setBroadcastLists(data.lists);
-        localStorage.setItem(LOCAL_STORAGE_LISTS, JSON.stringify(data.lists));
+        localStorage.setItem(tenantCacheKey(LOCAL_STORAGE_LISTS), JSON.stringify(data.lists));
         // Recarrega campanhas atualizadas
         try {
-          const campRes = await fetch(`${getBackendUrl()}/api/marketing/campaigns`);
+          const campRes = await legacyFetch(`/api/marketing/campaigns`);
           const campData = await campRes.json();
           if (campData.success && campData.campaigns) {
             setCampaigns(campData.campaigns);
-            localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(campData.campaigns));
+            localStorage.setItem(tenantCacheKey(LOCAL_STORAGE_CAMPAIGNS), JSON.stringify(campData.campaigns));
           }
         } catch (e) {}
 
@@ -380,8 +384,8 @@ export default function MarketingModule() {
         }
 
         if (sanitized.hasChanges) {
-          localStorage.setItem(LOCAL_STORAGE_LISTS, JSON.stringify(sanitized.lists));
-          fetch(`${getBackendUrl()}/api/marketing/lists`, {
+          localStorage.setItem(tenantCacheKey(LOCAL_STORAGE_LISTS), JSON.stringify(sanitized.lists));
+          legacyFetch(`/api/marketing/lists`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ lists: sanitized.lists })
@@ -408,7 +412,7 @@ export default function MarketingModule() {
       let fetchedGroups: WhatsAppGroup[] = [];
 
       try {
-        const res = await fetch(`${getBackendUrl()}/api/marketing/whatsapp-data`);
+        const res = await legacyFetch(`/api/marketing/whatsapp-data`);
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.contacts)) {
@@ -444,8 +448,8 @@ export default function MarketingModule() {
       setWhatsAppGroups(fetchedGroups);
       
       try {
-        localStorage.setItem('SP_MARKETING_CONTACTS', JSON.stringify(fetchedContacts));
-        localStorage.setItem('SP_MARKETING_GROUPS', JSON.stringify(fetchedGroups));
+        localStorage.setItem(tenantCacheKey('SP_MARKETING_CONTACTS'), JSON.stringify(fetchedContacts));
+        localStorage.setItem(tenantCacheKey('SP_MARKETING_GROUPS'), JSON.stringify(fetchedGroups));
       } catch (storeErr) {}
 
       setSyncStatus(`Sincronizado com sucesso! ${fetchedContacts.length} contatos e ${fetchedGroups.length} grupos carregados.`);
@@ -461,8 +465,8 @@ export default function MarketingModule() {
   // Carrega contatos e grupos do cache ao iniciar
   useEffect(() => {
     try {
-      const savedContacts = localStorage.getItem('SP_MARKETING_CONTACTS');
-      const savedGroups = localStorage.getItem('SP_MARKETING_GROUPS');
+      const savedContacts = localStorage.getItem(tenantCacheKey('SP_MARKETING_CONTACTS'));
+      const savedGroups = localStorage.getItem(tenantCacheKey('SP_MARKETING_GROUPS'));
       if (savedContacts) {
         setAllContacts(JSON.parse(savedContacts));
       }
@@ -665,14 +669,14 @@ export default function MarketingModule() {
       setIsCampaignModalOpen(false);
 
       try {
-        const raw = localStorage.getItem(LOCAL_STORAGE_CAMPAIGNS);
+        const raw = localStorage.getItem(tenantCacheKey(LOCAL_STORAGE_CAMPAIGNS));
         const stored = raw ? JSON.parse(raw) : [];
         const newStored = stored.some((c: any) => c.id === updatedCamp.id)
           ? stored.map((c: any) => c.id === updatedCamp.id ? updatedCamp : c)
           : [...stored, updatedCamp];
-        localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(newStored));
+        localStorage.setItem(tenantCacheKey(LOCAL_STORAGE_CAMPAIGNS), JSON.stringify(newStored));
 
-        fetch(`${getBackendUrl()}/api/marketing/campaigns`, {
+        legacyFetch(`/api/marketing/campaigns`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ campaigns: newStored })
@@ -721,12 +725,12 @@ export default function MarketingModule() {
       setIsCampaignModalOpen(false);
 
       try {
-        const raw = localStorage.getItem(LOCAL_STORAGE_CAMPAIGNS);
+        const raw = localStorage.getItem(tenantCacheKey(LOCAL_STORAGE_CAMPAIGNS));
         const stored = raw ? JSON.parse(raw) : [];
         const newStored = [...stored.filter((c: any) => c.id !== newCamp.id), newCamp];
-        localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(newStored));
+        localStorage.setItem(tenantCacheKey(LOCAL_STORAGE_CAMPAIGNS), JSON.stringify(newStored));
 
-        fetch(`${getBackendUrl()}/api/marketing/campaigns`, {
+        legacyFetch(`/api/marketing/campaigns`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ campaigns: newStored })
@@ -801,7 +805,7 @@ export default function MarketingModule() {
     } catch {}
 
     try {
-      const resp = await fetch(`${getBackendUrl()}/api/marketing/sent-history`);
+      const resp = await legacyFetch(`/api/marketing/sent-history`);
       if (resp.ok) {
         const data = await resp.json();
         const serverCampSent = data.sentHistory?.[camp.id] || [];
@@ -882,7 +886,7 @@ export default function MarketingModule() {
           if (isAbortingRef.current) break;
 
           try {
-            const res = await fetch(`${getBackendUrl()}/api/marketing/send-direct`, {
+            const res = await legacyFetch(`/api/marketing/send-direct`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -994,7 +998,7 @@ export default function MarketingModule() {
           .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, cardapioUrl)
           .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, grupoVipUrl || '');
 
-        await fetch(`${getBackendUrl()}/api/marketing/send-direct`, {
+        await legacyFetch(`/api/marketing/send-direct`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1091,6 +1095,8 @@ export default function MarketingModule() {
                   ? 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/30 text-amber-300 animate-pulse'
                   : whatsAppSessionStatus === 'SESSION_INVALID'
                   ? 'bg-red-500/15 hover:bg-red-500/25 border-red-500/30 text-red-300'
+                  : !canUseWhatsAppEngine
+                  ? 'bg-white/5 hover:bg-white/10 border-white/15 text-white/70'
                   : !backendOnline
                   ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/25 text-red-400'
                   : 'bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold border-transparent shadow-sm'
@@ -1102,6 +1108,8 @@ export default function MarketingModule() {
                   ? "Conectando ao WhatsApp..."
                   : whatsAppSessionStatus === 'SESSION_INVALID'
                   ? "🔴 Sessão Inválida — Conectar Novamente"
+                  : !canUseWhatsAppEngine
+                  ? "WhatsApp dedicado da sua loja em implantação"
                   : !backendOnline
                   ? "Backend Offline. Inicie o servidor backend."
                   : hasSavedSession
@@ -1124,6 +1132,11 @@ export default function MarketingModule() {
                 <>
                   <AlertTriangle className="size-4 text-red-400" />
                   <span>Conectar Novamente</span>
+                </>
+              ) : !canUseWhatsAppEngine ? (
+                <>
+                  <Smartphone className="size-4 text-white/60" />
+                  <span>WhatsApp da Loja</span>
                 </>
               ) : !backendOnline ? (
                 <>
@@ -2434,6 +2447,18 @@ export default function MarketingModule() {
                   </button>
                 </div>
               </div>
+            ) : !canUseWhatsAppEngine ? (
+              <div className="space-y-4 text-center py-3">
+                <div className="size-14 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
+                  <Smartphone className="size-7" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">WhatsApp exclusivo da sua loja em implantação</h4>
+                  <p className="text-xs text-white/50 mt-1 max-w-xs mx-auto leading-relaxed">
+                    Por segurança, cada loja terá seu próprio número conectado de forma isolada. Enquanto isso, suas listas e campanhas ficam salvas apenas na sua conta e nenhum disparo sai por outro número.
+                  </p>
+                </div>
+              </div>
             ) : !backendOnline ? (
               <div className="space-y-4 text-center py-3">
                 <div className="size-14 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mx-auto text-red-400 shadow-lg shadow-red-500/10">
@@ -2451,11 +2476,6 @@ export default function MarketingModule() {
                   <div className="text-emerald-400 font-bold bg-white/5 p-2 rounded-xl border border-white/5 select-all">
                     cd backend &amp;&amp; npm start
                   </div>
-                </div>
-
-                <div className="p-3 bg-black/40 border border-white/5 rounded-xl text-center font-mono text-[10px] text-white/50 truncate">
-                  <span>URL Backend: </span>
-                  <code className="text-emerald-400 font-bold">{getBackendUrl()}</code>
                 </div>
 
                 <div className="pt-2 flex justify-center gap-2">

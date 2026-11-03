@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { getBackendUrl } from "@/lib/backend";
+import { legacyFetch, tenantCacheKey, setActiveBackendCompany, isLegacyBackendAllowed } from '@/lib/backend';
 
 export interface ContactItem {
   id: string;
@@ -25,7 +25,7 @@ const LOCAL_STORAGE_LISTS = 'smoking_broadcast_lists_v1';
 
 async function syncListsWithBackend(lists: BroadcastList[]): Promise<void> {
   try {
-    await fetch(`${getBackendUrl()}/api/marketing/lists`, {
+    await legacyFetch(`/api/marketing/lists`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lists })
@@ -79,7 +79,7 @@ export async function fetchMarketingLists(companyId: string): Promise<BroadcastL
     if (error) {
       console.warn('[MarketingLists] Supabase indisponível/sem tabela de listas. Consultando backend Node:', error.message);
       try {
-        const res = await fetch(`${getBackendUrl()}/api/marketing/lists`);
+        const res = await legacyFetch(`/api/marketing/lists`);
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.lists) && data.lists.length > 0) {
@@ -124,7 +124,7 @@ export async function fetchMarketingLists(companyId: string): Promise<BroadcastL
   } catch (err: any) {
     console.warn('[MarketingLists] Exceção ao consultar Supabase (usando fallback backend + offline):', err?.message || err);
     try {
-      const res = await fetch(`${getBackendUrl()}/api/marketing/lists`);
+      const res = await legacyFetch(`/api/marketing/lists`);
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.lists) && data.lists.length > 0) {
@@ -482,7 +482,7 @@ export async function removeContactFromList(companyId: string, listId: string, c
 // Helpers de cache local
 export function getOfflineListsCache(): BroadcastList[] {
   try {
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_LISTS) : null;
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(tenantCacheKey(LOCAL_STORAGE_LISTS)) : null;
     if (raw) return JSON.parse(raw);
   } catch (e) {}
   return [];
@@ -491,7 +491,7 @@ export function getOfflineListsCache(): BroadcastList[] {
 export function saveOfflineListsCache(lists: BroadcastList[]): void {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(LOCAL_STORAGE_LISTS, JSON.stringify(lists));
+      localStorage.setItem(tenantCacheKey(LOCAL_STORAGE_LISTS), JSON.stringify(lists));
     }
   } catch (e) {}
 }

@@ -35,3 +35,53 @@ export function getBackendUrl(): string {
 
   return 'http://localhost:3006';
 }
+
+// =====================================================================
+// ISOLAMENTO MULTITENANT DO BACKEND LEGADO
+// ---------------------------------------------------------------------
+// O backend Node atual é SINGLE-TENANT: possui uma única sessão de
+// WhatsApp (baileys_auth) e um único arquivo marketing_config.json,
+// ambos pertencentes à Smoking Pods. Qualquer outra empresa que fale
+// com ele lê/sobrescreve dados da Smoking Pods e dispara pelo número dela.
+// Por isso, apenas a conta oficial pode acessá-lo. Demais tenants ficam
+// bloqueados (falha como "offline") até existir motor dedicado por loja.
+// =====================================================================
+export const OFFICIAL_BACKEND_COMPANY_ID = 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+
+let activeBackendCompanyId: string | null = null;
+
+/** Registra a empresa logada. Chamado pelo layout/módulos a cada render. */
+export function setActiveBackendCompany(companyId: string | null | undefined): void {
+  activeBackendCompanyId = companyId || null;
+}
+
+/** true somente se a empresa ativa for a dona do backend legado. Padrão seguro: false. */
+export function isLegacyBackendAllowed(companyId?: string | null): boolean {
+  const id = companyId !== undefined ? companyId : activeBackendCompanyId;
+  return id === OFFICIAL_BACKEND_COMPANY_ID;
+}
+
+/**
+ * fetch para o backend legado com trava multitenant.
+ * Para tenants não autorizados, rejeita como falha de rede (os fluxos
+ * existentes já tratam isso como offline), sem nenhuma requisição sair.
+ */
+export function legacyFetch(path: string, init?: RequestInit): Promise<Response> {
+  if (!isLegacyBackendAllowed()) {
+    return Promise.reject(new Error('[Multitenant] Backend legado restrito à conta oficial.'));
+  }
+  return fetch(`${getBackendUrl()}${path}`, init);
+}
+
+/** Chave de localStorage isolada por empresa (evita vazamento entre contas no mesmo navegador). */
+export function tenantCacheKey(baseKey: string): string {
+  return `${baseKey}__${activeBackendCompanyId || 'anon'}`;
+}
+
+// Remove caches legados NÃO isolados por empresa (podiam conter dados de outra conta)
+if (typeof window !== 'undefined') {
+  try {
+    ['smoking_broadcast_lists_v1', 'smoking_marketing_campaigns_v1', 'SP_MARKETING_CONTACTS', 'SP_MARKETING_GROUPS']
+      .forEach((k) => localStorage.removeItem(k));
+  } catch {}
+}

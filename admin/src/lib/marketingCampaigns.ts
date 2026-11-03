@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { getBackendUrl } from "@/lib/backend";
+import { legacyFetch, tenantCacheKey, setActiveBackendCompany, isLegacyBackendAllowed } from '@/lib/backend';
 
 export interface Campaign {
   id: string;
@@ -34,7 +34,7 @@ const LOCAL_STORAGE_CAMPAIGNS = 'smoking_marketing_campaigns_v1';
 
 async function syncCampaignsWithBackend(campaigns: Campaign[]): Promise<void> {
   try {
-    await fetch(`${getBackendUrl()}/api/marketing/campaigns`, {
+    await legacyFetch(`/api/marketing/campaigns`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ campaigns })
@@ -143,7 +143,7 @@ export async function fetchMarketingCampaigns(companyId: string): Promise<Campai
     if (error) {
       console.warn('[MarketingCampaigns] Supabase indisponível/sem tabela de campanhas. Consultando backend Node:', error.message);
       try {
-        const res = await fetch(`${getBackendUrl()}/api/marketing/campaigns`);
+        const res = await legacyFetch(`/api/marketing/campaigns`);
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.campaigns) && data.campaigns.length > 0) {
@@ -179,7 +179,7 @@ export async function fetchMarketingCampaigns(companyId: string): Promise<Campai
   } catch (err: any) {
     console.warn('[MarketingCampaigns] Exceção ao consultar Supabase (usando fallback backend + offline):', err?.message || err);
     try {
-      const res = await fetch(`${getBackendUrl()}/api/marketing/campaigns`);
+      const res = await legacyFetch(`/api/marketing/campaigns`);
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.campaigns) && data.campaigns.length > 0) {
@@ -580,7 +580,7 @@ export async function deleteMarketingCampaign(companyId: string, campaignId: str
 // Helpers de cache local (estritamente READ-ONLY)
 function getOfflineCampaignsCache(): Campaign[] {
   try {
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_CAMPAIGNS) : null;
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(tenantCacheKey(LOCAL_STORAGE_CAMPAIGNS)) : null;
     if (raw) return JSON.parse(raw);
   } catch (e) {}
   return [];
@@ -589,7 +589,7 @@ function getOfflineCampaignsCache(): Campaign[] {
 function saveOfflineCampaignsCache(camps: Campaign[]): void {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(LOCAL_STORAGE_CAMPAIGNS, JSON.stringify(camps));
+      localStorage.setItem(tenantCacheKey(LOCAL_STORAGE_CAMPAIGNS), JSON.stringify(camps));
     }
   } catch (e) {}
 }
