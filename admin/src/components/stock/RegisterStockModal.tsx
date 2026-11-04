@@ -72,9 +72,9 @@ export function RegisterStockModal({
   
   // Sabores selecionados para o modelo atual (permite múltiplos sabores simultâneos)
   const [selectedFlavors, setSelectedFlavors] = useState<SelectedFlavorItem[]>([]);
-  const [bulkDefaultQty, setBulkDefaultQty] = useState<string>("5");
+  const [bulkDefaultQty, setBulkDefaultQty] = useState<string>("1");
   const [customFlavorName, setCustomFlavorName] = useState<string>("");
-  const [customFlavorQty, setCustomFlavorQty] = useState<string>("5");
+  const [customFlavorQty, setCustomFlavorQty] = useState<string>("1");
   const [addedBatchNotification, setAddedBatchNotification] = useState<string | null>(null);
 
   const [unitCostInput, setUnitCostInput] = useState<string>("");
@@ -176,12 +176,12 @@ export function RegisterStockModal({
     setUnitCostInput(cost ? String(cost) : "");
     setUnitSellInput(modelData.defaultPrice > 0 ? String(modelData.defaultPrice) : "");
 
-    // Se tiver apenas 1 sabor, já pré-seleciona
+    // Se tiver apenas 1 sabor, já pré-seleciona com quantidade 1
     if (modelData.flavors.length === 1) {
       setSelectedFlavors([
         {
           flavor: modelData.flavors[0].flavor,
-          qty: parseInt(bulkDefaultQty) || 5,
+          qty: parseInt(bulkDefaultQty) || 1,
           productId: modelData.flavors[0].id,
           currentStock: modelData.flavors[0].stock
         }
@@ -221,7 +221,7 @@ export function RegisterStockModal({
       if (exists) {
         return prev.filter((f) => f.flavor.toLowerCase() !== flavorName.toLowerCase());
       } else {
-        const defaultQ = parseInt(bulkDefaultQty) || 5;
+        const defaultQ = parseInt(bulkDefaultQty) || 1;
         return [
           ...prev,
           {
@@ -235,10 +235,10 @@ export function RegisterStockModal({
     });
   };
 
-  // Selecionar todos os sabores disponíveis com a quantidade padrão
+  // Selecionar todos os sabores disponíveis com a quantidade padrão (1)
   const handleSelectAllFlavors = () => {
     if (availableFlavorsForModel.length === 0) return;
-    const defaultQ = parseInt(bulkDefaultQty) || 5;
+    const defaultQ = parseInt(bulkDefaultQty) || 1;
     const map = new Map<string, SelectedFlavorItem>();
     selectedFlavors.forEach((f) => map.set(f.flavor.toLowerCase(), f));
 
@@ -288,7 +288,7 @@ export function RegisterStockModal({
   const handleAddCustomFlavor = () => {
     const name = customFlavorName.trim();
     if (!name) return;
-    const qty = parseInt(customFlavorQty) || 5;
+    const qty = parseInt(customFlavorQty) || 1;
     const exists = selectedFlavors.some((f) => f.flavor.toLowerCase() === name.toLowerCase());
     if (exists) {
       handleUpdateFlavorQty(name, qty, true);
