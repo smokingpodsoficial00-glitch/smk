@@ -20,6 +20,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { updateProductCost } from "@/lib/productCosts";
 import { createStockRepurchase } from "@/lib/stockRepurchases";
+import { broadcastLiveCatalogSync } from "@/lib/categories";
 
 export interface StockEntryItem {
   id: string;
@@ -456,19 +457,60 @@ export function RegisterStockModal({
             created_at: nowIso
           });
         }
+      }
 
-        // Custo unitário oficial da loja
+      // 2. Propagar preço de venda e custo de reposição para TODOS os sabores de cada modelo comprado
+      const modelsProcessed = new Set<string>();
+      for (const item of items) {
+        const brandClean = item.brand.trim();
+        const modelClean = item.model.trim();
+        const groupKey = `${brandClean.toLowerCase()}__${modelClean.toLowerCase()}`;
+        if (modelsProcessed.has(groupKey)) continue;
+        modelsProcessed.add(groupKey);
+
+        // Busca todos os sabores deste modelo na loja para sincronizar custo e preço uniformemente
+        const { data: allVariants } = await supabase
+          .from("smoking_products")
+          .select("id")
+          .eq("company_id", targetCompanyId)
+          .ilike("brand", brandClean)
+          .ilike("name", modelClean);
+
+        const variantIds = allVariants ? allVariants.map((v) => v.id) : [];
+
+        if (variantIds.length > 0) {
+          // Atualiza em lote na tabela oficial smoking_products todos os sabores desse modelo
+          await supabase
+            .from("smoking_products")
+            .update({
+              price: item.unitSell,
+              cost_price: item.unitCost
+            })
+            .in("id", variantIds)
+            .eq("company_id", targetCompanyId);
+        }
+
+        // Sincroniza custo oficial no metastore e cache de custos
         try {
-          const modelKey = `${item.brand.toLowerCase()}__${item.model.toLowerCase()}`;
           await updateProductCost({
-            modelKey,
-            productIds: existingId ? [existingId] : [],
+            modelKey: groupKey,
+            productIds: variantIds,
             costPrice: item.unitCost,
             companyId: targetCompanyId
           });
         } catch (costErr) {
-          console.warn("Aviso ao sincronizar custo:", costErr);
+          console.warn("Aviso ao sincronizar custo do modelo:", costErr);
         }
+      }
+
+      // Sincroniza em tempo real com o catálogo digital
+      try {
+        await broadcastLiveCatalogSync({
+          type: "STOCK_UPDATED",
+          company_id: targetCompanyId
+        });
+      } catch (broadcastErr) {
+        console.warn("Aviso ao emitir live sync:", broadcastErr);
       }
 
       // 2. Gravar o registro histórico de recompra em smoking_stock_repurchases
