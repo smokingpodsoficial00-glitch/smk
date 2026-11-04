@@ -2,7 +2,8 @@ import React, { useState, useMemo, useRef } from "react";
 import {
   PackageSearch, Plus, Minus, Search, Copy, Edit3, Check, X,
   Boxes, MoreVertical, Trash2, AlertCircle, Clock, Upload,
-  ImagePlus, Loader2, Sparkles, ChevronDown, CheckCircle2, Star
+  ImagePlus, Loader2, Sparkles, ChevronDown, CheckCircle2, Star,
+  PackagePlus
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 
@@ -36,6 +37,7 @@ interface MobileSupplyChainViewProps {
   activeMainView: "ESTOQUE" | "PARADOS";
   setActiveMainView: (view: "ESTOQUE" | "PARADOS") => void;
   onOpenReplenishmentPlanner: () => void;
+  onOpenRegisterStock?: () => void;
   onCopyAvailableStock: () => void;
   copiedStockFeedback: boolean;
   onUpdateStock: (id: string, newStock: number) => void;
@@ -77,6 +79,7 @@ export function MobileSupplyChainView({
   activeMainView,
   setActiveMainView,
   onOpenReplenishmentPlanner,
+  onOpenRegisterStock,
   onCopyAvailableStock,
   copiedStockFeedback,
   onUpdateStock,
@@ -309,12 +312,25 @@ export function MobileSupplyChainView({
             </button>
 
             {/* Linha de Ações Secundárias Compactas */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className={`grid ${onOpenRegisterStock ? "grid-cols-3" : "grid-cols-2"} gap-1.5`}>
+              {/* Botão Registrar Estoque */}
+              {onOpenRegisterStock && (
+                <button
+                  type="button"
+                  onClick={onOpenRegisterStock}
+                  className="h-9 px-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-[11px] font-extrabold flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-[0.98] shadow-sm shadow-emerald-500/20"
+                  title="Registrar compras e entrada de estoque"
+                >
+                  <PackagePlus className="size-3.5 shrink-0 stroke-[2.5]" />
+                  <span className="truncate">Registrar</span>
+                </button>
+              )}
+
               {/* Botão Copiar Estoque com Feedback Refinado */}
               <button
                 type="button"
                 onClick={onCopyAvailableStock}
-                className={`h-9 px-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98] ${
+                className={`h-9 px-2 rounded-xl border text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-[0.98] ${
                   copiedStockFeedback
                     ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
                     : "bg-white/5 hover:bg-white/10 border-white/10 text-white/90"
@@ -324,12 +340,12 @@ export function MobileSupplyChainView({
                 {copiedStockFeedback ? (
                   <>
                     <Check className="size-3.5 text-emerald-400 shrink-0" />
-                    <span className="font-bold truncate">Estoque copiado</span>
+                    <span className="font-bold truncate">Copiado</span>
                   </>
                 ) : (
                   <>
                     <Copy className="size-3.5 text-muted-foreground shrink-0" />
-                    <span className="truncate">Copiar Estoque</span>
+                    <span className="truncate">Copiar</span>
                   </>
                 )}
               </button>
@@ -338,7 +354,7 @@ export function MobileSupplyChainView({
               <button
                 type="button"
                 onClick={onOpenReplenishmentPlanner}
-                className="h-9 px-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/90 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98]"
+                className="h-9 px-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/90 text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-[0.98]"
               >
                 <PackageSearch className="size-3.5 text-muted-foreground shrink-0" />
                 <span className="truncate">Recompra</span>

@@ -4,7 +4,7 @@ import {
   Trash2, Search, Filter, ArrowUpDown, MoreVertical, Copy, Edit3, DollarSign, 
   CheckCircle2, X, TrendingUp, PieChart, ChevronRight, ChevronDown, ChevronUp, 
   Tag, Box, Boxes, Zap, Camera, Download, FileText, BarChart3, Check, Share2, Smartphone, 
-  Monitor, Store, ExternalLink, ListOrdered, Save, Star, ShoppingCart, Flame
+  Monitor, Store, ExternalLink, ListOrdered, Save, Star, ShoppingCart, Flame, PackagePlus
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatBRL } from "@/lib/cart";
@@ -15,6 +15,7 @@ import { ManualSaleModal } from "./ManualSaleModal";
 import { ReplenishmentPlannerModal, loadSavedGoals, type FinancialGoals } from "./ReplenishmentPlannerModal";
 import { StagnantStockSection } from "./StagnantStockSection";
 import { MobileSupplyChainView } from "./stock/MobileSupplyChainView";
+import { RegisterStockModal } from "./stock/RegisterStockModal";
 import { SmartAutocomplete, normalizeForMatch, type SmartOption } from "./ui/SmartAutocomplete";
 
 // ─── Donut chart colors ───────────────────────────────────
@@ -57,6 +58,8 @@ export default function SupplyChainDashboard() {
 
   // ─── Modal de Planejador de Reposição & Metas de Escala ──
   const [showReplenishmentModal, setShowReplenishmentModal] = useState(false);
+  const [showRegisterStockModal, setShowRegisterStockModal] = useState(false);
+  const [costsMap, setCostsMap] = useState<Record<string, number>>({});
   const [financialGoals, setFinancialGoals] = useState<FinancialGoals>(loadSavedGoals);
   const [copiedStockFeedback, setCopiedStockFeedback] = useState(false);
 
@@ -638,6 +641,7 @@ export default function SupplyChainDashboard() {
       const prodData = prodRes.data;
       const realOrders = ordersRes.data;
       const compData = compRes?.data;
+      if (costsMap) setCostsMap(costsMap);
 
       if (compData?.payment_gateway && typeof compData.payment_gateway === "object") {
         const gw = compData.payment_gateway;
@@ -2212,6 +2216,17 @@ export default function SupplyChainDashboard() {
 
             {/* Botões Superiores com Hierarquia Clara */}
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Botão Registrar Estoque (Destaque Principal ao lado de Copiar Estoque) */}
+              <button
+                type="button"
+                onClick={() => setShowRegisterStockModal(true)}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-[11px] sm:text-xs font-black shadow-lg shadow-emerald-500/25 transition-all cursor-pointer active:scale-[0.97] flex-1 sm:flex-initial"
+                title="Registrar remessa de compras e entrada de estoque com cálculo de margem e histórico"
+              >
+                <PackagePlus className="size-3.5 stroke-[2.5] shrink-0" />
+                <span className="truncate">Registrar Estoque</span>
+              </button>
+
               {/* Botão Copiar Estoque (Discreto, ao lado de Planejador de Recompra) */}
               <button
                 type="button"
@@ -2998,6 +3013,7 @@ export default function SupplyChainDashboard() {
           activeMainView={activeMainView}
           setActiveMainView={setActiveMainView}
           onOpenReplenishmentPlanner={() => setShowReplenishmentModal(true)}
+          onOpenRegisterStock={() => setShowRegisterStockModal(true)}
           onCopyAvailableStock={handleCopyAvailableStock}
           copiedStockFeedback={copiedStockFeedback}
           onUpdateStock={handleUpdateStock}
@@ -4250,6 +4266,18 @@ export default function SupplyChainDashboard() {
       />
 
       {/* ━━━ MODAL DE PLANEJADOR DE REPOSIÇÃO & METAS ━━━━━━━━━━ */}
+      {/* ━━━ MODAL DE REGISTRO DE COMPRAS & ENTRADA DE ESTOQUE ━━━ */}
+      <RegisterStockModal
+        isOpen={showRegisterStockModal}
+        onClose={() => setShowRegisterStockModal(false)}
+        companyId={company?.id}
+        products={products}
+        costsMap={costsMap}
+        onSuccess={() => {
+          fetchData();
+        }}
+      />
+
       <ReplenishmentPlannerModal
         isOpen={showReplenishmentModal}
         onClose={() => setShowReplenishmentModal(false)}
