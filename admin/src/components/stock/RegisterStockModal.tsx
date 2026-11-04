@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import {
   X,
   Plus,
+  Minus,
   Trash2,
   PackagePlus,
   CheckCircle2,
@@ -13,10 +14,11 @@ import {
   ArrowRight,
   AlertTriangle,
   Loader2,
-  Info
+  Info,
+  Check
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { updateProductCost, fetchProductCostsMap } from "@/lib/productCosts";
+import { updateProductCost } from "@/lib/productCosts";
 import { createStockRepurchase } from "@/lib/stockRepurchases";
 
 export interface StockEntryItem {
@@ -31,6 +33,14 @@ export interface StockEntryItem {
   unitSell: number;
   currentStock: number;
   isNewProduct?: boolean;
+}
+
+export interface SelectedFlavorItem {
+  flavor: string;
+  qty: number;
+  productId?: string;
+  currentStock: number;
+  isCustom?: boolean;
 }
 
 interface RegisterStockModalProps {
@@ -59,14 +69,17 @@ export function RegisterStockModal({
   const [searchModelQuery, setSearchModelQuery] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
-  const [selectedFlavor, setSelectedFlavor] = useState("");
-  const [customFlavorInput, setCustomFlavorInput] = useState("");
-  const [quantity, setQuantity] = useState<string>("5");
+  
+  // Sabores selecionados para o modelo atual (permite múltiplos sabores simultâneos)
+  const [selectedFlavors, setSelectedFlavors] = useState<SelectedFlavorItem[]>([]);
+  const [bulkDefaultQty, setBulkDefaultQty] = useState<string>("5");
+  const [customFlavorName, setCustomFlavorName] = useState<string>("");
+  const [customFlavorQty, setCustomFlavorQty] = useState<string>("5");
+  const [addedBatchNotification, setAddedBatchNotification] = useState<string | null>(null);
+
   const [unitCostInput, setUnitCostInput] = useState<string>("");
   const [unitSellInput, setUnitSellInput] = useState<string>("");
-  const [matchedProductId, setMatchedProductId] = useState<string | null>(null);
   const [previousCost, setPreviousCost] = useState<number | null>(null);
-  const [currentStockForFlavor, setCurrentStockForFlavor] = useState<number>(0);
   const [isNewProductMode, setIsNewProductMode] = useState(false);
 
   // Campos gerais da remessa
@@ -139,6 +152,17 @@ export function RegisterStockModal({
       .slice(0, 10);
   }, [searchModelQuery, modelCatalog]);
 
+  // Sabores disponíveis para o modelo atualmente selecionado
+  const availableFlavorsForModel = useMemo(() => {
+    if (!selectedBrand || !selectedModel) return [];
+    const entry = modelCatalog.find(
+      (m) =>
+        m.brand.toLowerCase() === selectedBrand.toLowerCase() &&
+        m.model.toLowerCase() === selectedModel.toLowerCase()
+    );
+    return entry ? entry.flavors : [];
+  }, [selectedBrand, selectedModel, modelCatalog]);
+
   // Quando o operador seleciona um modelo da lista existente
   const handleSelectModel = (modelData: typeof modelCatalog[0]) => {
     setSelectedBrand(modelData.brand);
@@ -152,15 +176,18 @@ export function RegisterStockModal({
     setUnitCostInput(cost ? String(cost) : "");
     setUnitSellInput(modelData.defaultPrice > 0 ? String(modelData.defaultPrice) : "");
 
-    // Se tiver apenas 1 sabor, já seleciona
+    // Se tiver apenas 1 sabor, já pré-seleciona
     if (modelData.flavors.length === 1) {
-      setSelectedFlavor(modelData.flavors[0].flavor);
-      setMatchedProductId(modelData.flavors[0].id);
-      setCurrentStockForFlavor(modelData.flavors[0].stock);
+      setSelectedFlavors([
+        {
+          flavor: modelData.flavors[0].flavor,
+          qty: parseInt(bulkDefaultQty) || 5,
+          productId: modelData.flavors[0].id,
+          currentStock: modelData.flavors[0].stock
+        }
+      ]);
     } else {
-      setSelectedFlavor("");
-      setMatchedProductId(null);
-      setCurrentStockForFlavor(0);
+      setSelectedFlavors([]);
     }
   };
 
@@ -181,70 +208,127 @@ export function RegisterStockModal({
     setSelectedBrand(brand);
     setSelectedModel(model);
     setIsNewProductMode(true);
-    setSelectedFlavor("");
-    setMatchedProductId(null);
+    setSelectedFlavors([]);
     setPreviousCost(null);
     setUnitCostInput("");
     setUnitSellInput("");
-    setCurrentStockForFlavor(0);
   };
 
-  // Quando escolhe um sabor existente do modelo
-  const handleSelectFlavor = (flavorName: string) => {
-    setSelectedFlavor(flavorName);
-    setCustomFlavorInput("");
-
-    const currentModelEntry = modelCatalog.find(
-      (m) =>
-        m.brand.toLowerCase() === selectedBrand.toLowerCase() &&
-        m.model.toLowerCase() === selectedModel.toLowerCase()
-    );
-
-    if (currentModelEntry) {
-      const flv = currentModelEntry.flavors.find(
-        (f) => f.flavor.toLowerCase() === flavorName.toLowerCase()
-      );
-      if (flv) {
-        setMatchedProductId(flv.id);
-        setCurrentStockForFlavor(flv.stock);
-        if (flv.price > 0 && !unitSellInput) setUnitSellInput(String(flv.price));
-        if (flv.cost > 0 && !unitCostInput) setUnitCostInput(String(flv.cost));
-        return;
+  // Alternar seleção de um sabor (Adicionar/Remover do lote do modelo)
+  const handleToggleFlavor = (flavorName: string, productId?: string, currentStock: number = 0) => {
+    setSelectedFlavors((prev) => {
+      const exists = prev.some((f) => f.flavor.toLowerCase() === flavorName.toLowerCase());
+      if (exists) {
+        return prev.filter((f) => f.flavor.toLowerCase() !== flavorName.toLowerCase());
+      } else {
+        const defaultQ = parseInt(bulkDefaultQty) || 5;
+        return [
+          ...prev,
+          {
+            flavor: flavorName,
+            qty: defaultQ,
+            productId,
+            currentStock
+          }
+        ];
       }
-    }
-    setMatchedProductId(null);
-    setCurrentStockForFlavor(0);
+    });
   };
 
-  // Sabores disponíveis para o modelo atualmente selecionado
-  const availableFlavorsForModel = useMemo(() => {
-    if (!selectedBrand || !selectedModel) return [];
-    const entry = modelCatalog.find(
-      (m) =>
-        m.brand.toLowerCase() === selectedBrand.toLowerCase() &&
-        m.model.toLowerCase() === selectedModel.toLowerCase()
-    );
-    return entry ? entry.flavors : [];
-  }, [selectedBrand, selectedModel, modelCatalog]);
+  // Selecionar todos os sabores disponíveis com a quantidade padrão
+  const handleSelectAllFlavors = () => {
+    if (availableFlavorsForModel.length === 0) return;
+    const defaultQ = parseInt(bulkDefaultQty) || 5;
+    const map = new Map<string, SelectedFlavorItem>();
+    selectedFlavors.forEach((f) => map.set(f.flavor.toLowerCase(), f));
 
-  // Cálculos dinâmicos da peça no formulário
+    availableFlavorsForModel.forEach((f) => {
+      const k = f.flavor.toLowerCase();
+      if (!map.has(k)) {
+        map.set(k, {
+          flavor: f.flavor,
+          qty: defaultQ,
+          productId: f.id,
+          currentStock: f.stock
+        });
+      }
+    });
+
+    setSelectedFlavors(Array.from(map.values()));
+  };
+
+  // Limpar sabores selecionados do modelo
+  const handleClearFlavors = () => {
+    setSelectedFlavors([]);
+  };
+
+  // Atualizar a quantidade de um sabor selecionado
+  const handleUpdateFlavorQty = (flavorName: string, deltaOrValue: number | string, isDirectValue = false) => {
+    setSelectedFlavors((prev) =>
+      prev.map((f) => {
+        if (f.flavor.toLowerCase() !== flavorName.toLowerCase()) return f;
+        let newQty = f.qty;
+        if (isDirectValue) {
+          newQty = parseInt(String(deltaOrValue)) || 1;
+        } else {
+          newQty = Math.max(1, f.qty + Number(deltaOrValue));
+        }
+        return { ...f, qty: Math.max(1, newQty) };
+      })
+    );
+  };
+
+  // Aplicar quantidade para todos os sabores selecionados de uma vez só
+  const handleApplyBulkQtyToAll = () => {
+    const q = parseInt(bulkDefaultQty) || 1;
+    setSelectedFlavors((prev) => prev.map((f) => ({ ...f, qty: q })));
+  };
+
+  // Adicionar um sabor novo que não estava no catálogo
+  const handleAddCustomFlavor = () => {
+    const name = customFlavorName.trim();
+    if (!name) return;
+    const qty = parseInt(customFlavorQty) || 5;
+    const exists = selectedFlavors.some((f) => f.flavor.toLowerCase() === name.toLowerCase());
+    if (exists) {
+      handleUpdateFlavorQty(name, qty, true);
+    } else {
+      setSelectedFlavors((prev) => [
+        ...prev,
+        {
+          flavor: name,
+          qty,
+          currentStock: 0,
+          isCustom: true
+        }
+      ]);
+    }
+    setCustomFlavorName("");
+  };
+
+  // Cálculos dinâmicos dos valores
   const parsedUnitCost = parseFloat(unitCostInput.replace(",", ".")) || 0;
   const parsedUnitSell = parseFloat(unitSellInput.replace(",", ".")) || 0;
-  const parsedQty = parseInt(quantity) || 0;
   const unitProfit = parsedUnitSell > 0 && parsedUnitCost > 0 ? parsedUnitSell - parsedUnitCost : 0;
   const markupPercent = parsedUnitCost > 0 ? (unitProfit / parsedUnitCost) * 100 : 0;
   const costDiff = previousCost !== null && parsedUnitCost > 0 ? parsedUnitCost - previousCost : null;
   const costDiffPercent = previousCost && previousCost > 0 && costDiff !== null ? (costDiff / previousCost) * 100 : null;
 
-  // Adicionar item ao lote da compra
-  const handleAddItem = () => {
+  // Total de unidades e valores para os sabores selecionados do modelo atual
+  const totalSelectedUnits = useMemo(
+    () => selectedFlavors.reduce((acc, f) => acc + (f.qty || 0), 0),
+    [selectedFlavors]
+  );
+  const totalModelSubtotal = totalSelectedUnits * parsedUnitCost;
+
+  // Adicionar todos os sabores selecionados deste modelo à lista de mercadorias da compra
+  const handleAddSelectedFlavorsToBatch = () => {
     if (!selectedModel.trim()) {
       alert("Por favor, selecione ou digite o modelo do produto.");
       return;
     }
-    const finalFlavor = selectedFlavor.trim() || customFlavorInput.trim() || "Sabor Padrão";
-    if (parsedQty <= 0) {
-      alert("Informe uma quantidade válida maior que zero.");
+    if (selectedFlavors.length === 0) {
+      alert("Selecione ou adicione ao menos um sabor que chegou nesta remessa.");
       return;
     }
     if (parsedUnitCost <= 0) {
@@ -256,33 +340,47 @@ export function RegisterStockModal({
       return;
     }
 
-    const newItem: StockEntryItem = {
+    const newItems: StockEntryItem[] = selectedFlavors.map((f) => ({
       id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      productId: matchedProductId || undefined,
+      productId: f.productId,
       brand: selectedBrand.trim() || "Outros",
       model: selectedModel.trim(),
-      flavor: finalFlavor,
-      qty: parsedQty,
+      flavor: f.flavor,
+      qty: f.qty,
       unitCost: parsedUnitCost,
       previousCost: previousCost,
       unitSell: parsedUnitSell,
-      currentStock: currentStockForFlavor,
-      isNewProduct: isNewProductMode || !matchedProductId
-    };
+      currentStock: f.currentStock,
+      isNewProduct: isNewProductMode || !f.productId
+    }));
 
-    setItems((prev) => [newItem, ...prev]);
+    setItems((prev) => [...newItems, ...prev]);
 
-    // Reseta apenas os campos de sabor e quantidade, mantendo o modelo caso queira adicionar outro sabor do mesmo pod
-    setSelectedFlavor("");
-    setCustomFlavorInput("");
-    setQuantity("5");
+    // Exibe banner de confirmação rápido
+    setAddedBatchNotification(
+      `${newItems.length} sabor(es) (${totalSelectedUnits} un) de ${selectedBrand} ${selectedModel} adicionados!`
+    );
+    setTimeout(() => setAddedBatchNotification(null), 4000);
+
+    // Limpa a seleção de sabores para poder adicionar outros modelos ou fechar
+    setSelectedFlavors([]);
   };
 
+  // Remover item individual da lista de compras
   const handleRemoveItem = (id: string) => {
     setItems((prev) => prev.filter((it) => it.id !== id));
   };
 
-  // Cálculos do Lote Total
+  // Alterar quantidade direto na lista de compras
+  const handleUpdateItemQty = (id: string, delta: number) => {
+    setItems((prev) =>
+      prev
+        .map((it) => (it.id === id ? { ...it, qty: it.qty + delta } : it))
+        .filter((it) => it.qty > 0)
+    );
+  };
+
+  // Cálculos do Lote Total da Compra
   const totalUnits = useMemo(() => items.reduce((acc, it) => acc + it.qty, 0), [items]);
   const totalCost = useMemo(() => items.reduce((acc, it) => acc + it.qty * it.unitCost, 0), [items]);
   const totalProjectedRevenue = useMemo(() => items.reduce((acc, it) => acc + it.qty * it.unitSell, 0), [items]);
@@ -304,7 +402,6 @@ export function RegisterStockModal({
 
       // 1. Processa cada item do lote
       for (const item of items) {
-        // A) Se o produto/sabor já existe no Supabase (pelo ID ou pela combinação de marca+modelo+sabor)
         let existingId = item.productId;
 
         if (!existingId) {
@@ -339,13 +436,13 @@ export function RegisterStockModal({
               stock: newStock,
               price: item.unitSell,
               cost_price: item.unitCost,
-              created_at: nowIso, // renova data de entrada para zerar "dias parado"
+              created_at: nowIso,
               is_active: true
             })
             .eq("id", existingId)
             .eq("company_id", targetCompanyId);
         } else {
-          // B) Produto ou sabor novo -> Inserir novo registro em smoking_products
+          // Produto ou sabor novo -> Inserir novo registro em smoking_products
           await supabase.from("smoking_products").insert({
             company_id: targetCompanyId,
             brand: item.brand,
@@ -360,7 +457,7 @@ export function RegisterStockModal({
           });
         }
 
-        // C) Atualiza o custo unitário oficial da loja
+        // Custo unitário oficial da loja
         try {
           const modelKey = `${item.brand.toLowerCase()}__${item.model.toLowerCase()}`;
           await updateProductCost({
@@ -411,21 +508,21 @@ export function RegisterStockModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
+      <div className="bg-[#0c0c0e] border border-white/10 rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         
-        {/* Top Header */}
-        <div className="px-5 sm:px-7 py-4 sm:py-5 border-b border-white/10 flex items-center justify-between gap-4 bg-white/[0.02]">
+        {/* Topo do Modal */}
+        <div className="px-5 sm:px-7 py-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
           <div className="flex items-center gap-3">
-            <div className="size-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-lg shadow-emerald-500/10">
-              <PackagePlus className="size-6" />
+            <div className="size-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <PackagePlus className="size-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
                   Reposição de Estoque
                 </span>
-                <span className="text-xs text-white/40">Entrada Rápida</span>
+                <span className="text-[10px] text-white/40">Entrada Rápida</span>
               </div>
               <h2 className="text-base sm:text-lg font-black text-white tracking-tight mt-0.5">
                 Registrar Compra de Mercadorias
@@ -436,30 +533,41 @@ export function RegisterStockModal({
           <button
             type="button"
             onClick={onClose}
-            className="size-8 rounded-full bg-white/5 hover:bg-white/10 text-white/50 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+            className="size-8 rounded-full bg-white/5 hover:bg-white/10 text-white/50 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="size-4" />
           </button>
         </div>
 
-        {/* Corpo com Scroll */}
-        <div className="p-5 sm:p-7 overflow-y-auto custom-scrollbar space-y-6 flex-1 text-white">
+        {/* Notificação Temporária de Lote Adicionado */}
+        {addedBatchNotification && (
+          <div className="px-5 py-2.5 bg-emerald-500/20 border-b border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center justify-between animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
+              <span>{addedBatchNotification}</span>
+            </div>
+            <span className="text-[11px] text-emerald-400/80">Role abaixo para conferir o resumo ↓</span>
+          </div>
+        )}
 
-          {/* 1. SEÇÃO: Adicionar Mercadoria ao Lote */}
-          <div className="bg-[#121215] border border-white/10 rounded-2xl p-4 sm:p-5 space-y-4">
+        {/* Corpo com Scroll */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-7 space-y-6">
+
+          {/* 1. SEÇÃO: Adição Inteligente de Mercadoria */}
+          <div className="bg-[#141417] border border-white/10 rounded-2xl p-4 sm:p-5 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-white flex items-center gap-1.5">
                 <Sparkles className="size-3.5 text-amber-400" />
                 <span>Adicionar Produto Comprado</span>
               </span>
               {selectedModel && (
-                <span className="text-[11px] text-emerald-400 font-semibold">
-                  {isNewProductMode ? "✨ Produto Novo" : "✓ Encaixado no Catálogo"}
+                <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                  <Check className="size-3.5" /> Encaixado no Catálogo
                 </span>
               )}
             </div>
 
-            {/* Linha 1: Pesquisa Inteligente de Produto / Modelo */}
+            {/* Linha 1: Pesquisa Inteligente de Modelo */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-white/70 block">
                 Pesquisar ou Criar Produto / Modelo:
@@ -472,28 +580,29 @@ export function RegisterStockModal({
                     setSearchModelQuery(e.target.value);
                     if (selectedModel && e.target.value !== `${selectedBrand} ${selectedModel}`) {
                       setSelectedModel("");
+                      setSelectedFlavors([]);
                     }
                   }}
-                  placeholder="Ex: Elfbar Ice King 40K, Ignite V50, Lost Mary..."
-                  className="w-full px-4 py-2.5 rounded-xl bg-black/60 border border-white/15 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 font-medium"
+                  placeholder="Digite a marca ou modelo (Ex: Elfbar BC15K, Lost Mary, Ignite...)"
+                  className="w-full px-4 py-2.5 rounded-xl bg-black/60 border border-white/15 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all font-semibold"
                 />
 
-                {/* Dropdown de Resultados da Pesquisa Inteligente */}
-                {searchModelQuery.trim() && !selectedModel && (
-                  <div className="absolute top-full left-0 right-0 z-20 mt-1 max-h-56 overflow-y-auto bg-[#16161a] border border-white/15 rounded-2xl shadow-2xl p-1.5 space-y-1">
+                {/* Dropdown de Sugestões de Modelos do Catálogo */}
+                {!selectedModel && searchModelQuery.trim().length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-20 bg-[#141418] border border-white/15 rounded-2xl shadow-2xl p-2 max-h-56 overflow-y-auto custom-scrollbar space-y-1">
                     {filteredModels.map((m) => (
                       <button
                         key={m.key}
                         type="button"
                         onClick={() => handleSelectModel(m)}
-                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/10 transition-colors flex items-center justify-between text-xs cursor-pointer group"
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/10 flex items-center justify-between text-xs cursor-pointer transition-colors"
                       >
                         <div>
-                          <span className="font-bold text-white group-hover:text-emerald-400 transition-colors">
+                          <span className="font-bold text-white block">
                             {m.brand} {m.model}
                           </span>
-                          <span className="text-[10px] text-white/40 block mt-0.5">
-                            {m.flavors.length} sabores cadastrados
+                          <span className="text-[10px] text-white/50">
+                            {m.flavors.length} sabores no catálogo • {m.flavors.reduce((a, b) => a + b.stock, 0)} un em estoque
                           </span>
                         </div>
                         <div className="text-right">
@@ -521,86 +630,221 @@ export function RegisterStockModal({
               </div>
             </div>
 
-            {/* Linha 2: Seleção de Sabor & Quantidade */}
+            {/* Linha 2: MÚLTIPLOS SABORES DO MESMO PRODUTO */}
             {selectedModel && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 animate-in fade-in">
-                {/* Sabores */}
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-white/70 block">
-                    Sabor que Chegou:
-                  </label>
-                  {availableFlavorsForModel.length > 0 && !customFlavorInput ? (
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto custom-scrollbar p-1">
-                        {availableFlavorsForModel.map((f) => (
-                          <button
-                            key={f.id}
-                            type="button"
-                            onClick={() => handleSelectFlavor(f.flavor)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                              selectedFlavor === f.flavor
-                                ? "bg-emerald-500 text-black shadow-md font-bold"
-                                : "bg-white/5 hover:bg-white/10 text-white/80 border border-white/10"
-                            }`}
-                          >
-                            {f.flavor} ({f.stock} un)
-                          </button>
-                        ))}
-                      </div>
+              <div className="space-y-3 pt-2 border-t border-white/5 animate-in fade-in">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <label className="text-[11px] font-bold text-white flex items-center gap-1.5">
+                      <Sparkles className="size-3 text-emerald-400" />
+                      <span>Sabores que Chegaram no Lote</span>
+                    </label>
+                    <span className="text-[10px] text-white/50">
+                      Clique nos sabores para marcar quantos de cada um chegaram
+                    </span>
+                  </div>
+
+                  {availableFlavorsForModel.length > 1 && (
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedFlavor("");
-                          setCustomFlavorInput(" ");
-                        }}
-                        className="text-[11px] text-emerald-400 hover:underline font-semibold cursor-pointer block"
+                        onClick={handleSelectAllFlavors}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold cursor-pointer transition-colors flex items-center gap-1"
                       >
-                        + Digitar um sabor diferente
+                        <Check className="size-3" />
+                        <span>Selecionar Todos ({availableFlavorsForModel.length})</span>
                       </button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={customFlavorInput}
-                        onChange={(e) => setCustomFlavorInput(e.target.value)}
-                        placeholder="Nome do sabor (Ex: Melancia Ice, Menta...)"
-                        className="flex-1 px-3 py-2 rounded-xl bg-black/60 border border-white/15 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-emerald-500"
-                        autoFocus
-                      />
-                      {availableFlavorsForModel.length > 0 && (
+                      {selectedFlavors.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => setCustomFlavorInput("")}
-                          className="px-2.5 py-1 text-xs text-white/50 hover:text-white cursor-pointer"
+                          onClick={handleClearFlavors}
+                          className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white text-[11px] cursor-pointer"
                         >
-                          Cancelar
+                          Limpar
                         </button>
                       )}
                     </div>
                   )}
                 </div>
 
-                {/* Quantidade Comprada */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-white/70 block">
-                      Quantidade Comprada:
-                    </label>
-                    {currentStockForFlavor > 0 && (
-                      <span className="text-[10px] text-white/50 font-mono">
-                        Estoque atual: {currentStockForFlavor} un
-                      </span>
-                    )}
+                {/* Pílulas de Seleção Rápida dos Sabores */}
+                {availableFlavorsForModel.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto custom-scrollbar p-1">
+                    {availableFlavorsForModel.map((f) => {
+                      const isSelected = selectedFlavors.some(
+                        (sf) => sf.flavor.toLowerCase() === f.flavor.toLowerCase()
+                      );
+                      const selectedItem = selectedFlavors.find(
+                        (sf) => sf.flavor.toLowerCase() === f.flavor.toLowerCase()
+                      );
+
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => handleToggleFlavor(f.flavor, f.id, f.stock)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
+                            isSelected
+                              ? "bg-emerald-500 text-black font-extrabold shadow-md shadow-emerald-500/25 border border-emerald-400 scale-[1.02]"
+                              : "bg-[#18181b] hover:bg-white/10 text-white/80 border border-white/10"
+                          }`}
+                        >
+                          <span>{f.flavor}</span>
+                          {isSelected ? (
+                            <span className="px-1.5 py-0.5 rounded-md bg-black/30 text-black font-mono text-[10px] font-black">
+                              {selectedItem?.qty} un ✓
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-white/40 font-mono">
+                              ({f.stock} un)
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <input
-                    type="number"
-                    min="1"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    placeholder="Ex: 5, 10, 20"
-                    className="w-full px-3.5 py-2 rounded-xl bg-black/60 border border-white/15 text-white text-xs font-bold focus:outline-none focus:border-emerald-500"
-                  />
+                )}
+
+                {/* Grade de Quantidades por Sabor Selecionado */}
+                {selectedFlavors.length > 0 && (
+                  <div className="bg-[#101013] border border-emerald-500/30 rounded-2xl p-3.5 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-white/5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-emerald-400">
+                          {selectedFlavors.length} {selectedFlavors.length === 1 ? "sabor marcado" : "sabores marcados"}
+                        </span>
+                        <span className="text-white/40 text-xs">•</span>
+                        <span className="text-xs font-mono font-bold text-white">
+                          Total: {totalSelectedUnits} unidades
+                        </span>
+                      </div>
+
+                      {/* Definir quantidade padrão em lote */}
+                      {selectedFlavors.length > 1 && (
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className="text-white/50 text-[11px]">Colocar em todos:</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={bulkDefaultQty}
+                            onChange={(e) => setBulkDefaultQty(e.target.value)}
+                            className="w-14 px-2 py-0.5 bg-black/60 border border-white/15 rounded-lg text-white font-mono text-center text-xs focus:outline-none focus:border-emerald-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleApplyBulkQtyToAll}
+                            className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold rounded-lg cursor-pointer transition-colors"
+                          >
+                            Aplicar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Linhas de cada sabor com Stepper [-] [qty] [+] */}
+                    <div className="space-y-2 max-h-52 overflow-y-auto custom-scrollbar pr-1">
+                      {selectedFlavors.map((sf) => (
+                        <div
+                          key={sf.flavor}
+                          className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-colors"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <span className="font-bold text-white text-xs truncate block">
+                              {sf.flavor}
+                            </span>
+                            <span className="text-[10px] text-white/40 font-mono">
+                              Estoque atual: {sf.currentStock} un ➔ Ficará: {sf.currentStock + sf.qty} un
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {/* Stepper [-] [input] [+] */}
+                            <div className="flex items-center bg-black/60 border border-white/15 rounded-xl overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateFlavorQty(sf.flavor, -1)}
+                                className="px-2.5 py-1 text-white/70 hover:text-white hover:bg-white/10 cursor-pointer font-bold"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                min="1"
+                                value={sf.qty}
+                                onChange={(e) => handleUpdateFlavorQty(sf.flavor, e.target.value, true)}
+                                className="w-12 text-center text-xs font-mono font-bold text-white bg-transparent focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateFlavorQty(sf.flavor, 1)}
+                                className="px-2.5 py-1 text-white/70 hover:text-white hover:bg-white/10 cursor-pointer font-bold"
+                              >
+                                +
+                              </button>
+                            </div>
+
+                            {/* Botões rápidos +5 / +10 */}
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateFlavorQty(sf.flavor, 5)}
+                              className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-[10px] font-mono cursor-pointer"
+                              title="Adicionar +5 un"
+                            >
+                              +5
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleToggleFlavor(sf.flavor)}
+                              className="p-1 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 cursor-pointer transition-colors"
+                              title="Remover este sabor"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Adicionar Sabor Não Listado (Custom Flavor) */}
+                <div className="p-3 rounded-xl bg-white/[0.02] border border-dashed border-white/10 space-y-2">
+                  <span className="text-[11px] text-white/60 font-semibold block">
+                    + Chegou algum sabor novo que não está na lista acima?
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={customFlavorName}
+                      onChange={(e) => setCustomFlavorName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddCustomFlavor();
+                        }
+                      }}
+                      placeholder="Nome do sabor (Ex: Blueberry Ice, Menthol...)"
+                      className="flex-1 px-3 py-1.5 rounded-xl bg-black/60 border border-white/15 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-emerald-500"
+                    />
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-[10px] text-white/40">Qtd:</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={customFlavorQty}
+                        onChange={(e) => setCustomFlavorQty(e.target.value)}
+                        className="w-14 px-2 py-1.5 rounded-xl bg-black/60 border border-white/15 text-white text-xs font-mono text-center focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddCustomFlavor}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold cursor-pointer transition-colors shrink-0"
+                    >
+                      + Adicionar Sabor
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -682,19 +926,37 @@ export function RegisterStockModal({
               </div>
             )}
 
-            {/* Botão de Adicionar à Lista */}
+            {/* Subtotal do Produto e Botão de Adicionar à Compra */}
             {selectedModel && (
-              <div className="pt-2 flex justify-end">
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-white/5">
+                <div className="text-xs font-mono text-white/60">
+                  {totalSelectedUnits > 0 && parsedUnitCost > 0 ? (
+                    <span>
+                      Subtotal deste produto: <strong className="text-white">{totalSelectedUnits} un × R$ {parsedUnitCost.toFixed(2)}</strong> = <strong className="text-emerald-400">R$ {totalModelSubtotal.toFixed(2)}</strong>
+                    </span>
+                  ) : (
+                    <span>Marque os sabores e quantidades acima para prosseguir.</span>
+                  )}
+                </div>
+
                 <button
                   type="button"
-                  onClick={handleAddItem}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-lg shadow-emerald-500/20 cursor-pointer active:scale-95"
+                  onClick={handleAddSelectedFlavorsToBatch}
+                  disabled={selectedFlavors.length === 0}
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-30 disabled:cursor-not-allowed text-black text-xs font-extrabold flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-500/20 cursor-pointer active:scale-95"
                 >
-                  <Plus className="size-4" />
-                  <span>Adicionar à Compra</span>
+                  <Plus className="size-4 stroke-[3]" />
+                  {selectedFlavors.length === 0 ? (
+                    <span>Selecione os sabores acima</span>
+                  ) : selectedFlavors.length === 1 ? (
+                    <span>Adicionar {selectedFlavors[0].flavor} ({selectedFlavors[0].qty} un) à Compra</span>
+                  ) : (
+                    <span>Adicionar {selectedFlavors.length} Sabores ({totalSelectedUnits} un) à Compra</span>
+                  )}
                 </button>
               </div>
             )}
+
           </div>
 
           {/* 2. SEÇÃO: Grade de Mercadorias Compradas no Lote */}
@@ -740,8 +1002,6 @@ export function RegisterStockModal({
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-[11px] text-white/50">
-                          <span>Quantidade: <strong className="text-white">{item.qty} un</strong></span>
-                          <span>•</span>
                           <span>Custo: <strong className="text-white">R$ {item.unitCost.toFixed(2)}</strong></span>
                           {diff !== null && diff !== 0 && (
                             <span className={diff > 0 ? "text-amber-400 font-bold" : "text-emerald-400 font-bold"}>
@@ -753,7 +1013,28 @@ export function RegisterStockModal({
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
+                        {/* Stepper direto na lista de compras */}
+                        <div className="flex items-center bg-black/60 border border-white/15 rounded-xl overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateItemQty(item.id, -1)}
+                            className="px-2 py-0.5 text-white/70 hover:text-white hover:bg-white/10 font-bold cursor-pointer"
+                          >
+                            -
+                          </button>
+                          <span className="w-12 text-center font-mono font-bold text-white text-xs">
+                            {item.qty} un
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateItemQty(item.id, 1)}
+                            className="px-2 py-0.5 text-white/70 hover:text-white hover:bg-white/10 font-bold cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+
                         <div className="text-left sm:text-right">
                           <span className="text-[10px] text-white/40 uppercase tracking-wider block">Subtotal</span>
                           <span className="font-mono font-bold text-emerald-400 text-sm">
