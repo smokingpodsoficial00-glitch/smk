@@ -128,7 +128,7 @@ export async function ensureSaleCustomer(params: {
       .eq("company_id", companyId)
       .eq("phone", formattedPhone);
 
-    if (!searchErr && existingClients && existingClients.length === 1) {
+    if (!searchErr && existingClients && existingClients.length >= 1) {
       const existing = existingClients[0];
       // Atualizar dados cadastrais do cliente existente no tenant
       await supabase
