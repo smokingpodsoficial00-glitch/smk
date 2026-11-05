@@ -266,7 +266,11 @@ export function MobileManualSaleFlow({
         existing.flavorCount += 1;
       }
     });
-    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.totalStock > 0 && b.totalStock <= 0) return -1;
+      if (a.totalStock <= 0 && b.totalStock > 0) return 1;
+      return a.label.localeCompare(b.label);
+    });
   }, [productsList]);
 
   // Filtragem de Modelos na busca

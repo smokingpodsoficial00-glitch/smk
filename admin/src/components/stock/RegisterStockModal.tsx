@@ -21,6 +21,7 @@ import { supabase } from "@/lib/supabase";
 import { updateProductCost } from "@/lib/productCosts";
 import { createStockRepurchase } from "@/lib/stockRepurchases";
 import { broadcastLiveCatalogSync } from "@/lib/categories";
+import { invalidateSaleCatalogCache } from "@/components/ManualSaleModal";
 
 export interface StockEntryItem {
   id: string;
@@ -536,6 +537,11 @@ export function RegisterStockModal({
         totalInvested: totalInvestedWithFreight,
         projectedProfit: totalProjectedProfit
       });
+
+      // Invalida o cache do catálogo de vendas manuais para refletir estoque novo imediatamente
+      try {
+        invalidateSaleCatalogCache(targetCompanyId);
+      } catch (e) {}
 
       // Atualiza a tela de estoque
       onSuccess();

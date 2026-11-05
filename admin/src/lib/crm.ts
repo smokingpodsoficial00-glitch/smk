@@ -161,6 +161,46 @@ export async function ensureSaleCustomer(params: {
     .single();
 
   if (insertErr || !newClientData?.id) {
+    // Recuperação inteligente de Multitenant: Se o banco Supabase ainda tiver a constraint
+    // global antiga 'smoking_clients_phone_key' (UNIQUE apenas em phone, sem company_id),
+    // reutilizamos o cliente existente com esse telefone para NUNCA travar a venda do lojista.
+    const isPhoneDuplicate =
+      insertErr &&
+      (insertErr.message?.includes("smoking_clients_phone_key") ||
+        insertErr.code === "23505" ||
+        insertErr.message?.toLowerCase().includes("unique constraint") ||
+        insertErr.message?.toLowerCase().includes("duplicate key"));
+
+    if (isPhoneDuplicate && isRealPhone) {
+      console.warn(
+        "[ensureSaleCustomer] Detectada duplicidade global de telefone (smoking_clients_phone_key). Reutilizando registro existente no CRM para não abortar a venda..."
+      );
+
+      const { data: globalExisting } = await supabase
+        .from("smoking_clients")
+        .select("id, company_id, name")
+        .eq("phone", formattedPhone)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (globalExisting?.id) {
+        if (!globalExisting.company_id && companyId) {
+          await supabase
+            .from("smoking_clients")
+            .update({
+              company_id: companyId,
+              name: cleanName,
+              address: clientAddressToSave,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", globalExisting.id);
+        }
+
+        return { customerId: globalExisting.id, formattedPhone };
+      }
+    }
+
     console.error("[ensureSaleCustomer] Falha crítica ao criar cliente em smoking_clients:", insertErr);
     throw new Error(
       "Não foi possível salvar o cliente no CRM (" +

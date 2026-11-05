@@ -254,17 +254,31 @@ export function ManualSaleModal({
     loadInitialData();
   }, [isOpen, companyId]);
 
-  // Lista Simplificada de Todos os Modelos (ex: "ELFBAR ICE KING")
+  // Lista Simplificada de Todos os Modelos com contagem de estoque
   const availableModels = useMemo(() => {
-    const map = new Map<string, { label: string; key: string }>();
+    const map = new Map<string, { label: string; key: string; totalStock: number; inStockFlavorsCount: number }>();
     productsList.forEach((p) => {
       const key = `${p.brand}__${p.name}`.toLowerCase();
       const label = `${p.brand} ${p.name}`.trim();
+      const stockNum = Number(p.stock) || 0;
       if (!map.has(key)) {
-        map.set(key, { label, key });
+        map.set(key, {
+          label,
+          key,
+          totalStock: stockNum,
+          inStockFlavorsCount: stockNum > 0 ? 1 : 0,
+        });
+      } else {
+        const item = map.get(key)!;
+        item.totalStock += stockNum;
+        if (stockNum > 0) item.inStockFlavorsCount += 1;
       }
     });
-    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.totalStock > 0 && b.totalStock <= 0) return -1;
+      if (a.totalStock <= 0 && b.totalStock > 0) return 1;
+      return a.label.localeCompare(b.label);
+    });
   }, [productsList]);
 
   // Modelos filtrados pela busca
@@ -1206,10 +1220,23 @@ export function ManualSaleModal({
                                 className={`w-full px-3.5 py-2.5 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer text-xs ${
                                   isSelected
                                     ? "bg-emerald-500/15 text-emerald-300 font-bold"
+                                    : m.totalStock <= 0
+                                    ? "hover:bg-white/5 text-white/40"
                                     : "hover:bg-white/10 text-white/85"
                                 }`}
                               >
-                                <span className="truncate">{m.label}</span>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="truncate">{m.label}</span>
+                                  {m.totalStock <= 0 ? (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 shrink-0">
+                                      Sem estoque
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                                      {m.totalStock} un
+                                    </span>
+                                  )}
+                                </div>
                                 {isSelected && <CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />}
                               </button>
                             );
@@ -1279,8 +1306,9 @@ export function ManualSaleModal({
                       </div>
                       <div className="max-h-60 overflow-y-auto divide-y divide-white/5 custom-scrollbar">
                         {filteredFlavors.length === 0 ? (
-                          <div className="p-3 text-center text-xs text-white/40">
-                            Nenhum sabor com estoque disponível para este modelo
+                          <div className="p-4 text-center text-xs space-y-1">
+                            <div className="font-bold text-red-400">Todos os sabores deste modelo estão esgotados</div>
+                            <div className="text-[10px] text-white/40">Adicione estoque deste produto em "Registrar Compra" para vender</div>
                           </div>
                         ) : (
                           filteredFlavors.map((f) => {
