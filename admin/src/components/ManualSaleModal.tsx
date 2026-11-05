@@ -282,7 +282,8 @@ export function ManualSaleModal({
     if (!selectedModelKey) return [];
     return productsList.filter((p) => {
       const key = `${p.brand}__${p.name}`.toLowerCase();
-      return key === selectedModelKey;
+      const stockNum = Number(p.stock) || 0;
+      return key === selectedModelKey && stockNum > 0;
     });
   }, [productsList, selectedModelKey]);
 
@@ -1279,7 +1280,7 @@ export function ManualSaleModal({
                       <div className="max-h-60 overflow-y-auto divide-y divide-white/5 custom-scrollbar">
                         {filteredFlavors.length === 0 ? (
                           <div className="p-3 text-center text-xs text-white/40">
-                            Nenhum sabor encontrado
+                            Nenhum sabor com estoque disponível para este modelo
                           </div>
                         ) : (
                           filteredFlavors.map((f) => {
@@ -1290,7 +1291,7 @@ export function ManualSaleModal({
                               <button
                                 key={f.id}
                                 type="button"
-                                disabled={isOutOfStock}
+                                disabled={false}
                                 onClick={() => handleSelectFlavor(f)}
                                 className={`w-full px-3.5 py-2.5 text-left flex items-center justify-between gap-3 transition-colors text-xs ${
                                   isOutOfStock
@@ -1301,10 +1302,10 @@ export function ManualSaleModal({
                                 }`}
                               >
                                 <div className="min-w-0">
-                                  <div className={`font-bold truncate ${isOutOfStock ? "text-white/40 line-through" : "text-white"}`}>{f.flavor}</div>
+                                  <div className="font-bold truncate text-white">{f.flavor}</div>
                                   <div className="flex items-center gap-2 text-[10px] text-white/50">
                                     <span className={stockNum > 0 ? "text-emerald-400 font-medium" : "text-red-400 font-bold"}>
-                                      {stockNum > 0 ? `${stockNum} un em estoque` : "Esgotado (0 un)"}
+                                      {stockNum} un em estoque
                                     </span>
                                     {f.price && (
                                       <span>• R$ {Number(f.price).toFixed(2).replace(".", ",")}</span>

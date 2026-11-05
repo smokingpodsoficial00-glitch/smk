@@ -283,7 +283,8 @@ export function MobileManualSaleFlow({
     if (!selectedModelKey) return [];
     return productsList.filter((p) => {
       const key = `${p.brand}__${p.name}`.toLowerCase();
-      return key === selectedModelKey;
+      const stockNum = Number(p.stock) || 0;
+      return key === selectedModelKey && stockNum > 0;
     });
   }, [productsList, selectedModelKey]);
 
@@ -1208,7 +1209,7 @@ export function MobileManualSaleFlow({
                                     : "bg-emerald-500/10 text-emerald-400"
                                 }`}
                               >
-                                {isOutOfStock ? "Esgotado" : `${stockNum} un.`}
+                                {stockNum} un.
                               </span>
                               <span className="text-[11px] font-semibold text-zinc-300">
                                 R$ {Number(flavor.price || 0).toFixed(2)}
