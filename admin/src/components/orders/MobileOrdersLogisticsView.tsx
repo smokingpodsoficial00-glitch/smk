@@ -157,10 +157,13 @@ export function MobileOrdersLogisticsView({
       FIADOS: 0,
     };
     orders.forEach((o) => {
-      if (o.isFiado && o.fiadoStatus === "PENDENTE") {
+      if (o.isFiado) {
         res.FIADOS++;
-      } else if (res[o.status] !== undefined) {
-        res[o.status]++;
+      }
+      if (!o.isFiado || o.fiadoStatus !== "PENDENTE") {
+        if (res[o.status] !== undefined) {
+          res[o.status]++;
+        }
       }
     });
     return res;
@@ -309,7 +312,7 @@ export function MobileOrdersLogisticsView({
                 .map((i) => `${i.quantity || 1}x ${i.flavor || i.model || "Produto"}`)
                 .join(", ");
               const isExpanded = expandedOrderIds.has(order.realId);
-              const isFiadoPending = Boolean(order.isFiado && order.fiadoStatus !== "PAGO");
+              const isFiadoPending = activeTab === "FIADOS" || Boolean(order.isFiado && order.fiadoStatus !== "PAGO");
 
               // ━━━ ESTADO MINIMIZADO (Apenas Nome, Dia de Pagamento e Valor a Pagar) ━━━
               if (!isExpanded) {
@@ -393,13 +396,13 @@ export function MobileOrdersLogisticsView({
 
                     <div className="flex items-center gap-2">
                       <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                        order.isFiado
+                        (order.isFiado || activeTab === "FIADOS")
                           ? isFiadoPending
                             ? "bg-red-500/15 border border-red-500/40 text-red-400"
                             : "bg-white/10 border border-white/20 text-white"
                           : "bg-white/10 border border-white/20 text-white"
                       }`}>
-                        {order.isFiado
+                        {(order.isFiado || activeTab === "FIADOS")
                           ? isFiadoPending
                             ? `FALTA PAGAR (${order.fiadoDueDateFormatted || "Pendente"})`
                             : "FIADO PAGO"
@@ -477,7 +480,7 @@ export function MobileOrdersLogisticsView({
                   </div>
 
                   {/* Bloco de Fiado no Card Mobile (Exatamente como no print, com destaque vermelho para falta pagar) */}
-                  {order.isFiado && (
+                  {(order.isFiado || activeTab === "FIADOS") && (
                     <div className={`p-3 rounded-xl border space-y-2 ${
                       isFiadoPending
                         ? "border-red-500/30 bg-red-500/[0.04]"
