@@ -13,6 +13,8 @@ import { MobilePushSetupModal } from"./MobilePushSetupModal";
 import { MobileOrdersLogisticsView } from "./orders/MobileOrdersLogisticsView";
 import { deleteOrderWithStockRestoration } from"@/lib/orders";
 import { invalidateFinanceCache } from "./FinanceDashboard";
+import { invalidateLiveClientsCache } from "@/lib/crm";
+import { invalidateSalesHistoryCache } from "@/lib/salesHistory";
 import {
   extractFiadoInfo,
   getOrderDisplayPaymentMethod,
@@ -36,7 +38,7 @@ export interface AdminOrder {
  paymentMethod: string;
  receiptUrl: string | null;
  paymentStatus: string;
- status: 'AGUARDANDO_PAGAMENTO' | 'PREPARANDO' | 'EM_ROTA' | 'ENTREGUE' | 'CONCLUIDO' | 'CANCELADO';
+ status: 'AGUARDANDO_PAGAMENTO' | 'PREPARANDO' | 'EM_ROTA' | 'ENTREGUE' | 'CONCLUIDO' | 'CANCELADO' | 'FIADO';
  time: string;
  createdAt: string;
  requestedDiscount?: boolean;
@@ -128,8 +130,9 @@ export default function KanbanBoard() {
  const mapped: AdminOrder[] = data
  .filter(o => o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' && (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_')))
  .map(o => {
- const isCompleted = completedIds.includes(o.id) || o.delivery_status === 'CONCLUIDO' || o.receipt_url === 'CONCLUIDO';
  const fiadoInfo = extractFiadoInfo(o);
+ const isPendingFiado = fiadoInfo.isFiado && fiadoInfo.status === 'PENDENTE';
+ const isCompleted = !isPendingFiado && (completedIds.includes(o.id) || o.delivery_status === 'CONCLUIDO' || o.receipt_url === 'CONCLUIDO');
  const displayPaymentMethod = getOrderDisplayPaymentMethod(o);
  return {
  id: o.id.substring(0, 8).toUpperCase(),
@@ -148,7 +151,7 @@ export default function KanbanBoard() {
  paymentMethod: displayPaymentMethod,
  receiptUrl: o.receipt_url,
  paymentStatus: o.payment_status,
- status: isCompleted ? 'CONCLUIDO' : (o.delivery_status || 'PREPARANDO'),
+ status: isPendingFiado ? 'FIADO' : (isCompleted ? 'CONCLUIDO' : (o.delivery_status === 'FIADO' ? 'FIADO' : (o.delivery_status || 'PREPARANDO'))),
  time: new Date(o.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
  createdAt: o.created_at,
  requestedDiscount: !!o.requested_discount || o.receipt_url === 'SOLICITOU_DESCONTO',
@@ -214,31 +217,37 @@ export default function KanbanBoard() {
  const [editFiadoAmount, setEditFiadoAmount] = useState<string>("");
  const [selectedFiadoPayMethod, setSelectedFiadoPayMethod] = useState<Record<string, 'PIX' | 'DINHEIRO' | 'CARTAO'>>({});
 
- const handleConfirmFiadoPayment = async (order: AdminOrder) => {
-   const chosenMethod = selectedFiadoPayMethod[order.realId] || 'PIX';
-   setProcessingFiadoId(order.realId);
-   const res = await markFiadoOrderAsPaid({ orderId: order.realId, paidMethod: chosenMethod, companyId: company?.id });
-   setProcessingFiadoId(null);
-   if (res.success) {
-     invalidateFinanceCache();
-     await fetchOrders();
-   } else {
-     alert("Erro ao registrar pagamento do fiado: " + (res.error || "Erro desconhecido"));
-   }
- };
+  const handleConfirmFiadoPayment = async (order: AdminOrder) => {
+    const chosenMethod = selectedFiadoPayMethod[order.realId] || 'PIX';
+    setProcessingFiadoId(order.realId);
+    const res = await markFiadoOrderAsPaid({ orderId: order.realId, paidMethod: chosenMethod, companyId: company?.id });
+    setProcessingFiadoId(null);
+    if (res.success) {
+      saveCompletedIds([...getCompletedIds(), order.realId]);
+      invalidateFinanceCache();
+      invalidateLiveClientsCache(company?.id);
+      invalidateSalesHistoryCache(company?.id);
+      await fetchOrders();
+    } else {
+      alert("Erro ao registrar pagamento do fiado: " + (res.error || "Erro desconhecido"));
+    }
+  };
 
- const handleReopenFiadoPayment = async (order: AdminOrder) => {
-   if (!confirm(`Deseja marcar o fiado de ${order.clientName} novamente como PENDENTE? O valor sairá do Caixa Real até ser pago.`)) return;
-   setProcessingFiadoId(order.realId);
-   const res = await reopenFiadoOrder({ orderId: order.realId, companyId: company?.id });
-   setProcessingFiadoId(null);
-   if (res.success) {
-     invalidateFinanceCache();
-     await fetchOrders();
-   } else {
-     alert("Erro ao reabrir fiado: " + (res.error || "Erro desconhecido"));
-   }
- };
+  const handleReopenFiadoPayment = async (order: AdminOrder) => {
+    if (!confirm(`Deseja marcar o fiado de ${order.clientName} novamente como PENDENTE? O valor sairá do Caixa Real até ser pago.`)) return;
+    setProcessingFiadoId(order.realId);
+    const res = await reopenFiadoOrder({ orderId: order.realId, companyId: company?.id });
+    setProcessingFiadoId(null);
+    if (res.success) {
+      saveCompletedIds(getCompletedIds().filter(id => id !== order.realId));
+      invalidateFinanceCache();
+      invalidateLiveClientsCache(company?.id);
+      invalidateSalesHistoryCache(company?.id);
+      await fetchOrders();
+    } else {
+      alert("Erro ao reabrir fiado: " + (res.error || "Erro desconhecido"));
+    }
+  };
 
  const handleStartEditFiado = (order: AdminOrder) => {
    setEditingFiadoId(order.realId);
@@ -437,7 +446,7 @@ export default function KanbanBoard() {
  { title:"Entregue", status:"ENTREGUE", color:"bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]" },
  ] as const;
 
- const activeOrders = orders.filter(o => o.status !== 'CONCLUIDO' && !(o.isFiado && o.fiadoStatus === 'PENDENTE'));
+ const activeOrders = orders.filter(o => o.status !== 'CONCLUIDO' && o.status !== 'FIADO' && !(o.isFiado && o.fiadoStatus === 'PENDENTE'));
  const allCompletedOrders = orders.filter(o => o.status === 'CONCLUIDO' && !(o.isFiado && o.fiadoStatus === 'PENDENTE'));
  const allFiadoOrders = orders.filter(o => o.isFiado);
  const pendingFiadoOrders = allFiadoOrders.filter(o => o.fiadoStatus === 'PENDENTE');

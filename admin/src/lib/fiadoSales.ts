@@ -89,6 +89,25 @@ export function calculateDaysUntilDue(dueDateIso?: string | null): number {
 export function isOrderFiado(order: any): boolean {
   if (!order) return false;
 
+  // 1. Status de entrega gravado como FIADO
+  if (
+    order.delivery_status === "FIADO" ||
+    order.delivery_status === "FIADO_PENDENTE" ||
+    order.deliveryStatus === "FIADO" ||
+    order.deliveryStatus === "FIADO_PENDENTE"
+  ) {
+    return true;
+  }
+
+  // 2. Método de pagamento explícito FIADO
+  if (
+    order.payment_method === "FIADO" ||
+    order.paymentMethod === "FIADO"
+  ) {
+    return true;
+  }
+
+  // 3. Itens com marcação is_fiado ou fiado_due_date ou fiado_status
   if (Array.isArray(order.items)) {
     if (
       order.items.some(
@@ -96,18 +115,15 @@ export function isOrderFiado(order: any): boolean {
           item &&
           (item.is_fiado === true ||
             item.isFiado === true ||
+            Boolean(item.fiado_status) ||
+            Boolean(item.fiadoStatus) ||
+            Boolean(item.fiado_due_date) ||
+            Boolean(item.fiadoDueDate) ||
             item.real_payment_method === "FIADO")
       )
     ) {
       return true;
     }
-  }
-
-  if (
-    order.payment_method === "FIADO" ||
-    order.paymentMethod === "FIADO"
-  ) {
-    return true;
   }
 
   return false;
@@ -289,6 +305,8 @@ export async function markFiadoOrderAsPaid(params: {
       .update({
         items: updatedItems,
         payment_status: "PAGO",
+        delivery_status: "CONCLUIDO",
+        receipt_url: "CONCLUIDO",
         payment_method: safeDbMethod,
       })
       .eq("id", orderId);
@@ -349,6 +367,9 @@ export async function reopenFiadoOrder(params: {
       .from("smoking_orders")
       .update({
         items: updatedItems,
+        delivery_status: "FIADO",
+        payment_status: "PENDENTE",
+        receipt_url: null,
       })
       .eq("id", orderId);
 

@@ -51,7 +51,7 @@ export interface MobileOrdersLogisticsViewProps {
   onOrdersChanged?: () => void;
 }
 
-type MobileTab = "PREPARANDO" | "EM_ROTA" | "ENTREGUE" | "CONCLUIDO" | "FIADOS" | "AGUARDANDO_PAGAMENTO";
+type MobileTab = "PREPARANDO" | "EM_ROTA" | "ENTREGUE" | "CONCLUIDO" | "FIADOS";
 
 function getRelativeTime(dateString: string): string {
   try {
@@ -70,50 +70,15 @@ function getRelativeTime(dateString: string): string {
   }
 }
 
-interface TabDefinition {
-  id: MobileTab;
+interface ActiveFlowTab {
+  id: "PREPARANDO" | "EM_ROTA" | "ENTREGUE";
   label: string;
-  activeColor: string;
-  dotColor: string;
 }
 
-const TABS: TabDefinition[] = [
-  {
-    id: "PREPARANDO",
-    label: "Preparando",
-    activeColor: "bg-amber-500/20 border-amber-500 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]",
-    dotColor: "bg-amber-500",
-  },
-  {
-    id: "EM_ROTA",
-    label: "Em Rota",
-    activeColor: "bg-blue-500/20 border-blue-500 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.25)]",
-    dotColor: "bg-blue-500",
-  },
-  {
-    id: "ENTREGUE",
-    label: "Entregues",
-    activeColor: "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.25)]",
-    dotColor: "bg-emerald-500",
-  },
-  {
-    id: "CONCLUIDO",
-    label: "Concluídos",
-    activeColor: "bg-purple-500/20 border-purple-500 text-purple-300 shadow-[0_0_12px_rgba(168,85,247,0.25)]",
-    dotColor: "bg-purple-400",
-  },
-  {
-    id: "FIADOS",
-    label: "Fiados",
-    activeColor: "bg-white/20 border-white/40 text-white shadow-[0_0_12px_rgba(255,255,255,0.2)]",
-    dotColor: "bg-white",
-  },
-  {
-    id: "AGUARDANDO_PAGAMENTO",
-    label: "Aguardando Pagamento",
-    activeColor: "bg-zinc-100/20 border-zinc-300 text-white shadow-[0_0_12px_rgba(255,255,255,0.25)]",
-    dotColor: "bg-zinc-400",
-  },
+const ACTIVE_FLOW_TABS: ActiveFlowTab[] = [
+  { id: "PREPARANDO", label: "Preparando" },
+  { id: "EM_ROTA", label: "Em Rota" },
+  { id: "ENTREGUE", label: "Entregues" },
 ];
 
 function getTabLabel(tab: MobileTab): string {
@@ -128,8 +93,6 @@ function getTabLabel(tab: MobileTab): string {
       return "Concluídos";
     case "FIADOS":
       return "Fiados";
-    case "AGUARDANDO_PAGAMENTO":
-      return "Aguardando Pagamento";
     default:
       return "";
   }
@@ -146,11 +109,8 @@ export function MobileOrdersLogisticsView({
   onOpenPushModal,
   onOrdersChanged,
 }: MobileOrdersLogisticsViewProps) {
-  // Aba ativa nas pílulas horizontais
+  // Aba ativa nas abas enquadradas no celular
   const [activeTab, setActiveTab] = useState<MobileTab>("PREPARANDO");
-
-  // Campo de busca rápida
-  const [searchQuery, setSearchQuery] = useState("");
   const [processingFiadoId, setProcessingFiadoId] = useState<string | null>(null);
 
   // Estado para Bottom Sheet de Detalhes
@@ -174,7 +134,6 @@ export function MobileOrdersLogisticsView({
   // Contagem por Status
   const counts: Record<string, number> = useMemo(() => {
     const res: Record<string, number> = {
-      AGUARDANDO_PAGAMENTO: 0,
       PREPARANDO: 0,
       EM_ROTA: 0,
       ENTREGUE: 0,
@@ -191,112 +150,24 @@ export function MobileOrdersLogisticsView({
     return res;
   }, [orders]);
 
-  // Se houver pedidos em Aguardando Pagamento mas a aba ativa estiver vazia, ou vice-versa
-  useEffect(() => {
-    // Se a aba atual estiver vazia mas outra aba tiver pedidos ativos, podemos mantê-la ou navegar
-  }, [counts]);
-
-  // Filtragem dos pedidos conforme a aba ativa e o campo de busca
+  // Filtragem dos pedidos conforme a aba ativa
   const filteredOrders = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-
     return orders.filter((o) => {
-      // 1. Filtro da aba
       if (activeTab === "FIADOS") {
-        if (!o.isFiado) return false;
-      } else {
-        if (o.isFiado && o.fiadoStatus === "PENDENTE") return false;
-        if (o.status !== activeTab) return false;
+        return Boolean(o.isFiado);
       }
-
-      // 2. Filtro de busca
-      if (!q) return true;
-
-      const matchesId = o.id.toLowerCase().includes(q) || o.realId.toLowerCase().includes(q);
-      const matchesClient = (o.clientName || "").toLowerCase().includes(q);
-      const matchesPhone = (o.phone || "").toLowerCase().includes(q);
-      const matchesAddress = (o.address || "").toLowerCase().includes(q);
-      const matchesItems = o.items.some(
-        (i) => (i.model || "").toLowerCase().includes(q) || (i.flavor || "").toLowerCase().includes(q)
-      );
-
-      return matchesId || matchesClient || matchesPhone || matchesAddress || matchesItems;
+      if (o.isFiado && o.fiadoStatus === "PENDENTE") return false;
+      return o.status === activeTab;
     });
-  }, [orders, activeTab, searchQuery]);
+  }, [orders, activeTab]);
 
   return (
     <div className="flex flex-col h-full w-full bg-[#070709] text-white select-none overflow-hidden">
-      {/* ========================================================
-          1. HEADER COMPACTO MOBILE COM STATUS REALTIME
-         ======================================================== */}
-      <header className="shrink-0 bg-[#0c0c0f] border-b border-white/10 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="size-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-            <Package className="size-4" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold tracking-tight text-white leading-tight truncate">
-                Painel de Pedidos
-              </h1>
-              <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-full shrink-0">
-                <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[9px] text-emerald-400 font-extrabold uppercase tracking-wider">
-                  Ao Vivo
-                </span>
-              </div>
-            </div>
-            <p className="text-[11px] text-zinc-400 font-medium leading-none mt-0.5">
-              {orders.length} {orders.length === 1 ? "pedido" : "pedidos"} no sistema
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={onOpenPushModal}
-            className="size-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white active:scale-95 transition-all cursor-pointer"
-            aria-label="Notificações Push"
-            title="Alertas & Push"
-          >
-            <Bell className="size-4" />
-          </button>
-        </div>
-      </header>
-
-      {/* ========================================================
-          2. CAMPO DE BUSCA COMPACTO (>= 16px font-size)
-         ======================================================== */}
-      <div className="shrink-0 bg-[#09090c] px-4 pt-3 pb-2.5 border-b border-white/5">
-        <div className="relative w-full">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-zinc-400 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar pedido por cliente, ID, sabor ou modelo..."
-            className="w-full bg-[#141418] border border-white/10 focus:border-emerald-500/50 rounded-xl pl-10 pr-9 py-2.5 text-base text-white placeholder:text-zinc-500 focus:outline-none transition-all shadow-inner"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 size-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer"
-              aria-label="Limpar busca"
-            >
-              <X className="size-3" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ========================================================
-          3. PÍLULAS HORIZONTAIS DE NAVEGAÇÃO DE STATUS
-         ======================================================== */}
-      <div className="shrink-0 bg-[#0a0a0d] border-b border-white/10 py-2.5 select-none">
-        <div className="flex items-center gap-2 overflow-x-auto px-4 scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden touch-pan-x">
-          {TABS.map((tab) => {
+      {/* ━━━ NAVEGAÇÃO DE STATUS ENQUADRADA NO CELULAR (SEM SCROLL LATERAL) ━━━ */}
+      <div className="shrink-0 bg-[#09090c] border-b border-white/10 px-3 py-2 space-y-1.5 select-none">
+        {/* Linha 1: Funil em Andamento (3 colunas iguais) */}
+        <div className="grid grid-cols-3 gap-1.5 w-full">
+          {ACTIVE_FLOW_TABS.map((tab) => {
             const isActive = activeTab === tab.id;
             const count = counts[tab.id] ?? 0;
             return (
@@ -304,26 +175,80 @@ export function MobileOrdersLogisticsView({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`min-h-[42px] px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 flex items-center gap-1.5 border transition-all active:scale-95 cursor-pointer ${
+                className={`h-11 px-1 rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-0.5 border transition-all active:scale-95 cursor-pointer ${
                   isActive
-                    ? tab.activeColor
-                    : "bg-[#151519] border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
+                    ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.35)]"
+                    : "bg-[#141418] border-white/10 text-zinc-300 hover:text-white hover:bg-white/5"
                 }`}
               >
-                <span className={`size-2 rounded-full ${tab.dotColor} ${isActive ? "animate-pulse" : ""}`} />
-                <span>{tab.label}</span>
-                <span
-                  className={`text-[11px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
-                    isActive ? "bg-white/20 text-white" : "bg-white/5 text-zinc-400"
-                  }`}
-                >
-                  {count}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate">{tab.label}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                      isActive ? "bg-black/15 text-black" : "bg-white/10 text-white"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </div>
               </button>
             );
           })}
-          {/* Espaçador para swipe lateral suave até a última pílula */}
-          <div className="w-2 shrink-0" aria-hidden="true" />
+        </div>
+
+        {/* Linha 2: Concluídos & Fiados (2 colunas destacadas) */}
+        <div className="grid grid-cols-2 gap-1.5 w-full">
+          {/* Concluídos */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("CONCLUIDO")}
+            className={`h-11 px-3 rounded-xl text-xs font-bold flex items-center justify-between border transition-all active:scale-95 cursor-pointer ${
+              activeTab === "CONCLUIDO"
+                ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.35)]"
+                : "bg-[#141418] border-white/10 text-zinc-300 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className={`size-4 ${activeTab === "CONCLUIDO" ? "text-black" : "text-white"}`} />
+              <span>Concluídos</span>
+            </div>
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-mono font-extrabold ${
+                activeTab === "CONCLUIDO" ? "bg-black/15 text-black" : "bg-white/10 text-white"
+              }`}
+            >
+              {counts.CONCLUIDO ?? 0}
+            </span>
+          </button>
+
+          {/* Fiados (ÁREA MAIS DESTACADA) */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("FIADOS")}
+            className={`h-11 px-3 rounded-xl text-xs font-bold flex items-center justify-between border-2 transition-all active:scale-95 cursor-pointer ${
+              activeTab === "FIADOS"
+                ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.45)] ring-2 ring-white/50"
+                : counts.FIADOS > 0
+                ? "bg-[#18181d] border-white/40 text-white shadow-[0_0_12px_rgba(255,255,255,0.15)]"
+                : "bg-[#141418] border-white/20 text-zinc-300 hover:text-white"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <BookOpen className={`size-4 ${activeTab === "FIADOS" ? "text-black" : "text-white"}`} />
+              <span className="tracking-wide">Fiados</span>
+            </div>
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-mono font-extrabold ${
+                activeTab === "FIADOS"
+                  ? "bg-black text-white"
+                  : counts.FIADOS > 0
+                  ? "bg-white text-black shadow-sm"
+                  : "bg-white/10 text-white"
+              }`}
+            >
+              {counts.FIADOS ?? 0}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -333,36 +258,26 @@ export function MobileOrdersLogisticsView({
       <main className="flex-1 min-h-0 flex flex-col overflow-y-auto px-4 py-3 custom-scrollbar">
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-3">
-            <Loader2 className="size-8 animate-spin text-emerald-400 mx-auto" />
+            <Loader2 className="size-8 animate-spin text-white mx-auto" />
             <p className="text-xs text-zinc-400">Carregando pedidos...</p>
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
             <div className="w-full max-w-sm bg-[#121215] border border-dashed border-white/10 rounded-2xl p-6 text-center space-y-3 shadow-lg">
-              <Package className="size-9 text-zinc-600 mx-auto" />
+              <Package className="size-9 text-zinc-500 mx-auto" />
               <div>
-                <p className="text-sm font-bold text-zinc-200">Nenhum pedido nesta fase</p>
-                <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  {searchQuery
-                    ? `Nenhum resultado para "${searchQuery}"`
-                    : `Não há pedidos em "${getTabLabel(activeTab)}"`}
+                <p className="text-sm font-bold text-white">Nenhum pedido nesta fase</p>
+                <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                  Não há pedidos em "{getTabLabel(activeTab)}"
                 </p>
               </div>
-              {searchQuery ? (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="text-xs text-emerald-400 font-bold hover:underline cursor-pointer"
-                >
-                  Limpar busca
-                </button>
-              ) : activeTab !== "PREPARANDO" && counts.PREPARANDO > 0 ? (
+              {activeTab !== "PREPARANDO" && counts.PREPARANDO > 0 ? (
                 <button
                   type="button"
                   onClick={() => setActiveTab("PREPARANDO")}
-                  className="px-3.5 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold active:scale-95 transition-all cursor-pointer inline-flex items-center gap-1.5 mx-auto"
+                  className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-xs font-bold active:scale-95 transition-all cursor-pointer inline-flex items-center gap-1.5 mx-auto"
                 >
-                  <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span className="size-1.5 rounded-full bg-white animate-pulse" />
                   <span>Ver Preparando ({counts.PREPARANDO})</span>
                 </button>
               ) : null}
@@ -381,7 +296,7 @@ export function MobileOrdersLogisticsView({
             return (
               <div
                 key={order.realId}
-                className="bg-[#121215] border border-white/10 hover:border-white/20 rounded-2xl p-4 space-y-3 shadow-md transition-all active:scale-[0.99]"
+                className="bg-[#121215] border border-white/10 hover:border-white/25 rounded-2xl p-4 space-y-3 shadow-md transition-all active:scale-[0.99]"
               >
                 {/* Cabeçalho do Card (ID + Tempo + Pagamento) */}
                 <div
@@ -389,16 +304,16 @@ export function MobileOrdersLogisticsView({
                   className="flex items-center justify-between cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-zinc-300 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md">
+                    <span className="font-mono text-xs font-bold text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded-md">
                       #{order.id}
                     </span>
                     <span className="text-[11px] text-zinc-400 flex items-center gap-1">
-                      <Clock className="size-3 text-zinc-500" />
+                      <Clock className="size-3 text-zinc-400" />
                       {getRelativeTime(order.createdAt)}
                     </span>
                   </div>
 
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-emerald-400">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/10 border border-white/20 text-white">
                     {order.isFiado
                       ? order.fiadoStatus === "PENDENTE"
                         ? `FIADO (${order.fiadoDueDateFormatted || "Pendente"})`
@@ -416,31 +331,31 @@ export function MobileOrdersLogisticsView({
                     <h3 className="text-sm font-bold text-white truncate leading-tight">
                       {order.clientName}
                     </h3>
-                    <ChevronRight className="size-4 text-zinc-600 shrink-0" />
+                    <ChevronRight className="size-4 text-zinc-500 shrink-0" />
                   </div>
 
                   {/* Resumo dos Itens */}
                   <p className="text-xs text-zinc-300 line-clamp-1 leading-snug">
-                    <span className="text-emerald-400 font-bold">{podsCount} item(ns):</span>{" "}
+                    <span className="text-white font-bold">{podsCount} item(ns):</span>{" "}
                     {itemsSummary}
                   </p>
 
                   {/* Destino Logístico */}
                   <div className="flex items-center gap-2 pt-0.5">
                     {isNational ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md">
-                        <Truck className="size-3" />
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded-md">
+                        <Truck className="size-3 text-white" />
                         Correios ({nationalInfo?.state || "Nacional"})
                       </span>
                     ) : order.address &&
                       (order.address.includes("Balcão") || order.address.includes("balcao")) ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-zinc-300 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md">
-                        <Store className="size-3 text-zinc-400" />
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded-md">
+                        <Store className="size-3 text-zinc-300" />
                         Balcão / Retirada
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-md truncate max-w-[240px]">
-                        <Bike className="size-3 shrink-0" />
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded-md truncate max-w-[240px]">
+                        <Bike className="size-3 shrink-0 text-white" />
                         <span className="truncate">{order.address || "Entrega Local"}</span>
                       </span>
                     )}
@@ -457,19 +372,19 @@ export function MobileOrdersLogisticsView({
                       ? `+ Frete ${formatBRL(order.shippingFee)}`
                       : "Frete Grátis"}
                   </span>
-                  <span className="text-base font-black text-emerald-400">
+                  <span className="text-base font-black text-white">
                     {formatBRL(order.totalAmount)}
                   </span>
                 </div>
 
                 {/* Bloco de Fiado no Card Mobile */}
                 {order.isFiado && (
-                  <div className="p-3 rounded-xl border border-white/10 bg-white/[0.03] space-y-2">
+                  <div className="p-3 rounded-xl border border-white/20 bg-white/[0.04] space-y-2">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-zinc-300 flex items-center gap-1 font-medium">
                         Dia do pagamento: {order.fiadoDueDateFormatted || "Não informada"}
                       </span>
-                      <span className="font-bold text-emerald-400">
+                      <span className="font-extrabold text-white">
                         {formatBRL(order.fiadoAmountOwed || order.totalAmount)}
                       </span>
                     </div>
@@ -480,9 +395,9 @@ export function MobileOrdersLogisticsView({
                           href={`https://wa.me/${order.phone.replace(/\D/g, "").startsWith("55") ? order.phone.replace(/\D/g, "") : `55${order.phone.replace(/\D/g, "")}`}?text=${encodeURIComponent(`Olá ${order.clientName}! Tudo bem? Passando para combinar sobre o pagamento do seu pedido #${order.id} no valor de ${formatBRL(order.fiadoAmountOwed || order.totalAmount)}, para ${order.fiadoDueDateFormatted || "o dia combinado"}.`)}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex-1 min-h-[40px] rounded-xl bg-white/10 border border-white/10 text-white text-[11px] font-semibold flex items-center justify-center gap-1.5"
+                          className="flex-1 min-h-[40px] rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all"
                         >
-                          <Phone className="size-3.5 text-zinc-400" />
+                          <Phone className="size-3.5 text-zinc-300" />
                           <span>WhatsApp</span>
                         </a>
                       )}
@@ -500,7 +415,7 @@ export function MobileOrdersLogisticsView({
                               alert("Erro ao confirmar pagamento: " + (res.error || ""));
                             }
                           }}
-                          className="flex-1 min-h-[40px] rounded-xl bg-emerald-500 text-black text-[11px] font-bold flex items-center justify-center gap-1"
+                          className="flex-1 min-h-[40px] rounded-xl bg-white hover:bg-zinc-200 text-black text-[11px] font-extrabold flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(255,255,255,0.3)] active:scale-95 transition-all"
                         >
                           <CheckCircle2 className="size-3.5" />
                           <span>{processingFiadoId === order.realId ? "Salvando..." : "Confirmar que foi Pago"}</span>
@@ -515,7 +430,7 @@ export function MobileOrdersLogisticsView({
                             setProcessingFiadoId(null);
                             if (res.success) onOrdersChanged?.();
                           }}
-                          className="px-3 min-h-[40px] rounded-xl bg-white/10 text-zinc-300 text-[11px] font-semibold flex items-center justify-center gap-1"
+                          className="px-3 min-h-[40px] rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-zinc-300 text-[11px] font-semibold flex items-center justify-center gap-1 active:scale-95 transition-all"
                         >
                           <RotateCcw className="size-3" />
                           <span>Desfazer</span>
@@ -533,7 +448,7 @@ export function MobileOrdersLogisticsView({
                     <button
                       type="button"
                       onClick={() => onUpdateStatus(order.realId, "EM_ROTA")}
-                      className="w-full min-h-[48px] bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-98 transition-all"
+                      className="w-full min-h-[48px] bg-white hover:bg-zinc-200 text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(255,255,255,0.35)] active:scale-98 transition-all"
                     >
                       <Truck className="size-4" />
                       <span>Despachar Pedido ➔</span>
@@ -544,7 +459,7 @@ export function MobileOrdersLogisticsView({
                     <button
                       type="button"
                       onClick={() => onUpdateStatus(order.realId, "ENTREGUE")}
-                      className="w-full min-h-[48px] bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-400 hover:to-cyan-300 text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(59,130,246,0.3)] active:scale-98 transition-all"
+                      className="w-full min-h-[48px] bg-white hover:bg-zinc-200 text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(255,255,255,0.35)] active:scale-98 transition-all"
                     >
                       <CheckCircle2 className="size-4" />
                       <span>Confirmar Entrega ✓</span>
@@ -555,7 +470,7 @@ export function MobileOrdersLogisticsView({
                     <button
                       type="button"
                       onClick={() => onUpdateStatus(order.realId, "CONCLUIDO")}
-                      className="w-full min-h-[48px] bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-black font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-98 transition-all"
+                      className="w-full min-h-[48px] bg-white hover:bg-zinc-200 text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(255,255,255,0.35)] active:scale-98 transition-all"
                     >
                       <CheckCircle2 className="size-4" />
                       <span>Concluir Pedido ✓</span>
@@ -566,21 +481,10 @@ export function MobileOrdersLogisticsView({
                     <button
                       type="button"
                       onClick={() => setSelectedOrderForDetails(order)}
-                      className="w-full min-h-[44px] bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-2 active:scale-98 transition-all"
+                      className="w-full min-h-[44px] bg-white/10 hover:bg-white/15 border border-white/20 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-2 active:scale-98 transition-all"
                     >
                       <span>Ver Detalhes do Pedido</span>
                       <ChevronRight className="size-3.5 text-zinc-400" />
-                    </button>
-                  )}
-
-                  {order.status === "AGUARDANDO_PAGAMENTO" && (
-                    <button
-                      type="button"
-                      onClick={() => onUpdateStatus(order.realId, "PREPARANDO")}
-                      className="w-full min-h-[48px] bg-emerald-500/20 border border-emerald-500 text-emerald-400 font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 active:scale-98 transition-all"
-                    >
-                      <Check className="size-4" />
-                      <span>Confirmar Pagamento (Pix Caiu)</span>
                     </button>
                   )}
                 </div>
@@ -612,7 +516,7 @@ export function MobileOrdersLogisticsView({
                   <span className="font-mono text-sm font-bold text-white">
                     Pedido #{selectedOrderForDetails.id}
                   </span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white/10 text-white border border-white/20">
                     {selectedOrderForDetails.status.replace("_", " ")}
                   </span>
                 </div>
@@ -645,7 +549,7 @@ export function MobileOrdersLogisticsView({
                         await onGrantDiscount(selectedOrderForDetails.realId);
                         setSelectedOrderForDetails(null);
                       }}
-                      className="min-h-[44px] bg-emerald-500 text-black font-extrabold rounded-xl"
+                      className="min-h-[44px] bg-white text-black font-extrabold rounded-xl"
                     >
                       Aprovar 10%
                     </button>
@@ -702,7 +606,7 @@ export function MobileOrdersLogisticsView({
                     <div key={idx} className="pt-2 first:pt-0 flex items-center justify-between">
                       <div>
                         <p className="text-xs font-bold text-white leading-tight">
-                          <span className="text-emerald-400">{item.quantity}x</span>{" "}
+                          <span className="text-white font-extrabold">{item.quantity}x</span>{" "}
                           {item.flavor || "Sabor Único"}
                         </p>
                         <p className="text-[11px] text-zinc-400 mt-0.5">{item.model}</p>
@@ -732,11 +636,11 @@ export function MobileOrdersLogisticsView({
                     <button
                       type="button"
                       onClick={() => handleCopy(selectedOrderForDetails.address, "address")}
-                      className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1"
+                      className="text-[11px] text-zinc-300 hover:text-white font-semibold flex items-center gap-1"
                     >
                       {copiedText === "address" ? (
                         <>
-                          <Check className="size-3" />
+                          <Check className="size-3 text-white" />
                           <span>Copiado!</span>
                         </>
                       ) : (
@@ -751,7 +655,7 @@ export function MobileOrdersLogisticsView({
 
                 <div className="space-y-2">
                   <div className="flex items-start gap-2 text-zinc-300">
-                    <MapPin className="size-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <MapPin className="size-4 text-white shrink-0 mt-0.5" />
                     <p className="leading-snug">
                       {selectedOrderForDetails.address || "Atendimento Balcão / WhatsApp"}
                     </p>
@@ -804,7 +708,7 @@ export function MobileOrdersLogisticsView({
                   <span className="text-zinc-300">
                     Método: <b>{selectedOrderForDetails.paymentMethod}</b>
                   </span>
-                  <span className="text-lg font-black text-emerald-400">
+                  <span className="text-lg font-black text-white">
                     {formatBRL(selectedOrderForDetails.totalAmount)}
                   </span>
                 </div>
@@ -818,7 +722,7 @@ export function MobileOrdersLogisticsView({
                       rel="noopener noreferrer"
                       className="min-h-[44px] w-full rounded-xl bg-white/5 border border-white/10 text-white font-semibold flex items-center justify-center gap-2 mt-2"
                     >
-                      <ReceiptText className="size-4 text-emerald-400" />
+                      <ReceiptText className="size-4 text-white" />
                       <span>Ver Comprovante Anexado</span>
                       <ExternalLink className="size-3 text-zinc-500" />
                     </a>
@@ -865,7 +769,7 @@ export function MobileOrdersLogisticsView({
                       await onUpdateStatus(selectedOrderForDetails.realId, "ENTREGUE");
                       setSelectedOrderForDetails(null);
                     }}
-                    className="w-full min-h-[44px] bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold rounded-xl flex items-center justify-center gap-2"
+                    className="w-full min-h-[44px] bg-white/10 hover:bg-white/15 border border-white/20 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
                   >
                     <RotateCcw className="size-4" />
                     <span>Reabrir Pedido</span>
@@ -911,7 +815,7 @@ export function MobileOrdersLogisticsView({
 
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="size-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <div className="size-9 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
                     <Truck className="size-4" />
                   </div>
                   <div>
@@ -935,8 +839,8 @@ export function MobileOrdersLogisticsView({
               {isNational ? (
                 /* Fluxo Nacional (Correios) */
                 <div className="space-y-4">
-                  <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2">
-                    <div className="flex items-center gap-2 text-amber-300 font-bold text-xs">
+                  <div className="p-4 bg-white/5 border border-white/15 rounded-2xl space-y-2">
+                    <div className="flex items-center gap-2 text-white font-bold text-xs">
                       <Package className="size-4" />
                       <span>Envio Nacional (Correios / Sedex / PAC)</span>
                     </div>
@@ -957,7 +861,7 @@ export function MobileOrdersLogisticsView({
                       setIsDispatching(false);
                       setSelectedOrderForDispatch(null);
                     }}
-                    className="w-full min-h-[50px] bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-black font-extrabold text-sm rounded-xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] active:scale-98 transition-all"
+                    className="w-full min-h-[50px] bg-white hover:bg-zinc-200 text-black font-extrabold text-sm rounded-xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.35)] active:scale-98 transition-all"
                   >
                     {isDispatching ? (
                       <>
@@ -986,7 +890,7 @@ export function MobileOrdersLogisticsView({
                       checked={notifyWhatsAppOnDispatch}
                       onChange={(e) => setNotifyWhatsAppOnDispatch(e.target.checked)}
                       disabled={isDispatching}
-                      className="size-5 rounded-md accent-emerald-500 bg-[#121215] border-white/20"
+                      className="size-5 rounded-md accent-white bg-[#121215] border-white/20"
                     />
                     <div>
                       <span className="text-xs font-bold text-white block">

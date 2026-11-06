@@ -661,8 +661,8 @@ export function MobileManualSaleFlow({
         items: orderItems,
         total_amount: grandTotal,
         shipping_fee: numericShippingFee,
-        payment_status: "PAGO",
-        delivery_status: "PREPARANDO",
+        payment_status: isFiadoSale ? "PENDENTE" : "PAGO",
+        delivery_status: isFiadoSale ? "FIADO" : "PREPARANDO",
         payment_method: safePaymentMethod,
         company_id: companyId,
       };
@@ -703,7 +703,7 @@ export function MobileManualSaleFlow({
 
       // 6. Lista de Transmissão de Marketing (se habilitado)
       const cleanPhoneDigits = clientPhone.replace(/\D/g, "");
-      if (autoAddToMarketingList && cleanPhoneDigits && !isNoWhatsApp && !formattedPhone.startsWith("INSTA_")) {
+      if (autoAddToMarketingList && !isFiadoSale && cleanPhoneDigits && !isNoWhatsApp && !formattedPhone.startsWith("INSTA_")) {
         try {
           await ensureBuyerInBroadcastList({
             companyId,

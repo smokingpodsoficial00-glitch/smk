@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { isOrderFiadoPending } from "./fiadoSales";
 
 export type FlavorProfileType = 'ice' | 'fruity' | 'tobacco' | 'dessert' | 'other';
 export type ProspectingStatusType = 'base_antiga' | 'contatado' | 'reativado' | 'vip_recorrente';
@@ -719,9 +720,18 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
 
       // Obter pedidos atribuídos EXCLUSIVAMENTE a este cliente
       const clientOrders = orders.filter(o => orderAssignment.get(String(o.id)) === clientId);
-      clientOrders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      // Filtrar apenas pedidos válidos e efetivamente quitados (exclui cancelados e fiados pendentes de quitação)
+      const validOrders = clientOrders.filter(o => o && o.delivery_status !== 'CANCELADO' && !isOrderFiadoPending(o));
 
-      const latestOrder = clientOrders[0] || null;
+      // Se o cliente só tiver compras pendentes a fiado (e nenhuma quitada), NÃO exibe no CRM até quitar
+      if (validOrders.length === 0) {
+        continue;
+      }
+
+      validOrders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      const latestOrder = validOrders[0] || null;
+      if (!latestOrder) continue;
+
       const rawPhone = client.phone ? String(client.phone).trim() : '';
       const isInsta = rawPhone.startsWith('INSTA_') || rawPhone.startsWith('SEM_WPP_') || rawPhone.includes('Instagram');
       const phoneClean = isInsta ? '' : rawPhone.replace(/\D/g, '');
@@ -747,15 +757,13 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
       const name = String(client.name || latestOrder?.client_name || (phoneClean ? `Cliente ${phoneClean.slice(-4)}` : 'Cliente')).trim();
       const address = String(client.address || latestOrder?.shipping_address || 'Atendimento Balcão / WhatsApp').trim();
 
-
-      if (clientOrders.length > 0 && latestOrder) {
-        // --- CLIENTE COM COMPRAS HISTÓRICAS ---
-        const validOrders = clientOrders.filter(o => o && o.delivery_status !== 'CANCELADO');
+      if (validOrders.length > 0 && latestOrder) {
+        // --- CLIENTE COM COMPRAS HISTÓRICAS QUITADAS ---
         const spent = validOrders.reduce((sum, o) => {
           const total = parseFloat(o.total_amount || 0);
           return sum + (isNaN(total) ? 0 : total);
         }, 0);
-        const ordersCount = clientOrders.length;
+        const ordersCount = validOrders.length;
 
         const lastOrderDateStr = latestOrder.created_at ? new Date(latestOrder.created_at).toLocaleDateString('pt-BR') : 'Hoje';
         const lastOrderTimestamp = latestOrder.created_at ? new Date(latestOrder.created_at).getTime() : now;
@@ -873,7 +881,7 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
           customNotes: client.custom_notes || '',
           urgencyLevel,
           nextReplenishmentDate,
-          orders: clientOrders,
+          orders: validOrders,
           lastOrderTimestamp,
           lastActivityTimestamp: lastOrderTimestamp,
           clientCreatedAt: client.created_at,

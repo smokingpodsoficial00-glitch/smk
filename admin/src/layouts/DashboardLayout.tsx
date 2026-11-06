@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
-  LayoutDashboard, PackageSearch, Users, Settings, CircleDollarSign, 
+  LayoutDashboard, Package, PackageSearch, Users, Settings, CircleDollarSign, 
   Store, ChevronRight, LogOut, Megaphone, Scale, Compass, Crown, Sun, Moon, Menu, X, Smartphone, Bell,
   Plus, MoreHorizontal
 } from 'lucide-react';
@@ -48,12 +48,27 @@ export function DashboardLayout() {
     if (p.includes('/pedidos')) return 'Pedidos';
     if (p.includes('/financeiro')) return 'Financeiro';
     if (p.includes('/estoque')) return 'Estoque';
-    if (p.includes('/clientes')) return 'CRM & Últimas Vendas';
+    if (p.includes('/clientes')) return 'CRM';
     if (p.includes('/marketing')) return 'Marketing';
-    if (p.includes('/socios')) return 'Sócios & Equity';
-    if (p.includes('/gestao-saas')) return 'Vendas do SaaS';
+    if (p.includes('/socios')) return 'Sócios';
+    if (p.includes('/gestao-saas')) return 'SaaS';
     if (p.includes('/configuracoes')) return 'Configurações';
-    return displayName;
+    if (p.includes('/comparador')) return 'Comparador';
+    return 'Pedidos';
+  };
+
+  const getCurrentPageIcon = () => {
+    const p = location.pathname;
+    if (p.includes('/pedidos')) return <Package className="size-4 text-white" />;
+    if (p.includes('/financeiro')) return <CircleDollarSign className="size-4 text-white" />;
+    if (p.includes('/estoque')) return <PackageSearch className="size-4 text-white" />;
+    if (p.includes('/clientes')) return <Users className="size-4 text-white" />;
+    if (p.includes('/marketing')) return <Megaphone className="size-4 text-white" />;
+    if (p.includes('/socios')) return <Crown className="size-4 text-white" />;
+    if (p.includes('/gestao-saas')) return <Smartphone className="size-4 text-white" />;
+    if (p.includes('/configuracoes')) return <Settings className="size-4 text-white" />;
+    if (p.includes('/comparador')) return <Scale className="size-4 text-white" />;
+    return <Package className="size-4 text-white" />;
   };
 
   const renderSidebarNavigation = () => {
@@ -289,47 +304,33 @@ export function DashboardLayout() {
       {/* ━━━ TOP BAR MOBILE COMPACTA (~48px) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <header className="md:hidden h-12 px-3.5 flex items-center justify-between border-b border-white/10 bg-[#0a0a0a]/95 backdrop-blur-md shrink-0 z-30 select-none">
         <div className="flex items-center gap-2.5 min-w-0">
-          {company?.logo_url || config?.logo_url ? (
-            <img 
-              src={(company?.logo_url || config?.logo_url) ?? undefined} 
-              alt={displayName} 
-              className="w-6 h-6 rounded-md object-contain shrink-0" 
-            />
-          ) : (
-            <div className="w-6 h-6 rounded-md bg-white/10 border border-white/20 flex items-center justify-center shrink-0">
-              <Store className="size-3.5 text-white" />
-            </div>
-          )}
-          <div className="min-w-0 flex items-center gap-2">
-            <span className="text-xs font-extrabold text-white truncate max-w-[130px] sm:max-w-[200px]">
-              {displayName}
-            </span>
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20 shrink-0">
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="truncate max-w-[100px]">{getCurrentPageTitle()}</span>
-            </span>
+          <div className="size-7 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 shadow-[0_0_10px_rgba(255,255,255,0.08)]">
+            {getCurrentPageIcon()}
           </div>
+          <h1 className="text-sm font-extrabold text-white tracking-wide truncate">
+            {getCurrentPageTitle()}
+          </h1>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          {/* Botão rápido de Alertas / Notificações no Topo */}
+        <div className="flex items-center gap-2">
+          {/* Botão de Alertas / Notificações no Topo (Preto e Branco Brilhante) */}
           <button
             type="button"
             onClick={() => setMobilePushModalOpen(true)}
-            className="px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
-            title="Configurar Notificações"
+            className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 border border-white/20 text-white text-[11px] font-bold flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-sm"
+            title="Alertas & Notificações"
           >
-            <Bell className="size-3 text-emerald-400" />
+            <Bell className="size-3.5 text-white" />
             <span>Alertas</span>
           </button>
 
           <button
             type="button"
             onClick={toggleTheme}
-            className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-white/80 active:scale-95 transition-all cursor-pointer"
+            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white active:scale-95 transition-all cursor-pointer"
             title="Alternar Tema"
           >
-            {theme === 'dark' ? <Sun className="size-3.5 text-amber-400" /> : <Moon className="size-3.5 text-sky-400" />}
+            {theme === 'dark' ? <Sun className="size-3.5 text-white" /> : <Moon className="size-3.5 text-white" />}
           </button>
         </div>
       </header>

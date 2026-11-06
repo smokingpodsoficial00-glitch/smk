@@ -185,11 +185,14 @@ export async function fetchSalesHistory(companyId?: string): Promise<{ sales: De
     const productCounts = new Map<string, number>();
     const puffsCounts = new Map<string, number>();
 
-    const sales: DetailedSale[] = validOrders.map((o: any, idx: number) => {
+    // Exclui pedidos fiados ainda pendentes de quitação do Histórico de Vendas
+    const paidOrdersOnly = validOrders.filter((o: any) => !isOrderFiadoPending(o));
+
+    const sales: DetailedSale[] = paidOrdersOnly.map((o: any, idx: number) => {
       const cleanPhone = String(o.client_phone || '').replace(/\D/g, '');
       const orderAmount = parseFloat(o.total_amount || 0);
       const orderTime = new Date(o.created_at).getTime();
-      const isCompleted = o.delivery_status !== 'CANCELADO' && !isOrderFiadoPending(o);
+      const isCompleted = o.delivery_status !== 'CANCELADO';
 
       if (isCompleted) {
         totalRevenue += orderAmount;
