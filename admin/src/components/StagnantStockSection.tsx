@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import {
   PackageSearch, Tag, Sparkles, Search, Clock, Box, DollarSign,
-  AlertCircle, ChevronRight, CheckCircle2, Crown
+  AlertCircle, ChevronRight, CheckCircle2, Crown, ChevronDown
 } from "lucide-react";
 import { fetchProductPromotionsMap, updateProductPromotion, type PromoData } from "../lib/productPromotions";
 import { LiquidationOfferModal } from "./LiquidationOfferModal";
@@ -95,6 +95,21 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
   const [selectedVipProduct, setSelectedVipProduct] = useState<any | null>(null);
   const [isDemoActive, setIsDemoActive] = useState(false);
   const [demoItems, setDemoItems] = useState(INITIAL_DEMO_ITEMS);
+
+  // Controle de cards expandidos / minimizados no mobile
+  const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
+
+  const toggleExpandItem = (id: string) => {
+    setExpandedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   // Carregar mapa de promoções do Supabase DB
   const loadPromotions = async () => {
@@ -636,98 +651,189 @@ export const StagnantStockSection: React.FC<StagnantStockSectionProps> = ({
         </table>
       </div>
 
-      {/* MOBILE: Cards empilhados */}
-      <div className="md:hidden space-y-3">
+      {/* MOBILE: Cards minimizados por padrão / maximizados ao tocar */}
+      <div className="md:hidden space-y-2.5">
         {filteredQueue.length === 0 && (
           <div className="bg-[#141414] border border-white/10 rounded-2xl p-8 text-center space-y-2">
             <PackageSearch className="size-7 mx-auto text-muted-foreground/30" />
             <p className="text-sm font-semibold text-white">Nenhum produto parado.</p>
           </div>
         )}
-        {filteredQueue.map((item, idx) => (
-          <div key={item.id} className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-3">
-            {/* Linha 1: Produto */}
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] font-bold text-muted-foreground shrink-0">#{idx + 1}</span>
-              {item.image_url ? (
-                <img src={item.image_url} alt={item.name} className="size-10 rounded-lg object-contain bg-black/60 p-0.5 border border-white/10 shrink-0" />
-              ) : (
-                <div className="size-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-muted-foreground font-bold text-[10px]">
-                  {item.brand?.substring(0, 2) || "POD"}
+        {filteredQueue.map((item, idx) => {
+          const isExpanded = expandedItemIds.has(item.id);
+
+          // ━━━ ESTADO MINIMIZADO (Apenas Nome, Sabor, Dias Parado, Preço e Unidades) ━━━
+          if (!isExpanded) {
+            return (
+              <div
+                key={item.id}
+                onClick={() => toggleExpandItem(item.id)}
+                className="bg-[#141414] border border-white/10 hover:border-white/20 rounded-2xl px-3.5 py-3 flex items-center justify-between gap-3 cursor-pointer select-none active:scale-[0.99] transition-all shadow-sm"
+              >
+                {/* Ranking + Imagem + Identificação */}
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <span className="text-[11px] font-bold text-muted-foreground shrink-0 w-4 text-center">
+                    #{idx + 1}
+                  </span>
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      className="size-10 rounded-lg object-contain bg-black/60 p-0.5 border border-white/10 shrink-0"
+                    />
+                  ) : (
+                    <div className="size-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-muted-foreground font-bold text-[10px]">
+                      {item.brand?.substring(0, 2) || "POD"}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-white text-xs truncate leading-tight">
+                        {item.brand} {item.name}
+                      </span>
+                      {item.isPromotional && (
+                        <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
+                          PROMO
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-zinc-300 truncate mt-0.5">
+                      {item.flavor}
+                    </div>
+                    <div className="text-[11px] font-bold text-emerald-400 mt-0.5">
+                      {item.isPromotional && item.promoData?.promoPrice ? (
+                        <span>R$ {item.promoData.promoPrice.toFixed(2)}</span>
+                      ) : (
+                        <span>R$ {item.sellPrice.toFixed(2)}</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="font-bold text-white text-sm truncate">{item.brand} {item.name}</div>
-                <div className="text-xs text-white/90 font-medium mt-0.5">{item.flavor}</div>
+
+                {/* Dias Parado + Estoque + Chevron */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="text-right">
+                    <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-white/90 font-bold text-[10px] block mb-1">
+                      {item.diasParado} {item.diasParado === 1 ? "dia" : "dias"}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                      <span className="size-1.5 rounded-full bg-emerald-400" />
+                      {item.stock} un.
+                    </span>
+                  </div>
+                  <ChevronDown className="size-4 text-zinc-500 shrink-0" />
+                </div>
               </div>
-              <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/90 font-bold text-xs shrink-0 whitespace-nowrap">
-                {item.diasParado} {item.diasParado === 1 ? "dia" : "dias"}
-              </span>
-            </div>
-            {/* Linha 2: Métricas */}
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="bg-black/30 rounded-lg px-2 py-1.5">
-                <span className="text-[9px] text-muted-foreground uppercase block">Estoque</span>
-                <span className="text-xs font-bold text-white">{item.stock} un.</span>
-              </div>
-              <div className="bg-black/30 rounded-lg px-2 py-1.5">
-                <span className="text-[9px] text-muted-foreground uppercase block">Preço</span>
-                {item.isPromotional && item.promoData?.promoPrice ? (
-                  <span className="text-xs font-bold text-emerald-400">R$ {item.promoData.promoPrice.toFixed(2)}</span>
+            );
+          }
+
+          // ━━━ ESTADO MAXIMIZADO (Card Completo com Custo e Ações) ━━━
+          return (
+            <div
+              key={item.id}
+              className="bg-[#141414] border border-white/20 rounded-2xl p-4 space-y-3 shadow-md transition-all"
+            >
+              {/* Linha 1: Produto + Botão Recolher */}
+              <div
+                onClick={() => toggleExpandItem(item.id)}
+                className="flex items-center gap-3 cursor-pointer"
+              >
+                <span className="text-[11px] font-bold text-muted-foreground shrink-0">#{idx + 1}</span>
+                {item.image_url ? (
+                  <img src={item.image_url} alt={item.name} className="size-10 rounded-lg object-contain bg-black/60 p-0.5 border border-white/10 shrink-0" />
                 ) : (
-                  <span className="text-xs font-bold text-white">R$ {item.sellPrice.toFixed(2)}</span>
+                  <div className="size-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-muted-foreground font-bold text-[10px]">
+                    {item.brand?.substring(0, 2) || "POD"}
+                  </div>
                 )}
-              </div>
-              <div className="bg-black/30 rounded-lg px-2 py-1.5">
-                <span className="text-[9px] text-muted-foreground uppercase block">Custo</span>
-                <span className="text-xs font-bold text-muted-foreground">{item.costPrice > 0 ? `R$ ${item.costPrice.toFixed(2)}` : "—"}</span>
-              </div>
-            </div>
-            {/* Linha 3: Badges + Ações */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                {item.isDemo && (
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white/10 text-white/90 border border-white/20">DEMO</span>
-                )}
-                {item.isPromotional && (
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">EM PROMOÇÃO</span>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setSelectedOfferProduct(item)}
-                  className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-1 ${
-                    item.isPromotional
-                      ? "bg-white/10 hover:bg-white/15 text-white border border-white/15"
-                      : "bg-emerald-500 hover:bg-emerald-400 text-black shadow-sm shadow-emerald-500/20"
-                  }`}
-                >
-                  <Tag className={`size-3 ${item.isPromotional ? "text-white" : "text-black"}`} />
-                  <span>{item.isPromotional ? "Editar" : "Oferta"}</span>
-                </button>
-                {item.isPromotional && (
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-white text-sm truncate">{item.brand} {item.name}</div>
+                  <div className="text-xs text-white/90 font-medium mt-0.5">{item.flavor}</div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/90 font-bold text-xs whitespace-nowrap">
+                    {item.diasParado} {item.diasParado === 1 ? "dia" : "dias"}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => handleTogglePromotion(item)}
-                    className="px-2.5 py-1.5 rounded-lg font-semibold text-xs border bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleExpandItem(item.id);
+                    }}
+                    className="size-7 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-all cursor-pointer"
+                    title="Recolher card"
                   >
-                    Encerrar
+                    <ChevronDown className="size-4 rotate-180" />
                   </button>
-                )}
-                {!item.isPromotional && (
+                </div>
+              </div>
+
+              {/* Linha 2: Métricas Detalhadas (Estoque, Preço, Custo) */}
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-black/40 border border-white/5 rounded-xl px-2 py-2">
+                  <span className="text-[9px] text-muted-foreground uppercase block font-bold">Estoque</span>
+                  <span className="text-xs font-black text-white">{item.stock} un.</span>
+                </div>
+                <div className="bg-black/40 border border-white/5 rounded-xl px-2 py-2">
+                  <span className="text-[9px] text-muted-foreground uppercase block font-bold">Preço</span>
+                  {item.isPromotional && item.promoData?.promoPrice ? (
+                    <span className="text-xs font-black text-emerald-400">R$ {item.promoData.promoPrice.toFixed(2)}</span>
+                  ) : (
+                    <span className="text-xs font-black text-white">R$ {item.sellPrice.toFixed(2)}</span>
+                  )}
+                </div>
+                <div className="bg-black/40 border border-white/5 rounded-xl px-2 py-2">
+                  <span className="text-[9px] text-muted-foreground uppercase block font-bold">Custo</span>
+                  <span className="text-xs font-black text-zinc-400">{item.costPrice > 0 ? `R$ ${item.costPrice.toFixed(2)}` : "—"}</span>
+                </div>
+              </div>
+
+              {/* Linha 3: Badges + Ações */}
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/5">
+                <div className="flex items-center gap-1.5">
+                  {item.isDemo && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white/10 text-white/90 border border-white/20">DEMO</span>
+                  )}
+                  {item.isPromotional && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">EM PROMOÇÃO</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => handleTogglePromotion(item)}
-                    className="px-2.5 py-1.5 rounded-lg font-semibold text-xs border bg-white/5 hover:bg-white/10 text-muted-foreground border-white/10 transition-colors cursor-pointer"
+                    onClick={() => setSelectedOfferProduct(item)}
+                    className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-1 ${
+                      item.isPromotional
+                        ? "bg-white/10 hover:bg-white/15 text-white border border-white/15"
+                        : "bg-emerald-500 hover:bg-emerald-400 text-black shadow-sm shadow-emerald-500/20"
+                    }`}
                   >
-                    +Promo
+                    <Tag className={`size-3.5 ${item.isPromotional ? "text-white" : "text-black"}`} />
+                    <span>{item.isPromotional ? "Editar" : "Oferta"}</span>
                   </button>
-                )}
+                  {item.isPromotional && (
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePromotion(item)}
+                      className="px-2.5 py-1.5 rounded-xl font-semibold text-xs border bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 transition-colors cursor-pointer"
+                    >
+                      Encerrar
+                    </button>
+                  )}
+                  {!item.isPromotional && (
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePromotion(item)}
+                      className="px-2.5 py-1.5 rounded-xl font-semibold text-xs border bg-white/5 hover:bg-white/10 text-zinc-300 border-white/10 transition-colors cursor-pointer"
+                    >
+                      +Promo
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Modal de Criar Oferta de Queima de Estoque */}
