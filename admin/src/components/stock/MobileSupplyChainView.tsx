@@ -3,7 +3,7 @@ import {
   PackageSearch, Plus, Minus, Search, Copy, Edit3, Check, X,
   Boxes, MoreVertical, Trash2, AlertCircle, Clock, Upload,
   ImagePlus, Loader2, Sparkles, ChevronDown, CheckCircle2, Star,
-  PackagePlus
+  PackagePlus, Eye, EyeOff
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 
@@ -121,7 +121,33 @@ export function MobileSupplyChainView({
   // Sabor Delete Confirmation State
   const [confirmDeleteFlavorId, setConfirmDeleteFlavorId] = useState<string | null>(null);
 
+  // Filtro de ocultar esgotados (ativo por padrão conforme solicitado)
+  const [hideOutOfStock, setHideOutOfStock] = useState(true);
+
+  // Cards expandidos / minimizados no mobile
+  const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(new Set());
+
+  const toggleGroupExpand = (groupKey: string) => {
+    setExpandedGroupKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) {
+        next.delete(groupKey);
+      } else {
+        next.add(groupKey);
+      }
+      return next;
+    });
+  };
+
   const pendingCount = Object.keys(pendingStockChanges).length;
+
+  // Lista de produtos filtrada pelo toggle de esgotados (ativo por padrão)
+  const displayedGroups = useMemo(() => {
+    if (!hideOutOfStock || filterTab === "SEM_ESTOQUE") {
+      return skuGroups;
+    }
+    return skuGroups.filter((g) => g.totalStock > 0);
+  }, [skuGroups, hideOutOfStock, filterTab]);
 
   // Sync active group data when products change
   const currentFlavorsGroup = useMemo(() => {
@@ -434,35 +460,137 @@ export function MobileSupplyChainView({
                 <span className="size-1.5 rounded-full bg-red-400" />
                 Sem estoque
               </button>
+
+              {/* Botão de Esconder Mercadoria Esgotada (sempre ativo por padrão na entrada) */}
+              <button
+                type="button"
+                onClick={() => setHideOutOfStock((prev) => !prev)}
+                className={`h-8 px-2.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                  hideOutOfStock
+                    ? "bg-white text-black shadow-sm font-extrabold"
+                    : "bg-white/5 text-muted-foreground hover:text-white border border-white/10"
+                }`}
+                title="Esconder ou exibir mercadorias que estão esgotadas"
+              >
+                {hideOutOfStock ? (
+                  <>
+                    <EyeOff className="size-3.5 text-black shrink-0" />
+                    <span>Ocultando esgotados</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="size-3.5 text-zinc-400 shrink-0" />
+                    <span>Mostrar esgotados</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
-          {/* ━━━ 4. LISTA DE MODELOS (CARDS COMPACTOS) ━━━━━━━━━ */}
+          {/* ━━━ 4. LISTA DE MODELOS (MINIMIZADO POR PADRÃO / MAXIMIZADO AO CLICAR) ━━━ */}
           <div className="space-y-2.5">
-            {skuGroups.length === 0 ? (
+            {displayedGroups.length === 0 ? (
               <div className="bg-[#141414] border border-white/10 rounded-2xl p-8 text-center space-y-2">
                 <PackageSearch className="size-8 mx-auto text-muted-foreground/40" />
                 <p className="text-sm font-bold text-white">Nenhum produto encontrado</p>
-                <p className="text-xs text-muted-foreground">Tente alterar os termos de busca ou filtros.</p>
+                <p className="text-xs text-muted-foreground">
+                  {hideOutOfStock
+                    ? "Os produtos sem estoque estão ocultos. Toque no botão 'Ocultando esgotados' acima para ver tudo."
+                    : "Tente alterar os termos de busca ou filtros."}
+                </p>
               </div>
             ) : (
-              skuGroups.map((group) => {
+              displayedGroups.map((group) => {
                 const isOutOfStock = group.totalStock <= 0;
                 const isLowStock = group.totalStock > 0 && group.totalStock < 5;
                 const topFlavors = group.flavors.slice(0, 3);
                 const hasMoreFlavors = group.flavors.length > 3;
+                const isExpanded = expandedGroupKeys.has(group.groupKey);
 
+                // ━━━ ESTADO MINIMIZADO (Apenas Imagem, Marca, Nome, Preço de Venda e Unidades) ━━━
+                if (!isExpanded) {
+                  return (
+                    <div
+                      key={group.groupKey}
+                      onClick={() => toggleGroupExpand(group.groupKey)}
+                      className={`bg-[#141414] border rounded-2xl px-3.5 py-3 transition-all cursor-pointer select-none active:scale-[0.99] shadow-sm flex items-center justify-between gap-3 ${
+                        isOutOfStock
+                          ? "border-red-500/20 opacity-80"
+                          : "border-white/10 hover:border-white/20"
+                      }`}
+                    >
+                      {/* Imagem + Marca + Nome + Preço */}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        {group.image_url ? (
+                          <img
+                            src={group.image_url}
+                            alt={group.name}
+                            className="size-11 rounded-xl object-contain bg-black/60 p-1 border border-white/10 shrink-0"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="size-11 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-muted-foreground font-bold text-[11px]">
+                            {group.brand?.substring(0, 2).toUpperCase() || "PR"}
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-wider truncate">
+                              {group.brand}
+                            </span>
+                            {group.puffs && group.puffs > 0 ? (
+                              <span className="text-[10px] text-white/40 shrink-0">· {group.puffs} puffs</span>
+                            ) : null}
+                          </div>
+                          <h3 className="font-bold text-white text-sm truncate leading-tight mt-0.5">
+                            {group.name}
+                          </h3>
+                          <div className="text-[11px] font-bold text-emerald-400 mt-0.5">
+                            {formatBRL(group.price)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Estoque Total + Chevron */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold ${
+                            isOutOfStock
+                              ? "bg-red-500/15 text-red-400 border border-red-500/30"
+                              : isLowStock
+                              ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                              : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                          }`}
+                        >
+                          <span
+                            className={`size-1.5 rounded-full ${
+                              isOutOfStock ? "bg-red-400" : isLowStock ? "bg-amber-400" : "bg-emerald-400"
+                            }`}
+                          />
+                          {group.totalStock} un.
+                        </span>
+                        <ChevronDown className="size-4 text-zinc-500" />
+                      </div>
+                    </div>
+                  );
+                }
+
+                // ━━━ ESTADO MAXIMIZADO (Sabores, Edição e Ações Completas) ━━━
                 return (
                   <div
                     key={group.groupKey}
-                    className={`bg-[#141414] border rounded-2xl p-3.5 space-y-2.5 transition-all ${
+                    className={`bg-[#141414] border rounded-2xl p-3.5 space-y-2.5 transition-all shadow-md ${
                       isOutOfStock
-                        ? "border-red-500/20 opacity-90"
-                        : "border-white/10 hover:border-white/20"
+                        ? "border-red-500/30 opacity-95"
+                        : "border-white/20"
                     }`}
                   >
-                    {/* Linha Superior: Imagem + Marca/Modelo/Preço + Badge de Estoque */}
-                    <div className="flex items-start justify-between gap-2.5">
+                    {/* Linha Superior: Imagem + Marca/Modelo/Preço + Badge de Estoque + Botão Recolher */}
+                    <div
+                      onClick={() => toggleGroupExpand(group.groupKey)}
+                      className="flex items-start justify-between gap-2.5 cursor-pointer"
+                    >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         {/* Imagem do Produto */}
                         {group.image_url ? (
@@ -497,8 +625,8 @@ export function MobileSupplyChainView({
                         </div>
                       </div>
 
-                      {/* Badge de Estoque Total do Modelo */}
-                      <div className="shrink-0 text-right">
+                      {/* Badge de Estoque Total + Botão de Minimizar */}
+                      <div className="shrink-0 flex items-center gap-2">
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold ${
                             isOutOfStock
@@ -515,6 +643,18 @@ export function MobileSupplyChainView({
                           />
                           {group.totalStock} un.
                         </span>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleGroupExpand(group.groupKey);
+                          }}
+                          className="size-7 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-all cursor-pointer"
+                          title="Recolher produto"
+                        >
+                          <ChevronDown className="size-4 rotate-180" />
+                        </button>
                       </div>
                     </div>
 
