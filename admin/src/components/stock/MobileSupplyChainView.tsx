@@ -325,67 +325,41 @@ export function MobileSupplyChainView({
       {/* ━━━ SE VISÃO ESTOQUE ATIVA: RENDERIZA CONTROLES DE ESTOQUE ━━━ */}
       {activeMainView === "ESTOQUE" && (
         <>
-          {/* ━━━ 2. AÇÕES PRINCIPAIS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-          <div className="space-y-2">
-            {/* Botão Primário de Destaque */}
+          {/* ━━━ 2. AÇÕES PRINCIPAIS COMPACTAS (Divididas em 1 linha no mobile) ━━━ */}
+          <div className="grid grid-cols-2 gap-2">
+            {/* Botão Novo Produto */}
             <button
               type="button"
               onClick={onOpenNewProductModal}
-              className="w-full h-11 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-black font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+              className="h-9 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-black font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/20 transition-all cursor-pointer"
             >
-              <Plus className="size-4 stroke-[3]" />
-              <span>Novo Produto</span>
+              <Plus className="size-3.5 stroke-[3]" />
+              <span className="truncate">Novo Produto</span>
             </button>
 
-            {/* Linha de Ações Secundárias Compactas */}
-            <div className={`grid ${onOpenRegisterStock ? "grid-cols-3" : "grid-cols-2"} gap-1.5`}>
-              {/* Botão Registrar Estoque */}
-              {onOpenRegisterStock && (
-                <button
-                  type="button"
-                  onClick={onOpenRegisterStock}
-                  className="h-9 px-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-[11px] font-extrabold flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-[0.98] shadow-sm shadow-emerald-500/20"
-                  title="Registrar compras e entrada de estoque"
-                >
-                  <PackagePlus className="size-3.5 shrink-0 stroke-[2.5]" />
-                  <span className="truncate">Registrar</span>
-                </button>
+            {/* Botão Copiar Estoque com Feedback */}
+            <button
+              type="button"
+              onClick={onCopyAvailableStock}
+              className={`h-9 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98] ${
+                copiedStockFeedback
+                  ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
+                  : "bg-white/5 hover:bg-white/10 border-white/10 text-white"
+              }`}
+              title="Copiar lista de estoque disponível"
+            >
+              {copiedStockFeedback ? (
+                <>
+                  <Check className="size-3.5 text-emerald-400 shrink-0" />
+                  <span className="font-bold truncate">Copiado!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="size-3.5 text-zinc-400 shrink-0" />
+                  <span className="truncate">Copiar Estoque</span>
+                </>
               )}
-
-              {/* Botão Copiar Estoque com Feedback Refinado */}
-              <button
-                type="button"
-                onClick={onCopyAvailableStock}
-                className={`h-9 px-2 rounded-xl border text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-[0.98] ${
-                  copiedStockFeedback
-                    ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
-                    : "bg-white/5 hover:bg-white/10 border-white/10 text-white/90"
-                }`}
-                title="Copiar lista de estoque disponível"
-              >
-                {copiedStockFeedback ? (
-                  <>
-                    <Check className="size-3.5 text-emerald-400 shrink-0" />
-                    <span className="font-bold truncate">Copiado</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="size-3.5 text-muted-foreground shrink-0" />
-                    <span className="truncate">Copiar</span>
-                  </>
-                )}
-              </button>
-
-              {/* Botão Planejador de Recompra */}
-              <button
-                type="button"
-                onClick={onOpenReplenishmentPlanner}
-                className="h-9 px-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/90 text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-[0.98]"
-              >
-                <PackageSearch className="size-3.5 text-muted-foreground shrink-0" />
-                <span className="truncate">Recompra</span>
-              </button>
-            </div>
+            </button>
           </div>
 
           {/* ━━━ 3. BUSCA E FILTROS RÁPIDOS ━━━━━━━━━━━━━━━━━━━━━ */}
