@@ -180,10 +180,16 @@ export function MobileManualSaleFlow({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Se o modal pai já forneceu ou está carregando os dados, evita requisições redundantes
+    // Se o modal pai já forneceu os dados, evita requisições redundantes
     if (initialProducts && initialProducts.length > 0) {
       setProductsList(initialProducts);
       setLoadingInitialData(Boolean(isLoadingData));
+      return;
+    }
+
+    // Se o modal pai já está ativamente carregando os dados, aguarda o pai concluir
+    if (isLoadingData) {
+      setLoadingInitialData(true);
       return;
     }
 
@@ -321,7 +327,33 @@ export function MobileManualSaleFlow({
     }
   }, [currentSelectedFlavorProd]);
 
-  // Busca Inteligente de Clientes (Pesquisa e Rankeamento)
+  // Pré-indexação de Clientes para busca com latência 0ms no celular
+  const indexedClients = useMemo(() => {
+    return clientsList.map((c: any) => {
+      const rawName = c.name || "";
+      const rawPhone = c.phone || "";
+      const normName = normalizeText(rawName);
+      const digits = rawPhone.replace(/\D/g, "");
+      const localDigits = digits.length >= 12 && digits.startsWith("55") ? digits.slice(2) : digits;
+      const numberWithoutDdd = localDigits.length >= 10 ? localDigits.slice(2) : localDigits;
+      const nameWords = normName.split(/\s+/);
+      return {
+        raw: c,
+        id: c.id,
+        name: rawName,
+        phone: rawPhone,
+        address: c.address,
+        company_id: c.company_id,
+        _normName: normName,
+        _nameWords: nameWords,
+        _digits: digits,
+        _localDigits: localDigits,
+        _numberWithoutDdd: numberWithoutDdd,
+      };
+    });
+  }, [clientsList]);
+
+  // Busca Inteligente de Clientes (Pesquisa e Rankeamento Instantâneo)
   const rankedClients = useMemo(() => {
     const rawQuery = clientSearchQuery.trim();
     if (!rawQuery) return [];
@@ -331,54 +363,46 @@ export function MobileManualSaleFlow({
 
     const scored: Array<{ client: any; score: number }> = [];
 
-    for (const c of clientsList) {
-      const cName = normalizeText(c.name || "");
-      const cDigits = (c.phone || "").replace(/\D/g, "");
-      const cLocalDigits = cDigits.length >= 12 && cDigits.startsWith("55") ? cDigits.slice(2) : cDigits;
-      const cNumberWithoutDdd = cLocalDigits.length >= 10 ? cLocalDigits.slice(2) : cLocalDigits;
-
+    for (let i = 0; i < indexedClients.length; i++) {
+      const c = indexedClients[i];
       let score = 0;
 
-      // 1. Match por Nome
+      // 1. Match por Nome (sem reprocessar regex/strings pesadas)
       if (qText) {
-        if (cName === qText) {
+        if (c._normName === qText) {
           score = Math.max(score, 100);
-        } else if (cName.startsWith(qText)) {
+        } else if (c._normName.startsWith(qText)) {
           score = Math.max(score, 85);
-        } else if (cName.split(/\s+/).some((w) => w.startsWith(qText))) {
+        } else if (c._nameWords.some((w: string) => w.startsWith(qText))) {
           score = Math.max(score, 70);
-        } else if (cName.includes(qText)) {
+        } else if (c._normName.includes(qText)) {
           score = Math.max(score, 45);
         }
       }
 
       // 2. Match por Telefone / Dígitos
       if (qDigits) {
-        if (cLocalDigits === qDigits || cDigits === qDigits || cNumberWithoutDdd === qDigits) {
+        if (c._localDigits === qDigits || c._digits === qDigits || c._numberWithoutDdd === qDigits) {
           score = Math.max(score, 100);
         } else if (
-          cLocalDigits.startsWith(qDigits) ||
-          cNumberWithoutDdd.startsWith(qDigits) ||
-          cDigits.startsWith(qDigits)
+          c._localDigits.startsWith(qDigits) ||
+          c._numberWithoutDdd.startsWith(qDigits) ||
+          c._digits.startsWith(qDigits)
         ) {
           score = Math.max(score, 80);
-        } else if (cDigits.includes(qDigits) || cLocalDigits.includes(qDigits)) {
+        } else if (c._digits.includes(qDigits) || c._localDigits.includes(qDigits)) {
           score = Math.max(score, 55);
         }
       }
 
       if (score > 0) {
-        scored.push({ client: c, score });
+        scored.push({ client: c.raw, score });
       }
     }
 
-    scored.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return (a.client.name || "").localeCompare(b.client.name || "", "pt-BR");
-    });
-
-    return scored.map((item) => item.client);
-  }, [clientsList, clientSearchQuery]);
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, 25).map((item) => item.client);
+  }, [indexedClients, clientSearchQuery]);
 
   // Selecionar Cliente Existente do CRM
   const handleSelectClient = (c: any) => {
@@ -1015,6 +1039,14 @@ export function MobileManualSaleFlow({
                     </button>
                   )}
                 </div>
+
+                {/* Indicador de Sincronização em Tempo Real */}
+                {loadingInitialData && (
+                  <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-zinc-300">
+                    <Loader2 className="size-3.5 animate-spin text-white shrink-0" />
+                    <span>Sincronizando clientes em tempo real...</span>
+                  </div>
+                )}
 
                 {/* Lista de Resultados Encontrados */}
                 {clientSearchQuery.trim() ? (
