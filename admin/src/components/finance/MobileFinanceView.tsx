@@ -227,6 +227,8 @@ export interface MobileFinanceViewProps {
   onSelectYearId: (id: string) => void;
   selectedYear: ConsolidatedPeriod | null;
   annualEvolution: GroupedPeriodEvolution;
+  onOpenRepurchaseComparison?: () => void;
+  onOpenRegisterStock?: () => void;
 }
 
 function MobileFinanceViewComponent({
@@ -278,6 +280,8 @@ function MobileFinanceViewComponent({
   onSelectYearId,
   selectedYear,
   annualEvolution,
+  onOpenRepurchaseComparison,
+  onOpenRegisterStock,
 }: MobileFinanceViewProps) {
   // Aba ativa principal
   const [activeTab, setActiveTab] = useState<"resumo" | "metas" | "caixa" | "evolucao" | "historico">("resumo");
@@ -1210,22 +1214,51 @@ function MobileFinanceViewComponent({
               </div>
             </div>
 
-            {/* Botão de Registrar Recompra */}
-            <button
-              type="button"
-              onClick={() => {
-                setStockAmountInput("");
-                setFreightAmountInput("");
-                setRepurchaseNotesInput("");
-                setRepurchaseDateInput(new Date().toISOString().split("T")[0]);
-                setRepurchaseFormError(null);
-                setIsRepurchaseSheetOpen(true);
-              }}
-              className="w-full bg-white hover:bg-slate-100 text-black font-extrabold text-xs py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer min-h-[44px]"
-            >
-              <Plus className="size-4 stroke-[3]" />
-              <span>+ Registrar Recompra de Estoque</span>
-            </button>
+            {/* Botões de Registro & Comparativo de Recompras + Registrar Estoque */}
+            <div className="space-y-2">
+              {onOpenRepurchaseComparison && (
+                <button
+                  type="button"
+                  onClick={onOpenRepurchaseComparison}
+                  className="w-full bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 font-extrabold text-xs py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer min-h-[44px]"
+                >
+                  <GitCompare className="size-4 text-emerald-400" />
+                  <span>📊 Registro & Comparativo de Recompras</span>
+                  <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/25 text-emerald-200 text-[10px] font-black">
+                    {repurchases.length}
+                  </span>
+                </button>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                {onOpenRegisterStock && (
+                  <button
+                    type="button"
+                    onClick={onOpenRegisterStock}
+                    className="w-full bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/35 text-cyan-300 font-bold text-xs py-3 px-2 rounded-xl flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer min-h-[44px]"
+                  >
+                    <PackagePlus className="size-4 text-cyan-400 shrink-0" />
+                    <span className="truncate">Registrar Estoque</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStockAmountInput("");
+                    setFreightAmountInput("");
+                    setRepurchaseNotesInput("");
+                    setRepurchaseDateInput(new Date().toISOString().split("T")[0]);
+                    setRepurchaseFormError(null);
+                    setIsRepurchaseSheetOpen(true);
+                  }}
+                  className="w-full bg-white hover:bg-slate-100 text-black font-extrabold text-xs py-3 px-2 rounded-xl shadow-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer min-h-[44px]"
+                >
+                  <Plus className="size-4 stroke-[3] shrink-0" />
+                  <span className="truncate">+ Registrar Recompra</span>
+                </button>
+              </div>
+            </div>
 
             {/* Histórico de Recompras em Cards Verticais */}
             <div className="space-y-2.5 pt-1">

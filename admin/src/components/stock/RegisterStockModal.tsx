@@ -15,7 +15,12 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { updateProductCost } from "@/lib/productCosts";
-import { createStockRepurchase } from "@/lib/stockRepurchases";
+import {
+  createStockRepurchase,
+  fetchStockRepurchases,
+  enrichStockRepurchasesList,
+  type EnrichedStockRepurchase,
+} from "@/lib/stockRepurchases";
 import { broadcastLiveCatalogSync } from "@/lib/categories";
 import { invalidateSaleCatalogCache } from "@/components/ManualSaleModal";
 import { invalidateFinanceCache } from "@/components/FinanceDashboard";
@@ -99,6 +104,8 @@ export function RegisterStockModal({
     projectedProfit: number;
   } | null>(null);
 
+  const [lastRepurchase, setLastRepurchase] = useState<EnrichedStockRepurchase | null>(null);
+
   // Resetar 100% do estado sempre que o modal abrir ou fechar para impedir que itens
   // de uma compra anterior fiquem retidos na memória e sejam somados novamente!
   const resetModalState = () => {
@@ -126,8 +133,20 @@ export function RegisterStockModal({
   useEffect(() => {
     if (!isOpen) {
       resetModalState();
+      return;
     }
-  }, [isOpen]);
+    let active = true;
+    fetchStockRepurchases(targetCompanyId)
+      .then((list) => {
+        if (!active) return;
+        const enriched = enrichStockRepurchasesList(list, products);
+        setLastRepurchase(enriched.length > 0 ? enriched[0] : null);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [isOpen, targetCompanyId, products]);
 
   // Agrupamento dos produtos existentes para sugestão inteligente
   const modelCatalog = useMemo(() => {
@@ -718,12 +737,31 @@ export function RegisterStockModal({
             ? `${supplierNotes} (${batchTotalUnits} un, ${batchItems.length} itens)`
             : `Entrada rápida de estoque: ${batchTotalUnits} un (${batchItems.length} itens)`;
 
+          const batchMarkupPct = batchTotalInvested > 0 ? (batchProjectedProfit / batchTotalInvested) * 100 : 0;
+          const batchMarginPct = batchTotalRevenue > 0 ? (batchProjectedProfit / batchTotalRevenue) * 100 : 0;
+
           await createStockRepurchase({
             companyId: targetCompanyId,
             stock_purchase_amount: batchTotalCost,
             freight_amount: parsedFreight,
             purchase_date: nowIso.split("T")[0],
-            notes: repurchaseNotes
+            notes: repurchaseNotes,
+            meta: {
+              units: batchTotalUnits,
+              projectedRevenue: Number(batchTotalRevenue.toFixed(2)),
+              projectedProfit: Number(batchProjectedProfit.toFixed(2)),
+              markupPct: Number(batchMarkupPct.toFixed(1)),
+              marginPct: Number(batchMarginPct.toFixed(1)),
+              items: batchItems.map((it) => ({
+                brand: it.brand,
+                model: it.model,
+                flavor: it.flavor,
+                qty: it.qty,
+                unitCost: it.unitCost,
+                previousCost: it.previousCost ?? null,
+                unitSell: it.unitSell,
+              })),
+            },
           });
         } catch (repurchaseErr) {
           console.warn("Aviso ao salvar histórico de recompra:", repurchaseErr);
@@ -1457,6 +1495,59 @@ export function RegisterStockModal({
                   </span>
                 </div>
               </div>
+
+              {/* Comparativo Ao Vivo com a Recompra Passada */}
+              {lastRepurchase && (
+                <div className="p-3.5 rounded-xl bg-black/50 border border-white/10 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-purple-300 flex items-center gap-1.5">
+                      <Sparkles className="size-3.5 text-purple-400" />
+                      <span>
+                        Comparativo com a Recompra Passada (
+                        {new Date(lastRepurchase.purchase_date + "T00:00:00").toLocaleDateString("pt-BR")}
+                        )
+                      </span>
+                    </span>
+                    <span className="text-[10px] font-mono text-white/50">
+                      Passada: {lastRepurchase.units} un • R$ {lastRepurchase.total_repurchase_amount.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-white/5 text-[11px]">
+                    <div>
+                      <span className="text-white/50">Investimento vs Passada: </span>
+                      <strong
+                        className={
+                          totalInvestedWithFreight >= lastRepurchase.total_repurchase_amount
+                            ? "text-amber-300 font-mono"
+                            : "text-emerald-400 font-mono"
+                        }
+                      >
+                        {totalInvestedWithFreight - lastRepurchase.total_repurchase_amount >= 0 ? "+" : ""}
+                        R$ {(totalInvestedWithFreight - lastRepurchase.total_repurchase_amount).toFixed(2)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-white/50">Lucro vs Passada (+R$ {lastRepurchase.projectedProfit.toFixed(2)}): </span>
+                      <strong
+                        className={
+                          totalProjectedProfit >= lastRepurchase.projectedProfit
+                            ? "text-emerald-400 font-mono"
+                            : "text-amber-300 font-mono"
+                        }
+                      >
+                        {totalProjectedProfit - lastRepurchase.projectedProfit >= 0 ? "▲ +R$ " : "▼ -R$ "}
+                        {Math.abs(totalProjectedProfit - lastRepurchase.projectedProfit).toFixed(2)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-white/50">Nossa Taxa (ROI): </span>
+                      <strong className="text-emerald-300 font-mono">
+                        +{totalMarkup.toFixed(1)}% (Passada: +{lastRepurchase.markupPct.toFixed(1)}%)
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

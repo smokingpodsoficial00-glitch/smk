@@ -66,8 +66,11 @@ import {
   fetchStockRepurchases,
   createStockRepurchase,
   deleteStockRepurchase,
+  enrichStockRepurchasesList,
   type StockRepurchase,
 } from "../lib/stockRepurchases";
+import { RepurchaseComparisonModal } from "./finance/RepurchaseComparisonModal";
+import { RegisterStockModal } from "./stock/RegisterStockModal";
 import {
   type CycleDefinition,
   type CycleFinancialMetrics,
@@ -1101,7 +1104,7 @@ interface FinanceDataCache {
 let financeSessionCache: FinanceDataCache | null = null;
 const FINANCE_CACHE_TTL_MS = 30 * 1000; // 30 segundos
 
-export const invalidateFinanceCache = () => {
+export const invalidateFinanceCache = (_companyId?: string | null) => {
   financeSessionCache = null;
 };
 
@@ -1178,9 +1181,18 @@ export default function FinanceDashboard() {
 
   // Recompra de Estoque & Caixa Real State (Módulo Independente)
   const [repurchases, setRepurchases] = useState<StockRepurchase[]>([]);
+  const [financeProductsList, setFinanceProductsList] = useState<any[]>([]);
   const [loadingRepurchases, setLoadingRepurchases] = useState(false);
   const [isRepurchaseModalOpen, setIsRepurchaseModalOpen] = useState(false);
+  const [isRepurchaseComparisonOpen, setIsRepurchaseComparisonOpen] = useState(false);
+  const [selectedRepurchaseForComparison, setSelectedRepurchaseForComparison] = useState<string | null>(null);
+  const [isRegisterStockModalOpen, setIsRegisterStockModalOpen] = useState(false);
   const [repurchaseToDelete, setRepurchaseToDelete] = useState<StockRepurchase | null>(null);
+
+  const enrichedRepurchases = useMemo(
+    () => enrichStockRepurchasesList(repurchases, financeProductsList),
+    [repurchases, financeProductsList]
+  );
 
   // Form State para Nova Recompra
   const [stockAmountInput, setStockAmountInput] = useState("");
@@ -1364,6 +1376,7 @@ export default function FinanceDashboard() {
       }
 
       setRepurchases(loadedRepurchases);
+      setFinanceProductsList(productsData || []);
       const validOrders = filterValidOrders(rawOrders);
       setAllValidOrders(validOrders);
       setPersistedProductCosts(persistedCosts);
@@ -2458,6 +2471,11 @@ export default function FinanceDashboard() {
           onSelectYearId={setSelectedYearId}
           selectedYear={selectedYear}
           annualEvolution={annualEvolution}
+          onOpenRepurchaseComparison={() => {
+            setSelectedRepurchaseForComparison(null);
+            setIsRepurchaseComparisonOpen(true);
+          }}
+          onOpenRegisterStock={() => setIsRegisterStockModalOpen(true)}
         />
       </div>
 
@@ -2983,7 +3001,29 @@ export default function FinanceDashboard() {
               Controle de desembolsos para reposição de mercadorias, fretes de fornecedores e saldo real remanescente em caixa.
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedRepurchaseForComparison(null);
+                setIsRepurchaseComparisonOpen(true);
+              }}
+              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.25)] hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] transition-all active:scale-95 cursor-pointer"
+            >
+              <GitCompare className="size-4 stroke-[2.5]" />
+              <span>Registro & Comparativo de Recompras</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsRegisterStockModalOpen(true)}
+              className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white border border-white/20 font-bold text-xs sm:text-sm px-3.5 py-2.5 rounded-xl transition-all active:scale-95 cursor-pointer"
+              title="Registrar compra selecionando os produtos comprados, custo, preço de venda e atualizando o estoque"
+            >
+              <PackagePlus className="size-4 text-emerald-400" />
+              <span>Registrar Estoque (Produtos)</span>
+            </button>
+
             <button
               onClick={handleOpenRepurchaseModal}
               data-tour="btn-registrar-recompra"
@@ -3074,6 +3114,56 @@ export default function FinanceDashboard() {
           </div>
         </div>
 
+        {/* Faixa de Resumo Comparativo: Última Recompra vs Recompra Anterior */}
+        {enrichedRepurchases.length >= 1 && (() => {
+          const latest = enrichedRepurchases[0];
+          const prev = enrichedRepurchases.length > 1 ? enrichedRepurchases[1] : null;
+          const latestDateStr = latest.purchase_date
+            ? new Date(latest.purchase_date + "T00:00:00").toLocaleDateString("pt-BR")
+            : "—";
+          const prevDateStr = prev?.purchase_date
+            ? new Date(prev.purchase_date + "T00:00:00").toLocaleDateString("pt-BR")
+            : null;
+
+          return (
+            <div className="bg-gradient-to-r from-emerald-500/10 via-purple-500/5 to-black/60 border border-emerald-500/30 rounded-2xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-4 text-emerald-400" />
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-300">
+                    Resumo da Última Recompra ({latestDateStr}) {prevDateStr ? `vs Passada (${prevDateStr})` : ""}
+                  </span>
+                </div>
+                <p className="text-xs text-white/70">
+                  Investido: <strong className="text-white">{formatBRL(latest.total_repurchase_amount)}</strong> ({latest.units} un) •{" "}
+                  Venda Projetada: <strong className="text-blue-300">{formatBRL(latest.projectedRevenue)}</strong> •{" "}
+                  Lucro da Compra: <strong className="text-emerald-400">+{formatBRL(latest.projectedProfit)}</strong>{" "}
+                  <span className="text-amber-300 font-bold">(Taxa ROI: +{latest.markupPct.toFixed(1)}%)</span>
+                  {prev && latest.profitGrowthDiff != null && latest.profitGrowthPct != null && (
+                    <span className={`ml-2 font-extrabold ${latest.profitGrowthDiff >= 0 ? "text-emerald-400" : "text-amber-300"}`}>
+                      • {latest.profitGrowthDiff >= 0 ? "▲ +" : "▼ "}
+                      {latest.profitGrowthPct.toFixed(1)}% ({latest.profitGrowthDiff >= 0 ? "+" : ""}
+                      {formatBRL(latest.profitGrowthDiff)}) vs recompra anterior
+                    </span>
+                  )}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRepurchaseForComparison(latest.id);
+                  setIsRepurchaseComparisonOpen(true);
+                }}
+                className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-extrabold transition-all cursor-pointer"
+              >
+                <GitCompare className="size-3.5" />
+                <span>Comparar Recompras & Lucros →</span>
+              </button>
+            </div>
+          );
+        })()}
+
         {/* Tabela de Histórico de Recompras */}
         <div className="space-y-3 pt-2">
           <div className="flex items-center justify-between">
@@ -3084,9 +3174,12 @@ export default function FinanceDashboard() {
                 {repurchases.length}
               </span>
             </h4>
+            <span className="text-[11px] text-white/40 hidden sm:inline">
+              Clique em &ldquo;Comparar&rdquo; em qualquer linha para analisar lucros e crescimento vs recompra passada
+            </span>
           </div>
 
-          {repurchases.length === 0 ? (
+          {enrichedRepurchases.length === 0 ? (
             <div className="bg-black/20 border border-dashed border-white/10 rounded-2xl p-8 text-center space-y-3">
               <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-white/40">
                 <PackagePlus className="size-6" />
@@ -3111,43 +3204,81 @@ export default function FinanceDashboard() {
                 <thead>
                   <tr className="border-b border-white/10 bg-white/5 text-white/60 font-bold uppercase tracking-wider">
                     <th className="py-3 px-4">Data</th>
+                    <th className="py-3 px-3 text-center">Qtd.</th>
                     <th className="py-3 px-4 text-right">Estoque (Produtos)</th>
-                    <th className="py-3 px-4 text-right">Frete Reposição</th>
+                    <th className="py-3 px-3 text-right">Frete Reposição</th>
                     <th className="py-3 px-4 text-right">Total Desembolsado</th>
+                    <th className="py-3 px-4 text-right">Lucro & Nossa Taxa</th>
+                    <th className="py-3 px-4 text-right">Crescimento vs Anterior</th>
                     <th className="py-3 px-4">Observação</th>
                     <th className="py-3 px-4 text-center">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 font-medium">
-                  {repurchases.map((rep) => {
+                  {enrichedRepurchases.map((rep) => {
                     const formattedDate = rep.purchase_date
                       ? new Date(rep.purchase_date + "T00:00:00").toLocaleDateString("pt-BR")
                       : "—";
                     return (
                       <tr key={rep.id} className="hover:bg-white/5 transition-colors">
-                        <td className="py-3.5 px-4 font-mono font-bold text-white/90">
+                        <td className="py-3.5 px-4 font-mono font-bold text-white/90 whitespace-nowrap">
                           {formattedDate}
                         </td>
-                        <td className="py-3.5 px-4 text-right font-extrabold text-white text-sm">
+                        <td className="py-3.5 px-3 text-center font-mono font-bold text-white/80 whitespace-nowrap">
+                          {rep.units} un
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-extrabold text-white text-sm whitespace-nowrap">
                           {formatBRL(rep.stock_purchase_amount)}
                         </td>
-                        <td className="py-3.5 px-4 text-right font-bold text-white/70">
+                        <td className="py-3.5 px-3 text-right font-bold text-white/70 whitespace-nowrap">
                           {rep.freight_amount > 0 ? formatBRL(rep.freight_amount) : "R$ 0,00"}
                         </td>
-                        <td className="py-3.5 px-4 text-right font-black text-amber-300 text-sm">
+                        <td className="py-3.5 px-4 text-right font-black text-amber-300 text-sm whitespace-nowrap">
                           {formatBRL(rep.total_repurchase_amount)}
+                        </td>
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                          <span className="font-mono font-extrabold text-emerald-400 text-sm">
+                            +{formatBRL(rep.projectedProfit)}
+                          </span>
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-[10px] font-bold">
+                            +{rep.markupPct.toFixed(0)}%
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-mono font-bold whitespace-nowrap">
+                          {rep.profitGrowthPct != null && rep.profitGrowthDiff != null ? (
+                            <span className={rep.profitGrowthDiff >= 0 ? "text-emerald-400" : "text-amber-400"}>
+                              {rep.profitGrowthDiff >= 0 ? "▲ +" : "▼ "}
+                              {rep.profitGrowthPct.toFixed(1)}%
+                            </span>
+                          ) : (
+                            <span className="text-white/30 text-[10px]">Base inicial</span>
+                          )}
                         </td>
                         <td className="py-3.5 px-4 text-white/60 max-w-xs truncate">
                           {rep.notes || <span className="text-white/20 italic">Sem observações</span>}
                         </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <button
-                            onClick={() => setRepurchaseToDelete(rep)}
-                            title="Excluir Recompra"
-                            className="size-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 inline-flex items-center justify-center transition-all active:scale-95 cursor-pointer"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedRepurchaseForComparison(rep.id);
+                                setIsRepurchaseComparisonOpen(true);
+                              }}
+                              title="Comparar esta recompra com a anterior"
+                              className="h-8 px-2.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1 text-[11px] font-bold transition-all active:scale-95 cursor-pointer"
+                            >
+                              <GitCompare className="size-3.5" />
+                              <span>Comparar</span>
+                            </button>
+                            <button
+                              onClick={() => setRepurchaseToDelete(rep)}
+                              title="Excluir Recompra"
+                              className="size-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 inline-flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -4713,6 +4844,32 @@ export default function FinanceDashboard() {
           defaultType="DESPESA_OPERACIONAL"
         />
       )}
+
+      {/* Modal Completo: Registro & Comparativo de Recompras (Recompra a Recompra, Lucros e Crescimento) */}
+      <RepurchaseComparisonModal
+        isOpen={isRepurchaseComparisonOpen}
+        onClose={() => setIsRepurchaseComparisonOpen(false)}
+        repurchases={repurchases}
+        products={financeProductsList}
+        initialSelectedId={selectedRepurchaseForComparison}
+        onOpenRegisterStockModal={() => {
+          setIsRepurchaseComparisonOpen(false);
+          setIsRegisterStockModalOpen(true);
+        }}
+      />
+
+      {/* Modal Integrado de Registrar Estoque / Compra de Mercadorias (direto pelo Financeiro) */}
+      <RegisterStockModal
+        isOpen={isRegisterStockModalOpen}
+        onClose={() => setIsRegisterStockModalOpen(false)}
+        companyId={company?.id}
+        products={financeProductsList}
+        costsMap={persistedProductCosts}
+        onSuccess={() => {
+          invalidateFinanceCache();
+          fetchFinanceData(false, true);
+        }}
+      />
       </div>
     </>
   );
