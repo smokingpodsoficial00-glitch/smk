@@ -1,13 +1,10 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   X,
   TrendingUp,
   TrendingDown,
-  PackagePlus,
   Boxes,
   ArrowRightLeft,
-  Sparkles,
-  CheckCircle2,
   Calendar,
   DollarSign,
   Percent,
@@ -27,7 +24,7 @@ interface RepurchaseComparisonModalProps {
   repurchases: StockRepurchase[];
   products: any[];
   initialSelectedId?: string | null;
-  onOpenRegisterStockModal: () => void;
+  onOpenRegisterStockModal?: () => void;
 }
 
 export function RepurchaseComparisonModal({
@@ -36,8 +33,9 @@ export function RepurchaseComparisonModal({
   repurchases,
   products,
   initialSelectedId,
-  onOpenRegisterStockModal,
 }: RepurchaseComparisonModalProps) {
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
   const enrichedList = useMemo(
     () => enrichStockRepurchasesList(repurchases, products),
     [repurchases, products]
@@ -73,12 +71,17 @@ export function RepurchaseComparisonModal({
     }
   }, [isOpen, enrichedList, initialSelectedId]);
 
-  // Quando o usuário troca a Recompra Atual no seletor, sugerir automaticamente a imediatamente anterior a ela
-  const handleSelectCurrent = (newCurrId: string) => {
+  // Quando o usuário clica em uma recompra na tabela ou troca no seletor, seleciona ela e sugere a imediatamente anterior
+  const handleSelectCurrent = (newCurrId: string, scrollToTop = false) => {
     setSelectedCurrentId(newCurrId);
     const idx = enrichedList.findIndex((r) => r.id === newCurrId);
     if (idx >= 0 && idx + 1 < enrichedList.length) {
       setSelectedPreviousId(enrichedList[idx + 1].id);
+    } else {
+      setSelectedPreviousId("");
+    }
+    if (scrollToTop && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
@@ -114,7 +117,6 @@ export function RepurchaseComparisonModal({
       previousRep.projectedProfit > 0 ? (profitDiff / previousRep.projectedProfit) * 100 : 0;
 
     const markupDiff = currentRep.markupPct - previousRep.markupPct;
-    const unitCostDiff = currentRep.avgUnitCost - previousRep.avgUnitCost;
 
     return {
       costDiff,
@@ -126,28 +128,8 @@ export function RepurchaseComparisonModal({
       profitDiff,
       profitPct,
       markupDiff,
-      unitCostDiff,
     };
   }, [currentRep, previousRep]);
-
-  // Totais Acumulados de todas as recompras
-  const globalTotals = useMemo(() => {
-    const totalInvested = enrichedList.reduce((acc, r) => acc + r.total_repurchase_amount, 0);
-    const totalUnits = enrichedList.reduce((acc, r) => acc + r.units, 0);
-    const totalRevenue = enrichedList.reduce((acc, r) => acc + r.projectedRevenue, 0);
-    const totalProfit = enrichedList.reduce((acc, r) => acc + r.projectedProfit, 0);
-    const avgMarkup = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
-    const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-
-    return {
-      totalInvested,
-      totalUnits,
-      totalRevenue,
-      totalProfit,
-      avgMarkup,
-      avgMargin,
-    };
-  }, [enrichedList]);
 
   if (!isOpen) return null;
 
@@ -156,130 +138,81 @@ export function RepurchaseComparisonModal({
     return new Date(dateStr + "T00:00:00").toLocaleDateString("pt-BR");
   };
 
+  const currentOrderNum = currentRep
+    ? enrichedList.length - enrichedList.findIndex((r) => r.id === currentRep.id)
+    : 0;
+  const previousOrderNum = previousRep
+    ? enrichedList.length - enrichedList.findIndex((r) => r.id === previousRep.id)
+    : 0;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-[#0b0b0e] border border-white/15 rounded-3xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
-        {/* ━━━ CABEÇALHO DO MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <div className="px-5 sm:px-7 py-4 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/[0.02]">
-          <div className="flex items-center gap-3">
-            <div className="size-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 lg:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-[#09090b] border border-white/10 rounded-3xl w-[96vw] max-w-[1440px] h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+        {/* ━━━ CABEÇALHO LIMPO E ESPAÇADO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <div className="px-6 sm:px-10 py-5 sm:py-6 border-b border-white/10 flex items-center justify-between gap-4 bg-[#0c0c0f] shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="size-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shrink-0">
               <ArrowRightLeft className="size-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                  Inteligência de Recompras
-                </span>
-                <span className="text-[10px] text-white/40">
-                  {enrichedList.length} {enrichedList.length === 1 ? "registro" : "registros"}
-                </span>
-              </div>
-              <h2 className="text-base sm:text-lg font-black text-white tracking-tight mt-0.5">
-                Registro & Comparativo de Recompras (Lucros e Crescimento)
+              <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                Comparativo de Recompras
               </h2>
+              <p className="text-xs sm:text-sm text-white/45 mt-0.5">
+                Acompanhe o valor investido, o lucro e o crescimento de cada recompra de estoque
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 self-end sm:self-auto">
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onOpenRegisterStockModal();
-              }}
-              className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-95 cursor-pointer"
-            >
-              <PackagePlus className="size-4 stroke-[2.5]" />
-              <span>Registrar Compra de Mercadorias (Estoque)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="size-9 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="size-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            title="Fechar"
+          >
+            <X className="size-5" />
+          </button>
         </div>
 
-        {/* ━━━ CORPO SCROLLÁVEL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-7 space-y-6">
-          {/* 1. RESUMO ACUMULADO DE TODAS AS RECOMPRAS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-            <div className="bg-[#121216] border border-white/10 rounded-2xl p-4 space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
-                <DollarSign className="size-3.5 text-white/50" /> Total Investido ({enrichedList.length} recompras)
-              </span>
-              <div className="text-lg sm:text-xl font-black text-white font-mono">
-                {formatBRL(globalTotals.totalInvested)}
-              </div>
-              <span className="text-[10px] text-white/40 block">
-                {globalTotals.totalUnits} unidades adquiridas no total
-              </span>
-            </div>
-
-            <div className="bg-[#121216] border border-white/10 rounded-2xl p-4 space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
-                <BarChart3 className="size-3.5 text-blue-400" /> Retorno Bruto Esperado
-              </span>
-              <div className="text-lg sm:text-xl font-black text-blue-300 font-mono">
-                {formatBRL(globalTotals.totalRevenue)}
-              </div>
-              <span className="text-[10px] text-white/40 block">
-                Valor de venda total das mercadorias compradas
-              </span>
-            </div>
-
-            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                <TrendingUp className="size-3.5 text-emerald-400" /> Lucro Total das Recompras
-              </span>
-              <div className="text-lg sm:text-xl font-black text-emerald-300 font-mono">
-                +{formatBRL(globalTotals.totalProfit)}
-              </div>
-              <span className="text-[10px] text-emerald-400/80 font-semibold block">
-                Lucro líquido gerado em cima das compras
-              </span>
-            </div>
-
-            <div className="bg-[#121216] border border-white/10 rounded-2xl p-4 space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
-                <Percent className="size-3.5 text-amber-400" /> Taxa Média sobre Custo (ROI)
-              </span>
-              <div className="text-lg sm:text-xl font-black text-amber-300 font-mono">
-                +{globalTotals.avgMarkup.toFixed(1)}%
-              </div>
-              <span className="text-[10px] text-white/40 block">
-                Margem sobre venda: {globalTotals.avgMargin.toFixed(1)}%
-              </span>
-            </div>
-          </div>
-
-          {/* 2. COMPARADOR LADO A LADO: RECOMPRA ATUAL VS RECOMPRA PASSADA */}
+        {/* ━━━ CORPO PRINCIPAL BEM ESPAÇADO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto custom-scrollbar px-6 sm:px-10 py-7 sm:py-8 space-y-9"
+        >
+          {/* 1. PAINEL SUPERIOR: RECOMPRA SELECIONADA VS RECOMPRA ANTERIOR */}
           {enrichedList.length > 0 && currentRep && (
-            <div className="bg-[#121216] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/10 pb-4">
-                <div>
-                  <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
-                    <Sparkles className="size-4 text-emerald-400" />
-                    <span>Comparativo Direto: Recompra Atual vs Recompra Passada</span>
-                  </h3>
-                  <p className="text-xs text-white/50 mt-0.5">
-                    Compare quanto foi investido, quantas unidades entraram, a nossa taxa em cima e o crescimento de lucro entre uma recompra e outra.
+            <div className="space-y-6">
+              {/* Barra de Seleção das Recompras */}
+              <div className="bg-[#101014] border border-white/10 rounded-2xl p-5 sm:p-6 flex flex-col xl:flex-row xl:items-center justify-between gap-5">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
+                      Recompra #{currentOrderNum} • {formatDateBR(currentRep.purchase_date)}
+                    </span>
+                    {previousRep && (
+                      <>
+                        <span className="text-xs font-bold text-white/30">vs</span>
+                        <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/70 text-xs font-semibold">
+                          Anterior #{previousOrderNum} • {formatDateBR(previousRep.purchase_date)}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-white/45 pt-0.5">
+                    Selecione abaixo na lista ou troque nos seletores ao lado para comparar qualquer recompra
                   </p>
                 </div>
 
-                {/* Seletores das 2 Recompras */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 shrink-0">
+                {/* Seletores Dropdown Amplos */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 xl:min-w-[540px]">
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block mb-1">
-                      Recompra Selecionada (Base):
+                    <label className="text-[11px] font-semibold text-white/50 block mb-1.5">
+                      Recompra em Análise
                     </label>
                     <select
                       value={selectedCurrentId}
                       onChange={(e) => handleSelectCurrent(e.target.value)}
-                      className="w-full bg-black/80 border border-emerald-500/40 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-400"
+                      className="w-full bg-[#09090b] border border-emerald-500/40 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-emerald-400 cursor-pointer"
                     >
                       {enrichedList.map((r, idx) => (
                         <option key={r.id} value={r.id}>
@@ -290,13 +223,13 @@ export function RepurchaseComparisonModal({
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-purple-300 block mb-1">
-                      Comparar com Recompra Passada:
+                    <label className="text-[11px] font-semibold text-white/50 block mb-1.5">
+                      Comparar com Anterior
                     </label>
                     <select
                       value={selectedPreviousId}
                       onChange={(e) => setSelectedPreviousId(e.target.value)}
-                      className="w-full bg-black/80 border border-white/20 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-purple-400"
+                      className="w-full bg-[#09090b] border border-white/15 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-white/90 focus:outline-none focus:border-white/40 cursor-pointer"
                     >
                       <option value="">Sem comparação</option>
                       {enrichedList
@@ -314,302 +247,230 @@ export function RepurchaseComparisonModal({
                 </div>
               </div>
 
-              {/* 4 Cards Comparativos da Remessa */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Card A: Custo Desembolsado */}
-                <div className="bg-black/50 border border-white/10 rounded-2xl p-4 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">
-                      1. Valor Gasto na Compra
-                    </span>
-                    <span className="text-[10px] font-mono text-white/40">
-                      {formatDateBR(currentRep.purchase_date)}
-                    </span>
-                  </div>
-
-                  <div>
-                    <div className="text-xl font-black text-white font-mono">
-                      {formatBRL(currentRep.total_repurchase_amount)}
-                    </div>
-                    <p className="text-[11px] text-white/50 mt-0.5">
-                      Produtos: {formatBRL(currentRep.stock_purchase_amount)}
-                      {currentRep.freight_amount > 0 ? ` + Frete: ${formatBRL(currentRep.freight_amount)}` : ""}
-                    </p>
-                  </div>
-
-                  {previousRep && directComparison && (
-                    <div className="pt-2 border-t border-white/10 space-y-1 text-[11px]">
-                      <div className="flex items-center justify-between text-white/50">
-                        <span>Recompra passada ({formatDateBR(previousRep.purchase_date)}):</span>
-                        <span className="font-mono font-bold text-white/80">
-                          {formatBRL(previousRep.total_repurchase_amount)}
-                        </span>
-                      </div>
-                      <div
-                        className={`font-bold flex items-center gap-1 ${
-                          directComparison.costDiff >= 0 ? "text-amber-300" : "text-emerald-400"
-                        }`}
-                      >
-                        {directComparison.costDiff >= 0 ? (
-                          <TrendingUp className="size-3.5" />
-                        ) : (
-                          <TrendingDown className="size-3.5" />
-                        )}
-                        <span>
-                          {directComparison.costDiff >= 0 ? "+" : ""}
-                          {formatBRL(directComparison.costDiff)} ({directComparison.costPct >= 0 ? "+" : ""}
-                          {directComparison.costPct.toFixed(1)}%)
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Card B: Volume de Mercadorias & Custo Médio Unitário */}
-                <div className="bg-black/50 border border-white/10 rounded-2xl p-4 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">
-                      2. Mercadorias & Custo Médio
-                    </span>
-                    <Boxes className="size-3.5 text-white/40" />
-                  </div>
-
-                  <div>
-                    <div className="text-xl font-black text-white font-mono">
-                      {currentRep.units} un
-                    </div>
-                    <p className="text-[11px] text-white/50 mt-0.5">
-                      Custo médio:{" "}
-                      <strong className="text-white">{formatBRL(currentRep.avgUnitCost)}/un</strong>
-                    </p>
-                  </div>
-
-                  {previousRep && directComparison && (
-                    <div className="pt-2 border-t border-white/10 space-y-1 text-[11px]">
-                      <div className="flex items-center justify-between text-white/50">
-                        <span>Passada ({previousRep.units} un):</span>
-                        <span className="font-mono font-bold text-white/80">
-                          {formatBRL(previousRep.avgUnitCost)}/un
-                        </span>
-                      </div>
-                      <div
-                        className={`font-bold flex items-center gap-1 ${
-                          directComparison.unitsDiff >= 0 ? "text-emerald-400" : "text-amber-300"
-                        }`}
-                      >
-                        <span>
-                          Volume: {directComparison.unitsDiff >= 0 ? "+" : ""}
-                          {directComparison.unitsDiff} un ({directComparison.unitsPct >= 0 ? "+" : ""}
-                          {directComparison.unitsPct.toFixed(1)}%)
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Card C: Faturamento Esperado da Remessa */}
-                <div className="bg-black/50 border border-white/10 rounded-2xl p-4 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-300">
-                      3. Faturamento desta Compra
-                    </span>
-                    {currentRep.isEstimated && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-white/60">
-                        Estimado
+              {/* 4 Cards Principais Bem Espaçados (Estilo do Sistema) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
+                {/* CARD 1: VALOR INVESTIDO & UNIDADES */}
+                <div className="bg-[#101014] border border-white/10 rounded-2xl p-6 flex flex-col justify-between min-h-[175px]">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-white/50">
+                        Valor Investido
                       </span>
+                      <div className="size-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/50">
+                        <DollarSign className="size-4" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                        {formatBRL(currentRep.total_repurchase_amount)}
+                      </div>
+                      <p className="text-xs text-white/50 mt-1.5">
+                        <strong className="text-white/80">{currentRep.units} unidades</strong> compradas
+                        {currentRep.freight_amount > 0 ? ` • Frete: ${formatBRL(currentRep.freight_amount)}` : ""}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 mt-4 border-t border-white/10 flex items-center justify-between text-xs">
+                    {previousRep && directComparison ? (
+                      <>
+                        <span className="text-white/45">
+                          Anterior: <strong className="text-white/75">{formatBRL(previousRep.total_repurchase_amount)}</strong>
+                        </span>
+                        <span
+                          className={`font-bold ${
+                            directComparison.costDiff >= 0 ? "text-white/80" : "text-emerald-400"
+                          }`}
+                        >
+                          {directComparison.costDiff >= 0 ? "+" : ""}
+                          {formatBRL(directComparison.costDiff)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-white/35">Custo médio: {formatBRL(currentRep.avgUnitCost)}/un</span>
                     )}
                   </div>
-
-                  <div>
-                    <div className="text-xl font-black text-blue-300 font-mono">
-                      {formatBRL(currentRep.projectedRevenue)}
-                    </div>
-                    <p className="text-[11px] text-white/50 mt-0.5">
-                      Venda média:{" "}
-                      <strong className="text-white">{formatBRL(currentRep.avgUnitSell)}/un</strong>
-                    </p>
-                  </div>
-
-                  {previousRep && directComparison && (
-                    <div className="pt-2 border-t border-white/10 space-y-1 text-[11px]">
-                      <div className="flex items-center justify-between text-white/50">
-                        <span>Faturamento passada:</span>
-                        <span className="font-mono font-bold text-white/80">
-                          {formatBRL(previousRep.projectedRevenue)}
-                        </span>
-                      </div>
-                      <div
-                        className={`font-bold flex items-center gap-1 ${
-                          directComparison.revDiff >= 0 ? "text-emerald-400" : "text-red-400"
-                        }`}
-                      >
-                        {directComparison.revDiff >= 0 ? (
-                          <TrendingUp className="size-3.5" />
-                        ) : (
-                          <TrendingDown className="size-3.5" />
-                        )}
-                        <span>
-                          {directComparison.revDiff >= 0 ? "+" : ""}
-                          {formatBRL(directComparison.revDiff)} ({directComparison.revPct >= 0 ? "+" : ""}
-                          {directComparison.revPct.toFixed(1)}%)
-                        </span>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                {/* Card D: LUCRO E TAXA EM CIMA DESTA MERCADORIA */}
-                <div className="bg-gradient-to-b from-emerald-500/15 to-black/60 border-2 border-emerald-500/40 rounded-2xl p-4 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">
-                      4. Lucro & Taxa desta Compra
-                    </span>
-                    <span className="text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      +{currentRep.markupPct.toFixed(1)}% ROI
-                    </span>
-                  </div>
-
-                  <div>
-                    <div className="text-xl font-black text-emerald-300 font-mono">
-                      +{formatBRL(currentRep.projectedProfit)}
-                    </div>
-                    <p className="text-[11px] text-emerald-400/80 font-medium mt-0.5">
-                      Lucro por pod: +{formatBRL(currentRep.avgUnitProfit)} • Margem: {currentRep.marginPct.toFixed(1)}%
-                    </p>
-                  </div>
-
-                  {previousRep && directComparison && (
-                    <div className="pt-2 border-t border-emerald-500/20 space-y-1 text-[11px]">
-                      <div className="flex items-center justify-between text-white/60">
-                        <span>Lucro passada (+{previousRep.markupPct.toFixed(0)}%):</span>
-                        <span className="font-mono font-bold text-white">
-                          +{formatBRL(previousRep.projectedProfit)}
-                        </span>
-                      </div>
-                      <div
-                        className={`font-extrabold flex items-center gap-1 ${
-                          directComparison.profitDiff >= 0 ? "text-emerald-300" : "text-red-400"
-                        }`}
-                      >
-                        {directComparison.profitDiff >= 0 ? (
-                          <TrendingUp className="size-3.5" />
-                        ) : (
-                          <TrendingDown className="size-3.5" />
-                        )}
-                        <span>
-                          Crescimento: {directComparison.profitDiff >= 0 ? "+" : ""}
-                          {formatBRL(directComparison.profitDiff)} ({directComparison.profitPct >= 0 ? "+" : ""}
-                          {directComparison.profitPct.toFixed(1)}%)
-                        </span>
+                {/* CARD 2: RETORNO EM VENDAS */}
+                <div className="bg-[#101014] border border-white/10 rounded-2xl p-6 flex flex-col justify-between min-h-[175px]">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-white/50">
+                        Venda Projetada
+                      </span>
+                      <div className="size-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/50">
+                        <BarChart3 className="size-4" />
                       </div>
                     </div>
-                  )}
+
+                    <div>
+                      <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                        {formatBRL(currentRep.projectedRevenue)}
+                      </div>
+                      <p className="text-xs text-white/50 mt-1.5">
+                        Média de venda: <strong className="text-white/80">{formatBRL(currentRep.avgUnitSell)}/un</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 mt-4 border-t border-white/10 flex items-center justify-between text-xs">
+                    {previousRep && directComparison ? (
+                      <>
+                        <span className="text-white/45">
+                          Anterior: <strong className="text-white/75">{formatBRL(previousRep.projectedRevenue)}</strong>
+                        </span>
+                        <span
+                          className={`font-bold ${
+                            directComparison.revDiff >= 0 ? "text-emerald-400" : "text-amber-400"
+                          }`}
+                        >
+                          {directComparison.revDiff >= 0 ? "+" : ""}
+                          {formatBRL(directComparison.revDiff)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-white/35">Retorno bruto total da compra</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* CARD 3: LUCRO DESTA COMPRA (DESTAQUE ESMERALDA) */}
+                <div className="bg-emerald-500/[0.07] border border-emerald-500/35 rounded-2xl p-6 flex flex-col justify-between min-h-[175px]">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                        Lucro da Compra
+                      </span>
+                      <div className="size-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                        <TrendingUp className="size-4" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight">
+                        +{formatBRL(currentRep.projectedProfit)}
+                      </div>
+                      <p className="text-xs text-emerald-400/75 mt-1.5 font-medium">
+                        +{formatBRL(currentRep.avgUnitProfit)} de lucro por unidade
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 mt-4 border-t border-emerald-500/20 flex items-center justify-between text-xs">
+                    {previousRep && directComparison ? (
+                      <>
+                        <span className="text-white/55">
+                          Anterior: <strong className="text-white/85">+{formatBRL(previousRep.projectedProfit)}</strong>
+                        </span>
+                        <span
+                          className={`font-extrabold flex items-center gap-1 ${
+                            directComparison.profitDiff >= 0 ? "text-emerald-400" : "text-amber-400"
+                          }`}
+                        >
+                          {directComparison.profitDiff >= 0 ? (
+                            <TrendingUp className="size-3.5" />
+                          ) : (
+                            <TrendingDown className="size-3.5" />
+                          )}
+                          {directComparison.profitPct >= 0 ? "+" : ""}
+                          {directComparison.profitPct.toFixed(1)}%
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-emerald-400/70">Margem sobre venda: {currentRep.marginPct.toFixed(1)}%</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* CARD 4: NOSSO ROI EM CIMA DA COMPRA */}
+                <div className="bg-[#101014] border border-white/10 rounded-2xl p-6 flex flex-col justify-between min-h-[175px]">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-white/50">
+                        Nosso ROI (Taxa)
+                      </span>
+                      <div className="size-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-emerald-400">
+                        <Percent className="size-4" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                        +{currentRep.markupPct.toFixed(1)}%
+                      </div>
+                      <p className="text-xs text-white/50 mt-1.5">
+                        Retorno em cima do valor investido
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 mt-4 border-t border-white/10 flex items-center justify-between text-xs">
+                    {previousRep && directComparison ? (
+                      <>
+                        <span className="text-white/45">
+                          Anterior: <strong className="text-white/75">+{previousRep.markupPct.toFixed(1)}%</strong>
+                        </span>
+                        <span
+                          className={`font-bold ${
+                            directComparison.markupDiff >= 0 ? "text-emerald-400" : "text-amber-400"
+                          }`}
+                        >
+                          {directComparison.markupDiff >= 0 ? "+" : ""}
+                          {directComparison.markupDiff.toFixed(1)}%
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-white/35">Margem líquida: {currentRep.marginPct.toFixed(1)}%</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Balão Resumo de Diagnóstico da Recompra */}
-              {previousRep && directComparison && (
-                <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-start gap-3 text-xs text-white/80 leading-relaxed">
-                  <CheckCircle2 className="size-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-white">Resumo da Comparação:</strong> Na recompra de{" "}
-                    <strong className="text-emerald-300">{formatDateBR(currentRep.purchase_date)}</strong>, foram investidos{" "}
-                    <strong className="text-white">{formatBRL(currentRep.total_repurchase_amount)}</strong> para{" "}
-                    <strong className="text-white">{currentRep.units} unidades</strong>, projetando um lucro líquido de{" "}
-                    <strong className="text-emerald-400">+{formatBRL(currentRep.projectedProfit)}</strong> (nossa taxa em cima do custo é de{" "}
-                    <strong className="text-amber-300">+{currentRep.markupPct.toFixed(1)}%</strong>). Em comparação com a recompra de{" "}
-                    <strong className="text-purple-300">{formatDateBR(previousRep.purchase_date)}</strong>, o lucro desta remessa{" "}
-                    {directComparison.profitDiff >= 0 ? (
-                      <span className="text-emerald-400 font-bold">
-                        cresceu +{formatBRL(directComparison.profitDiff)} (+{directComparison.profitPct.toFixed(1)}%)
-                      </span>
-                    ) : (
-                      <span className="text-amber-300 font-bold">
-                        variou {formatBRL(directComparison.profitDiff)} ({directComparison.profitPct.toFixed(1)}%)
-                      </span>
-                    )}
-                    {directComparison.unitCostDiff !== 0 && (
-                      <span>
-                        {" "}
-                        e o custo médio por unidade ficou{" "}
-                        <strong>
-                          {directComparison.unitCostDiff > 0
-                            ? `+${formatBRL(directComparison.unitCostDiff)} mais caro`
-                            : `-${formatBRL(Math.abs(directComparison.unitCostDiff))} mais barato`}
-                        </strong>
-                        .
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Lista de Mercadorias Detalhadas Desta Recompra (quando disponível via Registrar Estoque) */}
+              {/* Produtos Registrados Nesta Compra (quando cadastrada pelo Registrar Estoque) */}
               {currentRep.items && currentRep.items.length > 0 && (
-                <div className="space-y-2.5 pt-2 border-t border-white/10">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-white/70 flex items-center gap-1.5">
-                    <Layers className="size-3.5 text-emerald-400" />
-                    <span>
-                      Mercadorias Registradas nesta Compra ({currentRep.items.length}{" "}
-                      {currentRep.items.length === 1 ? "item" : "itens"})
-                    </span>
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                <div className="bg-[#101014] border border-white/10 rounded-2xl p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-white/60 flex items-center gap-2">
+                      <Layers className="size-4 text-emerald-400" />
+                      <span>Produtos Comprados Neste Lote ({currentRep.items.length})</span>
+                    </h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {currentRep.items.map((item, idx) => {
-                      const itemCostTotal = item.qty * item.unitCost;
                       const itemProfitTotal = item.qty * (item.unitSell - item.unitCost);
                       const itemMarkup =
                         item.unitCost > 0 ? ((item.unitSell - item.unitCost) / item.unitCost) * 100 : 0;
-                      const prevDiff =
-                        item.previousCost !== null && item.previousCost !== undefined
-                          ? item.unitCost - item.previousCost
-                          : null;
 
                       return (
                         <div
                           key={`${item.brand}-${item.model}-${item.flavor}-${idx}`}
-                          className="p-3 rounded-xl bg-black/60 border border-white/10 flex flex-col justify-between gap-2 text-xs"
+                          className="p-4 rounded-xl bg-[#09090b] border border-white/10 flex flex-col justify-between gap-3"
                         >
-                          <div>
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-bold text-white truncate">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <span className="font-bold text-sm text-white block truncate">
                                 {item.brand} {item.model}
                               </span>
-                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold text-[10px] shrink-0">
-                                {item.qty} un
+                              <span className="text-xs text-white/50 block mt-0.5 truncate">
+                                {item.flavor}
                               </span>
                             </div>
-                            <span className="text-[11px] text-white/60 block mt-0.5 truncate">
-                              Sabor: <strong className="text-white/90">{item.flavor}</strong>
+                            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 font-bold text-xs shrink-0">
+                              {item.qty} un
                             </span>
                           </div>
 
-                          <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px]">
-                            <div>
-                              <span className="text-white/50 block">
-                                Custo: <strong className="text-white">{formatBRL(item.unitCost)}</strong>
-                                {prevDiff !== null && prevDiff !== 0 && (
-                                  <span
-                                    className={`ml-1 font-bold ${
-                                      prevDiff > 0 ? "text-amber-400" : "text-emerald-400"
-                                    }`}
-                                  >
-                                    ({prevDiff > 0 ? `+${formatBRL(prevDiff)}` : formatBRL(prevDiff)})
-                                  </span>
-                                )}
-                              </span>
-                              <span className="text-white/50 block">
-                                Venda: <strong className="text-white">{formatBRL(item.unitSell)}</strong>
-                              </span>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-emerald-400 font-mono font-bold block">
-                                Lucro: +{formatBRL(itemProfitTotal)}
-                              </span>
-                              <span className="text-[10px] text-amber-300 font-mono">
-                                Taxa: +{itemMarkup.toFixed(0)}% ({formatBRL(itemCostTotal)} pago)
-                              </span>
-                            </div>
+                          <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
+                            <span className="text-white/50">
+                              Custo: <strong className="text-white/90">{formatBRL(item.unitCost)}</strong> • Venda:{" "}
+                              <strong className="text-white/90">{formatBRL(item.unitSell)}</strong>
+                            </span>
+                            <span className="text-emerald-400 font-bold">
+                              +{formatBRL(itemProfitTotal)} (+{itemMarkup.toFixed(0)}%)
+                            </span>
                           </div>
                         </div>
                       );
@@ -620,31 +481,34 @@ export function RepurchaseComparisonModal({
             </div>
           )}
 
-          {/* 3. TABELA DE HISTÓRICO & EVOLUÇÃO RECOMPRA A RECOMPRA */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs sm:text-sm font-bold text-white/90 uppercase tracking-wider flex items-center gap-2">
+          {/* 2. EVOLUÇÃO DE RECOMPRAS (TABELA LIMPA E BEM ESPAÇADA) */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+              <div className="flex items-center gap-2.5">
                 <Calendar className="size-4 text-emerald-400" />
-                <span>Evolução Histórica Recompra a Recompra</span>
-              </h3>
-              <span className="text-[11px] text-white/40">
-                Clique em qualquer linha para selecioná-la no comparador acima
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                  Evolução de Recompras
+                </h3>
+                <span className="text-xs bg-white/10 text-white/70 px-2.5 py-0.5 rounded-full font-bold">
+                  {enrichedList.length}
+                </span>
+              </div>
+              <span className="text-xs text-white/40">
+                Clique em qualquer recompra para carregar a comparação completa acima
               </span>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#121216]">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#101014]">
+              <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 bg-white/5 text-white/60 font-bold uppercase text-[10px] tracking-wider">
-                    <th className="py-3 px-3.5">#</th>
-                    <th className="py-3 px-3.5">Data</th>
-                    <th className="py-3 px-3.5 text-center">Unidades</th>
-                    <th className="py-3 px-3.5 text-right">Custo Pago (+Frete)</th>
-                    <th className="py-3 px-3.5 text-right">Venda Projetada</th>
-                    <th className="py-3 px-3.5 text-right">Lucro da Compra</th>
-                    <th className="py-3 px-3.5 text-center">Nossa Taxa (ROI)</th>
-                    <th className="py-3 px-3.5 text-right">Crescimento vs Anterior</th>
-                    <th className="py-3 px-3.5">Observação / Lote</th>
+                  <tr className="border-b border-white/10 bg-white/[0.03] text-white/50 font-bold uppercase text-[11px] tracking-wider">
+                    <th className="py-4 px-6">Dia da Compra</th>
+                    <th className="py-4 px-6 text-center">Unidades</th>
+                    <th className="py-4 px-6 text-right">Valor Investido</th>
+                    <th className="py-4 px-6 text-right">Venda Projetada</th>
+                    <th className="py-4 px-6 text-right">Lucro da Compra</th>
+                    <th className="py-4 px-6 text-center">Nosso ROI</th>
+                    <th className="py-4 px-6 text-right">Crescimento vs Anterior</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 font-medium">
@@ -656,54 +520,59 @@ export function RepurchaseComparisonModal({
                     return (
                       <tr
                         key={rep.id}
-                        onClick={() => handleSelectCurrent(rep.id)}
+                        onClick={() => handleSelectCurrent(rep.id, true)}
                         className={`transition-colors cursor-pointer ${
                           isSelected
-                            ? "bg-emerald-500/15 hover:bg-emerald-500/20"
+                            ? "bg-emerald-500/10 hover:bg-emerald-500/15"
                             : isCompared
-                            ? "bg-purple-500/10 hover:bg-purple-500/15"
-                            : "hover:bg-white/5"
+                            ? "bg-white/[0.04] hover:bg-white/[0.07]"
+                            : "hover:bg-white/[0.03]"
                         }`}
                       >
-                        <td className="py-3 px-3.5 font-mono font-bold text-white/60">
-                          #{orderNum}
-                        </td>
-                        <td className="py-3 px-3.5 font-mono font-bold text-white whitespace-nowrap">
-                          {formatDateBR(rep.purchase_date)}
-                          {isSelected && (
-                            <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded bg-emerald-500 text-black font-extrabold uppercase">
-                              Selecionada
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs font-mono font-bold text-white/40 w-7">
+                              #{orderNum}
                             </span>
-                          )}
-                          {isCompared && (
-                            <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded bg-purple-400 text-black font-extrabold uppercase">
-                              Comparada
+                            <span className="font-bold text-white">
+                              {formatDateBR(rep.purchase_date)}
                             </span>
-                          )}
+                            {isSelected && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold">
+                                Selecionada
+                              </span>
+                            )}
+                            {isCompared && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/10 border border-white/20 text-white/70 font-semibold">
+                                Anterior
+                              </span>
+                            )}
+                          </div>
                         </td>
-                        <td className="py-3 px-3.5 text-center font-mono font-bold text-white/90">
+
+                        <td className="py-4 px-6 text-center font-bold text-white/80 whitespace-nowrap">
                           {rep.units} un
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono font-bold text-white">
+
+                        <td className="py-4 px-6 text-right font-bold text-white whitespace-nowrap">
                           {formatBRL(rep.total_repurchase_amount)}
-                          {rep.freight_amount > 0 && (
-                            <span className="block text-[10px] text-white/40 font-normal">
-                              (Frete: {formatBRL(rep.freight_amount)})
-                            </span>
-                          )}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono text-blue-300 font-bold">
+
+                        <td className="py-4 px-6 text-right font-semibold text-white/80 whitespace-nowrap">
                           {formatBRL(rep.projectedRevenue)}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono font-extrabold text-emerald-400">
+
+                        <td className="py-4 px-6 text-right font-extrabold text-emerald-400 whitespace-nowrap">
                           +{formatBRL(rep.projectedProfit)}
                         </td>
-                        <td className="py-3 px-3.5 text-center">
-                          <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-mono font-bold text-[11px]">
+
+                        <td className="py-4 px-6 text-center whitespace-nowrap">
+                          <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 font-bold text-xs">
                             +{rep.markupPct.toFixed(1)}%
                           </span>
                         </td>
-                        <td className="py-3 px-3.5 text-right font-mono font-bold whitespace-nowrap">
+
+                        <td className="py-4 px-6 text-right font-bold whitespace-nowrap">
                           {rep.profitGrowthPct != null && rep.profitGrowthDiff != null ? (
                             <span
                               className={
@@ -711,15 +580,15 @@ export function RepurchaseComparisonModal({
                               }
                             >
                               {rep.profitGrowthDiff >= 0 ? "▲ +" : "▼ "}
-                              {rep.profitGrowthPct.toFixed(1)}% ({rep.profitGrowthDiff >= 0 ? "+" : ""}
-                              {formatBRL(rep.profitGrowthDiff)})
+                              {rep.profitGrowthPct.toFixed(1)}%{" "}
+                              <span className="text-xs font-normal opacity-75">
+                                ({rep.profitGrowthDiff >= 0 ? "+" : ""}
+                                {formatBRL(rep.profitGrowthDiff)})
+                              </span>
                             </span>
                           ) : (
-                            <span className="text-white/30 text-[10px]">1ª Recompra</span>
+                            <span className="text-white/30 text-xs">1ª Recompra</span>
                           )}
-                        </td>
-                        <td className="py-3 px-3.5 text-white/60 max-w-[200px] truncate">
-                          {rep.notes || <span className="text-white/20 italic">Sem observações</span>}
                         </td>
                       </tr>
                     );
@@ -728,20 +597,6 @@ export function RepurchaseComparisonModal({
               </table>
             </div>
           </div>
-        </div>
-
-        {/* ━━━ RODAPÉ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <div className="px-5 sm:px-7 py-3.5 border-t border-white/10 flex items-center justify-between bg-white/[0.02]">
-          <span className="text-[11px] text-white/40">
-            💡 Todas as entradas feitas em &ldquo;Registrar Estoque&rdquo; alimentam este comparativo automaticamente.
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-colors cursor-pointer"
-          >
-            Fechar
-          </button>
         </div>
       </div>
     </div>
