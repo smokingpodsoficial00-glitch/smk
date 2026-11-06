@@ -184,8 +184,7 @@ export function MobileOrdersLogisticsView({
     orders.forEach((o) => {
       if (o.isFiado && o.fiadoStatus === "PENDENTE") {
         res.FIADOS++;
-      }
-      if (res[o.status] !== undefined) {
+      } else if (res[o.status] !== undefined) {
         res[o.status]++;
       }
     });
@@ -205,8 +204,9 @@ export function MobileOrdersLogisticsView({
       // 1. Filtro da aba
       if (activeTab === "FIADOS") {
         if (!o.isFiado) return false;
-      } else if (o.status !== activeTab) {
-        return false;
+      } else {
+        if (o.isFiado && o.fiadoStatus === "PENDENTE") return false;
+        if (o.status !== activeTab) return false;
       }
 
       // 2. Filtro de busca

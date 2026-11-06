@@ -437,8 +437,8 @@ export default function KanbanBoard() {
  { title:"Entregue", status:"ENTREGUE", color:"bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]" },
  ] as const;
 
- const activeOrders = orders.filter(o => o.status !== 'CONCLUIDO');
- const allCompletedOrders = orders.filter(o => o.status === 'CONCLUIDO');
+ const activeOrders = orders.filter(o => o.status !== 'CONCLUIDO' && !(o.isFiado && o.fiadoStatus === 'PENDENTE'));
+ const allCompletedOrders = orders.filter(o => o.status === 'CONCLUIDO' && !(o.isFiado && o.fiadoStatus === 'PENDENTE'));
  const allFiadoOrders = orders.filter(o => o.isFiado);
  const pendingFiadoOrders = allFiadoOrders.filter(o => o.fiadoStatus === 'PENDENTE');
  const paidFiadoOrders = allFiadoOrders.filter(o => o.fiadoStatus === 'PAGO');
@@ -650,7 +650,7 @@ export default function KanbanBoard() {
  <div className="flex-1 overflow-y-auto md:overflow-hidden p-3 sm:p-6 flex flex-col gap-4 min-h-0 bg-[#070707]/30 custom-scrollbar">
  <div data-tour="kanban-pedidos" className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 xl:gap-7 min-h-0">
  {columns.filter(c => c.status !== 'AGUARDANDO_PAGAMENTO').map(col => {
- const colOrders = orders.filter(o => o.status === col.status);
+ const colOrders = activeOrders.filter(o => o.status === col.status);
  return (
  <div key={col.title} className="flex flex-col md:h-full md:max-h-full min-w-0 md:min-h-0 md:overflow-hidden bg-[#0a0a0a]/60 border border-white/5 rounded-2xl p-4">
  <div className="flex items-center justify-between px-1 shrink-0 pb-3 border-b border-white/5">
