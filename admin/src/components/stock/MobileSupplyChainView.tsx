@@ -673,8 +673,17 @@ export function MobileSupplyChainView({
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       {currentFlavorsGroup && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/80 backdrop-blur-sm animate-fadeIn">
-          {/* Backdrop click to close */}
-          <div className="flex-1" onClick={() => setFlavorsSheetGroup(null)} />
+          {/* Backdrop click to close (auto-saves pending stock changes) */}
+          <div
+            className="flex-1"
+            onClick={async () => {
+              if (pendingCount > 0) {
+                const ok = await onSaveAllStockChanges();
+                if (!ok) return;
+              }
+              setFlavorsSheetGroup(null);
+            }}
+          />
 
           <div className="bg-[#141414] border-t border-white/15 rounded-t-3xl max-h-[85vh] flex flex-col overflow-hidden animate-slideUp shadow-2xl">
             {/* Grab Handle */}
@@ -709,8 +718,15 @@ export function MobileSupplyChainView({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFlavorsSheetGroup(null)}
-                  className="size-8 rounded-full bg-white/10 hover:bg-white/15 text-white flex items-center justify-center cursor-pointer"
+                  disabled={isSavingStock}
+                  onClick={async () => {
+                    if (pendingCount > 0) {
+                      const ok = await onSaveAllStockChanges();
+                      if (!ok) return;
+                    }
+                    setFlavorsSheetGroup(null);
+                  }}
+                  className="size-8 rounded-full bg-white/10 hover:bg-white/15 text-white flex items-center justify-center cursor-pointer disabled:opacity-50"
                 >
                   <X className="size-4" />
                 </button>
@@ -810,24 +826,41 @@ export function MobileSupplyChainView({
 
             {/* Rodapé da Gaveta com Botão de Fechar e Salvar */}
             <div className="p-4 border-t border-white/10 bg-[#161616] flex items-center justify-between gap-3 shrink-0 pb-safe">
-              <button
-                type="button"
-                onClick={() => setFlavorsSheetGroup(null)}
-                className="flex-1 h-11 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-sm flex items-center justify-center cursor-pointer"
-              >
-                Concluir
-              </button>
-              {pendingCount > 0 && (
+              {pendingCount > 0 ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={isSavingStock}
+                    onClick={async () => {
+                      await onDiscardStockChanges();
+                      setFlavorsSheetGroup(null);
+                    }}
+                    className="h-11 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white/80 font-bold text-sm flex items-center justify-center cursor-pointer disabled:opacity-50"
+                  >
+                    Descartar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const ok = await onSaveAllStockChanges();
+                      if (ok) {
+                        setFlavorsSheetGroup(null);
+                      }
+                    }}
+                    disabled={isSavingStock}
+                    className="flex-1 h-11 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                  >
+                    {isSavingStock ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4 stroke-[3]" />}
+                    <span>Salvar e Concluir ({pendingCount})</span>
+                  </button>
+                </>
+              ) : (
                 <button
                   type="button"
-                  onClick={async () => {
-                    await onSaveAllStockChanges();
-                  }}
-                  disabled={isSavingStock}
-                  className="flex-1 h-11 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20"
+                  onClick={() => setFlavorsSheetGroup(null)}
+                  className="flex-1 h-11 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-sm flex items-center justify-center cursor-pointer"
                 >
-                  {isSavingStock ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4 stroke-[3]" />}
-                  <span>Salvar Alterações</span>
+                  Concluir
                 </button>
               )}
             </div>

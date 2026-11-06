@@ -11,7 +11,8 @@ import { formatBRL } from "@/lib/cart";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchCategories, fetchProductCategoryMappings, updateModelCategories, broadcastLiveCatalogSync, DEFAULT_CATEGORIES, type Category } from "../lib/categories";
 import { fetchProductCostsMap, updateProductCost } from "../lib/productCosts";
-import { ManualSaleModal } from "./ManualSaleModal";
+import { ManualSaleModal, invalidateSaleCatalogCache } from "./ManualSaleModal";
+import { invalidateFinanceCache } from "./FinanceDashboard";
 import { ReplenishmentPlannerModal, loadSavedGoals, type FinancialGoals } from "./ReplenishmentPlannerModal";
 import { StagnantStockSection } from "./StagnantStockSection";
 import { MobileSupplyChainView } from "./stock/MobileSupplyChainView";
@@ -273,6 +274,7 @@ export default function SupplyChainDashboard() {
   // Estado para Alterações Pendentes de Estoque (Botão Salvar no Canto Inferior Direito)
   const [pendingStockChanges, setPendingStockChanges] = useState<Record<string, number>>({});
   const pendingStockChangesRef = useRef<Record<string, number>>({});
+  const originalDbStockRef = useRef<Record<string, number>>({});
   const [isSavingStock, setIsSavingStock] = useState(false);
 
   useEffect(() => {
@@ -703,6 +705,8 @@ export default function SupplyChainDashboard() {
             costVal = costsMap[cleanKey];
           }
 
+          const dbStockVal = typeof p.stock === "number" ? p.stock : parseInt(p.stock) || 0;
+          originalDbStockRef.current[p.id] = dbStockVal;
           const stagedStock = pendingStockChangesRef.current[p.id];
           const cachedImg = modelImagesMap[groupKey] || productImageCacheRef.current[groupKey] || productImageCacheRef.current[p.id] || "";
           const finalImageUrl = p.image_url || cachedImg;
@@ -711,7 +715,7 @@ export default function SupplyChainDashboard() {
             ...p,
             image_url: finalImageUrl,
             cost_price: costVal,
-            stock: stagedStock !== undefined ? stagedStock : p.stock
+            stock: stagedStock !== undefined ? stagedStock : dbStockVal
           };
         });
         setProducts(mergedProducts);
@@ -1112,7 +1116,13 @@ export default function SupplyChainDashboard() {
 
   const handleUpdateStock = (id: string, newStock: number) => {
     if (newStock < 0) return;
-    const updated = { ...pendingStockChangesRef.current, [id]: newStock };
+    const origStock = originalDbStockRef.current[id];
+    const updated = { ...pendingStockChangesRef.current };
+    if (origStock !== undefined && origStock === newStock) {
+      delete updated[id];
+    } else {
+      updated[id] = newStock;
+    }
     pendingStockChangesRef.current = updated;
     setPendingStockChanges(updated);
     setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: newStock } : p));
@@ -1127,21 +1137,25 @@ export default function SupplyChainDashboard() {
     setIsSavingStock(true);
     try {
       for (const [id, stock] of entries) {
-        const existingProd = products.find((p: any) => p.id === id);
-        const prevStock = existingProd ? (parseInt(existingProd.stock) || 0) : 0;
-        const updatePayload: any = stock > prevStock ? { stock, created_at: new Date().toISOString() } : { stock };
+        const prevDbStock = originalDbStockRef.current[id] !== undefined
+          ? originalDbStockRef.current[id]
+          : (parseInt(products.find((p: any) => p.id === id)?.stock) || 0);
+        const updatePayload: any = stock > prevDbStock ? { stock, created_at: new Date().toISOString() } : { stock };
         let query = supabase.from("smoking_products").update(updatePayload).eq("id", id);
         if (company?.id) query = query.eq("company_id", company.id);
         const { data, error } = await query.select();
         if (error || !data || data.length === 0) {
-          const fallbackRes = await supabase.from("smoking_products").update(updatePayload).eq("id", id);
+          const fallbackRes = await supabase.from("smoking_products").update(updatePayload).eq("id", id).select();
           if (fallbackRes.error) {
             throw fallbackRes.error;
           }
         }
+        originalDbStockRef.current[id] = stock;
       }
       pendingStockChangesRef.current = {};
       setPendingStockChanges({});
+      invalidateSaleCatalogCache(targetCompanyId);
+      invalidateFinanceCache();
       broadcastLiveCatalogSync({ type: "STOCK_UPDATED", company_id: targetCompanyId });
       await fetchData();
       return true;
@@ -3047,9 +3061,17 @@ export default function SupplyChainDashboard() {
         const realFlavors = currentGroup.realFlavors || [];
         const hasModalPendingChanges = realFlavors.some((f: any) => pendingStockChanges[f.id] !== undefined);
 
-        const handleCloseViewingFlavors = () => {
+        const handleDiscardAndCloseViewingFlavors = () => {
           if (hasModalPendingChanges) {
             handleDiscardStockChanges();
+          }
+          setViewingFlavorsGroup(null);
+        };
+
+        const handleCloseViewingFlavors = async () => {
+          if (hasModalPendingChanges) {
+            const ok = await handleSaveAllStockChanges();
+            if (!ok) return;
           }
           setViewingFlavorsGroup(null);
         };
@@ -3210,7 +3232,7 @@ export default function SupplyChainDashboard() {
                     <button
                       type="button"
                       disabled={isSavingStock}
-                      onClick={handleCloseViewingFlavors}
+                      onClick={handleDiscardAndCloseViewingFlavors}
                       className="px-3.5 py-2.5 rounded-xl bg-elevated hover:bg-white/10 text-muted-foreground hover:text-white text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
                     >
                       Descartar

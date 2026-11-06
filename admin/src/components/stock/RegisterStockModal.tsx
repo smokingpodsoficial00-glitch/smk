@@ -1,27 +1,24 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   X,
   Plus,
-  Minus,
   Trash2,
   PackagePlus,
   CheckCircle2,
   TrendingUp,
   TrendingDown,
-  DollarSign,
   Boxes,
   Sparkles,
-  ArrowRight,
-  AlertTriangle,
   Loader2,
-  Info,
-  Check
+  Check,
+  RefreshCw
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { updateProductCost } from "@/lib/productCosts";
 import { createStockRepurchase } from "@/lib/stockRepurchases";
 import { broadcastLiveCatalogSync } from "@/lib/categories";
 import { invalidateSaleCatalogCache } from "@/components/ManualSaleModal";
+import { invalidateFinanceCache } from "@/components/FinanceDashboard";
 
 export interface StockEntryItem {
   id: string;
@@ -54,6 +51,11 @@ interface RegisterStockModalProps {
   onSuccess: () => void;
 }
 
+const getItemIdentityKey = (brand: string, model: string, flavor: string, productId?: string) => {
+  if (productId) return `id:${productId}`;
+  return `key:${brand.trim().toLowerCase()}__${model.trim().toLowerCase()}__${flavor.trim().toLowerCase()}`;
+};
+
 export function RegisterStockModal({
   isOpen,
   onClose,
@@ -71,7 +73,7 @@ export function RegisterStockModal({
   const [searchModelQuery, setSearchModelQuery] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
-  
+
   // Sabores selecionados para o modelo atual (permite múltiplos sabores simultâneos)
   const [selectedFlavors, setSelectedFlavors] = useState<SelectedFlavorItem[]>([]);
   const [bulkDefaultQty, setBulkDefaultQty] = useState<string>("1");
@@ -88,22 +90,58 @@ export function RegisterStockModal({
   const [supplierNotes, setSupplierNotes] = useState("");
   const [freightAmountInput, setFreightAmountInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUpdatingPriceOnly, setIsUpdatingPriceOnly] = useState(false);
+  const isSubmittingRef = useRef(false);
+
   const [successModalData, setSuccessModalData] = useState<{
     totalUnits: number;
     totalInvested: number;
     projectedProfit: number;
   } | null>(null);
 
+  // Resetar 100% do estado sempre que o modal abrir ou fechar para impedir que itens
+  // de uma compra anterior fiquem retidos na memória e sejam somados novamente!
+  const resetModalState = () => {
+    setItems([]);
+    setSearchModelQuery("");
+    setSelectedBrand("");
+    setSelectedModel("");
+    setSelectedFlavors([]);
+    setBulkDefaultQty("1");
+    setCustomFlavorName("");
+    setCustomFlavorQty("1");
+    setAddedBatchNotification(null);
+    setUnitCostInput("");
+    setUnitSellInput("");
+    setPreviousCost(null);
+    setIsNewProductMode(false);
+    setSupplierNotes("");
+    setFreightAmountInput("");
+    setIsSubmitting(false);
+    setIsUpdatingPriceOnly(false);
+    isSubmittingRef.current = false;
+    setSuccessModalData(null);
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      resetModalState();
+    }
+  }, [isOpen]);
+
   // Agrupamento dos produtos existentes para sugestão inteligente
   const modelCatalog = useMemo(() => {
-    const map = new Map<string, {
-      key: string;
-      brand: string;
-      model: string;
-      flavors: { id: string; flavor: string; stock: number; price: number; cost: number }[];
-      defaultPrice: number;
-      defaultCost: number;
-    }>();
+    const map = new Map<
+      string,
+      {
+        key: string;
+        brand: string;
+        model: string;
+        flavors: { id: string; flavor: string; stock: number; price: number; cost: number }[];
+        defaultPrice: number;
+        defaultCost: number;
+      }
+    >();
 
     products.forEach((p) => {
       const brand = (p.brand || "").trim();
@@ -166,7 +204,7 @@ export function RegisterStockModal({
   }, [selectedBrand, selectedModel, modelCatalog]);
 
   // Quando o operador seleciona um modelo da lista existente
-  const handleSelectModel = (modelData: typeof modelCatalog[0]) => {
+  const handleSelectModel = (modelData: (typeof modelCatalog)[0]) => {
     setSelectedBrand(modelData.brand);
     setSelectedModel(modelData.model);
     setSearchModelQuery(`${modelData.brand} ${modelData.model}`);
@@ -198,7 +236,6 @@ export function RegisterStockModal({
     const q = searchModelQuery.trim();
     if (!q) return;
 
-    // Tenta separar a primeira palavra como marca se houver espaço
     const parts = q.split(" ");
     let brand = "Outros";
     let model = q;
@@ -224,11 +261,19 @@ export function RegisterStockModal({
         return prev.filter((f) => f.flavor.toLowerCase() !== flavorName.toLowerCase());
       } else {
         const defaultQ = parseInt(bulkDefaultQty) || 1;
+        // Se este sabor já foi adicionado na lista da compra abaixo, carrega a quantidade atual dele
+        const existingInBatch = items.find(
+          (it) =>
+            (productId && it.productId === productId) ||
+            (it.brand.toLowerCase() === selectedBrand.toLowerCase() &&
+              it.model.toLowerCase() === selectedModel.toLowerCase() &&
+              it.flavor.toLowerCase() === flavorName.toLowerCase())
+        );
         return [
           ...prev,
           {
             flavor: flavorName,
-            qty: defaultQ,
+            qty: existingInBatch ? existingInBatch.qty : defaultQ,
             productId,
             currentStock
           }
@@ -323,7 +368,94 @@ export function RegisterStockModal({
   );
   const totalModelSubtotal = totalSelectedUnits * parsedUnitCost;
 
-  // Adicionar todos os sabores selecionados deste modelo à lista de mercadorias da compra
+  // Atualizar APENAS o custo e o preço de venda do modelo selecionado no catálogo, SEM adicionar estoque e SEM criar recompra
+  const handleUpdateOnlyModelPrices = async () => {
+    if (!selectedModel.trim() || isNewProductMode) return;
+    if (parsedUnitCost <= 0 || parsedUnitSell <= 0) {
+      alert("Informe um Custo Unitário e Preço de Venda válidos maiores que zero.");
+      return;
+    }
+
+    setIsUpdatingPriceOnly(true);
+    try {
+      const brandNorm = selectedBrand.trim();
+      const modelNorm = selectedModel.trim();
+      const groupKey = `${brandNorm.toLowerCase()}__${modelNorm.toLowerCase()}`;
+
+      const { data: allModelVariants, error: fetchErr } = await supabase
+        .from("smoking_products")
+        .select("id")
+        .eq("company_id", targetCompanyId)
+        .ilike("brand", brandNorm)
+        .ilike("name", modelNorm);
+
+      if (fetchErr) throw fetchErr;
+
+      const variantIds = (allModelVariants || []).map((v: any) => v.id);
+      if (variantIds.length === 0) {
+        alert("Nenhuma variante encontrada para este modelo no banco de dados.");
+        return;
+      }
+
+      const { error: updErr } = await supabase
+        .from("smoking_products")
+        .update({
+          cost_price: parsedUnitCost,
+          price: parsedUnitSell
+        })
+        .in("id", variantIds)
+        .eq("company_id", targetCompanyId);
+
+      if (updErr) throw updErr;
+
+      // Se houver itens desse mesmo modelo já na lista abaixo, sincroniza o custo/preço deles também
+      setItems((prev) =>
+        prev.map((it) =>
+          it.brand.toLowerCase() === brandNorm.toLowerCase() &&
+          it.model.toLowerCase() === modelNorm.toLowerCase()
+            ? { ...it, unitCost: parsedUnitCost, unitSell: parsedUnitSell }
+            : it
+        )
+      );
+
+      try {
+        await updateProductCost({
+          modelKey: groupKey,
+          productIds: variantIds,
+          costPrice: parsedUnitCost,
+          companyId: targetCompanyId
+        });
+      } catch (costErr) {
+        console.warn("Aviso ao sincronizar custo do modelo:", costErr);
+      }
+
+      try {
+        await broadcastLiveCatalogSync({
+          type: "STOCK_UPDATED",
+          company_id: targetCompanyId
+        });
+      } catch (e) {}
+
+      try {
+        invalidateSaleCatalogCache(targetCompanyId);
+        invalidateFinanceCache();
+      } catch (e) {}
+
+      setPreviousCost(parsedUnitCost);
+      setAddedBatchNotification(
+        `Preços de ${brandNorm} ${modelNorm} atualizados (Custo: R$ ${parsedUnitCost.toFixed(2)} | Venda: R$ ${parsedUnitSell.toFixed(2)}) sem alterar a quantidade em estoque!`
+      );
+      setTimeout(() => setAddedBatchNotification(null), 5000);
+      onSuccess();
+    } catch (err: any) {
+      console.error("Erro ao atualizar apenas preço/custo do modelo:", err);
+      alert(`Erro ao atualizar preços: ${err.message || "Tente novamente."}`);
+    } finally {
+      setIsUpdatingPriceOnly(false);
+    }
+  };
+
+  // Adicionar todos os sabores selecionados deste modelo à lista de mercadorias da compra (SEM duplicar sabores já na lista)
   const handleAddSelectedFlavorsToBatch = () => {
     if (!selectedModel.trim()) {
       alert("Por favor, selecione ou digite o modelo do produto.");
@@ -342,13 +474,16 @@ export function RegisterStockModal({
       return;
     }
 
+    const brandNorm = selectedBrand.trim() || "Outros";
+    const modelNorm = selectedModel.trim();
+
     const newItems: StockEntryItem[] = selectedFlavors.map((f) => ({
       id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       productId: f.productId,
-      brand: selectedBrand.trim() || "Outros",
-      model: selectedModel.trim(),
-      flavor: f.flavor,
-      qty: f.qty,
+      brand: brandNorm,
+      model: modelNorm,
+      flavor: f.flavor.trim(),
+      qty: Math.max(1, Number(f.qty) || 1),
       unitCost: parsedUnitCost,
       previousCost: previousCost,
       unitSell: parsedUnitSell,
@@ -356,11 +491,42 @@ export function RegisterStockModal({
       isNewProduct: isNewProductMode || !f.productId
     }));
 
-    setItems((prev) => [...newItems, ...prev]);
+    // Mescla de forma inteligente: se o mesmo sabor já estiver na lista `items`,
+    // atualiza a quantidade e preço em vez de criar uma linha duplicada!
+    // Também sincroniza o custo e preço de venda para outros sabores do mesmo modelo na lista.
+    setItems((prev) => {
+      const updatedPrev = prev.map((existing) => {
+        if (
+          existing.brand.toLowerCase() === brandNorm.toLowerCase() &&
+          existing.model.toLowerCase() === modelNorm.toLowerCase()
+        ) {
+          return {
+            ...existing,
+            unitCost: parsedUnitCost,
+            unitSell: parsedUnitSell
+          };
+        }
+        return existing;
+      });
 
-    // Exibe banner de confirmação rápido
+      const mergedMap = new Map<string, StockEntryItem>();
+      // Insere primeiro os novos/atualizados no topo
+      for (const ni of newItems) {
+        const key = getItemIdentityKey(ni.brand, ni.model, ni.flavor, ni.productId);
+        mergedMap.set(key, ni);
+      }
+      // Mantém os anteriores que não colidem com os sabores recém-adicionados
+      for (const oldItem of updatedPrev) {
+        const key = getItemIdentityKey(oldItem.brand, oldItem.model, oldItem.flavor, oldItem.productId);
+        if (!mergedMap.has(key)) {
+          mergedMap.set(key, oldItem);
+        }
+      }
+      return Array.from(mergedMap.values());
+    });
+
     setAddedBatchNotification(
-      `${newItems.length} sabor(es) (${totalSelectedUnits} un) de ${selectedBrand} ${selectedModel} adicionados!`
+      `${newItems.length} sabor(es) (${totalSelectedUnits} un) de ${brandNorm} ${modelNorm} na lista de compra!`
     );
     setTimeout(() => setAddedBatchNotification(null), 4000);
 
@@ -393,17 +559,42 @@ export function RegisterStockModal({
 
   // Concluir Entrada de Estoque no Supabase
   const handleConfirmStockEntry = async () => {
+    if (isSubmittingRef.current || isSubmitting) return;
+
     if (items.length === 0) {
       alert("Adicione pelo menos um item à compra antes de confirmar.");
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
+
     try {
       const nowIso = new Date().toISOString();
 
-      // 1. Processa cada item do lote
-      for (const item of items) {
+      // 0. Consolida itens por identidade única (brand + model + flavor / productId)
+      // garantindo que jamais o mesmo sabor seja processado 2x no mesmo lote
+      const consolidatedMap = new Map<string, StockEntryItem>();
+      for (const rawItem of items) {
+        const key = getItemIdentityKey(rawItem.brand, rawItem.model, rawItem.flavor, rawItem.productId);
+        if (!consolidatedMap.has(key)) {
+          consolidatedMap.set(key, { ...rawItem });
+        } else {
+          const prev = consolidatedMap.get(key)!;
+          prev.qty = prev.qty + rawItem.qty;
+          prev.unitCost = rawItem.unitCost;
+          prev.unitSell = rawItem.unitSell;
+        }
+      }
+      const batchItems = Array.from(consolidatedMap.values());
+      const batchTotalUnits = batchItems.reduce((acc, it) => acc + it.qty, 0);
+      const batchTotalCost = batchItems.reduce((acc, it) => acc + it.qty * it.unitCost, 0);
+      const batchTotalInvested = batchTotalCost + parsedFreight;
+      const batchTotalRevenue = batchItems.reduce((acc, it) => acc + it.qty * it.unitSell, 0);
+      const batchProjectedProfit = batchTotalRevenue - batchTotalInvested;
+
+      // 1. Processa cada item único do lote
+      for (const item of batchItems) {
         let existingId = item.productId;
 
         if (!existingId) {
@@ -422,70 +613,76 @@ export function RegisterStockModal({
         }
 
         if (existingId) {
-          // Busca o estoque atual do banco para garantir soma correta e atômica
-          const { data: currentDbRow } = await supabase
+          // Busca o estoque atual real no banco para somar com precisão
+          const { data: currentProd } = await supabase
             .from("smoking_products")
             .select("stock")
             .eq("id", existingId)
             .single();
 
-          const dbStock = parseInt(currentDbRow?.stock || "0") || 0;
-          const newStock = dbStock + item.qty;
+          const dbStock = Number(currentProd?.stock) || 0;
+          const nextStock = dbStock + item.qty;
 
-          await supabase
+          const { error: updErr } = await supabase
             .from("smoking_products")
             .update({
-              stock: newStock,
-              price: item.unitSell,
+              stock: nextStock,
               cost_price: item.unitCost,
-              created_at: nowIso,
-              is_active: true
+              price: item.unitSell,
+              is_active: true,
+              created_at: nowIso // Reseta o timer de estoque parado na entrada de novo lote
             })
             .eq("id", existingId)
             .eq("company_id", targetCompanyId);
+
+          if (updErr) throw updErr;
         } else {
-          // Produto ou sabor novo -> Inserir novo registro em smoking_products
-          await supabase.from("smoking_products").insert({
+          // Herda imagem/puffs de outra variante do mesmo modelo se existir
+          const { data: sibling } = await supabase
+            .from("smoking_products")
+            .select("image_url, puffs")
+            .eq("company_id", targetCompanyId)
+            .ilike("brand", item.brand)
+            .ilike("name", item.model)
+            .limit(1);
+
+          const inheritedImage = sibling && sibling[0]?.image_url ? sibling[0].image_url : "";
+          const inheritedPuffs = sibling && sibling[0]?.puffs ? sibling[0].puffs : 15000;
+
+          const { error: insErr } = await supabase.from("smoking_products").insert({
             company_id: targetCompanyId,
             brand: item.brand,
             name: item.model,
             flavor: item.flavor,
             stock: item.qty,
-            price: item.unitSell,
             cost_price: item.unitCost,
-            puffs: 10000,
+            price: item.unitSell,
+            puffs: inheritedPuffs,
+            image_url: inheritedImage,
             is_active: true,
             created_at: nowIso
           });
+
+          if (insErr) throw insErr;
         }
-      }
 
-      // 2. Propagar preço de venda e custo de reposição para TODOS os sabores de cada modelo comprado
-      const modelsProcessed = new Set<string>();
-      for (const item of items) {
-        const brandClean = item.brand.trim();
-        const modelClean = item.model.trim();
-        const groupKey = `${brandClean.toLowerCase()}__${modelClean.toLowerCase()}`;
-        if (modelsProcessed.has(groupKey)) continue;
-        modelsProcessed.add(groupKey);
-
-        // Busca todos os sabores deste modelo na loja para sincronizar custo e preço uniformemente
-        const { data: allVariants } = await supabase
+        // Propaga o novo custo e preço de venda para TODAS as variantes do mesmo modelo (marca + modelo)
+        const groupKey = `${item.brand.toLowerCase()}__${item.model.toLowerCase()}`;
+        const { data: allModelVariants } = await supabase
           .from("smoking_products")
           .select("id")
           .eq("company_id", targetCompanyId)
-          .ilike("brand", brandClean)
-          .ilike("name", modelClean);
+          .ilike("brand", item.brand)
+          .ilike("name", item.model);
 
-        const variantIds = allVariants ? allVariants.map((v) => v.id) : [];
+        const variantIds = (allModelVariants || []).map((v: any) => v.id);
 
         if (variantIds.length > 0) {
-          // Atualiza em lote na tabela oficial smoking_products todos os sabores desse modelo
           await supabase
             .from("smoking_products")
             .update({
-              price: item.unitSell,
-              cost_price: item.unitCost
+              cost_price: item.unitCost,
+              price: item.unitSell
             })
             .in("id", variantIds)
             .eq("company_id", targetCompanyId);
@@ -514,33 +711,45 @@ export function RegisterStockModal({
         console.warn("Aviso ao emitir live sync:", broadcastErr);
       }
 
-      // 2. Gravar o registro histórico de recompra em smoking_stock_repurchases
-      try {
-        const repurchaseNotes = supplierNotes.trim()
-          ? `${supplierNotes} (${totalUnits} un, ${items.length} itens)`
-          : `Entrada rápida de estoque: ${totalUnits} un (${items.length} itens)`;
+      // 2. Gravar o registro histórico de recompra em smoking_stock_repurchases (apenas se houve unidades compradas)
+      if (batchTotalUnits > 0 && batchTotalCost > 0) {
+        try {
+          const repurchaseNotes = supplierNotes.trim()
+            ? `${supplierNotes} (${batchTotalUnits} un, ${batchItems.length} itens)`
+            : `Entrada rápida de estoque: ${batchTotalUnits} un (${batchItems.length} itens)`;
 
-        await createStockRepurchase({
-          companyId: targetCompanyId,
-          stock_purchase_amount: totalCost,
-          freight_amount: parsedFreight,
-          purchase_date: nowIso.split("T")[0],
-          notes: repurchaseNotes
-        });
-      } catch (repurchaseErr) {
-        console.warn("Aviso ao salvar histórico de recompra:", repurchaseErr);
+          await createStockRepurchase({
+            companyId: targetCompanyId,
+            stock_purchase_amount: batchTotalCost,
+            freight_amount: parsedFreight,
+            purchase_date: nowIso.split("T")[0],
+            notes: repurchaseNotes
+          });
+        } catch (repurchaseErr) {
+          console.warn("Aviso ao salvar histórico de recompra:", repurchaseErr);
+        }
       }
 
-      // 3. Exibir Modal de Sucesso
+      // 3. Limpar imediatamente a lista de itens para impedir qualquer re-execução acidental!
+      setItems([]);
+      setSelectedFlavors([]);
+      setSearchModelQuery("");
+      setSelectedBrand("");
+      setSelectedModel("");
+      setFreightAmountInput("");
+      setSupplierNotes("");
+
+      // 4. Exibir Modal de Sucesso
       setSuccessModalData({
-        totalUnits,
-        totalInvested: totalInvestedWithFreight,
-        projectedProfit: totalProjectedProfit
+        totalUnits: batchTotalUnits,
+        totalInvested: batchTotalInvested,
+        projectedProfit: batchProjectedProfit
       });
 
-      // Invalida o cache do catálogo de vendas manuais para refletir estoque novo imediatamente
+      // Invalida o cache do catálogo de vendas manuais e do financeiro para refletir estoque novo imediatamente
       try {
         invalidateSaleCatalogCache(targetCompanyId);
+        invalidateFinanceCache();
       } catch (e) {}
 
       // Atualiza a tela de estoque
@@ -550,6 +759,7 @@ export function RegisterStockModal({
       alert(`Erro ao processar entrada de estoque: ${err.message || "Tente novamente."}`);
     } finally {
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -558,7 +768,6 @@ export function RegisterStockModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
       <div className="bg-[#0c0c0e] border border-white/10 rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
-        
         {/* Topo do Modal */}
         <div className="px-5 sm:px-7 py-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
           <div className="flex items-center gap-3">
@@ -580,7 +789,10 @@ export function RegisterStockModal({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              resetModalState();
+              onClose();
+            }}
             className="size-8 rounded-full bg-white/5 hover:bg-white/10 text-white/50 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="size-4" />
@@ -594,13 +806,12 @@ export function RegisterStockModal({
               <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
               <span>{addedBatchNotification}</span>
             </div>
-            <span className="text-[11px] text-emerald-400/80">Role abaixo para conferir o resumo ↓</span>
+            <span className="text-[11px] text-emerald-400/80">Confira abaixo ↓</span>
           </div>
         )}
 
         {/* Corpo com Scroll */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-7 space-y-6">
-
           {/* 1. SEÇÃO: Adição Inteligente de Mercadoria */}
           <div className="bg-[#141417] border border-white/10 rounded-2xl p-4 sm:p-5 space-y-4">
             <div className="flex items-center justify-between">
@@ -650,12 +861,15 @@ export function RegisterStockModal({
                             {m.brand} {m.model}
                           </span>
                           <span className="text-[10px] text-white/50">
-                            {m.flavors.length} sabores no catálogo • {m.flavors.reduce((a, b) => a + b.stock, 0)} un em estoque
+                            {m.flavors.length} sabores no catálogo •{" "}
+                            {m.flavors.reduce((a, b) => a + b.stock, 0)} un em estoque
                           </span>
                         </div>
                         <div className="text-right">
                           <span className="text-[11px] font-mono text-emerald-400 font-bold block">
-                            {m.defaultCost > 0 ? `Último Custo: R$ ${m.defaultCost.toFixed(2)}` : "Sem custo"}
+                            {m.defaultCost > 0
+                              ? `Último Custo: R$ ${m.defaultCost.toFixed(2)}`
+                              : "Sem custo"}
                           </span>
                           <span className="text-[10px] text-white/40">
                             Venda: R$ {m.defaultPrice.toFixed(2)}
@@ -725,6 +939,13 @@ export function RegisterStockModal({
                       const selectedItem = selectedFlavors.find(
                         (sf) => sf.flavor.toLowerCase() === f.flavor.toLowerCase()
                       );
+                      const alreadyInBatchItem = items.find(
+                        (it) =>
+                          (f.id && it.productId === f.id) ||
+                          (it.brand.toLowerCase() === selectedBrand.toLowerCase() &&
+                            it.model.toLowerCase() === selectedModel.toLowerCase() &&
+                            it.flavor.toLowerCase() === f.flavor.toLowerCase())
+                      );
 
                       return (
                         <button
@@ -734,6 +955,8 @@ export function RegisterStockModal({
                           className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                             isSelected
                               ? "bg-emerald-500 text-black font-extrabold shadow-md shadow-emerald-500/25 border border-emerald-400 scale-[1.02]"
+                              : alreadyInBatchItem
+                              ? "bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40"
                               : "bg-[#18181b] hover:bg-white/10 text-white/80 border border-white/10"
                           }`}
                         >
@@ -741,6 +964,10 @@ export function RegisterStockModal({
                           {isSelected ? (
                             <span className="px-1.5 py-0.5 rounded-md bg-black/30 text-black font-mono text-[10px] font-black">
                               {selectedItem?.qty} un ✓
+                            </span>
+                          ) : alreadyInBatchItem ? (
+                            <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold">
+                              Na lista: +{alreadyInBatchItem.qty} un
                             </span>
                           ) : (
                             <span className="text-[10px] text-white/40 font-mono">
@@ -759,7 +986,8 @@ export function RegisterStockModal({
                     <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-white/5">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-emerald-400">
-                          {selectedFlavors.length} {selectedFlavors.length === 1 ? "sabor marcado" : "sabores marcados"}
+                          {selectedFlavors.length}{" "}
+                          {selectedFlavors.length === 1 ? "sabor marcado" : "sabores marcados"}
                         </span>
                         <span className="text-white/40 text-xs">•</span>
                         <span className="text-xs font-mono font-bold text-white">
@@ -801,7 +1029,8 @@ export function RegisterStockModal({
                               {sf.flavor}
                             </span>
                             <span className="text-[10px] text-white/40 font-mono">
-                              Estoque atual: {sf.currentStock} un ➔ Ficará: {sf.currentStock + sf.qty} un
+                              Estoque atual: {sf.currentStock} un ➔ Ficará:{" "}
+                              {sf.currentStock + sf.qty} un
                             </span>
                           </div>
 
@@ -819,7 +1048,9 @@ export function RegisterStockModal({
                                 type="number"
                                 min="1"
                                 value={sf.qty}
-                                onChange={(e) => handleUpdateFlavorQty(sf.flavor, e.target.value, true)}
+                                onChange={(e) =>
+                                  handleUpdateFlavorQty(sf.flavor, e.target.value, true)
+                                }
                                 className="w-12 text-center text-xs font-mono font-bold text-white bg-transparent focus:outline-none"
                               />
                               <button
@@ -831,7 +1062,7 @@ export function RegisterStockModal({
                               </button>
                             </div>
 
-                            {/* Botões rápidos +5 / +10 */}
+                            {/* Botão rápido +5 */}
                             <button
                               type="button"
                               onClick={() => handleUpdateFlavorQty(sf.flavor, 5)}
@@ -933,14 +1164,16 @@ export function RegisterStockModal({
                         <>
                           <TrendingUp className="size-3.5 text-amber-400" />
                           <span>
-                            ▲ Pagou +R$ {costDiff.toFixed(2)} mais caro nesta compra ({costDiffPercent?.toFixed(1)}%)
+                            ▲ Pagou +R$ {costDiff.toFixed(2)} mais caro nesta compra (
+                            {costDiffPercent?.toFixed(1)}%)
                           </span>
                         </>
                       ) : (
                         <>
                           <TrendingDown className="size-3.5 text-emerald-400" />
                           <span>
-                            ▼ Pagou -R$ {Math.abs(costDiff).toFixed(2)} mais barato nesta compra ({Math.abs(costDiffPercent || 0).toFixed(1)}%)
+                            ▼ Pagou -R$ {Math.abs(costDiff).toFixed(2)} mais barato nesta compra (
+                            {Math.abs(costDiffPercent || 0).toFixed(1)}%)
                           </span>
                         </>
                       )}
@@ -974,37 +1207,63 @@ export function RegisterStockModal({
               </div>
             )}
 
-            {/* Subtotal do Produto e Botão de Adicionar à Compra */}
+            {/* Subtotal do Produto, Atualização só de Preço e Botão de Adicionar à Compra */}
             {selectedModel && (
               <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-white/5">
                 <div className="text-xs font-mono text-white/60">
                   {totalSelectedUnits > 0 && parsedUnitCost > 0 ? (
                     <span>
-                      Subtotal deste produto: <strong className="text-white">{totalSelectedUnits} un × R$ {parsedUnitCost.toFixed(2)}</strong> = <strong className="text-emerald-400">R$ {totalModelSubtotal.toFixed(2)}</strong>
+                      Subtotal deste produto:{" "}
+                      <strong className="text-white">
+                        {totalSelectedUnits} un × R$ {parsedUnitCost.toFixed(2)}
+                      </strong>{" "}
+                      = <strong className="text-emerald-400">R$ {totalModelSubtotal.toFixed(2)}</strong>
                     </span>
                   ) : (
-                    <span>Marque os sabores e quantidades acima para prosseguir.</span>
+                    <span>Marque os sabores acima ou atualize apenas o custo/preço do modelo.</span>
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleAddSelectedFlavorsToBatch}
-                  disabled={selectedFlavors.length === 0}
-                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-30 disabled:cursor-not-allowed text-black text-xs font-extrabold flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-500/20 cursor-pointer active:scale-95"
-                >
-                  <Plus className="size-4 stroke-[3]" />
-                  {selectedFlavors.length === 0 ? (
-                    <span>Selecione os sabores acima</span>
-                  ) : selectedFlavors.length === 1 ? (
-                    <span>Adicionar {selectedFlavors[0].flavor} ({selectedFlavors[0].qty} un) à Compra</span>
-                  ) : (
-                    <span>Adicionar {selectedFlavors.length} Sabores ({totalSelectedUnits} un) à Compra</span>
+                <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                  {!isNewProductMode && parsedUnitCost > 0 && parsedUnitSell > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleUpdateOnlyModelPrices}
+                      disabled={isUpdatingPriceOnly || isSubmitting}
+                      className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white/80 hover:text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                      title="Atualiza apenas o Custo e Preço de Venda de todos os sabores deste modelo sem somar unidades ao estoque"
+                    >
+                      {isUpdatingPriceOnly ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="size-3.5 text-emerald-400" />
+                      )}
+                      <span>Salvar Só Custo/Preço (0 un)</span>
+                    </button>
                   )}
-                </button>
+
+                  <button
+                    type="button"
+                    onClick={handleAddSelectedFlavorsToBatch}
+                    disabled={selectedFlavors.length === 0}
+                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-30 disabled:cursor-not-allowed text-black text-xs font-extrabold flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-500/20 cursor-pointer active:scale-95"
+                  >
+                    <Plus className="size-4 stroke-[3]" />
+                    {selectedFlavors.length === 0 ? (
+                      <span>Selecione os sabores acima</span>
+                    ) : selectedFlavors.length === 1 ? (
+                      <span>
+                        Adicionar {selectedFlavors[0].flavor} ({selectedFlavors[0].qty} un) à Compra
+                      </span>
+                    ) : (
+                      <span>
+                        Adicionar {selectedFlavors.length} Sabores ({totalSelectedUnits} un) à Compra
+                      </span>
+                    )}
+                  </button>
+                </div>
               </div>
             )}
-
           </div>
 
           {/* 2. SEÇÃO: Grade de Mercadorias Compradas no Lote */}
@@ -1050,14 +1309,23 @@ export function RegisterStockModal({
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-[11px] text-white/50">
-                          <span>Custo: <strong className="text-white">R$ {item.unitCost.toFixed(2)}</strong></span>
+                          <span>
+                            Custo: <strong className="text-white">R$ {item.unitCost.toFixed(2)}</strong>
+                          </span>
                           {diff !== null && diff !== 0 && (
-                            <span className={diff > 0 ? "text-amber-400 font-bold" : "text-emerald-400 font-bold"}>
+                            <span
+                              className={
+                                diff > 0 ? "text-amber-400 font-bold" : "text-emerald-400 font-bold"
+                              }
+                            >
                               ({diff > 0 ? `+R$ ${diff.toFixed(2)}` : `-R$ ${Math.abs(diff).toFixed(2)}`})
                             </span>
                           )}
                           <span>•</span>
-                          <span>Preço Venda: <strong className="text-white">R$ {item.unitSell.toFixed(2)}</strong></span>
+                          <span>
+                            Preço Venda:{" "}
+                            <strong className="text-white">R$ {item.unitSell.toFixed(2)}</strong>
+                          </span>
                         </div>
                       </div>
 
@@ -1084,14 +1352,18 @@ export function RegisterStockModal({
                         </div>
 
                         <div className="text-left sm:text-right">
-                          <span className="text-[10px] text-white/40 uppercase tracking-wider block">Subtotal</span>
+                          <span className="text-[10px] text-white/40 uppercase tracking-wider block">
+                            Subtotal
+                          </span>
                           <span className="font-mono font-bold text-emerald-400 text-sm">
                             R$ {subtotal.toFixed(2)}
                           </span>
                         </div>
 
                         <div className="text-left sm:text-right hidden sm:block">
-                          <span className="text-[10px] text-white/40 uppercase tracking-wider block">Lucro Previsto</span>
+                          <span className="text-[10px] text-white/40 uppercase tracking-wider block">
+                            Lucro Previsto
+                          </span>
                           <span className="font-mono font-semibold text-white/90 text-xs">
                             +R$ {itemProfit.toFixed(2)}
                           </span>
@@ -1167,7 +1439,9 @@ export function RegisterStockModal({
                 </div>
 
                 <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                  <span className="text-[10px] text-white/50 uppercase block">Faturamento Previsto</span>
+                  <span className="text-[10px] text-white/50 uppercase block">
+                    Faturamento Previsto
+                  </span>
                   <span className="text-lg sm:text-xl font-black text-white font-mono mt-0.5 block">
                     R$ {totalProjectedRevenue.toFixed(2)}
                   </span>
@@ -1185,7 +1459,6 @@ export function RegisterStockModal({
               </div>
             </div>
           )}
-
         </div>
 
         {/* Rodapé com Botão Principal de Conclusão */}
@@ -1193,7 +1466,8 @@ export function RegisterStockModal({
           <div className="text-xs text-white/50 text-center sm:text-left">
             {items.length > 0 ? (
               <span>
-                Pronto para atualizar o estoque de <strong>{totalUnits} unidades</strong> e sincronizar preços.
+                Pronto para atualizar o estoque de <strong>{totalUnits} unidades</strong> e
+                sincronizar preços.
               </span>
             ) : (
               <span>Adicione itens para liberar a confirmação de entrada.</span>
@@ -1203,7 +1477,10 @@ export function RegisterStockModal({
           <div className="flex items-center gap-2.5 w-full sm:w-auto">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                resetModalState();
+                onClose();
+              }}
               disabled={isSubmitting}
               className="px-4 py-2.5 rounded-xl text-xs font-bold text-white/60 hover:text-white hover:bg-white/5 transition-colors cursor-pointer w-full sm:w-auto"
             >
@@ -1230,7 +1507,6 @@ export function RegisterStockModal({
             </button>
           </div>
         </div>
-
       </div>
 
       {/* Modal de Conclusão e Sucesso */}
@@ -1246,29 +1522,36 @@ export function RegisterStockModal({
                 Estoque Atualizado com Sucesso!
               </h3>
               <p className="text-xs text-white/60">
-                Todas as mercadorias foram somadas ao estoque e os custos/preços foram sincronizados no sistema.
+                Todas as mercadorias foram somadas ao estoque e os custos/preços foram sincronizados
+                no sistema.
               </p>
             </div>
 
             <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 grid grid-cols-3 gap-2 text-center text-xs">
               <div>
                 <span className="text-[10px] text-white/40 block">Peças</span>
-                <strong className="text-white font-mono text-sm">{successModalData.totalUnits} un</strong>
+                <strong className="text-white font-mono text-sm">
+                  {successModalData.totalUnits} un
+                </strong>
               </div>
               <div>
                 <span className="text-[10px] text-white/40 block">Investido</span>
-                <strong className="text-emerald-400 font-mono text-sm">R$ {successModalData.totalInvested.toFixed(2)}</strong>
+                <strong className="text-emerald-400 font-mono text-sm">
+                  R$ {successModalData.totalInvested.toFixed(2)}
+                </strong>
               </div>
               <div>
                 <span className="text-[10px] text-white/40 block">Lucro Previsto</span>
-                <strong className="text-emerald-400 font-mono text-sm">+R$ {successModalData.projectedProfit.toFixed(2)}</strong>
+                <strong className="text-emerald-400 font-mono text-sm">
+                  +R$ {successModalData.projectedProfit.toFixed(2)}
+                </strong>
               </div>
             </div>
 
             <button
               type="button"
               onClick={() => {
-                setSuccessModalData(null);
+                resetModalState();
                 onClose();
               }}
               className="w-full py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-sm transition-all shadow-lg shadow-emerald-500/20 cursor-pointer active:scale-95"
@@ -1278,7 +1561,6 @@ export function RegisterStockModal({
           </div>
         </div>
       )}
-
     </div>
   );
 }

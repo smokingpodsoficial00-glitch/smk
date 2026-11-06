@@ -6,6 +6,7 @@ import { ensureSaleCustomer } from "@/lib/crm";
 import { BRAZILIAN_STATES } from "@/lib/nationalSales";
 import { notifyMobileSale } from "@/lib/saleNotifications";
 import { validateCartStockAvailability, executeAtomicSaleWithStockLock } from "@/lib/stockValidation";
+import { invalidateFinanceCache } from "./FinanceDashboard";
 import { MobileManualSaleFlow } from "./sale/MobileManualSaleFlow";
 import {
   ShoppingCart,
@@ -147,6 +148,7 @@ export function ManualSaleModal({
   const [customPrice, setCustomPrice] = useState<string>("");
 
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -394,9 +396,17 @@ export function ManualSaleModal({
     };
   }, [selectedFlavorId, itemQuantity, customPrice, productsList]);
 
-  // Lista Efetiva de Itens no Pedido (soma os itens confirmados + o pod selecionado no formulário)
+  // Lista Efetiva de Itens no Pedido (soma os itens confirmados + o pod selecionado no formulário sem duplicar SKU)
   const effectiveItems = useMemo(() => {
     if (activeFormItem) {
+      const existingIdx = items.findIndex((i) => i.productId === activeFormItem.productId);
+      if (existingIdx >= 0) {
+        return items.map((item, idx) =>
+          idx === existingIdx
+            ? { ...item, quantity: item.quantity + activeFormItem.quantity, price: activeFormItem.price }
+            : item
+        );
+      }
       return [...items, activeFormItem];
     }
     return items;
@@ -591,6 +601,7 @@ export function ManualSaleModal({
 
   // Finalizar e Registrar Venda
   const handleSubmitSale = async () => {
+    if (submittingRef.current || submitting) return;
     setErrorMessage("");
     setSuccessMessage("");
 
@@ -604,6 +615,7 @@ export function ManualSaleModal({
       return;
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
 
     try {
@@ -693,6 +705,21 @@ export function ManualSaleModal({
 
       const insertedOrderId = atomicResult.orderId || null;
 
+      // 4. Atualizar imediatamente o estado local de estoque e invalidar caches de catálogo e financeiro
+      const soldByProduct = new Map<string, number>();
+      effectiveItems.forEach((it) => {
+        soldByProduct.set(it.productId, (soldByProduct.get(it.productId) || 0) + (Number(it.quantity) || 0));
+      });
+      setProductsList((prev) =>
+        prev.map((p) => {
+          const soldQty = soldByProduct.get(p.id) || 0;
+          if (soldQty <= 0) return p;
+          return { ...p, stock: Math.max(0, (Number(p.stock) || 0) - soldQty) };
+        })
+      );
+      invalidateSaleCatalogCache(companyId);
+      invalidateFinanceCache();
+
       // 5. Inserir automaticamente na Lista de Transmissão de Compradores do Marketing
       let marketingListNote = "";
       if (autoAddToMarketingList && cleanPhone && !isNoWhatsApp && !formattedPhone.startsWith("INSTA_")) {
@@ -726,6 +753,7 @@ export function ManualSaleModal({
 
       setTimeout(() => {
         invalidateSaleCatalogCache(companyId);
+        invalidateFinanceCache();
         onSaleSuccess();
         onClose();
         // Limpar formulário
@@ -749,6 +777,7 @@ export function ManualSaleModal({
       console.error("Erro ao registrar venda manual:", err);
       setErrorMessage(err.message || "Ocorreu um erro ao registrar a venda.");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -764,6 +793,7 @@ export function ManualSaleModal({
           onClose={onClose}
           onSaleSuccess={() => {
             invalidateSaleCatalogCache(companyId);
+            invalidateFinanceCache();
             onSaleSuccess();
           }}
           companyId={companyId}

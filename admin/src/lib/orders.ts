@@ -8,19 +8,19 @@ export interface DeleteOrderResult {
   error?: string;
 }
 
-/**
- * Exclui um pedido do banco de dados (smoking_orders) e restaura
- * automaticamente a quantidade de cada produto vendido de volta ao estoque (smoking_products).
- * Funciona globalmente para qualquer empresa/tenant.
- */
 // Trava em memória para impedir execuções simultâneas/duplicadas sobre o mesmo pedido
 const activeOrderDeletions = new Set<string>();
 
 /**
  * Exclui um pedido do banco de dados (smoking_orders) e restaura
  * garantidamente a quantidade de cada produto vendido de volta ao estoque (smoking_products).
- * Suporta fallback inteligente por modelo/sabor se o ID direto não for encontrado,
- * bloqueia requisições duplicadas e aborta com erro explícito caso o estoque não possa ser restaurado.
+ *
+ * Blindado contra:
+ * 1. Dupla devolução caso a trigger PostgreSQL `trg_stock_on_order_delete` esteja ativa no banco:
+ *    calcula `expectedStock = stockBeforeDelete + totalQtyToRestore` antes do DELETE e reconcilia
+ *    imediatamente após o DELETE para garantir incremento único exato (+1x, nunca +2x).
+ * 2. Múltiplos itens do mesmo `productId` no mesmo pedido (agrupa quantidades por produto).
+ * 3. Cliques múltiplos simultâneos (trava `activeOrderDeletions`).
  */
 export async function deleteOrderWithStockRestoration(
   orderId: string,
@@ -63,10 +63,20 @@ export async function deleteOrderWithStockRestoration(
     }
 
     let restoredCount = 0;
+    const stockReconciliationPlan = new Map<
+      string,
+      {
+        productId: string;
+        initialStock: number;
+        qtyToRestore: number;
+        expectedFinalStock: number;
+        name: string;
+        flavor: string;
+      }
+    >();
 
-    // 2. Restaurar o estoque em smoking_products se solicitado
+    // 2. Resolver produtos e calcular estoque exato antes da exclusão
     if (shouldRestoreStock && Array.isArray(order.items) && order.items.length > 0) {
-      // Pré-carregar catálogo de produtos da empresa para resolução segura de fallback se necessário
       let cachedCompanyProducts: any[] | null = null;
 
       for (const item of order.items) {
@@ -80,7 +90,9 @@ export async function deleteOrderWithStockRestoration(
 
         // TENTATIVA 1: Busca direta por UUID (item.product_id, item.productId ou item.id)
         const rawId = item.product_id || item.productId || item.id;
-        const isValidUuid = typeof rawId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawId);
+        const isValidUuid =
+          typeof rawId === 'string' &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawId);
 
         if (isValidUuid) {
           const { data: prodData, error: prodFetchErr } = await supabase
@@ -91,15 +103,16 @@ export async function deleteOrderWithStockRestoration(
 
           if (!prodFetchErr && prodData) {
             targetProductId = prodData.id;
-            currentStock = typeof prodData.stock === 'number' 
-              ? prodData.stock 
-              : parseInt(String(prodData.stock || '0'), 10);
+            currentStock =
+              typeof prodData.stock === 'number'
+                ? prodData.stock
+                : parseInt(String(prodData.stock || '0'), 10);
             resolvedProductName = prodData.name || resolvedProductName;
             resolvedProductFlavor = prodData.flavor || resolvedProductFlavor;
           }
         }
 
-        // TENTATIVA 2: Fallback resiliente por modelo/marca e sabor (padrão de segurança stockSync)
+        // TENTATIVA 2: Fallback resiliente por modelo/marca e sabor
         if (!targetProductId) {
           const targetFlavor = (item.flavor || '').trim().toLowerCase();
           const targetName = (item.name || item.model || item.brand || '').trim().toLowerCase();
@@ -119,7 +132,6 @@ export async function deleteOrderWithStockRestoration(
           }
 
           if (cachedCompanyProducts.length > 0 && targetFlavor && targetName) {
-            // Busca apenas candidatos com correspondência de modelo E sabor
             const matchingCandidates = cachedCompanyProducts.filter((p) => {
               const pFlavor = (p.flavor || '').trim().toLowerCase();
               const pName = (p.name || '').trim().toLowerCase();
@@ -142,14 +154,16 @@ export async function deleteOrderWithStockRestoration(
             if (matchingCandidates.length === 1) {
               const resolved = matchingCandidates[0];
               targetProductId = resolved.id;
-              currentStock = typeof resolved.stock === 'number'
-                ? resolved.stock
-                : parseInt(String(resolved.stock || '0'), 10);
+              currentStock =
+                typeof resolved.stock === 'number'
+                  ? resolved.stock
+                  : parseInt(String(resolved.stock || '0'), 10);
               resolvedProductName = resolved.name || resolvedProductName;
               resolvedProductFlavor = resolved.flavor || resolvedProductFlavor;
-              console.log(`[deleteOrder] Produto localizado por fallback unívoco (modelo + sabor): ${resolvedProductName} - ${resolvedProductFlavor} (${resolved.id})`);
             } else if (matchingCandidates.length > 1) {
-              console.error(`[deleteOrder] Ambiguidade: ${matchingCandidates.length} produtos encontrados para "${targetName} - ${targetFlavor}".`);
+              console.error(
+                `[deleteOrder] Ambiguidade: ${matchingCandidates.length} produtos encontrados para "${targetName} - ${targetFlavor}".`
+              );
               return {
                 success: false,
                 error: `Identificação ambígua: foram encontrados ${matchingCandidates.length} produtos compatíveis com "${resolvedProductName} (${resolvedProductFlavor})". Restauração cancelada para impedir devolução no produto errado.`
@@ -167,27 +181,42 @@ export async function deleteOrderWithStockRestoration(
           };
         }
 
-        // Incrementa o estoque do produto localizado
-        const newStock = currentStock + qtyToRestore;
+        if (!stockReconciliationPlan.has(targetProductId)) {
+          stockReconciliationPlan.set(targetProductId, {
+            productId: targetProductId,
+            initialStock: Number.isFinite(currentStock) ? currentStock : 0,
+            qtyToRestore: qtyToRestore,
+            expectedFinalStock: (Number.isFinite(currentStock) ? currentStock : 0) + qtyToRestore,
+            name: resolvedProductName,
+            flavor: resolvedProductFlavor
+          });
+        } else {
+          const existingPlan = stockReconciliationPlan.get(targetProductId)!;
+          existingPlan.qtyToRestore += qtyToRestore;
+          existingPlan.expectedFinalStock = existingPlan.initialStock + existingPlan.qtyToRestore;
+        }
+      }
+
+      // Aplica a devolução de estoque verificando permissão de escrita antes de apagar o pedido
+      for (const plan of stockReconciliationPlan.values()) {
         const { error: updErr } = await supabase
           .from('smoking_products')
-          .update({ stock: newStock })
-          .eq('id', targetProductId);
+          .update({ stock: plan.expectedFinalStock })
+          .eq('id', plan.productId);
 
         if (updErr) {
-          console.error(`[deleteOrder] Erro ao atualizar estoque do produto ${targetProductId}:`, updErr);
+          console.error(`[deleteOrder] Erro ao atualizar estoque do produto ${plan.productId}:`, updErr);
           return {
             success: false,
             error: `Falha ao devolver itens ao estoque (${updErr.message}). O pedido não foi excluído.`
           };
         }
 
-        restoredCount += qtyToRestore;
-        console.log(`[deleteOrder] Estoque restaurado com sucesso para ${resolvedProductName} (${resolvedProductFlavor}): ${currentStock} -> ${newStock} (+${qtyToRestore})`);
+        restoredCount += plan.qtyToRestore;
       }
     }
 
-    // 3. Deletar o pedido de smoking_orders SOMENTE após o estoque ser restaurado com sucesso
+    // 3. Deletar o pedido de smoking_orders SOMENTE após o estoque ser validado e restaurado com sucesso
     let delQuery = supabase
       .from('smoking_orders')
       .delete()
@@ -201,7 +230,33 @@ export async function deleteOrderWithStockRestoration(
 
     if (delErr) {
       console.error('[deleteOrder] Erro ao deletar pedido:', delErr);
+      // Rollback do estoque caso a exclusão do pedido tenha falhado
+      for (const plan of stockReconciliationPlan.values()) {
+        try {
+          await supabase
+            .from('smoking_products')
+            .update({ stock: plan.initialStock })
+            .eq('id', plan.productId);
+        } catch (rbErr) {}
+      }
       return { success: false, error: delErr.message };
+    }
+
+    // 3.1 RECONCILIAÇÃO PÓS-DELETE (Anti-Dupla Restauração por Trigger SQL trg_stock_on_order_delete):
+    // Se a trigger do banco tiver somado +qty novamente durante o DELETE FROM smoking_orders,
+    // forçamos o estoque de volta ao valor exato esperado (initialStock + qtyToRestore).
+    for (const plan of stockReconciliationPlan.values()) {
+      try {
+        await supabase
+          .from('smoking_products')
+          .update({ stock: plan.expectedFinalStock })
+          .eq('id', plan.productId);
+        console.log(
+          `[deleteOrder] Estoque reconciliado com sucesso para ${plan.name} (${plan.flavor}): ${plan.initialStock} -> ${plan.expectedFinalStock} (+${plan.qtyToRestore})`
+        );
+      } catch (reconcileErr) {
+        console.warn(`[deleteOrder] Aviso ao reconciliar estoque do produto ${plan.productId}:`, reconcileErr);
+      }
     }
 
     // 4. Se expressamente solicitado e o cliente não tiver mais nenhum pedido, limpar exclusivamente por customer_id

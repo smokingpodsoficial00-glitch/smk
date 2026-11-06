@@ -6,6 +6,8 @@ import { ensureSaleCustomer } from "@/lib/crm";
 import { BRAZILIAN_STATES } from "@/lib/nationalSales";
 import { notifyMobileSale } from "@/lib/saleNotifications";
 import { validateCartStockAvailability, executeAtomicSaleWithStockLock } from "@/lib/stockValidation";
+import { invalidateSaleCatalogCache } from "../ManualSaleModal";
+import { invalidateFinanceCache } from "../FinanceDashboard";
 import {
   ShoppingCart,
   User,
@@ -161,6 +163,7 @@ export function MobileManualSaleFlow({
 
   // Estados de Processamento e Resposta
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successInfo, setSuccessInfo] = useState<{
     clientName: string;
@@ -564,6 +567,7 @@ export function MobileManualSaleFlow({
 
   // FINALIZAR VENDA MANUAL
   const handleSubmitSale = async () => {
+    if (submittingRef.current || submitting) return;
     setErrorMessage("");
 
     if (items.length === 0) {
@@ -576,6 +580,7 @@ export function MobileManualSaleFlow({
       return;
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
 
     try {
@@ -657,6 +662,21 @@ export function MobileManualSaleFlow({
         throw new Error(atomicResult.errorMessage || "Falha ao registrar venda devido a restrição de estoque.");
       }
 
+      // 5. Abater estoque imediatamente da lista local em memória e invalidar caches
+      const soldByProduct = new Map<string, number>();
+      items.forEach((it) => {
+        soldByProduct.set(it.productId, (soldByProduct.get(it.productId) || 0) + (Number(it.quantity) || 0));
+      });
+      setProductsList((prev) =>
+        prev.map((p) => {
+          const soldQty = soldByProduct.get(p.id) || 0;
+          if (soldQty <= 0) return p;
+          return { ...p, stock: Math.max(0, (Number(p.stock) || 0) - soldQty) };
+        })
+      );
+      invalidateSaleCatalogCache(companyId);
+      invalidateFinanceCache();
+
       // 6. Lista de Transmissão de Marketing (se habilitado)
       const cleanPhoneDigits = clientPhone.replace(/\D/g, "");
       if (autoAddToMarketingList && cleanPhoneDigits && !isNoWhatsApp && !formattedPhone.startsWith("INSTA_")) {
@@ -697,6 +717,7 @@ export function MobileManualSaleFlow({
       console.error("Erro ao finalizar venda manual mobile:", err);
       setErrorMessage(err.message || "Ocorreu um erro ao registrar a venda.");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
