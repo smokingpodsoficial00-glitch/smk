@@ -14,6 +14,7 @@ import {
   Trash2,
   Edit2,
   ChevronRight,
+  ChevronDown,
   Flame,
   Crown,
   Send,
@@ -57,6 +58,19 @@ export function MobileCRMView({
   // Filtros rápidos móveis: 'todos' | 'recompra' | 'vip' | 'vendas'
   const [activeFilter, setActiveFilter] = useState<"todos" | "recompra" | "vip" | "vendas">("todos");
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedClientIds, setExpandedClientIds] = useState<Set<string>>(new Set());
+
+  const toggleExpandClient = (clientId: string) => {
+    setExpandedClientIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(clientId)) {
+        next.delete(clientId);
+      } else {
+        next.add(clientId);
+      }
+      return next;
+    });
+  };
 
   // Bottom Sheets Móveis
   const [selectedClientForSheet, setSelectedClientForSheet] = useState<RealClient | null>(null);
@@ -432,45 +446,7 @@ export function MobileCRMView({
 
   return (
     <div className="flex flex-col h-full w-full bg-[#070709] text-white select-none overflow-hidden">
-      {/* ========================================================
-          1. HEADER COMPACTO MOBILE COM STATUS REALTIME
-         ======================================================== */}
-      <header className="shrink-0 bg-[#0c0c0f] border-b border-white/10 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="size-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-            <Users className="size-4" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold tracking-tight text-white leading-tight truncate">
-                CRM de Clientes
-              </h1>
-              <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-full shrink-0">
-                <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[9px] text-emerald-400 font-extrabold uppercase tracking-wider">
-                  Ao Vivo
-                </span>
-              </div>
-            </div>
-            <p className="text-[11px] text-zinc-400 font-medium leading-none mt-0.5">
-              {clients.length} {clients.length === 1 ? "cliente" : "clientes"} no sistema
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => loadCRMData(true)}
-            disabled={isRefreshing}
-            className="size-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-            aria-label="Atualizar dados do CRM"
-            title="Recarregar"
-          >
-            <RefreshCw className={`size-4 ${isRefreshing ? "animate-spin text-emerald-400" : ""}`} />
-          </button>
-        </div>
-      </header>
+      
 
       {/* ========================================================
           2. CAMPO DE BUSCA COMPACTO (>= 16px font-size)
@@ -631,23 +607,72 @@ export function MobileCRMView({
               const isUrgent = client.urgencyLevel === "urgent";
               const isWarning = client.urgencyLevel === "warning";
               const isVip = client.segment === "champion" || client.segment === "loyal" || client.inVipGroup;
+              const isExpanded = expandedClientIds.has(client.id);
 
+              if (!isExpanded) {
+                // MODO MINIMALISTA (DEFAULT)
+                return (
+                  <div
+                    key={client.id}
+                    onClick={() => toggleExpandClient(client.id)}
+                    className="bg-[#0e0e12] border border-white/10 hover:border-white/20 rounded-2xl px-3.5 py-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer shadow-md"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-sm font-extrabold text-white truncate">
+                          {client.name || "Cliente"}
+                        </span>
+                        {isVip && (
+                          <span className="text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/35 px-1.5 py-0.5 rounded-full uppercase shrink-0">
+                            VIP
+                          </span>
+                        )}
+                        {isUrgent ? (
+                          <span className="text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/35 px-1.5 py-0.5 rounded-full uppercase shrink-0 flex items-center gap-1">
+                            <Flame className="size-2.5" /> Recompra Urgente
+                          </span>
+                        ) : isWarning ? (
+                          <span className="text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/35 px-1.5 py-0.5 rounded-full uppercase shrink-0">
+                            Secando
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 px-1.5 py-0.5 rounded-full uppercase shrink-0">
+                            Em Uso
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-400">
+                        <span>{client.ordersCount} {client.ordersCount === 1 ? "compra" : "compras"}</span>
+                        <span>•</span>
+                        <span>há {client.daysSinceLastOrder} dias</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <div className="text-right">
+                        <div className="text-sm font-black text-emerald-400 font-mono">
+                          {formatBRL(client.spent)}
+                        </div>
+                      </div>
+                      <div className="size-7 rounded-lg bg-white/5 flex items-center justify-center text-zinc-400">
+                        <ChevronDown className="size-4" />
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // MODO MAXIMIZADO (DETALHES AO CLICAR)
               return (
                 <div
                   key={client.id}
-                  onClick={() => {
-                    setSelectedClientForSheet(client);
-                    setIsEditingClient(false);
-                    setEditName(client.name);
-                    setEditPhone(cleanPhone || client.phone || "");
-                        setEditAddress(client.address || "");
-                    setEditError(null);
-                    setEditSuccess(null);
-                  }}
-                  className="bg-[#0e0e12] border border-white/10 hover:border-white/20 rounded-2xl p-3.5 space-y-3 active:scale-[0.99] transition-all cursor-pointer shadow-md"
+                  className="bg-[#0e0e12] border border-emerald-500/30 rounded-2xl p-3.5 space-y-3 transition-all shadow-lg"
                 >
-                  {/* Linha 1: Nome + Badges de Status */}
-                  <div className="flex items-start justify-between gap-2">
+                  {/* Linha 1: Cabeçalho com Nome, Badges, Valor e Botão de Minimizar */}
+                  <div
+                    onClick={() => toggleExpandClient(client.id)}
+                    className="flex items-start justify-between gap-2 cursor-pointer"
+                  >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-sm font-extrabold text-white truncate">
@@ -678,13 +703,18 @@ export function MobileCRMView({
                       </p>
                     </div>
 
-                    <div className="text-right shrink-0">
-                      <div className="text-sm font-black text-emerald-400 font-mono">
-                        {formatBRL(client.spent)}
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <div className="text-right">
+                        <div className="text-sm font-black text-emerald-400 font-mono">
+                          {formatBRL(client.spent)}
+                        </div>
+                        <span className="text-[10px] text-zinc-500 block">
+                          {client.ordersCount} {client.ordersCount === 1 ? "compra" : "compras"}
+                        </span>
                       </div>
-                      <span className="text-[10px] text-zinc-500">
-                        {client.ordersCount} {client.ordersCount === 1 ? "compra" : "compras"}
-                      </span>
+                      <div className="size-7 rounded-lg bg-white/10 flex items-center justify-center text-white">
+                        <ChevronDown className="size-4 rotate-180 transition-transform" />
+                      </div>
                     </div>
                   </div>
 
@@ -737,6 +767,7 @@ export function MobileCRMView({
                         setIsEditingClient(false);
                         setEditName(client.name);
                         setEditPhone(cleanPhone || client.phone || "");
+                        setEditAddress(client.address || "");
                         setEditError(null);
                         setEditSuccess(null);
                       }}
