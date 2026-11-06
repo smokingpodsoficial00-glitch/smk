@@ -105,8 +105,8 @@ const TABS: TabDefinition[] = [
   {
     id: "FIADOS",
     label: "Fiados",
-    activeColor: "bg-amber-500/20 border-amber-500 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]",
-    dotColor: "bg-amber-400",
+    activeColor: "bg-white/20 border-white/40 text-white shadow-[0_0_12px_rgba(255,255,255,0.2)]",
+    dotColor: "bg-white",
   },
   {
     id: "AGUARDANDO_PAGAMENTO",
@@ -401,8 +401,8 @@ export function MobileOrdersLogisticsView({
                   <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-emerald-400">
                     {order.isFiado
                       ? order.fiadoStatus === "PENDENTE"
-                        ? `📒 FIADO (${order.fiadoDueDateFormatted || "Pendente"})`
-                        : "✅ FIADO PAGO"
+                        ? `FIADO (${order.fiadoDueDateFormatted || "Pendente"})`
+                        : "FIADO PAGO"
                       : order.paymentMethod || "PIX"}
                   </span>
                 </div>
@@ -462,33 +462,28 @@ export function MobileOrdersLogisticsView({
                   </span>
                 </div>
 
-                {/* Bloco Especial de Fiado no Card Mobile */}
+                {/* Bloco de Fiado no Card Mobile */}
                 {order.isFiado && (
-                  <div className={`p-3 rounded-xl border space-y-2 ${
-                    order.fiadoStatus === "PENDENTE"
-                      ? "bg-amber-500/10 border-amber-500/30"
-                      : "bg-emerald-500/10 border-emerald-500/30"
-                  }`}>
+                  <div className="p-3 rounded-xl border border-white/10 bg-white/[0.03] space-y-2">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-amber-300 flex items-center gap-1">
-                        <Calendar className="size-3.5" />
-                        Dia de Pagar: {order.fiadoDueDateFormatted || "A definir"}
+                      <span className="text-zinc-300 flex items-center gap-1 font-medium">
+                        Dia do pagamento: {order.fiadoDueDateFormatted || "Não informada"}
                       </span>
-                      <span className="font-black text-amber-400">
-                        Deve: {formatBRL(order.fiadoAmountOwed || order.totalAmount)}
+                      <span className="font-bold text-emerald-400">
+                        {formatBRL(order.fiadoAmountOwed || order.totalAmount)}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-2">
                       {order.phone && !order.phone.startsWith("INSTA_") && (
                         <a
-                          href={`https://wa.me/${order.phone.replace(/\D/g, "").startsWith("55") ? order.phone.replace(/\D/g, "") : `55${order.phone.replace(/\D/g, "")}`}?text=${encodeURIComponent(`Olá ${order.clientName}! Tudo bem? Passando para lembrar do pagamento do seu pedido #${order.id} no valor de ${formatBRL(order.fiadoAmountOwed || order.totalAmount)}, combinado para ${order.fiadoDueDateFormatted || "hoje"}.`)}`}
+                          href={`https://wa.me/${order.phone.replace(/\D/g, "").startsWith("55") ? order.phone.replace(/\D/g, "") : `55${order.phone.replace(/\D/g, "")}`}?text=${encodeURIComponent(`Olá ${order.clientName}! Tudo bem? Passando para combinar sobre o pagamento do seu pedido #${order.id} no valor de ${formatBRL(order.fiadoAmountOwed || order.totalAmount)}, para ${order.fiadoDueDateFormatted || "o dia combinado"}.`)}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex-1 min-h-[40px] rounded-xl bg-[#25D366]/20 border border-[#25D366]/40 text-[#25D366] text-[11px] font-bold flex items-center justify-center gap-1.5"
+                          className="flex-1 min-h-[40px] rounded-xl bg-white/10 border border-white/10 text-white text-[11px] font-semibold flex items-center justify-center gap-1.5"
                         >
-                          <Phone className="size-3.5" />
-                          <span>WhatsApp ({order.phone})</span>
+                          <Phone className="size-3.5 text-zinc-400" />
+                          <span>WhatsApp</span>
                         </a>
                       )}
                       {order.fiadoStatus === "PENDENTE" ? (
@@ -505,10 +500,10 @@ export function MobileOrdersLogisticsView({
                               alert("Erro ao confirmar pagamento: " + (res.error || ""));
                             }
                           }}
-                          className="flex-1 min-h-[40px] rounded-xl bg-emerald-500 text-black text-[11px] font-extrabold flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                          className="flex-1 min-h-[40px] rounded-xl bg-emerald-500 text-black text-[11px] font-bold flex items-center justify-center gap-1"
                         >
                           <CheckCircle2 className="size-3.5" />
-                          <span>{processingFiadoId === order.realId ? "Salvando..." : "Foi Pago (Caixa Real)"}</span>
+                          <span>{processingFiadoId === order.realId ? "Salvando..." : "Confirmar que foi Pago"}</span>
                         </button>
                       ) : (
                         <button
@@ -520,7 +515,7 @@ export function MobileOrdersLogisticsView({
                             setProcessingFiadoId(null);
                             if (res.success) onOrdersChanged?.();
                           }}
-                          className="px-3 min-h-[40px] rounded-xl bg-white/10 text-zinc-300 text-[11px] font-bold flex items-center justify-center gap-1"
+                          className="px-3 min-h-[40px] rounded-xl bg-white/10 text-zinc-300 text-[11px] font-semibold flex items-center justify-center gap-1"
                         >
                           <RotateCcw className="size-3" />
                           <span>Desfazer</span>

@@ -152,8 +152,7 @@ export function MobileManualSaleFlow({
   // ETAPA 3: PAGAMENTO & ENTREGA
   const [paymentMethod, setPaymentMethod] = useState<"PIX" | "DINHEIRO" | "CARTAO" | "FIADO">("PIX");
   const [fiadoDueDate, setFiadoDueDate] = useState<string>(() => getFutureDateIso(7));
-  const [fiadoAmountOwed, setFiadoAmountOwed] = useState<string>("");
-  const [fiadoAmountEdited, setFiadoAmountEdited] = useState<boolean>(false);
+  const [fiadoIncludesShipping, setFiadoIncludesShipping] = useState<boolean>(true);
   const [shippingFee, setShippingFee] = useState<string>("0");
   const [shippingCost, setShippingCost] = useState<string>("0");
   const [autoAddToMarketingList, setAutoAddToMarketingList] = useState(true);
@@ -540,11 +539,9 @@ export function MobileManualSaleFlow({
   const grandTotal = subtotal + numericShippingFee;
   const estimatedProfit = subtotal - totalCost + (numericShippingFee - numericShippingCost);
 
-  useEffect(() => {
-    if (!fiadoAmountEdited) {
-      setFiadoAmountOwed(grandTotal > 0 ? grandTotal.toFixed(2).replace(".", ",") : "");
-    }
-  }, [grandTotal, fiadoAmountEdited]);
+  const fiadoAmountOwedCalc = useMemo(() => {
+    return fiadoIncludesShipping ? grandTotal : subtotal;
+  }, [fiadoIncludesShipping, grandTotal, subtotal]);
 
   // Validação para avançar do Passo 1 para o Passo 2
   const handleProceedToProducts = () => {
@@ -592,12 +589,10 @@ export function MobileManualSaleFlow({
     }
 
     const isFiadoSale = paymentMethod === "FIADO";
-    const parsedFiadoOwed = parseFloat(fiadoAmountOwed.replace(",", "."));
-    const numericFiadoOwed =
-      Number.isFinite(parsedFiadoOwed) && parsedFiadoOwed > 0 ? parsedFiadoOwed : grandTotal;
+    const numericFiadoOwed = isFiadoSale ? fiadoAmountOwedCalc : grandTotal;
 
     if (isFiadoSale && !fiadoDueDate) {
-      setErrorMessage("Por favor, informe o dia em que o cliente vai pagar o fiado.");
+      setErrorMessage("Por favor, informe a data em que o cliente vai pagar.");
       return;
     }
 
@@ -642,6 +637,7 @@ export function MobileManualSaleFlow({
             fiado_status: "PENDENTE",
             fiado_due_date: fiadoDueDate,
             fiado_amount_owed: Number(numericFiadoOwed.toFixed(2)),
+            fiado_includes_shipping: Boolean(fiadoIncludesShipping),
           }),
           ...(isNationalSale && {
             is_national: true,
@@ -1514,7 +1510,7 @@ export function MobileManualSaleFlow({
                   onClick={() => setPaymentMethod("FIADO")}
                   className={`min-h-[58px] rounded-2xl border p-2.5 flex flex-col items-center justify-center gap-1.5 transition-all ${
                     paymentMethod === "FIADO"
-                      ? "bg-amber-500/20 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.25)]"
+                      ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
                       : "bg-[#1c1c20] border-white/5 text-zinc-400 hover:text-white"
                   }`}
                 >
@@ -1524,50 +1520,55 @@ export function MobileManualSaleFlow({
               </div>
 
               {paymentMethod === "FIADO" && (
-                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3 mt-2 animate-in fade-in">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-300">
-                      📒 Agendamento do Fiado
-                    </span>
-                    <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">
-                      Fora do Caixa Real
-                    </span>
+                <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 space-y-3 mt-2 animate-in fade-in">
+                  <div>
+                    <label className="text-[11px] text-zinc-300 font-medium block mb-1">
+                      Dia em que vai pagar *
+                    </label>
+                    <input
+                      type="date"
+                      value={fiadoDueDate}
+                      onChange={(e) => setFiadoDueDate(e.target.value)}
+                      className="w-full bg-[#1c1c20] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50 font-semibold cursor-pointer"
+                    />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-2.5">
-                    <div>
-                      <label className="text-[11px] text-amber-200/90 font-semibold block mb-1">
-                        Dia em que vai pagar *
-                      </label>
-                      <input
-                        type="date"
-                        value={fiadoDueDate}
-                        onChange={(e) => setFiadoDueDate(e.target.value)}
-                        className="w-full bg-black/60 border border-amber-500/30 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 font-bold"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] text-amber-200/90 font-semibold block mb-1">
-                        Quanto ele deve (R$) *
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={fiadoAmountOwed}
-                        onChange={(e) => {
-                          setFiadoAmountOwed(e.target.value);
-                          setFiadoAmountEdited(true);
-                        }}
-                        placeholder={grandTotal.toFixed(2).replace(".", ",")}
-                        className="w-full bg-black/60 border border-amber-500/30 rounded-xl px-3 py-2.5 text-sm text-amber-300 focus:outline-none focus:border-amber-400 font-extrabold"
-                      />
+                  <div>
+                    <label className="text-[11px] text-zinc-300 font-medium block mb-1">
+                      Cobrança do Frete
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFiadoIncludesShipping(true)}
+                        className={`py-2.5 px-2 rounded-xl text-xs font-bold border transition-all text-center ${
+                          fiadoIncludesShipping
+                            ? "bg-white/15 text-white border-white/30"
+                            : "bg-[#1c1c20] text-zinc-400 border-white/10"
+                        }`}
+                      >
+                        Cobrar no Fiado
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFiadoIncludesShipping(false)}
+                        className={`py-2.5 px-2 rounded-xl text-xs font-bold border transition-all text-center ${
+                          !fiadoIncludesShipping
+                            ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                            : "bg-[#1c1c20] text-zinc-400 border-white/10"
+                        }`}
+                      >
+                        Frete Adiantado
+                      </button>
                     </div>
                   </div>
 
-                  <p className="text-[10px] text-amber-200/80 leading-relaxed">
-                    ⏳ Este valor só entrará no Caixa Real quando for marcado como pago na aba Fiados.
-                  </p>
+                  <div className="flex items-center justify-between text-xs pt-2 border-t border-white/5">
+                    <span className="text-zinc-400">Total a receber no fiado:</span>
+                    <span className="font-bold text-white">
+                      R$ {fiadoAmountOwedCalc.toFixed(2).replace(".", ",")}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
