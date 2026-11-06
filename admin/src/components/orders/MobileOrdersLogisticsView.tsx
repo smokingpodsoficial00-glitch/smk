@@ -322,18 +322,24 @@ export function MobileOrdersLogisticsView({
                       <h3 className="text-sm font-bold text-white truncate leading-tight">
                         {order.clientName}
                       </h3>
-                      {order.isFiado && order.fiadoDueDateFormatted && (
+                      {order.isFiado ? (
                         <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1.5">
                           <Calendar className="size-3 text-zinc-400 shrink-0" />
-                          <span>Dia do pagamento: <b className="text-white">{order.fiadoDueDateFormatted}</b></span>
+                          <span>Dia do pagamento: <b className="text-white">{order.fiadoDueDateFormatted || "A combinar"}</b></span>
+                        </p>
+                      ) : (
+                        <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1.5">
+                          <Calendar className="size-3 text-zinc-400 shrink-0" />
+                          <span>Data: <b className="text-white">{new Date(order.createdAt).toLocaleDateString("pt-BR")}</b></span>
                         </p>
                       )}
                     </div>
 
-                    <div className="text-right shrink-0">
+                    <div className="text-right shrink-0 flex items-center gap-2">
                       <span className="text-sm font-black text-white block">
                         {formatBRL(order.isFiado ? (order.fiadoAmountOwed || order.totalAmount) : order.totalAmount)}
                       </span>
+                      <ChevronDown className="size-4 text-zinc-500 shrink-0" />
                     </div>
                   </div>
                 );
@@ -538,7 +544,7 @@ export function MobileOrdersLogisticsView({
                       </button>
                     )}
 
-                    {order.status === "CONCLUIDO" && (
+                    {(order.status === "CONCLUIDO" || activeTab === "FIADOS" || !["PREPARANDO", "EM_ROTA", "ENTREGUE"].includes(order.status)) && (
                       <button
                         type="button"
                         onClick={() => setSelectedOrderForDetails(order)}
