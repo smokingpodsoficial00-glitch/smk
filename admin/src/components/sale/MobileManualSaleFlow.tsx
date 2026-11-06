@@ -214,13 +214,9 @@ export function MobileManualSaleFlow({
         let clientsQuery = supabase
           .from("smoking_clients")
           .select("id, name, phone, address, company_id")
-          .order("name", { ascending: true });
-
-        if (isOfficialStore) {
-          clientsQuery = clientsQuery.or(`company_id.eq.${companyId},company_id.is.null`);
-        } else {
-          clientsQuery = clientsQuery.eq("company_id", companyId);
-        }
+          .or(`company_id.eq.${companyId},company_id.is.null`)
+          .order("name", { ascending: true })
+          .limit(5000);
 
         const [{ data: prods, error: pErr }, { data: dbClients, error: cErr }] = await Promise.all([
           prodsQuery,
@@ -903,12 +899,12 @@ export function MobileManualSaleFlow({
         )}
 
         {/* ========================================================
-            ETAPA 1: CLIENTE (Pesquisa Inteligente & Novo Cadastro)
+            ETAPA 1: CLIENTE (Pesquisa Inteligente & Criar Novo)
            ======================================================== */}
         {currentStep === "CLIENT" && (
           <div className="space-y-4">
-            {/* Se um cliente já estiver selecionado */}
-            {clientName && selectedCustomerId ? (
+            {/* Se um cliente já estiver selecionado ou criado */}
+            {clientName ? (
               <div className="bg-[#151518] border border-emerald-500/30 rounded-2xl p-4 space-y-3 shadow-[0_0_20px_rgba(16,185,129,0.06)] animate-in fade-in">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
@@ -917,13 +913,17 @@ export function MobileManualSaleFlow({
                     </div>
                     <div className="min-w-0">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full inline-block mb-1">
-                        Cliente Selecionado (CRM)
+                        {selectedCustomerId ? "Cliente do CRM" : "Novo Cliente"}
                       </span>
                       <h3 className="text-base font-bold text-white truncate leading-tight">
                         {clientName}
                       </h3>
                       <p className="text-xs text-zinc-400 truncate mt-0.5">
-                        {isNoWhatsApp ? "Instagram / Sem WhatsApp" : formatDisplayPhone(clientPhone)}
+                        {isNoWhatsApp
+                          ? "Instagram / Sem WhatsApp"
+                          : clientPhone
+                          ? formatDisplayPhone(clientPhone)
+                          : "Sem telefone (opcional)"}
                       </p>
                     </div>
                   </div>
@@ -937,6 +937,20 @@ export function MobileManualSaleFlow({
                   </button>
                 </div>
 
+                {/* Se for um novo cliente, campo rápido para telefone opcional */}
+                {!selectedCustomerId && (
+                  <div className="pt-2 border-t border-white/5 space-y-2">
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      value={clientPhone}
+                      onChange={(e) => setClientPhone(e.target.value)}
+                      placeholder="WhatsApp do novo cliente (opcional, ex: 11 99999-8888)"
+                      className="w-full bg-[#1c1c20] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/50"
+                    />
+                  </div>
+                )}
+
                 {shippingAddress && (
                   <div className="flex items-center gap-2 pt-2 border-t border-white/5 text-xs text-zinc-400">
                     <MapPin className="size-3.5 shrink-0 text-zinc-500" />
@@ -944,81 +958,8 @@ export function MobileManualSaleFlow({
                   </div>
                 )}
               </div>
-            ) : isCreatingNewClient ? (
-              /* Formulário Limpo de Novo Cliente */
-              <div className="bg-[#151518] border border-white/10 rounded-2xl p-4 space-y-4 animate-in fade-in">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs uppercase font-extrabold tracking-wider text-zinc-400">
-                    Novo Cliente
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsCreatingNewClient(false)}
-                    className="text-xs text-zinc-400 hover:text-white py-1 px-2 rounded-lg bg-white/5"
-                  >
-                    Voltar para Busca
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                      Nome do Cliente <span className="text-emerald-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={clientName}
-                      onChange={(e) => setClientName(e.target.value)}
-                      placeholder="Ex: Lucas Ferreira"
-                      className="w-full bg-[#1c1c20] border border-white/10 rounded-xl px-3.5 py-3 text-base text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50"
-                      autoFocus
-                    />
-                  </div>
-
-                  {!isNoWhatsApp && (
-                    <div>
-                      <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                        WhatsApp (com DDD)
-                      </label>
-                      <input
-                        type="tel"
-                        inputMode="tel"
-                        value={clientPhone}
-                        onChange={(e) => setClientPhone(e.target.value)}
-                        placeholder="Ex: 11 99999-8888"
-                        className="w-full bg-[#1c1c20] border border-white/10 rounded-xl px-3.5 py-3 text-base text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50"
-                      />
-                    </div>
-                  )}
-
-                  <label className="flex items-center gap-3 py-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isNoWhatsApp}
-                      onChange={(e) => setIsNoWhatsApp(e.target.checked)}
-                      className="size-5 rounded-md accent-emerald-500 bg-[#1c1c20] border-white/20"
-                    />
-                    <span className="text-xs text-zinc-300 font-medium">
-                      Cliente veio do Instagram (Sem WhatsApp)
-                    </span>
-                  </label>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                      Endereço / Bairro (Opcional)
-                    </label>
-                    <input
-                      type="text"
-                      value={shippingAddress}
-                      onChange={(e) => setShippingAddress(e.target.value)}
-                      placeholder="Ex: Itaim Bibi, SP ou Balcão"
-                      className="w-full bg-[#1c1c20] border border-white/10 rounded-xl px-3.5 py-3 text-base text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50"
-                    />
-                  </div>
-                </div>
-              </div>
             ) : (
-              /* Busca Inteligente no CRM */
+              /* Busca Inteligente no CRM com Opção de Criar ao Digitar */
               <div className="space-y-3">
                 <div className="relative">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-zinc-400 pointer-events-none" />
@@ -1028,6 +969,7 @@ export function MobileManualSaleFlow({
                     onChange={(e) => setClientSearchQuery(e.target.value)}
                     placeholder="Digite o nome ou telefone do cliente..."
                     className="w-full bg-[#151518] border border-white/10 rounded-2xl pl-10 pr-10 py-3.5 text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-all"
+                    autoFocus
                   />
                   {clientSearchQuery && (
                     <button
@@ -1041,88 +983,98 @@ export function MobileManualSaleFlow({
                 </div>
 
                 {/* Indicador de Sincronização em Tempo Real */}
-                {loadingInitialData && (
+                {loadingInitialData && clientsList.length === 0 && (
                   <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-zinc-300">
                     <Loader2 className="size-3.5 animate-spin text-white shrink-0" />
                     <span>Sincronizando clientes em tempo real...</span>
                   </div>
                 )}
 
-                {/* Lista de Resultados Encontrados */}
+                {/* Quando o usuário digita: Resultados do CRM + Botão de Criar Novo Cliente no Rodapé */}
                 {clientSearchQuery.trim() ? (
                   <div className="space-y-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 px-1">
-                      Clientes encontrados ({rankedClients.length})
-                    </span>
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                        {rankedClients.length > 0
+                          ? `Clientes no CRM (${rankedClients.length})`
+                          : "Nenhum no CRM"}
+                      </span>
+                    </div>
 
-                    {rankedClients.length > 0 ? (
-                      <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1 custom-scrollbar">
-                        {rankedClients.slice(0, 15).map((client) => (
-                          <div
-                            key={client.id}
-                            onClick={() => handleSelectClient(client)}
-                            className="bg-[#151518] active:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/30 p-3.5 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition-all"
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="size-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 shrink-0">
-                                <User className="size-4" />
-                              </div>
-                              <div className="min-w-0">
-                                <h4 className="text-sm font-bold text-white truncate leading-tight">
-                                  {client.name}
-                                </h4>
-                                <p className="text-xs text-zinc-400 truncate mt-0.5">
-                                  {formatDisplayPhone(client.phone)}
-                                </p>
-                              </div>
-                            </div>
-                            <ChevronRight className="size-4 text-zinc-500 shrink-0" />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="bg-[#151518] border border-white/10 rounded-2xl p-5 text-center space-y-3">
-                        <p className="text-xs text-zinc-400">
-                          Nenhum cliente cadastrado com o termo "{clientSearchQuery}".
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setClientName(clientSearchQuery.trim());
-                            setIsCreatingNewClient(true);
-                            setClientSearchQuery("");
-                          }}
-                          className="inline-flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-xs px-4 py-2.5 rounded-xl active:scale-95 transition-all"
+                    <div className="space-y-1.5 max-h-[46vh] overflow-y-auto pr-1 custom-scrollbar">
+                      {/* Clientes encontrados no CRM */}
+                      {rankedClients.map((client) => (
+                        <div
+                          key={client.id}
+                          onClick={() => handleSelectClient(client)}
+                          className="bg-[#151518] active:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/30 p-3 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-all"
                         >
-                          <Plus className="size-4" />
-                          <span>Cadastrar "{clientSearchQuery.trim()}"</span>
-                        </button>
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="size-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 shrink-0">
+                              <User className="size-3.5" />
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="text-xs font-bold text-white truncate leading-tight">
+                                {client.name}
+                              </h4>
+                              <p className="text-[11px] text-zinc-400 truncate mt-0.5">
+                                {formatDisplayPhone(client.phone)}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md shrink-0">
+                            Selecionar
+                          </span>
+                        </div>
+                      ))}
+
+                      {/* BOTÃO 'CRIAR NOVO CLIENTE' NO FINAL DA LISTA */}
+                      <div
+                        onClick={() => {
+                          setClientName(clientSearchQuery.trim());
+                          setSelectedCustomerId(null);
+                          setClientSearchQuery("");
+                        }}
+                        className="bg-emerald-500/10 hover:bg-emerald-500/15 border border-dashed border-emerald-500/40 p-3 rounded-xl flex items-center justify-between gap-3 cursor-pointer active:scale-98 transition-all"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="size-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                            <Plus className="size-4 stroke-[2.5]" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 block leading-tight">
+                              Novo Cliente
+                            </span>
+                            <p className="text-xs font-bold text-white truncate leading-tight mt-0.5">
+                              Criar: "{clientSearchQuery.trim()}"
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-black font-extrabold bg-emerald-400 px-2.5 py-1 rounded-md shrink-0">
+                          Criar +
+                        </span>
                       </div>
-                    )}
+                    </div>
                   </div>
                 ) : (
-                  /* Sugestões Recentes ou Botão de Novo Cliente */
-                  <div className="space-y-3 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setIsCreatingNewClient(true)}
-                      className="w-full bg-white/5 hover:bg-white/10 border border-dashed border-white/20 rounded-2xl p-4 flex items-center justify-center gap-2.5 text-zinc-300 font-semibold text-xs active:scale-98 transition-all"
-                    >
-                      <Plus className="size-4 text-emerald-400" />
-                      <span>Cadastrar Novo Cliente Manualmente</span>
-                    </button>
-
+                  /* Quando o campo está vazio: Lista rápida de Clientes Cadastrados Recentes */
+                  <div className="space-y-2 pt-1">
                     {clientsList.length > 0 && (
-                      <div className="space-y-2 pt-2">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 px-1">
-                          Clientes Cadastrados Recentes
-                        </span>
-                        <div className="space-y-1.5 max-h-[35vh] overflow-y-auto pr-1 custom-scrollbar">
-                          {clientsList.slice(0, 5).map((client) => (
+                      <>
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                            Clientes Cadastrados Recentes
+                          </span>
+                          <span className="text-[10px] text-zinc-400 font-mono">
+                            {clientsList.length} no CRM
+                          </span>
+                        </div>
+                        <div className="space-y-1.5 max-h-[48vh] overflow-y-auto pr-1 custom-scrollbar">
+                          {clientsList.slice(0, 15).map((client) => (
                             <div
                               key={client.id}
                               onClick={() => handleSelectClient(client)}
-                              className="bg-[#151518]/70 border border-white/5 hover:border-white/15 p-3 rounded-xl flex items-center justify-between gap-3 cursor-pointer active:scale-98 transition-all"
+                              className="bg-[#151518]/80 border border-white/5 hover:border-white/15 p-3 rounded-xl flex items-center justify-between gap-3 cursor-pointer active:scale-98 transition-all"
                             >
                               <div className="min-w-0">
                                 <p className="text-xs font-bold text-white truncate leading-tight">
@@ -1132,13 +1084,13 @@ export function MobileManualSaleFlow({
                                   {formatDisplayPhone(client.phone)}
                                 </p>
                               </div>
-                              <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                              <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md shrink-0">
                                 Selecionar
                               </span>
                             </div>
                           ))}
                         </div>
-                      </div>
+                      </>
                     )}
                   </div>
                 )}

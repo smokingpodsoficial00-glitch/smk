@@ -211,13 +211,9 @@ export function ManualSaleModal({
         let clientsQuery = supabase
           .from("smoking_clients")
           .select("id, name, phone, address, company_id")
-          .order("name", { ascending: true });
-
-        if (isOfficialStore) {
-          clientsQuery = clientsQuery.or(`company_id.eq.${companyId},company_id.is.null`);
-        } else {
-          clientsQuery = clientsQuery.eq("company_id", companyId);
-        }
+          .or(`company_id.eq.${companyId},company_id.is.null`)
+          .order("name", { ascending: true })
+          .limit(5000);
 
         const [{ data: prods, error: pErr }, { data: dbClients, error: cErr }] = await Promise.all([
           prodsQuery,
