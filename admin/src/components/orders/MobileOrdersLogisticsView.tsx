@@ -320,9 +320,10 @@ export function MobileOrdersLogisticsView({
                   <div
                     key={order.realId}
                     onClick={() => toggleExpand(order.realId)}
+                    style={isFiadoPending ? { borderColor: "rgba(239, 68, 68, 0.4)", backgroundColor: "#161214" } : undefined}
                     className={`border rounded-2xl px-4 py-3 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all select-none shadow-sm ${
                       isFiadoPending
-                        ? "bg-[#161214] border-red-500/30 hover:border-red-500/50"
+                        ? "border-red-500/40 bg-[#161214]"
                         : "bg-[#121215] border-white/10 hover:border-white/25"
                     }`}
                   >
@@ -332,17 +333,26 @@ export function MobileOrdersLogisticsView({
                           {order.clientName}
                         </h3>
                         {isFiadoPending && (
-                          <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-red-500/15 border border-red-500/30 text-red-400 shrink-0">
+                          <span
+                            style={{ backgroundColor: "rgba(239, 68, 68, 0.15)", color: "#f87171", borderColor: "rgba(239, 68, 68, 0.4)" }}
+                            className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border shrink-0"
+                          >
                             Falta pagar
                           </span>
                         )}
                       </div>
                       {order.isFiado ? (
                         <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1.5">
-                          <Calendar className={`size-3 shrink-0 ${isFiadoPending ? "text-red-400" : "text-zinc-400"}`} />
+                          <Calendar
+                            style={{ color: isFiadoPending ? "#f87171" : undefined }}
+                            className={`size-3 shrink-0 ${isFiadoPending ? "text-red-400" : "text-zinc-400"}`}
+                          />
                           <span>
                             Dia do pagamento:{" "}
-                            <b className={isFiadoPending ? "text-red-400" : "text-white"}>
+                            <b
+                              style={{ color: isFiadoPending ? "#f87171" : "#ffffff" }}
+                              className={isFiadoPending ? "text-red-400" : "text-white"}
+                            >
                               {order.fiadoDueDateFormatted || "A combinar"}
                             </b>
                           </span>
@@ -358,15 +368,24 @@ export function MobileOrdersLogisticsView({
                     <div className="text-right shrink-0 flex items-center gap-2">
                       <div>
                         {isFiadoPending && (
-                          <span className="text-[9px] font-extrabold uppercase text-red-400 tracking-wider block">
+                          <span
+                            style={{ color: "#f87171" }}
+                            className="text-[9px] font-extrabold uppercase tracking-wider block"
+                          >
                             Falta pagar
                           </span>
                         )}
-                        <span className={`text-sm font-black block ${isFiadoPending ? "text-red-500" : "text-white"}`}>
+                        <span
+                          style={{ color: isFiadoPending ? "#ef4444" : "#ffffff" }}
+                          className={`text-sm font-black block ${isFiadoPending ? "text-red-500" : "text-white"}`}
+                        >
                           {formatBRL(order.isFiado ? (order.fiadoAmountOwed || order.totalAmount) : order.totalAmount)}
                         </span>
                       </div>
-                      <ChevronDown className="size-4 text-zinc-500 shrink-0" />
+                      <ChevronDown
+                        style={{ color: isFiadoPending ? "#f87171" : undefined }}
+                        className="size-4 text-zinc-500 shrink-0"
+                      />
                     </div>
                   </div>
                 );
@@ -481,22 +500,37 @@ export function MobileOrdersLogisticsView({
 
                   {/* Bloco de Fiado no Card Mobile (Exatamente como no print, com destaque vermelho para falta pagar) */}
                   {(order.isFiado || activeTab === "FIADOS") && (
-                    <div className={`p-3 rounded-xl border space-y-2 ${
-                      isFiadoPending
-                        ? "border-red-500/30 bg-red-500/[0.04]"
-                        : "border-white/20 bg-white/[0.04]"
-                    }`}>
+                    <div
+                      style={isFiadoPending ? { borderColor: "rgba(239, 68, 68, 0.4)", backgroundColor: "rgba(239, 68, 68, 0.05)" } : undefined}
+                      className={`p-3 rounded-xl border space-y-2 ${
+                        isFiadoPending
+                          ? "border-red-500/40 bg-red-500/[0.05]"
+                          : "border-white/20 bg-white/[0.04]"
+                      }`}
+                    >
                       <div className="flex items-center justify-between text-xs">
                         <span className={`flex items-center gap-1 font-medium ${isFiadoPending ? "text-red-300" : "text-zinc-300"}`}>
-                          Dia do pagamento: <b className={isFiadoPending ? "text-red-400" : "text-white"}>{order.fiadoDueDateFormatted || "Não informada"}</b>
+                          Dia do pagamento:{" "}
+                          <b
+                            style={{ color: isFiadoPending ? "#f87171" : "#ffffff" }}
+                            className={isFiadoPending ? "text-red-400" : "text-white"}
+                          >
+                            {order.fiadoDueDateFormatted || "Não informada"}
+                          </b>
                         </span>
                         <div className="text-right">
                           {isFiadoPending && (
-                            <span className="text-[9px] font-extrabold text-red-400 uppercase tracking-wider block">
+                            <span
+                              style={{ color: "#f87171" }}
+                              className="text-[9px] font-extrabold text-red-400 uppercase tracking-wider block"
+                            >
                               Falta pagar
                             </span>
                           )}
-                          <span className={`font-extrabold text-sm ${isFiadoPending ? "text-red-500" : "text-white"}`}>
+                          <span
+                            style={{ color: isFiadoPending ? "#ef4444" : "#ffffff" }}
+                            className={`font-extrabold text-sm ${isFiadoPending ? "text-red-500" : "text-white"}`}
+                          >
                             {formatBRL(order.fiadoAmountOwed || order.totalAmount)}
                           </span>
                         </div>
