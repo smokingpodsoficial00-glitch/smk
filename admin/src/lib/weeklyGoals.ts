@@ -6,6 +6,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { type CycleDefinition, getSaoPauloDateParts } from "./financialCycles";
+import { isOrderFiadoPending } from "./fiadoSales";
 
 export const SYSTEM_WEEKLY_GOALS_KEY = "__SYSTEM_SMK_WEEKLY_GOALS__";
 const DEFAULT_COMPANY_ID = "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
@@ -388,6 +389,7 @@ export function calculateWeeklyPerformances(
     // Filtrar pedidos que caem dentro desta semana pelo fuso America/Sao_Paulo
     const weekOrders = (orders || []).filter((o) => {
       if (!o.created_at) return false;
+      if (isOrderFiadoPending(o)) return false;
       const p = getSaoPauloDateParts(o.created_at);
       const dateKey = `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
       return dateKey >= w.startDateKey && dateKey <= w.endDateKey;

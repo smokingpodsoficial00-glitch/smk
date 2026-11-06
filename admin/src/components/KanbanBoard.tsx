@@ -3,7 +3,7 @@ import { formatBRL } from"@/lib/cart";
 import { 
  Clock, MapPin, ReceiptText, CheckCircle2, Truck, Bike, X, Loader2, 
  Search, Filter, MoreVertical, ChevronDown, ChevronUp, Copy, Printer, 
- Trash2, RotateCcw, Package, DollarSign, Eye, EyeOff, Plus, Bell
+ Trash2, RotateCcw, Package, DollarSign, Eye, EyeOff, Plus, Bell, Calendar, Phone, Edit3, Check, AlertTriangle, MessageCircle, BookOpen, AlertCircle
 } from"lucide-react";
 import { supabase } from"@/lib/supabase";
 import { useAuth } from"../contexts/AuthContext";
@@ -12,6 +12,16 @@ import { ManualSaleModal } from"./ManualSaleModal";
 import { MobilePushSetupModal } from"./MobilePushSetupModal";
 import { MobileOrdersLogisticsView } from "./orders/MobileOrdersLogisticsView";
 import { deleteOrderWithStockRestoration } from"@/lib/orders";
+import { invalidateFinanceCache } from "./FinanceDashboard";
+import {
+  extractFiadoInfo,
+  getOrderDisplayPaymentMethod,
+  markFiadoOrderAsPaid,
+  reopenFiadoOrder,
+  updateFiadoDetails,
+  formatIsoDateBR,
+  getTodaySaoPauloIso,
+} from "@/lib/fiadoSales";
 // stockSync: centralizada em deleteOrderWithStockRestoration
 
 export interface AdminOrder {
@@ -30,6 +40,16 @@ export interface AdminOrder {
  time: string;
  createdAt: string;
  requestedDiscount?: boolean;
+ isFiado?: boolean;
+ fiadoStatus?: 'PENDENTE' | 'PAGO';
+ fiadoDueDate?: string;
+ fiadoDueDateFormatted?: string;
+ fiadoAmountOwed?: number;
+ fiadoPaidAt?: string | null;
+ fiadoPaidMethod?: string | null;
+ fiadoDaysUntilDue?: number;
+ fiadoIsOverdue?: boolean;
+ fiadoIsDueToday?: boolean;
 }
 
 const getCompletedIds = (): string[] => {
@@ -70,7 +90,7 @@ export default function KanbanBoard() {
  const hasPendingFetchRef = useRef(false);
  const realtimeDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
- const fetchOrders = async () => {
+ const fetchOrders = async (_silent?: boolean) => {
  if (isFetchingRef.current) {
  hasPendingFetchRef.current = true;
  return;
@@ -109,6 +129,8 @@ export default function KanbanBoard() {
  .filter(o => o.client_phone !== '__SYSTEM_SMK_BEST_SELLERS__' && (!o.client_phone || !o.client_phone.startsWith('__SYSTEM_')))
  .map(o => {
  const isCompleted = completedIds.includes(o.id) || o.delivery_status === 'CONCLUIDO' || o.receipt_url === 'CONCLUIDO';
+ const fiadoInfo = extractFiadoInfo(o);
+ const displayPaymentMethod = getOrderDisplayPaymentMethod(o);
  return {
  id: o.id.substring(0, 8).toUpperCase(),
  realId: o.id,
@@ -123,13 +145,23 @@ export default function KanbanBoard() {
  })) : [],
  totalAmount: parseFloat(o.total_amount || 0),
  shippingFee: parseFloat(o.shipping_fee || 0),
- paymentMethod: o.payment_method,
+ paymentMethod: displayPaymentMethod,
  receiptUrl: o.receipt_url,
  paymentStatus: o.payment_status,
  status: isCompleted ? 'CONCLUIDO' : (o.delivery_status || 'PREPARANDO'),
  time: new Date(o.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
  createdAt: o.created_at,
- requestedDiscount: !!o.requested_discount || o.receipt_url === 'SOLICITOU_DESCONTO'
+ requestedDiscount: !!o.requested_discount || o.receipt_url === 'SOLICITOU_DESCONTO',
+ isFiado: fiadoInfo.isFiado,
+ fiadoStatus: fiadoInfo.status,
+ fiadoDueDate: fiadoInfo.dueDate,
+ fiadoDueDateFormatted: fiadoInfo.dueDateFormatted,
+ fiadoAmountOwed: fiadoInfo.amountOwed,
+ fiadoPaidAt: fiadoInfo.paidAt,
+ fiadoPaidMethod: fiadoInfo.paidMethod,
+ fiadoDaysUntilDue: fiadoInfo.daysUntilDue,
+ fiadoIsOverdue: fiadoInfo.isOverdue,
+ fiadoIsDueToday: fiadoInfo.isDueToday,
  };
  });
  setOrders(mapped);
@@ -173,7 +205,73 @@ export default function KanbanBoard() {
  };
  }, [company?.id]);
 
- const [activeTab, setActiveTab] = useState<'kanban' | 'concluidos'>('kanban');
+ const [activeTab, setActiveTab] = useState<'kanban' | 'concluidos' | 'fiados'>('kanban');
+ const [fiadoSearchQuery, setFiadoSearchQuery] = useState("");
+ const [fiadoStatusFilter, setFiadoStatusFilter] = useState<'PENDENTE' | 'ATRASADOS' | 'PAGO' | 'TODOS'>('PENDENTE');
+ const [processingFiadoId, setProcessingFiadoId] = useState<string | null>(null);
+ const [editingFiadoId, setEditingFiadoId] = useState<string | null>(null);
+ const [editFiadoDueDate, setEditFiadoDueDate] = useState<string>("");
+ const [editFiadoAmount, setEditFiadoAmount] = useState<string>("");
+ const [selectedFiadoPayMethod, setSelectedFiadoPayMethod] = useState<Record<string, 'PIX' | 'DINHEIRO' | 'CARTAO'>>({});
+
+ const handleConfirmFiadoPayment = async (order: AdminOrder) => {
+   const chosenMethod = selectedFiadoPayMethod[order.realId] || 'PIX';
+   setProcessingFiadoId(order.realId);
+   const res = await markFiadoOrderAsPaid({ orderId: order.realId, paidMethod: chosenMethod, companyId: company?.id });
+   setProcessingFiadoId(null);
+   if (res.success) {
+     invalidateFinanceCache();
+     await fetchOrders();
+   } else {
+     alert("Erro ao registrar pagamento do fiado: " + (res.error || "Erro desconhecido"));
+   }
+ };
+
+ const handleReopenFiadoPayment = async (order: AdminOrder) => {
+   if (!confirm(`Deseja marcar o fiado de ${order.clientName} novamente como PENDENTE? O valor sairá do Caixa Real até ser pago.`)) return;
+   setProcessingFiadoId(order.realId);
+   const res = await reopenFiadoOrder({ orderId: order.realId, companyId: company?.id });
+   setProcessingFiadoId(null);
+   if (res.success) {
+     invalidateFinanceCache();
+     await fetchOrders();
+   } else {
+     alert("Erro ao reabrir fiado: " + (res.error || "Erro desconhecido"));
+   }
+ };
+
+ const handleStartEditFiado = (order: AdminOrder) => {
+   setEditingFiadoId(order.realId);
+   setEditFiadoDueDate(order.fiadoDueDate || getTodaySaoPauloIso());
+   setEditFiadoAmount(String((order.fiadoAmountOwed || order.totalAmount).toFixed(2)).replace('.', ','));
+ };
+
+ const handleSaveFiadoEdit = async (realId: string) => {
+   const parsedAmount = parseFloat(editFiadoAmount.replace(',', '.'));
+   if (!editFiadoDueDate) {
+     alert("Informe a data de pagamento.");
+     return;
+   }
+   if (isNaN(parsedAmount) || parsedAmount <= 0) {
+     alert("Informe um valor válido.");
+     return;
+   }
+   setProcessingFiadoId(realId);
+   const res = await updateFiadoDetails({
+     orderId: realId,
+     dueDate: editFiadoDueDate,
+     amountOwed: parsedAmount,
+     companyId: company?.id,
+   });
+   setProcessingFiadoId(null);
+   if (res.success) {
+     setEditingFiadoId(null);
+     invalidateFinanceCache();
+     await fetchOrders();
+   } else {
+     alert("Erro ao atualizar fiado: " + (res.error || "Erro desconhecido"));
+   }
+ };
 
  const updateStatus = async (
  realId: string, 
@@ -341,6 +439,42 @@ export default function KanbanBoard() {
 
  const activeOrders = orders.filter(o => o.status !== 'CONCLUIDO');
  const allCompletedOrders = orders.filter(o => o.status === 'CONCLUIDO');
+ const allFiadoOrders = orders.filter(o => o.isFiado);
+ const pendingFiadoOrders = allFiadoOrders.filter(o => o.fiadoStatus === 'PENDENTE');
+ const paidFiadoOrders = allFiadoOrders.filter(o => o.fiadoStatus === 'PAGO');
+ const overdueOrTodayFiadoOrders = pendingFiadoOrders.filter(o => o.fiadoIsOverdue || o.fiadoIsDueToday);
+
+ const totalFiadoPendingAmount = pendingFiadoOrders.reduce((sum, o) => sum + (o.fiadoAmountOwed || o.totalAmount), 0);
+ const totalFiadoOverdueOrTodayAmount = overdueOrTodayFiadoOrders.reduce((sum, o) => sum + (o.fiadoAmountOwed || o.totalAmount), 0);
+ const totalFiadoPaidAmount = paidFiadoOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+
+ const filteredFiadoOrders = allFiadoOrders
+   .filter(o => {
+     if (fiadoStatusFilter === 'PENDENTE' && o.fiadoStatus !== 'PENDENTE') return false;
+     if (fiadoStatusFilter === 'ATRASADOS' && !(o.fiadoStatus === 'PENDENTE' && (o.fiadoIsOverdue || o.fiadoIsDueToday))) return false;
+     if (fiadoStatusFilter === 'PAGO' && o.fiadoStatus !== 'PAGO') return false;
+
+     if (fiadoSearchQuery.trim().length > 0) {
+       const q = fiadoSearchQuery.toLowerCase();
+       const matchesId = o.id.toLowerCase().includes(q);
+       const matchesClient = o.clientName.toLowerCase().includes(q) || (o.phone && o.phone.toLowerCase().includes(q));
+       const matchesDueDate = (o.fiadoDueDateFormatted || '').toLowerCase().includes(q) || (o.fiadoDueDate || '').includes(q);
+       const matchesItems = o.items.some(i => i.model.toLowerCase().includes(q) || i.flavor.toLowerCase().includes(q));
+       return matchesId || matchesClient || matchesDueDate || matchesItems;
+     }
+     return true;
+   })
+   .sort((a, b) => {
+     if (a.fiadoStatus !== b.fiadoStatus) {
+       return a.fiadoStatus === 'PENDENTE' ? -1 : 1;
+     }
+     if (a.fiadoStatus === 'PENDENTE') {
+       const dateA = a.fiadoDueDate || '9999-12-31';
+       const dateB = b.fiadoDueDate || '9999-12-31';
+       if (dateA !== dateB) return dateA.localeCompare(dateB);
+     }
+     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+   });
 
  // Filtro dinâmico para a aba de histórico ERP
  const filteredCompletedOrders = allCompletedOrders.filter(o => {
@@ -385,7 +519,7 @@ export default function KanbanBoard() {
  return true;
  });
 
- const totalCompletedAmount24h = filteredCompletedOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+ const totalCompletedAmount24h = filteredCompletedOrders.filter(o => !(o.isFiado && o.fiadoStatus === 'PENDENTE')).reduce((sum, o) => sum + o.totalAmount, 0);
  const totalCompletedItems24h = filteredCompletedOrders.reduce((sum, o) => sum + o.items.reduce((iSum, i) => iSum + i.quantity, 0), 0);
  const avgTicket24h = filteredCompletedOrders.length > 0 ? totalCompletedAmount24h / filteredCompletedOrders.length : 0;
 
@@ -411,6 +545,7 @@ export default function KanbanBoard() {
           onOpenWhatsAppDiscount={handleOpenWhatsAppDiscount}
           onOpenManualSale={() => setIsManualSaleOpen(true)}
           onOpenPushModal={() => setIsPushModalOpen(true)}
+          onOrdersChanged={() => { invalidateFinanceCache(); fetchOrders(); }}
         />
       </div>
 
@@ -452,7 +587,7 @@ export default function KanbanBoard() {
  <span>Registrar Venda</span>
  </button>
 
- <div className="grid grid-cols-2 sm:flex items-center gap-1 bg-[#121212]/50 p-1 rounded-xl border border-white/10 w-full sm:w-auto">
+ <div className="grid grid-cols-3 sm:flex items-center gap-1 bg-[#121212]/50 p-1 rounded-xl border border-white/10 w-full sm:w-auto">
  <button
  onClick={() => setActiveTab('kanban')}
  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-center justify-center cursor-pointer ${
@@ -473,6 +608,22 @@ export default function KanbanBoard() {
  >
  <CheckCircle2 className="size-3.5" />
  Concluídos ({allCompletedOrders.length})
+ </button>
+ <button
+ onClick={() => setActiveTab('fiados')}
+ className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer relative ${
+ activeTab === 'fiados' 
+ ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.2)]' 
+ : pendingFiadoOrders.length > 0
+ ? 'text-amber-400/90 hover:text-amber-300 hover:bg-amber-500/10'
+ : 'text-white/50 hover:text-white'
+ }`}
+ >
+ <BookOpen className="size-3.5" />
+ <span>Fiados ({pendingFiadoOrders.length})</span>
+ {overdueOrTodayFiadoOrders.length > 0 && (
+ <span className="size-2 rounded-full bg-red-500 animate-pulse" title="Há fiados vencendo hoje ou atrasados" />
+ )}
  </button>
  </div>
  </div>
@@ -615,6 +766,7 @@ export default function KanbanBoard() {
  <option value="PIX" className="bg-[#121212]">PIX</option>
  <option value="DINHEIRO" className="bg-[#121212]">Dinheiro</option>
  <option value="CARTAO" className="bg-[#121212]">Cartão</option>
+ <option value="FIADO" className="bg-[#121212]">Fiado (A Receber)</option>
  </select>
  </div>
  </div>
@@ -690,7 +842,11 @@ export default function KanbanBoard() {
  {/* Pagamento Badge */}
  <div className="w-24 text-center shrink-0">
  <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-elevated border border-border text-silver">
- {order.paymentMethod || 'PIX'}
+ {order.isFiado
+ ? order.fiadoStatus === 'PENDENTE'
+ ? `📒 FIADO (${order.fiadoDueDateFormatted || 'A Receber'})`
+ : `✅ FIADO PAGO (${order.fiadoPaidMethod || 'PIX'})`
+ : (order.paymentMethod || 'PIX')}
  </span>
  </div>
 
@@ -830,6 +986,373 @@ export default function KanbanBoard() {
  </div>
  )}
  </div>
+ </div>
+ )}
+
+ {/* Conteúdo da Aba: FIADOS (VENDAS A RECEBER & CONTROLE DE CAIXA REAL) */}
+ {activeTab === 'fiados' && (
+ <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5 custom-scrollbar">
+ {/* Top Banner - 3 KPIs de Fiados */}
+ <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+ <div className="bg-card border border-amber-500/30 rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
+ <div className="flex items-center justify-between">
+ <span className="text-xs uppercase text-amber-400 font-bold tracking-wider flex items-center gap-1.5">
+ <BookOpen className="size-3.5" />
+ A Receber (Fiados Pendentes)
+ </span>
+ <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold">
+ Fora do Caixa Real
+ </span>
+ </div>
+ <div className="text-2xl font-bold text-amber-400 mt-2">
+ {formatBRL(totalFiadoPendingAmount)}
+ </div>
+ <p className="text-[11px] text-muted-foreground mt-1">
+ {pendingFiadoOrders.length} {pendingFiadoOrders.length === 1 ? 'cliente devendo' : 'clientes devendo'} • Só entra no Caixa Real ao marcar como pago
+ </p>
+ </div>
+
+ <div className={`bg-card border rounded-2xl p-4 flex flex-col justify-between ${
+ overdueOrTodayFiadoOrders.length > 0 ? 'border-red-500/40 bg-red-500/[0.03]' : 'border-border'
+ }`}>
+ <div className="flex items-center justify-between">
+ <span className="text-xs uppercase text-muted-foreground font-semibold tracking-wider flex items-center gap-1.5">
+ <AlertCircle className={`size-3.5 ${overdueOrTodayFiadoOrders.length > 0 ? 'text-red-400' : 'text-muted-foreground'}`} />
+ Vencendo Hoje / Atrasados
+ </span>
+ {overdueOrTodayFiadoOrders.length > 0 && (
+ <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/30 text-red-400 font-bold">
+ Cobrar Agora
+ </span>
+ )}
+ </div>
+ <div className={`text-2xl font-bold mt-2 ${overdueOrTodayFiadoOrders.length > 0 ? 'text-red-400' : 'text-silver'}`}>
+ {formatBRL(totalFiadoOverdueOrTodayAmount)}
+ </div>
+ <p className="text-[11px] text-muted-foreground mt-1">
+ {overdueOrTodayFiadoOrders.length} {overdueOrTodayFiadoOrders.length === 1 ? 'cliente com data hoje/vencida' : 'clientes com data hoje/vencida'}
+ </p>
+ </div>
+
+ <div className="bg-card border border-emerald-500/20 rounded-2xl p-4 flex flex-col justify-between">
+ <div className="flex items-center justify-between">
+ <span className="text-xs uppercase text-emerald-400/90 font-semibold tracking-wider flex items-center gap-1.5">
+ <CheckCircle2 className="size-3.5" />
+ Fiados Já Pagos
+ </span>
+ <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold">
+ No Caixa Real
+ </span>
+ </div>
+ <div className="text-2xl font-bold text-emerald-400 mt-2">
+ {formatBRL(totalFiadoPaidAmount)}
+ </div>
+ <p className="text-[11px] text-muted-foreground mt-1">
+ {paidFiadoOrders.length} {paidFiadoOrders.length === 1 ? 'fiado recebido e contabilizado' : 'fiados recebidos e contabilizados'}
+ </p>
+ </div>
+ </div>
+
+ {/* Barra de Busca + Filtros de Status dos Fiados */}
+ <div className="bg-card border border-border rounded-2xl p-3 flex flex-col lg:flex-row items-center justify-between gap-3">
+ <div className="relative flex-1 w-full">
+ <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+ <input
+ type="text"
+ value={fiadoSearchQuery}
+ onChange={(e) => setFiadoSearchQuery(e.target.value)}
+ placeholder="Buscar cliente fiado por nome, telefone, data de pagamento (ex: 15/11), sabor ou ID..."
+ className="w-full bg-[#0f0f0f] border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/50 transition-all shadow-inner"
+ />
+ </div>
+
+ <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto justify-end">
+ <button
+ onClick={() => setFiadoStatusFilter('PENDENTE')}
+ className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+ fiadoStatusFilter === 'PENDENTE'
+ ? 'bg-amber-500 text-black shadow-[0_0_12px_rgba(245,158,11,0.3)]'
+ : 'bg-[#0f0f0f] text-silver border border-white/10 hover:border-amber-500/40'
+ }`}
+ >
+ <span>⏳ A Receber ({pendingFiadoOrders.length})</span>
+ </button>
+ <button
+ onClick={() => setFiadoStatusFilter('ATRASADOS')}
+ className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+ fiadoStatusFilter === 'ATRASADOS'
+ ? 'bg-red-500 text-white shadow-[0_0_12px_rgba(239,68,68,0.3)]'
+ : 'bg-[#0f0f0f] text-silver border border-white/10 hover:border-red-500/40'
+ }`}
+ >
+ <span>⚠️ Hoje / Atrasados ({overdueOrTodayFiadoOrders.length})</span>
+ </button>
+ <button
+ onClick={() => setFiadoStatusFilter('PAGO')}
+ className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+ fiadoStatusFilter === 'PAGO'
+ ? 'bg-emerald-500 text-black shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+ : 'bg-[#0f0f0f] text-silver border border-white/10 hover:border-emerald-500/40'
+ }`}
+ >
+ <span>✅ Pagos ({paidFiadoOrders.length})</span>
+ </button>
+ <button
+ onClick={() => setFiadoStatusFilter('TODOS')}
+ className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+ fiadoStatusFilter === 'TODOS'
+ ? 'bg-white/15 text-white border border-white/30'
+ : 'bg-[#0f0f0f] text-silver border border-white/10 hover:border-white/20'
+ }`}
+ >
+ Todos ({allFiadoOrders.length})
+ </button>
+ </div>
+ </div>
+
+ {/* Lista de Clientes Fiados */}
+ {filteredFiadoOrders.length === 0 ? (
+ <div className="bg-card border border-border rounded-2xl py-16 px-4 text-center flex flex-col items-center justify-center gap-3">
+ <BookOpen className="size-10 text-amber-400/30" />
+ <div className="space-y-1">
+ <p className="text-sm font-bold text-white">Nenhum registro de fiado encontrado neste filtro</p>
+ <p className="text-xs text-muted-foreground">
+ Para lançar uma venda a fiado, clique em <b>+ Registrar Venda</b> e selecione a forma de pagamento <b>Fiado</b>.
+ </p>
+ </div>
+ </div>
+ ) : (
+ <div className="space-y-3">
+ {filteredFiadoOrders.map((order) => {
+ const isPending = order.fiadoStatus === 'PENDENTE';
+ const amountOwed = order.fiadoAmountOwed || order.totalAmount;
+ const isProcessing = processingFiadoId === order.realId;
+ const isEditing = editingFiadoId === order.realId;
+ const cleanPhone = (order.phone || '').replace(/\D/g, '');
+ const whatsappPhone = cleanPhone ? (cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`) : '';
+ const itemsSummary = order.items.map(i => `${i.quantity}x ${i.flavor} (${i.model})`).join(', ');
+ const whatsappMessage = `Olá ${order.clientName}! Tudo bem? Passando para lembrar do pagamento referente ao seu pedido #${order.id} (${itemsSummary}) no valor de ${formatBRL(amountOwed)}, combinado para ${order.fiadoDueDateFormatted || 'hoje'}. Posso te enviar a chave Pix?`;
+ const payMethodChoice = selectedFiadoPayMethod[order.realId] || 'PIX';
+
+ return (
+ <div
+ key={order.realId}
+ className={`bg-card border rounded-2xl p-4 sm:p-5 transition-all ${
+ !isPending
+ ? 'border-emerald-500/25 bg-emerald-500/[0.02]'
+ : order.fiadoIsOverdue
+ ? 'border-red-500/40 bg-red-500/[0.03] shadow-[0_0_20px_rgba(239,68,68,0.06)]'
+ : order.fiadoIsDueToday
+ ? 'border-amber-500/50 bg-amber-500/[0.04] shadow-[0_0_20px_rgba(245,158,11,0.06)]'
+ : 'border-amber-500/20 hover:border-amber-500/35'
+ }`}
+ >
+ <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+ {/* Coluna 1: Cliente, Telefone & Contato Rápido */}
+ <div className="space-y-2 min-w-0 flex-1">
+ <div className="flex flex-wrap items-center gap-2">
+ <span className="text-[11px] font-bold text-muted-foreground bg-white/5 px-2 py-0.5 rounded-md border border-white/10">
+ #{order.id}
+ </span>
+ <h3 className="text-base font-bold text-white truncate">
+ {order.clientName}
+ </h3>
+ {isPending ? (
+ order.fiadoIsOverdue ? (
+ <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-red-500/20 border border-red-500/40 text-red-300">
+ ⚠️ Pagamento Atrasado
+ </span>
+ ) : order.fiadoIsDueToday ? (
+ <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/25 border border-amber-500/50 text-amber-300 animate-pulse">
+ 🔔 Paga Hoje
+ </span>
+ ) : (
+ <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/15 border border-amber-500/30 text-amber-300">
+ ⏳ Aguardando Pagamento
+ </span>
+ )
+ ) : (
+ <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/20 border border-emerald-500/40 text-emerald-300">
+ ✅ Pago ({order.fiadoPaidMethod || 'PIX'}) • No Caixa Real
+ </span>
+ )}
+ </div>
+
+ {/* Telefone + Botão WhatsApp Direto */}
+ <div className="flex flex-wrap items-center gap-2.5 pt-0.5">
+ {order.phone ? (
+ <>
+ <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-silver bg-[#121212] px-3 py-1.5 rounded-xl border border-white/10">
+ <Phone className="size-3.5 text-emerald-400" />
+ {order.phone}
+ </span>
+ <a
+ href={`https://wa.me/${whatsappPhone}?text=${encodeURIComponent(whatsappMessage)}`}
+ target="_blank"
+ rel="noopener noreferrer"
+ className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] border border-[#25D366]/30 text-xs font-bold transition-all cursor-pointer"
+ title="Abrir conversa no WhatsApp já com mensagem pronta de cobrança"
+ >
+ <span>💬 Chamar no WhatsApp</span>
+ </a>
+ </>
+ ) : (
+ <span className="text-xs text-muted-foreground italic">
+ Sem telefone cadastrado
+ </span>
+ )}
+ <span className="text-[11px] text-muted-foreground">
+ • Compra feita em {new Date(order.createdAt).toLocaleDateString('pt-BR')} às {order.time}
+ </span>
+ </div>
+
+ {/* Itens Comprados */}
+ <div className="text-xs text-silver/90 bg-[#0d0d0d] border border-white/5 rounded-xl px-3 py-2 flex flex-wrap items-center gap-2">
+ <span className="text-[10px] uppercase font-bold text-muted-foreground">Itens:</span>
+ <span>{itemsSummary}</span>
+ </div>
+ </div>
+
+ {/* Coluna 2: Dia que vai pagar & Quanto deve */}
+ <div className="flex flex-col sm:flex-row lg:items-center gap-3 shrink-0">
+ {isEditing ? (
+ <div className="bg-[#111] border border-amber-500/40 rounded-xl p-3 space-y-2.5 w-full sm:w-72">
+ <div className="text-[10px] font-bold uppercase text-amber-400">Editar Data e Valor do Fiado</div>
+ <div className="grid grid-cols-2 gap-2">
+ <div>
+ <label className="text-[10px] text-muted-foreground block mb-1">Dia que vai pagar</label>
+ <input
+ type="date"
+ value={editFiadoDueDate}
+ onChange={(e) => setEditFiadoDueDate(e.target.value)}
+ style={{ colorScheme: 'dark' }}
+ className="w-full bg-[#1a1a1a] border border-white/15 rounded-lg px-2 py-1.5 text-xs text-white"
+ />
+ </div>
+ <div>
+ <label className="text-[10px] text-muted-foreground block mb-1">Quanto deve (R$)</label>
+ <input
+ type="text"
+ value={editFiadoAmount}
+ onChange={(e) => setEditFiadoAmount(e.target.value)}
+ className="w-full bg-[#1a1a1a] border border-white/15 rounded-lg px-2 py-1.5 text-xs text-amber-300 font-bold"
+ />
+ </div>
+ </div>
+ <div className="flex items-center justify-end gap-2 pt-1">
+ <button
+ onClick={() => setEditingFiadoId(null)}
+ className="px-2.5 py-1 rounded-lg text-[11px] text-muted-foreground hover:text-white cursor-pointer"
+ >
+ Cancelar
+ </button>
+ <button
+ disabled={isProcessing}
+ onClick={() => handleSaveFiadoEdit(order.realId)}
+ className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-bold cursor-pointer"
+ >
+ {isProcessing ? 'Salvando...' : 'Salvar'}
+ </button>
+ </div>
+ </div>
+ ) : (
+ <div className="flex items-center gap-3 bg-[#0f0f0f] border border-white/10 rounded-xl px-4 py-3">
+ <div className="pr-3 border-r border-white/10">
+ <span className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+ <Calendar className="size-3 text-amber-400" />
+ Dia do Pagamento
+ </span>
+ <div className={`text-sm font-bold mt-0.5 ${
+ !isPending
+ ? 'text-emerald-400'
+ : order.fiadoIsOverdue
+ ? 'text-red-400'
+ : order.fiadoIsDueToday
+ ? 'text-amber-300'
+ : 'text-white'
+ }`}>
+ {order.fiadoDueDateFormatted || 'Não informado'}
+ </div>
+ {!isPending && order.fiadoPaidAt && (
+ <span className="text-[10px] text-emerald-400/80 block">
+ Pago em {new Date(order.fiadoPaidAt).toLocaleDateString('pt-BR')}
+ </span>
+ )}
+ </div>
+
+ <div>
+ <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+ Quanto Deve
+ </span>
+ <div className={`text-lg font-extrabold mt-0.5 ${isPending ? 'text-amber-400' : 'text-emerald-400'}`}>
+ {formatBRL(amountOwed)}
+ </div>
+ {isPending && (
+ <button
+ onClick={() => handleStartEditFiado(order)}
+ className="text-[10px] text-amber-400/80 hover:text-amber-300 underline cursor-pointer"
+ >
+ Alterar data/valor
+ </button>
+ )}
+ </div>
+ </div>
+ )}
+
+ </div>
+
+ {/* Coluna 3: Botão de Confirmar Pagamento (Lançar no Caixa Real) */}
+ <div className="flex flex-col gap-2 shrink-0 min-w-[220px]">
+ {isPending ? (
+ <>
+ <div className="flex items-center gap-1 bg-[#0f0f0f] p-1 rounded-xl border border-white/10">
+ {(['PIX', 'DINHEIRO', 'CARTAO'] as const).map((m) => (
+ <button
+ key={m}
+ type="button"
+ onClick={() => setSelectedFiadoPayMethod(prev => ({ ...prev, [order.realId]: m }))}
+ className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+ payMethodChoice === m
+ ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+ : 'text-muted-foreground hover:text-white'
+ }`}
+ >
+ {m === 'CARTAO' ? 'CARTÃO' : m}
+ </button>
+ ))}
+ </div>
+ <button
+ disabled={isProcessing}
+ onClick={() => handleConfirmFiadoPayment(order)}
+ className="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-[0_0_20px_rgba(16,185,129,0.25)] active:scale-95 cursor-pointer disabled:opacity-50"
+ >
+ <CheckCircle2 className="size-4 stroke-[2.5]" />
+ <span>{isProcessing ? 'Confirmando...' : 'Confirmar Pago (Caixa Real)'}</span>
+ </button>
+ </>
+ ) : (
+ <div className="flex flex-col items-end gap-1.5">
+ <div className="w-full py-2 px-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center justify-center gap-1.5">
+ <CheckCircle2 className="size-4" />
+ <span>Contabilizado no Caixa Real</span>
+ </div>
+ <button
+ disabled={isProcessing}
+ onClick={() => handleReopenFiadoPayment(order)}
+ className="text-[11px] text-muted-foreground hover:text-amber-400 flex items-center gap-1 cursor-pointer px-2 py-1"
+ >
+ <RotateCcw className="size-3" />
+ <span>Desfazer (Voltar p/ Pendente)</span>
+ </button>
+ </div>
+ )}
+ </div>
+ </div>
+ </div>
+ );
+ })}
+ </div>
+ )}
  </div>
  )}
 
@@ -1047,6 +1570,26 @@ function OrderCard({
  </button>
  </div>
  </div>
+
+ {/* 📒 BADGE DE VENDA A FIADO NO CARD DO KANBAN */}
+ {order.isFiado && (
+ <div className={`p-3 rounded-xl flex items-center justify-between gap-2 border ${
+ order.fiadoStatus === 'PENDENTE'
+ ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+ : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+ }`}>
+ <div className="flex flex-col">
+ <span className="font-bold text-[11px] flex items-center gap-1.5">
+ 📒 {order.fiadoStatus === 'PENDENTE' ? 'VENDA A FIADO (FORA DO CAIXA REAL)' : 'FIADO PAGO (NO CAIXA REAL)'}
+ </span>
+ <span className="text-[10px] opacity-80 mt-0.5">
+ {order.fiadoStatus === 'PENDENTE'
+ ? `Vai pagar dia: ${order.fiadoDueDateFormatted || 'A definir'} • Deve ${formatBRL(order.fiadoAmountOwed || order.totalAmount)}`
+ : `Quitado via ${order.fiadoPaidMethod || 'PIX'}`}
+ </span>
+ </div>
+ </div>
+ )}
 
  {/* 🏷️ MÓDULO DE DECISÃO DO DONO: ALERTA DE SOLICITAÇÃO DE DESCONTO */}
  {order.requestedDiscount && (

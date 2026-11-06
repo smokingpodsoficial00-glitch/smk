@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ensureBuyerInBroadcastList } from "@/lib/marketingLists";
 import { ensureSaleCustomer } from "@/lib/crm";
 import { BRAZILIAN_STATES } from "@/lib/nationalSales";
+import { getFutureDateIso, formatIsoDateBR } from "@/lib/fiadoSales";
 import { notifyMobileSale } from "@/lib/saleNotifications";
 import { validateCartStockAvailability, executeAtomicSaleWithStockLock } from "@/lib/stockValidation";
 import { invalidateSaleCatalogCache } from "../ManualSaleModal";
@@ -32,6 +33,7 @@ import {
   MapPin,
   RotateCcw,
   Check,
+  Calendar,
 } from "lucide-react";
 
 const normalizeText = (str: string) =>
@@ -148,7 +150,10 @@ export function MobileManualSaleFlow({
   const [customPrice, setCustomPrice] = useState<string>("");
 
   // ETAPA 3: PAGAMENTO & ENTREGA
-  const [paymentMethod, setPaymentMethod] = useState<"PIX" | "DINHEIRO" | "CARTAO">("PIX");
+  const [paymentMethod, setPaymentMethod] = useState<"PIX" | "DINHEIRO" | "CARTAO" | "FIADO">("PIX");
+  const [fiadoDueDate, setFiadoDueDate] = useState<string>(() => getFutureDateIso(7));
+  const [fiadoAmountOwed, setFiadoAmountOwed] = useState<string>("");
+  const [fiadoAmountEdited, setFiadoAmountEdited] = useState<boolean>(false);
   const [shippingFee, setShippingFee] = useState<string>("0");
   const [shippingCost, setShippingCost] = useState<string>("0");
   const [autoAddToMarketingList, setAutoAddToMarketingList] = useState(true);
@@ -535,6 +540,12 @@ export function MobileManualSaleFlow({
   const grandTotal = subtotal + numericShippingFee;
   const estimatedProfit = subtotal - totalCost + (numericShippingFee - numericShippingCost);
 
+  useEffect(() => {
+    if (!fiadoAmountEdited) {
+      setFiadoAmountOwed(grandTotal > 0 ? grandTotal.toFixed(2).replace(".", ",") : "");
+    }
+  }, [grandTotal, fiadoAmountEdited]);
+
   // Validação para avançar do Passo 1 para o Passo 2
   const handleProceedToProducts = () => {
     setErrorMessage("");
@@ -580,6 +591,16 @@ export function MobileManualSaleFlow({
       return;
     }
 
+    const isFiadoSale = paymentMethod === "FIADO";
+    const parsedFiadoOwed = parseFloat(fiadoAmountOwed.replace(",", "."));
+    const numericFiadoOwed =
+      Number.isFinite(parsedFiadoOwed) && parsedFiadoOwed > 0 ? parsedFiadoOwed : grandTotal;
+
+    if (isFiadoSale && !fiadoDueDate) {
+      setErrorMessage("Por favor, informe o dia em que o cliente vai pagar o fiado.");
+      return;
+    }
+
     submittingRef.current = true;
     setSubmitting(true);
 
@@ -615,6 +636,13 @@ export function MobileManualSaleFlow({
           price: item.price,
           unit_price: item.price,
           modelKey: modelKey,
+          real_payment_method: paymentMethod,
+          ...(isFiadoSale && {
+            is_fiado: true,
+            fiado_status: "PENDENTE",
+            fiado_due_date: fiadoDueDate,
+            fiado_amount_owed: Number(numericFiadoOwed.toFixed(2)),
+          }),
           ...(isNationalSale && {
             is_national: true,
             national_state: nationalState,
@@ -708,7 +736,14 @@ export function MobileManualSaleFlow({
         clientName: clientName.trim(),
         totalAmount: grandTotal,
         itemsCount: totalPodsCount,
-        paymentMethod: paymentMethod === "CARTAO" ? "Cartão" : paymentMethod === "DINHEIRO" ? "Dinheiro" : "PIX",
+        paymentMethod:
+          paymentMethod === "FIADO"
+            ? `Fiado (${formatIsoDateBR(fiadoDueDate)})`
+            : paymentMethod === "CARTAO"
+            ? "Cartão"
+            : paymentMethod === "DINHEIRO"
+            ? "Dinheiro"
+            : "PIX",
       });
 
       setCurrentStep("SUCCESS");
@@ -1430,7 +1465,7 @@ export function MobileManualSaleFlow({
                 Forma de Pagamento
               </span>
 
-              <div className="grid grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-2 gap-2.5">
                 {/* PIX */}
                 <button
                   type="button"
@@ -1472,7 +1507,69 @@ export function MobileManualSaleFlow({
                   <CreditCard className="size-5" />
                   <span className="text-xs font-bold">Cartão</span>
                 </button>
+
+                {/* FIADO */}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("FIADO")}
+                  className={`min-h-[58px] rounded-2xl border p-2.5 flex flex-col items-center justify-center gap-1.5 transition-all ${
+                    paymentMethod === "FIADO"
+                      ? "bg-amber-500/20 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.25)]"
+                      : "bg-[#1c1c20] border-white/5 text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  <Calendar className="size-5" />
+                  <span className="text-xs font-bold">Fiado</span>
+                </button>
               </div>
+
+              {paymentMethod === "FIADO" && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3 mt-2 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-300">
+                      📒 Agendamento do Fiado
+                    </span>
+                    <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">
+                      Fora do Caixa Real
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2.5">
+                    <div>
+                      <label className="text-[11px] text-amber-200/90 font-semibold block mb-1">
+                        Dia em que vai pagar *
+                      </label>
+                      <input
+                        type="date"
+                        value={fiadoDueDate}
+                        onChange={(e) => setFiadoDueDate(e.target.value)}
+                        className="w-full bg-black/60 border border-amber-500/30 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] text-amber-200/90 font-semibold block mb-1">
+                        Quanto ele deve (R$) *
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={fiadoAmountOwed}
+                        onChange={(e) => {
+                          setFiadoAmountOwed(e.target.value);
+                          setFiadoAmountEdited(true);
+                        }}
+                        placeholder={grandTotal.toFixed(2).replace(".", ",")}
+                        className="w-full bg-black/60 border border-amber-500/30 rounded-xl px-3 py-2.5 text-sm text-amber-300 focus:outline-none focus:border-amber-400 font-extrabold"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-amber-200/80 leading-relaxed">
+                    ⏳ Este valor só entrará no Caixa Real quando for marcado como pago na aba Fiados.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* MAIS OPÇÕES: FRETE & VENDA NACIONAL (Acordeão Retrátil) */}

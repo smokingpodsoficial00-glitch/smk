@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { isOrderFiadoPending, getOrderDisplayPaymentMethod } from "./fiadoSales";
 
 export interface SaleItem {
   name: string;
@@ -188,7 +189,7 @@ export async function fetchSalesHistory(companyId?: string): Promise<{ sales: De
       const cleanPhone = String(o.client_phone || '').replace(/\D/g, '');
       const orderAmount = parseFloat(o.total_amount || 0);
       const orderTime = new Date(o.created_at).getTime();
-      const isCompleted = o.delivery_status !== 'CANCELADO';
+      const isCompleted = o.delivery_status !== 'CANCELADO' && !isOrderFiadoPending(o);
 
       if (isCompleted) {
         totalRevenue += orderAmount;
@@ -288,8 +289,8 @@ export async function fetchSalesHistory(companyId?: string): Promise<{ sales: De
         delivery_fee: o.shipping_fee ? parseFloat(o.shipping_fee) : (o.delivery_fee ? parseFloat(o.delivery_fee) : 0),
         items: mappedItems,
         delivery_status: o.delivery_status || 'CONCLUIDO',
-        payment_status: o.payment_status || 'PAGO',
-        payment_method: o.payment_method || 'PIX',
+        payment_status: isOrderFiadoPending(o) ? 'PENDENTE' : (o.payment_status || 'PAGO'),
+        payment_method: getOrderDisplayPaymentMethod(o),
         created_at: o.created_at,
         source: o.source || 'WhatsApp',
         notes: o.notes || '',

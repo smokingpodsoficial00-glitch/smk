@@ -7,6 +7,7 @@
 
 import { isOrderNational, extractNationalInfo } from "./nationalSales";
 import { isCompanyExpenseTransaction } from "./partnerPayroll";
+import { isOrderFiadoPending } from "./fiadoSales";
 
 export interface CycleDefinition {
   id: string; // Ex: "2026-08"
@@ -216,7 +217,8 @@ export function filterValidOrders(orders: any[]): any[] {
       o.delivery_status !== "CANCELADO" &&
       o.client_phone !== "__SYSTEM_SMK_BEST_SELLERS__" &&
       (!o.client_phone || !o.client_phone.startsWith("__SYSTEM_")) &&
-      (!o.client_name || !o.client_name.toLowerCase().includes("system config"))
+      (!o.client_name || !o.client_name.toLowerCase().includes("system config")) &&
+      !isOrderFiadoPending(o)
   );
 }
 
