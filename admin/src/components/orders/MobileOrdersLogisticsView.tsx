@@ -310,248 +310,245 @@ export function MobileOrdersLogisticsView({
                 .join(", ");
               const isExpanded = expandedOrderIds.has(order.realId);
 
+              // ━━━ ESTADO MINIMIZADO (Apenas Nome, Dia de Pagamento e Valor a Pagar) ━━━
+              if (!isExpanded) {
+                return (
+                  <div
+                    key={order.realId}
+                    onClick={() => toggleExpand(order.realId)}
+                    className="bg-[#121215] border border-white/10 hover:border-white/25 rounded-2xl px-4 py-3 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all select-none shadow-sm"
+                  >
+                    <div className="min-w-0 pr-3">
+                      <h3 className="text-sm font-bold text-white truncate leading-tight">
+                        {order.clientName}
+                      </h3>
+                      {order.isFiado && order.fiadoDueDateFormatted && (
+                        <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1.5">
+                          <Calendar className="size-3 text-zinc-400 shrink-0" />
+                          <span>Dia do pagamento: <b className="text-white">{order.fiadoDueDateFormatted}</b></span>
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-sm font-black text-white block">
+                        {formatBRL(order.isFiado ? (order.fiadoAmountOwed || order.totalAmount) : order.totalAmount)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+
+              // ━━━ ESTADO MAXIMIZADO (O Card Completo Exatamente como no Print) ━━━
               return (
                 <div
                   key={order.realId}
-                  className={`bg-[#121215] border rounded-2xl transition-all ${
-                    isExpanded
-                      ? "border-white/30 p-3.5 space-y-3 shadow-xl"
-                      : "border-white/10 hover:border-white/20 p-3 shadow-sm active:scale-[0.99]"
-                  }`}
+                  className="bg-[#121215] border border-white/20 hover:border-white/30 rounded-2xl p-4 space-y-3 shadow-md transition-all active:scale-[0.99]"
                 >
-                  {/* ━━━ PARTE MINIMIZADA (Sempre visível, clique para expandir/recolher) ━━━ */}
-                  <div
-                    onClick={() => toggleExpand(order.realId)}
-                    className="flex items-center justify-between gap-3 cursor-pointer select-none"
-                  >
-                    {/* Lado Esquerdo: Nome + Informações Rápidas */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-white truncate leading-tight">
-                          {order.clientName}
-                        </h3>
-                        {order.isFiado ? (
-                          <span
-                            className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border shrink-0 ${
-                              order.fiadoStatus === "PENDENTE"
-                                ? "bg-white text-black border-white shadow-[0_0_8px_rgba(255,255,255,0.3)]"
-                                : "bg-white/10 text-zinc-300 border-white/20"
-                            }`}
-                          >
-                            {order.fiadoStatus === "PENDENTE" ? "Pendente" : "Pago"}
-                          </span>
-                        ) : (
-                          <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-white/10 border border-white/20 text-white shrink-0">
-                            {order.paymentMethod || "PIX"}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Sub-informações rápidas solicitadas */}
-                      <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-400 truncate">
-                        {order.isFiado ? (
-                          <span className="flex items-center gap-1 text-zinc-300 font-medium truncate">
-                            <Calendar className="size-3 text-zinc-400 shrink-0" />
-                            <span>Paga em: <b>{order.fiadoDueDateFormatted || "A combinar"}</b></span>
-                          </span>
-                        ) : (
-                          <span className="truncate text-zinc-300 font-medium">
-                            {podsCount} item(ns) • {itemsSummary}
-                          </span>
-                        )}
-                        <span className="text-zinc-600 shrink-0">•</span>
-                        <span className="text-zinc-400 font-mono text-[10px] shrink-0">#{order.id}</span>
-                        {!order.isFiado && (
-                          <>
-                            <span className="text-zinc-600 shrink-0">•</span>
-                            <span className="text-zinc-400 text-[10px] shrink-0">{getRelativeTime(order.createdAt)}</span>
-                          </>
-                        )}
-                      </div>
+                  {/* Cabeçalho do Card (ID + Tempo + Pagamento + Botão Minimizar) */}
+                  <div className="flex items-center justify-between">
+                    <div
+                      onClick={() => toggleExpand(order.realId)}
+                      className="flex items-center gap-2 cursor-pointer"
+                      title="Clique para minimizar"
+                    >
+                      <span className="font-mono text-xs font-bold text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded-md">
+                        #{order.id}
+                      </span>
+                      <span className="text-[11px] text-zinc-400 flex items-center gap-1">
+                        <Clock className="size-3 text-zinc-400" />
+                        {getRelativeTime(order.createdAt)}
+                      </span>
                     </div>
 
-                    {/* Lado Direito: Quanto a pessoa deve / Total + Seta de Expandir */}
-                    <div className="flex items-center gap-2.5 shrink-0 text-right">
-                      <div>
-                        <span className="text-sm font-black text-white block">
-                          {formatBRL(order.isFiado ? (order.fiadoAmountOwed || order.totalAmount) : order.totalAmount)}
-                        </span>
-                        {order.isFiado && order.shippingFee > 0 ? (
-                          <span className="text-[10px] text-zinc-500 block">
-                            +{formatBRL(order.shippingFee)} frete
-                          </span>
-                        ) : order.shippingFee > 0 ? (
-                          <span className="text-[10px] text-zinc-500 block">
-                            Frete {formatBRL(order.shippingFee)}
-                          </span>
-                        ) : null}
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/10 border border-white/20 text-white">
+                        {order.isFiado
+                          ? order.fiadoStatus === "PENDENTE"
+                            ? `FIADO (${order.fiadoDueDateFormatted || "Pendente"})`
+                            : "FIADO PAGO"
+                          : order.paymentMethod || "PIX"}
+                      </span>
 
-                      <div className="size-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-all">
-                        <ChevronDown
-                          className={`size-4 transition-transform duration-200 ${
-                            isExpanded ? "rotate-180 text-white" : ""
-                          }`}
-                        />
-                      </div>
+                      {/* Botão de Minimizar */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleExpand(order.realId);
+                        }}
+                        className="size-7 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-all cursor-pointer"
+                        title="Minimizar card"
+                      >
+                        <ChevronDown className="size-4 rotate-180" />
+                      </button>
                     </div>
                   </div>
 
-                  {/* ━━━ PARTE EXPANDIDA (Mostra ao clicar para ver tudo e mandar WhatsApp) ━━━ */}
-                  {isExpanded && (
-                    <div className="pt-2.5 border-t border-white/10 space-y-3 animate-in fade-in duration-150">
-                      {/* Detalhes de Produtos e Entrega */}
-                      <div className="space-y-1.5 text-xs bg-white/[0.02] border border-white/5 rounded-xl p-2.5">
-                        <div className="flex items-center justify-between text-zinc-400">
-                          <span className="font-semibold">Itens ({podsCount}):</span>
-                          <span className="text-white font-medium truncate max-w-[210px] text-right">
-                            {itemsSummary}
-                          </span>
-                        </div>
+                  {/* Corpo do Card: Cliente + Produtos + Destino */}
+                  <div
+                    onClick={() => setSelectedOrderForDetails(order)}
+                    className="space-y-1.5 cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-white truncate leading-tight">
+                        {order.clientName}
+                      </h3>
+                      <ChevronRight className="size-4 text-zinc-500 shrink-0" />
+                    </div>
 
-                        {order.address && (
-                          <div className="flex items-center justify-between text-zinc-400 pt-1 border-t border-white/5">
-                            <span className="flex items-center gap-1 font-semibold shrink-0">
-                              <MapPin className="size-3 text-zinc-400" />
-                              <span>Entrega:</span>
-                            </span>
-                            <span className="text-white font-medium truncate max-w-[210px] text-right">
-                              {order.address}
-                            </span>
-                          </div>
-                        )}
+                    {/* Resumo dos Itens */}
+                    <p className="text-xs text-zinc-300 line-clamp-1 leading-snug">
+                      <span className="text-white font-bold">{podsCount} item(ns):</span>{" "}
+                      {itemsSummary}
+                    </p>
 
-                        <div className="flex items-center justify-between text-zinc-400 pt-1 border-t border-white/5">
-                          <span className="font-semibold">Valor Total do Pedido:</span>
-                          <span className="text-white font-bold">{formatBRL(order.totalAmount)}</span>
-                        </div>
-                      </div>
-
-                      {/* Ações Específicas para Fiado: WhatsApp + Confirmar Pagamento */}
-                      {order.isFiado ? (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            {order.phone && !order.phone.startsWith("INSTA_") && (
-                              <a
-                                href={`https://wa.me/${order.phone.replace(/\D/g, "").startsWith("55") ? order.phone.replace(/\D/g, "") : `55${order.phone.replace(/\D/g, "")}`}?text=${encodeURIComponent(`Olá ${order.clientName}! Tudo bem? Passando para combinar sobre o pagamento do seu pedido #${order.id} no valor de ${formatBRL(order.fiadoAmountOwed || order.totalAmount)}, para ${order.fiadoDueDateFormatted || "o dia combinado"}.`)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex-1 min-h-[44px] rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"
-                              >
-                                <Phone className="size-4 text-zinc-300" />
-                                <span>Cobrar no WhatsApp</span>
-                              </a>
-                            )}
-
-                            {order.fiadoStatus === "PENDENTE" ? (
-                              <button
-                                type="button"
-                                disabled={processingFiadoId === order.realId}
-                                onClick={async () => {
-                                  setProcessingFiadoId(order.realId);
-                                  const res = await markFiadoOrderAsPaid({ orderId: order.realId, paidMethod: "PIX" });
-                                  setProcessingFiadoId(null);
-                                  if (res.success) {
-                                    onOrdersChanged?.();
-                                  } else {
-                                    alert("Erro ao confirmar pagamento: " + (res.error || ""));
-                                  }
-                                }}
-                                className="flex-1 min-h-[44px] rounded-xl bg-white hover:bg-zinc-200 text-black text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-[0_0_12px_rgba(255,255,255,0.3)] active:scale-95 transition-all"
-                              >
-                                <CheckCircle2 className="size-4" />
-                                <span>{processingFiadoId === order.realId ? "Salvando..." : "Confirmar Pago"}</span>
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled={processingFiadoId === order.realId}
-                                onClick={async () => {
-                                  setProcessingFiadoId(order.realId);
-                                  const res = await reopenFiadoOrder({ orderId: order.realId });
-                                  setProcessingFiadoId(null);
-                                  if (res.success) onOrdersChanged?.();
-                                }}
-                                className="px-3 min-h-[44px] rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-zinc-300 text-xs font-semibold flex items-center justify-center gap-1 active:scale-95 transition-all"
-                              >
-                                <RotateCcw className="size-3.5" />
-                                <span>Desfazer</span>
-                              </button>
-                            )}
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => setSelectedOrderForDetails(order)}
-                            className="w-full min-h-[40px] bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 active:scale-98 transition-all"
-                          >
-                            <span>Ver Todas as Informações do Pedido</span>
-                            <ChevronRight className="size-3.5 text-zinc-500" />
-                          </button>
-                        </div>
+                    {/* Destino Logístico */}
+                    <div className="flex items-center gap-2 pt-0.5">
+                      {isNational ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded-md">
+                          <Truck className="size-3 text-white" />
+                          Correios ({nationalInfo?.state || "Nacional"})
+                        </span>
+                      ) : order.address &&
+                        (order.address.includes("Balcão") || order.address.includes("balcao")) ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded-md">
+                          <Store className="size-3 text-zinc-300" />
+                          Balcão / Retirada
+                        </span>
                       ) : (
-                        /* Ações para Pedidos Concluídos ou em Andamento */
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            {order.phone && !order.phone.startsWith("INSTA_") && (
-                              <a
-                                href={`https://wa.me/${order.phone.replace(/\D/g, "").startsWith("55") ? order.phone.replace(/\D/g, "") : `55${order.phone.replace(/\D/g, "")}`}?text=${encodeURIComponent(`Olá ${order.clientName}! Tudo bem? Passando para falar sobre o seu pedido #${order.id}. Precisando de qualquer novidade ou reposição, conte com a gente!`)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex-1 min-h-[44px] rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"
-                              >
-                                <Phone className="size-4 text-zinc-300" />
-                                <span>Mandar WhatsApp</span>
-                              </a>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => setSelectedOrderForDetails(order)}
-                              className="flex-1 min-h-[44px] bg-white/10 hover:bg-white/15 border border-white/20 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 active:scale-98 transition-all"
-                            >
-                              <span>Ver Detalhes</span>
-                              <ChevronRight className="size-3.5 text-zinc-400" />
-                            </button>
-                          </div>
-
-                          {/* Botões operacionais para pedidos em andamento */}
-                          {order.status === "PREPARANDO" && (
-                            <button
-                              type="button"
-                              onClick={() => onUpdateStatus(order.realId, "EM_ROTA")}
-                              className="w-full min-h-[48px] bg-white hover:bg-zinc-200 text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(255,255,255,0.35)] active:scale-98 transition-all"
-                            >
-                              <Truck className="size-4" />
-                              <span>Despachar Pedido ➔</span>
-                            </button>
-                          )}
-
-                          {order.status === "EM_ROTA" && (
-                            <button
-                              type="button"
-                              onClick={() => onUpdateStatus(order.realId, "ENTREGUE")}
-                              className="w-full min-h-[48px] bg-white hover:bg-zinc-200 text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(255,255,255,0.35)] active:scale-98 transition-all"
-                            >
-                              <CheckCircle2 className="size-4" />
-                              <span>Confirmar Entrega ✓</span>
-                            </button>
-                          )}
-
-                          {order.status === "ENTREGUE" && (
-                            <button
-                              type="button"
-                              onClick={() => onUpdateStatus(order.realId, "CONCLUIDO")}
-                              className="w-full min-h-[48px] bg-white hover:bg-zinc-200 text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(255,255,255,0.35)] active:scale-98 transition-all"
-                            >
-                              <CheckCircle2 className="size-4" />
-                              <span>Concluir Pedido ✓</span>
-                            </button>
-                          )}
-                        </div>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded-md truncate max-w-[240px]">
+                          <Bike className="size-3 shrink-0 text-white" />
+                          <span className="truncate">{order.address || "Entrega Local"}</span>
+                        </span>
                       )}
                     </div>
+                  </div>
+
+                  {/* Linha de Total */}
+                  <div
+                    onClick={() => setSelectedOrderForDetails(order)}
+                    className="flex items-baseline justify-between pt-2 border-t border-white/5 cursor-pointer"
+                  >
+                    <span className="text-xs text-zinc-400 font-medium">
+                      {order.shippingFee > 0
+                        ? `+ Frete ${formatBRL(order.shippingFee)}`
+                        : "Frete Grátis"}
+                    </span>
+                    <span className="text-base font-black text-white">
+                      {formatBRL(order.totalAmount)}
+                    </span>
+                  </div>
+
+                  {/* Bloco de Fiado no Card Mobile (Exatamente como no print) */}
+                  {order.isFiado && (
+                    <div className="p-3 rounded-xl border border-white/20 bg-white/[0.04] space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-300 flex items-center gap-1 font-medium">
+                          Dia do pagamento: {order.fiadoDueDateFormatted || "Não informada"}
+                        </span>
+                        <span className="font-extrabold text-white">
+                          {formatBRL(order.fiadoAmountOwed || order.totalAmount)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {order.phone && !order.phone.startsWith("INSTA_") && (
+                          <a
+                            href={`https://wa.me/${order.phone.replace(/\D/g, "").startsWith("55") ? order.phone.replace(/\D/g, "") : `55${order.phone.replace(/\D/g, "")}`}?text=${encodeURIComponent(`Olá ${order.clientName}! Tudo bem? Passando para combinar sobre o pagamento do seu pedido #${order.id} no valor de ${formatBRL(order.fiadoAmountOwed || order.totalAmount)}, para ${order.fiadoDueDateFormatted || "o dia combinado"}.`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 min-h-[40px] rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all"
+                          >
+                            <Phone className="size-3.5 text-zinc-300" />
+                            <span>WhatsApp</span>
+                          </a>
+                        )}
+                        {order.fiadoStatus === "PENDENTE" ? (
+                          <button
+                            type="button"
+                            disabled={processingFiadoId === order.realId}
+                            onClick={async () => {
+                              setProcessingFiadoId(order.realId);
+                              const res = await markFiadoOrderAsPaid({ orderId: order.realId, paidMethod: "PIX" });
+                              setProcessingFiadoId(null);
+                              if (res.success) {
+                                onOrdersChanged?.();
+                              } else {
+                                alert("Erro ao confirmar pagamento: " + (res.error || ""));
+                              }
+                            }}
+                            className="flex-1 min-h-[40px] rounded-xl bg-white hover:bg-zinc-200 text-black text-[11px] font-extrabold flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(255,255,255,0.3)] active:scale-95 transition-all"
+                          >
+                            <CheckCircle2 className="size-3.5" />
+                            <span>{processingFiadoId === order.realId ? "Salvando..." : "Confirmar que foi Pago"}</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={processingFiadoId === order.realId}
+                            onClick={async () => {
+                              setProcessingFiadoId(order.realId);
+                              const res = await reopenFiadoOrder({ orderId: order.realId });
+                              setProcessingFiadoId(null);
+                              if (res.success) onOrdersChanged?.();
+                            }}
+                            className="px-3 min-h-[40px] rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-zinc-300 text-[11px] font-semibold flex items-center justify-center gap-1 active:scale-95 transition-all"
+                          >
+                            <RotateCcw className="size-3" />
+                            <span>Desfazer</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   )}
+
+                  {/* Ações operacionais / Ver Detalhes */}
+                  <div className="pt-1">
+                    {order.status === "PREPARANDO" && (
+                      <button
+                        type="button"
+                        onClick={() => onUpdateStatus(order.realId, "EM_ROTA")}
+                        className="w-full min-h-[48px] bg-white hover:bg-zinc-200 text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(255,255,255,0.35)] active:scale-98 transition-all"
+                      >
+                        <Truck className="size-4" />
+                        <span>Despachar Pedido ➔</span>
+                      </button>
+                    )}
+
+                    {order.status === "EM_ROTA" && (
+                      <button
+                        type="button"
+                        onClick={() => onUpdateStatus(order.realId, "ENTREGUE")}
+                        className="w-full min-h-[48px] bg-white hover:bg-zinc-200 text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(255,255,255,0.35)] active:scale-98 transition-all"
+                      >
+                        <CheckCircle2 className="size-4" />
+                        <span>Confirmar Entrega ✓</span>
+                      </button>
+                    )}
+
+                    {order.status === "ENTREGUE" && (
+                      <button
+                        type="button"
+                        onClick={() => onUpdateStatus(order.realId, "CONCLUIDO")}
+                        className="w-full min-h-[48px] bg-white hover:bg-zinc-200 text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(255,255,255,0.35)] active:scale-98 transition-all"
+                      >
+                        <CheckCircle2 className="size-4" />
+                        <span>Concluir Pedido ✓</span>
+                      </button>
+                    )}
+
+                    {order.status === "CONCLUIDO" && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderForDetails(order)}
+                        className="w-full min-h-[44px] bg-white/10 hover:bg-white/15 border border-white/20 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-2 active:scale-98 transition-all"
+                      >
+                        <span>Ver Detalhes do Pedido</span>
+                        <ChevronRight className="size-3.5 text-zinc-400" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
