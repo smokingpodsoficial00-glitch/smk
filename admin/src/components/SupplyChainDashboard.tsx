@@ -12,7 +12,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { fetchCategories, fetchProductCategoryMappings, updateModelCategories, broadcastLiveCatalogSync, DEFAULT_CATEGORIES, type Category } from "../lib/categories";
 import { fetchProductCostsMap, updateProductCost } from "../lib/productCosts";
 import { ManualSaleModal, invalidateSaleCatalogCache } from "./ManualSaleModal";
-import { invalidateFinanceCache } from "./FinanceDashboard";
+import { invalidateFinanceCache } from "@/lib/financeCache";
 import { ReplenishmentPlannerModal, loadSavedGoals, type FinancialGoals } from "./ReplenishmentPlannerModal";
 import { StagnantStockSection } from "./StagnantStockSection";
 import { MobileSupplyChainView } from "./stock/MobileSupplyChainView";

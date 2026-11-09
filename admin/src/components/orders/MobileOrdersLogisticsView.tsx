@@ -2,6 +2,9 @@ import { useState, useMemo, useEffect } from "react";
 import { formatBRL } from "@/lib/cart";
 import { isOrderNational, extractNationalInfo } from "@/lib/nationalSales";
 import { markFiadoOrderAsPaid, reopenFiadoOrder } from "@/lib/fiadoSales";
+import { invalidateFinanceCache } from "@/lib/financeCache";
+import { invalidateLiveClientsCache } from "@/lib/crm";
+import { invalidateSalesHistoryCache } from "@/lib/salesHistory";
 import type { AdminOrder } from "../KanbanBoard";
 import {
   Clock,
@@ -443,16 +446,16 @@ export function MobileOrdersLogisticsView({
                     </div>
                   </div>
 
-                  {/* Corpo do Card: Cliente + Produtos + Destino */}
+                  {/* Corpo do Card: Cliente + Produtos + Destino (ao clicar, minimiza/recolhe o card) */}
                   <div
-                    onClick={() => setSelectedOrderForDetails(order)}
+                    onClick={() => toggleExpand(order.realId)}
                     className="space-y-1.5 cursor-pointer"
                   >
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-bold text-white truncate leading-tight">
                         {order.clientName}
                       </h3>
-                      <ChevronRight className="size-4 text-zinc-500 shrink-0" />
+                      <ChevronDown className="size-4 text-zinc-500 shrink-0 rotate-180" />
                     </div>
 
                     {/* Resumo dos Itens */}
@@ -483,9 +486,9 @@ export function MobileOrdersLogisticsView({
                     </div>
                   </div>
 
-                  {/* Linha de Total */}
+                  {/* Linha de Total (ao clicar, minimiza/recolhe o card) */}
                   <div
-                    onClick={() => setSelectedOrderForDetails(order)}
+                    onClick={() => toggleExpand(order.realId)}
                     className="flex items-baseline justify-between pt-2 border-t border-white/5 cursor-pointer"
                   >
                     <span className="text-xs text-zinc-400 font-medium">
@@ -557,6 +560,16 @@ export function MobileOrdersLogisticsView({
                               const res = await markFiadoOrderAsPaid({ orderId: order.realId, paidMethod: "PIX" });
                               setProcessingFiadoId(null);
                               if (res.success) {
+                                try {
+                                  const raw = localStorage.getItem("smoking_completed_order_ids");
+                                  const ids = raw ? JSON.parse(raw) : [];
+                                  if (!ids.includes(order.realId)) {
+                                    localStorage.setItem("smoking_completed_order_ids", JSON.stringify([...ids, order.realId]));
+                                  }
+                                } catch {}
+                                invalidateFinanceCache();
+                                invalidateLiveClientsCache();
+                                invalidateSalesHistoryCache();
                                 onOrdersChanged?.();
                               } else {
                                 alert("Erro ao confirmar pagamento: " + (res.error || ""));
@@ -575,7 +588,17 @@ export function MobileOrdersLogisticsView({
                               setProcessingFiadoId(order.realId);
                               const res = await reopenFiadoOrder({ orderId: order.realId });
                               setProcessingFiadoId(null);
-                              if (res.success) onOrdersChanged?.();
+                              if (res.success) {
+                                try {
+                                  const raw = localStorage.getItem("smoking_completed_order_ids");
+                                  const ids = raw ? JSON.parse(raw) : [];
+                                  localStorage.setItem("smoking_completed_order_ids", JSON.stringify(ids.filter((id: string) => id !== order.realId)));
+                                } catch {}
+                                invalidateFinanceCache();
+                                invalidateLiveClientsCache();
+                                invalidateSalesHistoryCache();
+                                onOrdersChanged?.();
+                              }
                             }}
                             className="px-3 min-h-[40px] rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-zinc-300 text-[11px] font-semibold flex items-center justify-center gap-1 active:scale-95 transition-all"
                           >

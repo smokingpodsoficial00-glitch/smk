@@ -7,7 +7,7 @@ import { BRAZILIAN_STATES } from "@/lib/nationalSales";
 import { getFutureDateIso, formatIsoDateBR } from "@/lib/fiadoSales";
 import { notifyMobileSale } from "@/lib/saleNotifications";
 import { validateCartStockAvailability, executeAtomicSaleWithStockLock } from "@/lib/stockValidation";
-import { invalidateFinanceCache } from "./FinanceDashboard";
+import { invalidateFinanceCache } from "@/lib/financeCache";
 import { MobileManualSaleFlow } from "./sale/MobileManualSaleFlow";
 import {
   ShoppingCart,

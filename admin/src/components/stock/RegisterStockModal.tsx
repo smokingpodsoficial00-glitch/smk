@@ -23,7 +23,7 @@ import {
 } from "@/lib/stockRepurchases";
 import { broadcastLiveCatalogSync } from "@/lib/categories";
 import { invalidateSaleCatalogCache } from "@/components/ManualSaleModal";
-import { invalidateFinanceCache } from "@/components/FinanceDashboard";
+import { invalidateFinanceCache } from "@/lib/financeCache";
 
 export interface StockEntryItem {
   id: string;

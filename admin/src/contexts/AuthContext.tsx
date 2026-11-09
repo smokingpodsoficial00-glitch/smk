@@ -91,11 +91,29 @@ function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number, operationNam
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function getInitialLocalSession(): { user: User | null; company: Company | null; companyUser: CompanyUser | null; authState: AuthState } {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_SESSION_KEY) : null;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.user?.id && parsed?.company?.id && parsed?.companyUser?.id) {
+        return {
+          user: parsed.user,
+          company: parsed.company,
+          companyUser: parsed.companyUser,
+          authState: 'AUTHENTICATED_AUTHORIZED',
+        };
+      }
+    }
+  } catch (e) {}
+  return { user: null, company: null, companyUser: null, authState: 'AUTH_LOADING' };
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [company, setCompany] = useState<Company | null>(null);
-  const [companyUser, setCompanyUser] = useState<CompanyUser | null>(null);
-  const [authState, setAuthState] = useState<AuthState>('AUTH_LOADING');
+  const [user, setUser] = useState<User | null>(() => getInitialLocalSession().user);
+  const [company, setCompany] = useState<Company | null>(() => getInitialLocalSession().company);
+  const [companyUser, setCompanyUser] = useState<CompanyUser | null>(() => getInitialLocalSession().companyUser);
+  const [authState, setAuthState] = useState<AuthState>(() => getInitialLocalSession().authState);
 
   // loading derivado diretamente da máquina de estados:
   // Verdadeiro estritamente enquanto a autenticação inicial ou o perfil estiverem carregando.

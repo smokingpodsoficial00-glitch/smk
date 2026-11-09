@@ -12,7 +12,7 @@ import { ManualSaleModal } from"./ManualSaleModal";
 import { MobilePushSetupModal } from"./MobilePushSetupModal";
 import { MobileOrdersLogisticsView } from "./orders/MobileOrdersLogisticsView";
 import { deleteOrderWithStockRestoration } from"@/lib/orders";
-import { invalidateFinanceCache } from "./FinanceDashboard";
+import { invalidateFinanceCache } from "@/lib/financeCache";
 import { invalidateLiveClientsCache } from "@/lib/crm";
 import { invalidateSalesHistoryCache } from "@/lib/salesHistory";
 import {
@@ -69,11 +69,28 @@ const saveCompletedIds = (ids: string[]) => {
  } catch {}
 };
 
+const ORDERS_CACHE_KEY = 'smoking_orders_cache_v2';
+const getCachedOrders = (): AdminOrder[] => {
+  try {
+    const raw = localStorage.getItem(ORDERS_CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveCachedOrders = (orders: AdminOrder[]) => {
+  try {
+    localStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify(orders.slice(0, 100)));
+  } catch {}
+};
+
 export default function KanbanBoard() {
  const { company } = useAuth();
  setActiveBackendCompany(company?.id);
- const [orders, setOrders] = useState<AdminOrder[]>([]);
- const [loading, setLoading] = useState(true);
+ const cachedInit = useRef(getCachedOrders()).current;
+ const [orders, setOrders] = useState<AdminOrder[]>(cachedInit);
+ const [loading, setLoading] = useState(cachedInit.length === 0);
  const [selectedOrderForDispatch, setSelectedOrderForDispatch] = useState<string | null>(null);
  const [notifyCustomerOnDispatch, setNotifyCustomerOnDispatch] = useState(false);
  const [isDispatching, setIsDispatching] = useState(false);
@@ -168,6 +185,7 @@ export default function KanbanBoard() {
  };
  });
  setOrders(mapped);
+ saveCachedOrders(mapped);
  }
  } catch (err) {
  console.error("Erro ao buscar pedidos no Supabase:", err);

@@ -1089,24 +1089,14 @@ function MonthComparisonChart({
 }
 
 // Cache em memória para dados brutos do Financeiro (evita re-fetch em navegações rápidas entre páginas)
-interface FinanceDataCache {
-  companyId: string;
-  timestamp: number;
-  data: {
-    persistedCosts: Record<string, number>;
-    rawOrders: any[];
-    productsData: any[];
-    repurchases: StockRepurchase[];
-    partnerTxs: any[];
-    partners: any[];
-  };
-}
-let financeSessionCache: FinanceDataCache | null = null;
-const FINANCE_CACHE_TTL_MS = 30 * 1000; // 30 segundos
-
-export const invalidateFinanceCache = (_companyId?: string | null) => {
-  financeSessionCache = null;
-};
+import {
+  type FinanceDataCache,
+  FINANCE_CACHE_TTL_MS,
+  invalidateFinanceCache,
+  getFinanceSessionCache,
+  setFinanceSessionCache,
+} from "@/lib/financeCache";
+export { invalidateFinanceCache };
 
 export default function FinanceDashboard() {
   const { user, company, companyUser, loading: authLoading, signOut } = useAuth();
@@ -1235,11 +1225,12 @@ export default function FinanceDashboard() {
     const targetCompanyId = company.id;
     try {
       const now = Date.now();
+      const cached = getFinanceSessionCache();
       const hasFreshCache =
         !forceRefresh &&
-        financeSessionCache &&
-        financeSessionCache.companyId === targetCompanyId &&
-        now - financeSessionCache.timestamp < FINANCE_CACHE_TTL_MS;
+        cached &&
+        cached.companyId === targetCompanyId &&
+        now - cached.timestamp < FINANCE_CACHE_TTL_MS;
 
       if (!hasFreshCache) {
         setLoading(true);
@@ -1253,13 +1244,13 @@ export default function FinanceDashboard() {
       let loadedPartnerTxs: any[] = [];
       let loadedPartners: any[] = [];
 
-      if (hasFreshCache && financeSessionCache) {
-        persistedCosts = financeSessionCache.data.persistedCosts;
-        rawOrders = financeSessionCache.data.rawOrders;
-        productsData = financeSessionCache.data.productsData;
-        loadedRepurchases = financeSessionCache.data.repurchases;
-        loadedPartnerTxs = financeSessionCache.data.partnerTxs;
-        loadedPartners = financeSessionCache.data.partners;
+      if (hasFreshCache && cached) {
+        persistedCosts = cached.data.persistedCosts;
+        rawOrders = cached.data.rawOrders;
+        productsData = cached.data.productsData;
+        loadedRepurchases = cached.data.repurchases;
+        loadedPartnerTxs = cached.data.partnerTxs;
+        loadedPartners = cached.data.partners;
       } else {
         // Executa todas as consultas financeiras em paralelo com projeção leve (sem Base64 de imagens)
         const [persistedCostsRes, ordersRes, productsRes, repurchasesRes, partnerTxRes, partnersRes] = await Promise.all([
@@ -1361,7 +1352,7 @@ export default function FinanceDashboard() {
         loadedPartners = partnersRes?.data || [];
 
         // Salvar no cache em memória
-        financeSessionCache = {
+        setFinanceSessionCache({
           companyId: targetCompanyId,
           timestamp: Date.now(),
           data: {
@@ -1372,7 +1363,7 @@ export default function FinanceDashboard() {
             partnerTxs: loadedPartnerTxs,
             partners: loadedPartners,
           },
-        };
+        });
       }
 
       setRepurchases(loadedRepurchases);
