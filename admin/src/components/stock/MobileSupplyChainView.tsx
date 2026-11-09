@@ -325,23 +325,23 @@ export function MobileSupplyChainView({
       {/* ━━━ SE VISÃO ESTOQUE ATIVA: RENDERIZA CONTROLES DE ESTOQUE ━━━ */}
       {activeMainView === "ESTOQUE" && (
         <>
-          {/* ━━━ 2. AÇÕES PRINCIPAIS COMPACTAS (Divididas em 1 linha no mobile) ━━━ */}
-          <div className="grid grid-cols-2 gap-2">
+          {/* ━━━ 2. AÇÕES PRINCIPAIS COMPACTAS (Grade 3 botões perfeitamente enquadrados) ━━━ */}
+          <div className="grid grid-cols-3 gap-2">
             {/* Botão Novo Produto */}
             <button
               type="button"
               onClick={onOpenNewProductModal}
-              className="h-9 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-black font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/20 transition-all cursor-pointer"
+              className="h-9 px-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-black font-extrabold text-[11px] flex items-center justify-center gap-1 shadow-sm shadow-emerald-500/20 transition-all cursor-pointer"
             >
-              <Plus className="size-3.5 stroke-[3]" />
-              <span className="truncate">Novo Produto</span>
+              <Plus className="size-3.5 stroke-[3] shrink-0" />
+              <span className="truncate">Novo</span>
             </button>
 
             {/* Botão Copiar Estoque com Feedback */}
             <button
               type="button"
               onClick={onCopyAvailableStock}
-              className={`h-9 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98] ${
+              className={`h-9 px-2 rounded-xl border text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-[0.98] ${
                 copiedStockFeedback
                   ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
                   : "bg-white/5 hover:bg-white/10 border-white/10 text-white"
@@ -356,9 +356,20 @@ export function MobileSupplyChainView({
               ) : (
                 <>
                   <Copy className="size-3.5 text-zinc-400 shrink-0" />
-                  <span className="truncate">Copiar Estoque</span>
+                  <span className="truncate">Copiar</span>
                 </>
               )}
+            </button>
+
+            {/* Botão Planejador de Recompra */}
+            <button
+              type="button"
+              onClick={onOpenReplenishmentPlanner}
+              className="h-9 px-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 active:scale-[0.98] text-white text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer"
+              title="Abrir Planejador de Recompra"
+            >
+              <Boxes className="size-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate">Planejador</span>
             </button>
           </div>
 

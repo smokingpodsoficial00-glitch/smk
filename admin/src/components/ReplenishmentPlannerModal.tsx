@@ -885,22 +885,22 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
-      <div className="bg-[#09090b] border border-white/10 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+      <div className="bg-[#09090b] border border-white/10 rounded-t-2xl sm:rounded-2xl w-full max-w-5xl h-[95vh] sm:h-auto sm:max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         
         {/* ─── HEADER MODAL ─── */}
-        <div className="px-5 py-3.5 border-b border-white/10 bg-[#121212] flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="size-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+        <div className="px-4 sm:px-5 py-3 sm:py-3.5 border-b border-white/10 bg-[#121212] flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="size-8 sm:size-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
               <Boxes className="size-4 text-emerald-400" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                  Planejador de Estoque & Reposição
+                <h3 className="text-sm sm:text-base font-bold text-white tracking-tight truncate">
+                  Planejador de Recompra
                 </h3>
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
-                  {totalUnitsInOrder} {totalUnitsInOrder === 1 ? "peça" : "peças"} no pedido
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wider shrink-0">
+                  {totalUnitsInOrder} un
                 </span>
               </div>
             </div>
@@ -909,37 +909,31 @@ export const ReplenishmentPlannerModal: React.FC<ReplenishmentPlannerModalProps>
           <button
             type="button"
             onClick={onClose}
-            className="size-7 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="size-8 sm:size-7 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
           >
             <X className="size-4" />
           </button>
         </div>
 
         {/* ─── BARRA DE TOPO DO PEDIDO ATIVO COM RESUMO FIXO ─── */}
-        <div className="flex flex-wrap items-center justify-between border-b border-white/10 px-5 py-3 bg-[#0d0d0d] gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
-              <ShoppingCart className="size-3.5" />
-              <span>Pedido Ativo:</span>
-            </div>
-            <div className="text-xs text-zinc-300 font-medium flex items-center gap-2 flex-wrap">
-              <span className="text-white font-bold">{orderItems.length} {orderItems.length === 1 ? "modelo" : "modelos"}</span>
-              <span className="text-muted-foreground">·</span>
-              <span className="text-emerald-400 font-bold">{totalUnitsInOrder} {totalUnitsInOrder === 1 ? "unidade" : "unidades"}</span>
-              <span className="text-muted-foreground">·</span>
-              <span>Custo total: <strong className="text-white">R$ {totalCostOfOrder.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
-            </div>
+        <div className="flex items-center justify-between border-b border-white/10 px-4 sm:px-5 py-2.5 bg-[#0d0d0d] gap-2 shrink-0">
+          <div className="flex items-center gap-2 text-xs text-zinc-300 font-medium min-w-0 truncate">
+            <span className="text-white font-bold">{orderItems.length} mod.</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-emerald-400 font-bold">{totalUnitsInOrder} un.</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="truncate">Custo: <strong className="text-white">R$ {totalCostOfOrder.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
           </div>
 
           {/* Ação de Topo para Adicionar Produto ao Pedido */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setShowAddPodForm(!showAddPodForm)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-sm shadow-emerald-500/20"
+              className="inline-flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-sm shadow-emerald-500/20"
             >
               <Plus className="size-3.5 text-black" />
-              <span>{showAddPodForm ? "Fechar Formulário" : "Adicionar Produto"}</span>
+              <span>{showAddPodForm ? "Fechar" : "Adicionar"}</span>
             </button>
           </div>
         </div>
