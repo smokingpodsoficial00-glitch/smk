@@ -92,6 +92,18 @@ export default function PartnersDashboard() {
   const isFetchingRef = useRef(false);
   const hasPendingFetchRef = useRef(false);
 
+  // Limpeza forçada de cache legado do navegador para garantir extrato zerado
+  useEffect(() => {
+    try {
+      localStorage.removeItem("smk_partner_transactions");
+      localStorage.removeItem("smk_partner_transactions_v2");
+      localStorage.removeItem("smk_partner_transactions_v3");
+      localStorage.removeItem("smk_partner_transactions_v4");
+      localStorage.removeItem("smk_transactions_list_v4");
+      localStorage.removeItem("d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5_smk_transactions_list_v4");
+    } catch (e) {}
+  }, []);
+
   // 1. Carregar todos os dados reais integrados da empresa
   const loadAllData = async (silent = false) => {
     if (isFetchingRef.current) {

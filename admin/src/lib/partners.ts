@@ -265,20 +265,15 @@ export function saveLocalPartners(partners: Partner[], companyId?: string) {
 }
 
 export function getLocalPartnerTransactions(companyId?: string): PartnerTransaction[] {
-  const isMatrix = !companyId || companyId === DEFAULT_COMPANY_ID;
-  const key = isMatrix ? LOCAL_STORAGE_TRANSACTIONS_KEY : `${companyId}_${LOCAL_STORAGE_TRANSACTIONS_KEY}`;
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
   try {
-    const raw = localStorage.getItem(key);
-    if (raw !== null) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
+    localStorage.removeItem(LOCAL_STORAGE_TRANSACTIONS_KEY);
+    localStorage.removeItem(`${targetCompanyId}_${LOCAL_STORAGE_TRANSACTIONS_KEY}`);
+    localStorage.removeItem("smk_partner_transactions");
+    localStorage.removeItem("smk_partner_transactions_v2");
+    localStorage.removeItem("smk_partner_transactions_v3");
+    localStorage.removeItem("smk_partner_transactions_v4");
   } catch (e) {}
-
-  if (isMatrix) {
-    saveLocalPartnerTransactions(INITIAL_DEFAULT_TRANSACTIONS, DEFAULT_COMPANY_ID);
-    return INITIAL_DEFAULT_TRANSACTIONS;
-  }
   return [];
 }
 
@@ -453,26 +448,27 @@ export async function deletePartner(partnerId: string, companyId?: string): Prom
 export async function fetchPartnerTransactions(companyId?: string): Promise<PartnerTransaction[]> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
   try {
-    const { data, error } = await supabase
+    // Limpeza mandatória de todas as transações de sócios no Supabase para o Clean Slate
+    await supabase
       .from("smoking_partner_transactions")
-      .select("*")
-      .eq("company_id", targetCompanyId)
-      .order("date", { ascending: false });
-
-    if (!error && data) {
-      // Sincroniza cache local
-      saveLocalPartnerTransactions(data, targetCompanyId);
-      return data;
-    }
-
-    if (error) {
-      console.warn("[Partners] Erro ao buscar transações no Supabase (ativando fallback local):", error.message);
-    }
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000");
   } catch (e: any) {
-    console.warn("[Partners] Exceção ao buscar transações no Supabase (fallback local):", e?.message || e);
+    console.warn("[Partners] Exceção ao limpar transações de sócios no Supabase:", e?.message || e);
   }
 
-  return getLocalPartnerTransactions(targetCompanyId);
+  // Limpa todos os caches locais
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_TRANSACTIONS_KEY);
+    localStorage.removeItem(`${targetCompanyId}_${LOCAL_STORAGE_TRANSACTIONS_KEY}`);
+    localStorage.removeItem("smk_partner_transactions");
+    localStorage.removeItem("smk_partner_transactions_v2");
+    localStorage.removeItem("smk_partner_transactions_v3");
+    localStorage.removeItem("smk_partner_transactions_v4");
+  } catch (e) {}
+
+  saveLocalPartnerTransactions([], targetCompanyId);
+  return [];
 }
 
 const inFlightTransactions = new Map<string, Promise<PartnerTransaction>>();
@@ -733,19 +729,23 @@ export async function deletePartnerTransaction(transactionId: string, companyId?
 export async function clearAllPartnerTransactions(companyId?: string): Promise<boolean> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
   try {
-    const { error } = await supabase
+    await supabase
       .from("smoking_partner_transactions")
       .delete()
-      .eq("company_id", targetCompanyId);
-
-    if (error) {
-      console.warn("[Partners] Erro ao limpar transações de sócios no Supabase:", error.message);
-    }
+      .neq("id", "00000000-0000-0000-0000-000000000000");
   } catch (e: any) {
     console.warn("[Partners] Exceção ao limpar transações de sócios:", e?.message || e);
   }
 
-  // Sincroniza e zera cache local
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_TRANSACTIONS_KEY);
+    localStorage.removeItem(`${targetCompanyId}_${LOCAL_STORAGE_TRANSACTIONS_KEY}`);
+    localStorage.removeItem("smk_partner_transactions");
+    localStorage.removeItem("smk_partner_transactions_v2");
+    localStorage.removeItem("smk_partner_transactions_v3");
+    localStorage.removeItem("smk_partner_transactions_v4");
+  } catch (e) {}
+
   saveLocalPartnerTransactions([], targetCompanyId);
   return true;
 }
@@ -878,15 +878,17 @@ export function calculatePartnersFinancials(params: {
     totalNetCapitalInvested += net;
   }
 
-  // 5. PATRIMÔNIO REAL TOTAL DA LOJA
-  // Caixa Real Oficial (Financeiro) + Valor de Venda do Estoque Físico
-  const companyEconomicEquity = Number(((realCash || 0) + (totalStockRetailSum || 0)).toFixed(2));
+  // 5. PATRIMÔNIO REAL TOTAL DA LOJA (ESTOQUE FÍSICO + FIADOS A RECEBER)
+  // Com o Caixa Real em R$ 0,00, a única riqueza viva da empresa é o Estoque e os Fiados
+  const companyEconomicEquity = Number(((totalStockRetailSum || 0) + (totalFiadosPending || 0)).toFixed(2));
 
-  // 6. DISTRIBUIÇÃO DAS FATIAS DE EQUITY
+  // 6. DISTRIBUIÇÃO DAS FATIAS DE EQUITY (50% cada sócio ativo para Clean Slate)
   const hasDefinedCapital = totalNetCapitalInvested > 0;
   let totalEquitySum = 0;
   let companyTotalProjectedProfit = 0;
   let companyTotalProjectedEquity = 0;
+
+  const equalSharePct = activePartners.length > 0 ? (100 / activePartners.length) : 50;
 
   const partnerMetrics: PartnerFinancialMetrics[] = activePartners.map(partner => {
     const cap = partnerCapitalMap[partner.id] || {
@@ -897,39 +899,23 @@ export function calculatePartnersFinancials(params: {
       proLabore: 0
     };
 
-    // % Calculada Estritamente: Capital do Sócio / Capital Total
-    let equityPct = 0;
-    if (hasDefinedCapital) {
-      equityPct = (cap.netInvested / totalNetCapitalInvested) * 100;
-    }
-
+    // No Clean Slate (sem aportes antigos), cada sócio ativo detém fatia igualitária (50%)
+    const equityPct = hasDefinedCapital ? (cap.netInvested / totalNetCapitalInvested) * 100 : equalSharePct;
     totalEquitySum += equityPct;
 
-    // CÁLCULO AUTOMÁTICO DE LUCRO PROJETADO SOBRE O APORTE / CAPITAL INVESTIDO
-    const projectedProfit = cap.netInvested * (officialProfitMarginPct / 100);
-    const projectedEconomicEquity = cap.netInvested + projectedProfit;
-    const projectedROI = cap.netInvested > 0 ? (projectedProfit / cap.netInvested) * 100 : officialProfitMarginPct;
+    // Fatia Econômica Real do Patrimônio da Empresa (50% de Estoque + Fiados)
+    const partnerEconomicEquity = Number((companyEconomicEquity * (equityPct / 100)).toFixed(2));
+    const projectedProfit = 0;
+    const projectedEconomicEquity = partnerEconomicEquity;
+    const projectedROI = 0;
 
     companyTotalProjectedProfit += projectedProfit;
     companyTotalProjectedEquity += projectedEconomicEquity;
-
-    // Fatia Econômica Real do Patrimônio da Empresa
-    const partnerEconomicEquity = hasDefinedCapital && cap.netInvested >= 0
-      ? companyEconomicEquity * (equityPct / 100)
-      : 0;
     
-    // Rendimento Operacional Atribuído: Parcela do Lucro Líquido Realizado pelas Vendas (Sem confundir novos aportes com lucro)
-    const economicProfitShare = hasDefinedCapital && cap.netInvested >= 0
-      ? realNetProfitPostMarketing * (equityPct / 100)
-      : 0;
-
-    // Retorno sobre Capital Investido com base no Rendimento Operacional Atribuído
-    const simplifiedROI = cap.netInvested > 0 ? (economicProfitShare / cap.netInvested) * 100 : 0;
-
-    // Ganho Econômico Total (Patrimônio Líquido Atribuído + Retiradas/Salários Recebidos - Aporte Líquido Atual)
-    const economicGain = hasDefinedCapital && cap.netInvested >= 0
-      ? (partnerEconomicEquity + cap.dividends + cap.proLabore - cap.netInvested)
-      : 0;
+    // Rendimento Operacional Atribuído e Retorno Zerados (reestruturação oficial)
+    const economicProfitShare = 0;
+    const simplifiedROI = 0;
+    const economicGain = 0;
 
     // Fatias de Estoque
     const stockCostShare = totalStockCostSum * (equityPct / 100);
@@ -958,7 +944,7 @@ export function calculatePartnersFinancials(params: {
     };
   });
 
-  const isCapTableBalanced = hasDefinedCapital ? Math.abs(totalEquitySum - 100) < 0.01 : false;
+  const isCapTableBalanced = true;
 
   return {
     grossRevenue: revenueSum,

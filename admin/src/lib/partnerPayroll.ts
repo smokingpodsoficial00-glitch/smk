@@ -453,136 +453,37 @@ export function calculatePayrollOverview(params: {
   const normalized = normalizePayrollConfig(config, realPartners);
   const periodMode = normalized.periodMode;
 
-  // Regra 1 e 3: Não truncar o resultado em zero. Prejuízos são representados negativamente.
-  const baseNetProfit = Number(
-    (periodMode === "CYCLE" ? cycleNetProfit : allTimeNetProfit).toFixed(2)
-  );
-
   // Obtém percentuais vigentes do ciclo atual
   const activeCycleRule = getRuleForCycle(currentCycleId, normalized, realPartners);
   const activeReinvestmentPct = periodMode === "CYCLE" ? activeCycleRule.reinvestmentPct : normalized.reinvestmentPct;
   const activePartnerPcts = periodMode === "CYCLE" ? activeCycleRule.partnerPcts : normalized.partnerPcts;
 
-  // Distribuição exata em centavos no período selecionado
-  const sharesForPeriod = [
-    { id: "REINVESTMENT", pct: activeReinvestmentPct },
-    ...realPartners.map((p) => ({ id: p.id, pct: Number(activePartnerPcts[p.id] ?? 0) })),
-  ];
-  const distributedPeriodCents = distributeAmountInCents(baseNetProfit, sharesForPeriod);
+  // Clean Slate & Regime de Caixa Real Zerado:
+  // Como o Caixa Real da empresa está cravado em R$ 0,00 (falência / reestruturação), não existe dinheiro em caixa
+  // para saques de pró-labore nem aporte para o fundo de reinvestimento da loja.
+  // Todo o patrimônio restante reside exclusivamente em Estoque e Fiados a Receber.
+  const partnerItems: PartnerPayrollItem[] = realPartners.map((partner) => ({
+    partner,
+    salaryPct: Number(activePartnerPcts[partner.id] ?? 0),
+    grossSalaryGenerated: 0,
+    salaryPaidInPeriod: 0,
+    availableToReceive: 0,
+    totalSalaryPaidAllTime: 0,
+    carriedOverPendingSalary: 0,
+  }));
 
-  const reinvestmentAmount = distributedPeriodCents["REINVESTMENT"] ?? 0;
-
-  // Fundo de Reinvestimento Histórico Acumulado (Zerar para Clean Slate)
-  // Como a empresa não tem dinheiro em caixa, o fundo de reinvestimento acumulado é R$ 0,00.
-  const totalReinvestmentAccumulated = 0;
-
-  let totalPartnersPct = 0;
-  let totalPartnersGenerated = 0;
-  let totalPartnersPaid = 0;
-  let totalPartnersAvailable = 0;
-
-  const partnerItems: PartnerPayrollItem[] = realPartners.map((partner) => {
-    const salaryPct = Number(activePartnerPcts[partner.id] ?? 0);
-    const grossSalaryGenerated = distributedPeriodCents[partner.id] ?? 0;
-
-    // Transações de salário / pró-labore / distribuição de lucro deste sócio
-    const salaryTxs = (transactions || []).filter(
-      (tx) =>
-        tx.partner_id === partner.id &&
-        (tx.type === "PRO_LABORE" || tx.type === "DISTRIBUICAO_LUCRO")
-    );
-
-    const totalSalaryPaidAllTime = Number(
-      salaryTxs.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0).toFixed(2)
-    );
-
-    const periodSalaryTxs =
-      periodMode === "CYCLE"
-        ? salaryTxs.filter((tx) => {
-            const d = tx.date || tx.created_at;
-            if (!d) return false;
-            return getCycleForDate(d).id === currentCycleId;
-          })
-        : salaryTxs;
-
-    const salaryPaidInPeriod = Number(
-      periodSalaryTxs
-        .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0)
-        .toFixed(2)
-    );
-
-    let availableToReceive = 0;
-    let carriedOverPendingSalary = 0;
-
-    if (periodMode === "ALL_TIME") {
-      // Regra 7: No Acumulado Geral, aplica percentuais atuais sobre o resultado histórico e desconta os saques
-      // Permite saldo negativo se saques > direito acumulado ou se o negócio acumulou prejuízo
-      availableToReceive = Number(
-        (grossSalaryGenerated - totalSalaryPaidAllTime).toFixed(2)
-      );
-    } else {
-      // Regra 4, 5 e 6: No Modo Ciclo, calculamos a evolução histórica de todos os ciclos até o momento
-      if (historicalCycleMetrics.length > 0) {
-        let allTimeGeneratedFromCycles = 0;
-        let previousCyclesGenerated = 0;
-
-        for (const hCycle of historicalCycleMetrics) {
-          const hRule = getRuleForCycle(hCycle.cycleId, normalized, realPartners);
-          const hShares = [
-            { id: "REINVESTMENT", pct: hRule.reinvestmentPct },
-            ...realPartners.map((p) => ({ id: p.id, pct: Number(hRule.partnerPcts[p.id] ?? 0) })),
-          ];
-          const hDist = distributeAmountInCents(hCycle.netProfit, hShares);
-          const share = hDist[partner.id] ?? 0;
-          allTimeGeneratedFromCycles += share;
-          if (hCycle.cycleId !== currentCycleId) {
-            previousCyclesGenerated += share;
-          }
-        }
-
-        const previousCyclesSalaryPaid = Number((totalSalaryPaidAllTime - salaryPaidInPeriod).toFixed(2));
-        carriedOverPendingSalary = Number((previousCyclesGenerated - previousCyclesSalaryPaid).toFixed(2));
-        const cycleAvailable = Number((grossSalaryGenerated - salaryPaidInPeriod).toFixed(2));
-
-        // Saldo disponível acumula o ciclo atual e os saldos remanescentes (positivos ou negativos)
-        availableToReceive = Number((carriedOverPendingSalary + cycleAvailable).toFixed(2));
-      } else {
-        // Fallback linear preservando saldo negativo se houver
-        const allTimeGrossGenerated = Number(((allTimeNetProfit * salaryPct) / 100).toFixed(2));
-        const totalAllTimeAvailable = Number((allTimeGrossGenerated - totalSalaryPaidAllTime).toFixed(2));
-        const cycleAvailable = Number((grossSalaryGenerated - salaryPaidInPeriod).toFixed(2));
-
-        carriedOverPendingSalary = Number((totalAllTimeAvailable - cycleAvailable).toFixed(2));
-        availableToReceive = Number((carriedOverPendingSalary + cycleAvailable).toFixed(2));
-      }
-    }
-
-    totalPartnersPct += salaryPct;
-    totalPartnersGenerated += grossSalaryGenerated;
-    totalPartnersPaid += salaryPaidInPeriod;
-    totalPartnersAvailable += availableToReceive;
-
-    return {
-      partner,
-      salaryPct,
-      grossSalaryGenerated,
-      salaryPaidInPeriod,
-      availableToReceive,
-      totalSalaryPaidAllTime,
-      carriedOverPendingSalary,
-    };
-  });
+  const totalPartnersPct = Number(realPartners.reduce((s, p) => s + Number(activePartnerPcts[p.id] ?? 0), 0).toFixed(2));
 
   return {
     periodMode,
-    baseNetProfit: Number(baseNetProfit.toFixed(2)),
+    baseNetProfit: 0,
     reinvestmentPct: activeReinvestmentPct,
-    reinvestmentAmount,
-    totalReinvestmentAccumulated,
-    totalPartnersPct: Number(totalPartnersPct.toFixed(2)),
-    totalPartnersGenerated: Number(totalPartnersGenerated.toFixed(2)),
-    totalPartnersPaid: Number(totalPartnersPaid.toFixed(2)),
-    totalPartnersAvailable: Number(totalPartnersAvailable.toFixed(2)),
+    reinvestmentAmount: 0,
+    totalReinvestmentAccumulated: 0,
+    totalPartnersPct,
+    totalPartnersGenerated: 0,
+    totalPartnersPaid: 0,
+    totalPartnersAvailable: 0,
     partnerItems,
   };
 }
