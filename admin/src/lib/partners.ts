@@ -233,32 +233,8 @@ export const INITIAL_DEFAULT_PARTNERS: Partner[] = [
   }
 ];
 
-export const INITIAL_DEFAULT_TRANSACTIONS: PartnerTransaction[] = [
-  {
-    id: "tx-init-1",
-    company_id: DEFAULT_COMPANY_ID,
-    partner_id: "p1-eduardo",
-    partner_name: "Eduardo",
-    type: "APORTE",
-    amount: 500.00,
-    date: new Date().toISOString().split("T")[0],
-    description: "Aporte inicial de capital",
-    destination_category: "ESTOQUE",
-    created_at: new Date().toISOString()
-  },
-  {
-    id: "tx-init-2",
-    company_id: DEFAULT_COMPANY_ID,
-    partner_id: "p2-gabriel",
-    partner_name: "Gabriel",
-    type: "APORTE",
-    amount: 605.00,
-    date: new Date().toISOString().split("T")[0],
-    description: "Aporte inicial de capital",
-    destination_category: "ESTOQUE",
-    created_at: new Date().toISOString()
-  }
-];
+// Transações iniciais padrão zeradas para novo ciclo (Clean Slate)
+export const INITIAL_DEFAULT_TRANSACTIONS: PartnerTransaction[] = [];
 
 // ─── Funções de Cache Local (Secundário / Fallback de Contingência) ──────────
 
@@ -751,6 +727,29 @@ export async function deletePartnerTransaction(transactionId: string, companyId?
   return updated;
 }
 
+/**
+ * Exclui e zera todas as movimentações de sócios da empresa (Clean Slate)
+ */
+export async function clearAllPartnerTransactions(companyId?: string): Promise<boolean> {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  try {
+    const { error } = await supabase
+      .from("smoking_partner_transactions")
+      .delete()
+      .eq("company_id", targetCompanyId);
+
+    if (error) {
+      console.warn("[Partners] Erro ao limpar transações de sócios no Supabase:", error.message);
+    }
+  } catch (e: any) {
+    console.warn("[Partners] Exceção ao limpar transações de sócios:", e?.message || e);
+  }
+
+  // Sincroniza e zera cache local
+  saveLocalPartnerTransactions([], targetCompanyId);
+  return true;
+}
+
 // ─── Motor Financeiro Unificado (FONTE ÚNICA DE VERDADE DO FINANCEIRO) ──────
 
 export function calculatePartnersFinancials(params: {
@@ -761,6 +760,7 @@ export function calculatePartnersFinancials(params: {
   persistedCosts: Record<string, number>;
   operationalExpenses?: number;
   repurchases?: any[];
+  totalFiadosPending?: number;
 }): CompanyFinancialOverview {
   const {
     partners,
@@ -769,7 +769,8 @@ export function calculatePartnersFinancials(params: {
     products,
     persistedCosts,
     operationalExpenses = 0,
-    repurchases = []
+    repurchases = [],
+    totalFiadosPending = 0
   } = params;
 
   // 1. DRE OFICIAL & TESOURARIA: Delegar ao motor oficial do Financeiro (Fonte Única de Verdade)

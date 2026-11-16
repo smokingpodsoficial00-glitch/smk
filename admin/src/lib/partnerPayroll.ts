@@ -472,24 +472,9 @@ export function calculatePayrollOverview(params: {
 
   const reinvestmentAmount = distributedPeriodCents["REINVESTMENT"] ?? 0;
 
-  // Cálculo do Fundo de Reinvestimento Histórico Acumulado (Regra 8)
-  // Se métricas históricas de ciclo forem fornecidas, acumula ciclo a ciclo com seus respectivos percentuais
-  let totalReinvestmentAccumulated = 0;
-  if (historicalCycleMetrics.length > 0) {
-    for (const hCycle of historicalCycleMetrics) {
-      const hRule = getRuleForCycle(hCycle.cycleId, normalized, realPartners);
-      const hShares = [
-        { id: "REINVESTMENT", pct: hRule.reinvestmentPct },
-        ...realPartners.map((p) => ({ id: p.id, pct: Number(hRule.partnerPcts[p.id] ?? 0) })),
-      ];
-      const hDist = distributeAmountInCents(hCycle.netProfit, hShares);
-      totalReinvestmentAccumulated += hDist["REINVESTMENT"] ?? 0;
-    }
-    totalReinvestmentAccumulated = Number(totalReinvestmentAccumulated.toFixed(2));
-  } else {
-    // Fallback: aplica percentual histórico configurado sobre o resultado líquido total
-    totalReinvestmentAccumulated = Number(((allTimeNetProfit * normalized.reinvestmentPct) / 100).toFixed(2));
-  }
+  // Fundo de Reinvestimento Histórico Acumulado (Zerar para Clean Slate)
+  // Como a empresa não tem dinheiro em caixa, o fundo de reinvestimento acumulado é R$ 0,00.
+  const totalReinvestmentAccumulated = 0;
 
   let totalPartnersPct = 0;
   let totalPartnersGenerated = 0;

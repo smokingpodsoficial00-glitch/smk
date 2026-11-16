@@ -326,8 +326,8 @@ export function calculateMetricsForCycle(
   const freightRepurchases = Number(cycleRepurchases.reduce((sum, r) => sum + (Number(r.freight_amount) || 0), 0).toFixed(2));
   const totalInvestedRepurchases = Number((stockPurchases + freightRepurchases).toFixed(2));
 
-  // Caixa Real do ciclo: Faturamento dos produtos + Lucro de frete nacional - recompras do ciclo + entradas caixa - saídas caixa
-  const realCash = Number((revenueSum + nationalShippingProfitSum - stockPurchases + cycleCapitalInflows - cycleCapitalOutflows).toFixed(2));
+  // Caixa Real do ciclo: Zerado conforme reestruturação oficial (recursos da empresa residem em Estoque e Fiados)
+  const realCash = 0;
 
   const averageTicket = totalOrders > 0 ? Number((revenueSum / totalOrders).toFixed(2)) : 0;
   const averagePricePerPod = podsSoldSum > 0 ? Number((revenueSum / podsSoldSum).toFixed(2)) : 0;
@@ -679,6 +679,36 @@ export interface AllTimeFinancialMetrics {
   realCash: number;
 }
 
+export const CAIXA_REAL_RESET_KEY = "smk_caixa_real_zeroed_v1";
+
+/**
+ * Verifica se o Caixa Real está configurado para o estado zerado (Marco Zero / Clean Slate)
+ * Padrão: true (Caixa Real zerado conforme solicitação de reestruturação)
+ */
+export function isCaixaRealReset(companyId?: string): boolean {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return true;
+    const key = companyId ? `${CAIXA_REAL_RESET_KEY}_${companyId}` : CAIXA_REAL_RESET_KEY;
+    const val = localStorage.getItem(key);
+    return val !== "false";
+  } catch (e) {
+    return true;
+  }
+}
+
+/**
+ * Ativa ou desativa o zeramento do Caixa Real
+ */
+export function setCaixaRealReset(zeroed: boolean, companyId?: string): void {
+  try {
+    const key = companyId ? `${CAIXA_REAL_RESET_KEY}_${companyId}` : CAIXA_REAL_RESET_KEY;
+    localStorage.setItem(key, zeroed ? "true" : "false");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("smk-caixa-real-reset-changed", { detail: { zeroed } }));
+    }
+  } catch (e) {}
+}
+
 /**
  * Calcula os indicadores acumulados históricos completos (All-Time)
  * Utilizados para Eficiência Comercial e Caixa Real (que NÃO reiniciam no dia 14)
@@ -688,7 +718,8 @@ export function calculateAllTimeMetrics(
   repurchases: any[] = [],
   persistedCosts: Record<string, number> = {},
   partnerTransactions: any[] = [],
-  partners: any[] = []
+  partners: any[] = [],
+  companyId?: string
 ): AllTimeFinancialMetrics {
   const validOrders = filterValidOrders(orders);
 
@@ -773,8 +804,11 @@ export function calculateAllTimeMetrics(
   // 2. Retiradas de Capital, Distribuição de Lucro, Pró-Labore e Custos Operacionais subtraem do caixa imediatamente.
   const operationalCash = (revenueSum + nationalShippingProfitSum) - stockPurchases;
 
-  // Caixa Real (Operacional + Injeções em Caixa - Retiradas)
-  const realCash = Number((operationalCash + capitalInflows - capitalOutflows).toFixed(2));
+  // Caixa Real Atual (Tesouraria / Dinheiro em Caixa Vivo)
+  // Conforme determinação oficial de reestruturação (Clean Slate):
+  // O Caixa Real da empresa está cravado em R$ 0,00.
+  // Os únicos ativos de dinheiro da empresa são o Estoque Físico e os Fiados a Receber.
+  const realCash = 0;
 
   const averageTicket = totalOrders > 0 ? Number((revenueSum / totalOrders).toFixed(2)) : 0;
   const averagePricePerPod = podsSoldSum > 0 ? Number((revenueSum / podsSoldSum).toFixed(2)) : 0;

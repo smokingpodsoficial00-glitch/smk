@@ -7,6 +7,7 @@ import {
   AlertCircle, X, Percent, Zap, Settings2, Building2, Banknote
 } from 'lucide-react';
 import { formatBRL } from '@/lib/cart';
+import { isOrderFiadoPending } from '@/lib/fiadoSales';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchProductCostsMap } from '@/lib/productCosts';
@@ -15,6 +16,7 @@ import {
   fetchPartnerTransactions,
   deletePartnerTransaction,
   updatePartnerTransaction,
+  clearAllPartnerTransactions,
   calculatePartnersFinancials,
   type Partner,
   type PartnerTransaction,
@@ -367,6 +369,22 @@ export default function PartnersDashboard() {
     }
   };
 
+  const handleClearAllPartnerTransactions = async () => {
+    if (!window.confirm("Atenção: Deseja realmente zerar todas as movimentações dos sócios para o novo ciclo? Todos os aportes, retiradas e saldos dos sócios ficarão em R$ 0,00.")) {
+      return;
+    }
+    setIsDeletingTx(true);
+    try {
+      await clearAllPartnerTransactions(targetCompanyId);
+      setTransactions([]);
+      await loadAllData(true);
+    } catch (e) {
+      console.error("Erro ao zerar transações:", e);
+    } finally {
+      setIsDeletingTx(false);
+    }
+  };
+
   const handleConfirmDeleteTransaction = async () => {
     if (!txToDelete) return;
     setIsDeletingTx(true);
@@ -507,6 +525,18 @@ export default function PartnersDashboard() {
 
           {/* Controles de Período e Configuração */}
           <div className="flex flex-wrap items-center gap-2">
+          {transactions.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearAllPartnerTransactions}
+              disabled={isDeletingTx}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-all cursor-pointer disabled:opacity-40"
+              title="Zerar todas as movimentações dos sócios para a nova fase da empresa"
+            >
+              <Trash2 className="size-3.5" />
+              <span>Zerar Movimentações</span>
+            </button>
+          )}
             <div className="inline-flex rounded-xl bg-white/5 p-1 border border-white/10">
               <button
                 type="button"

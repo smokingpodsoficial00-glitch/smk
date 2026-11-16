@@ -56,6 +56,8 @@ import { ManualSaleModal } from "./ManualSaleModal";
 import { WeeklyGoalsModal } from "./WeeklyGoalsModal";
 import { NewTransactionModal } from "./partners/NewTransactionModal";
 import { isOrderNational } from "@/lib/nationalSales";
+import { isOrderFiadoPending } from "@/lib/fiadoSales";
+import { isCaixaRealReset, setCaixaRealReset } from "@/lib/financialCycles";
 import {
   type WeeklyGoalsConfig,
   loadWeeklyGoals,
@@ -1583,12 +1585,13 @@ export default function FinanceDashboard() {
 
   // ── All-Time Metrics (Histórico Completo para Eficiência Comercial & Caixa Real Atual) ──
   const allTimeMetrics = useMemo(() => {
-    return calculateAllTimeMetrics(allValidOrders, repurchases, persistedProductCosts, partnerTransactions, partnersList);
+    return calculateAllTimeMetrics(allValidOrders, repurchases, persistedProductCosts, partnerTransactions, partnersList, company?.id);
   }, [allValidOrders, repurchases, persistedProductCosts, partnerTransactions, partnersList]);
 
   // CAIXA REAL ATUAL: Posição patrimonial viva da empresa (NÃO reinicia no dia 14)
   // Conforme regra fundamental: Faturamento total acumulado - total pago em recompras
-  const realCash = allTimeMetrics.realCash;
+  // Caixa Real oficial cravado em 0.00 (Clean Slate / Reestruturação)
+  const realCash = 0;
   const totalStockPurchases = allTimeMetrics.stockPurchases;
   const totalFreightRepurchases = allTimeMetrics.freightRepurchases;
   const totalInvestedRepurchases = allTimeMetrics.totalInvestedRepurchases;
@@ -2330,9 +2333,16 @@ export default function FinanceDashboard() {
   const netCashAvailable = Math.max(0, (grossRevenue || 0) - (logisticsFee || 0) - numericMarketingSpent);
   const realNetProfitPostMarketing = (netProfit || 0) - numericMarketingSpent;
   
-  // Patrimônio Real Total da Loja = Caixa Real Calculado Atual + Valor de Venda do Estoque Físico Atual
-  // Regra oficial: NÃO utiliza Faturamento Bruto Acumulado (faturamento é volume histórico, não patrimônio)
-  const totalCompanyEquity = (realCash || 0) + (stockAssetRetail || 0);
+  // Total a Receber em Fiados Pendentes
+  const totalFiadoPending = useMemo(() => {
+    return (allValidOrders || [])
+      .filter(isOrderFiadoPending)
+      .reduce((sum: number, o: any) => sum + (parseFloat(o.total_amount || 0) || 0), 0);
+  }, [allValidOrders]);
+
+  // Patrimônio Real Total da Loja = Estoque Físico Atual + Fiados a Receber (Caixa Real em R$ 0,00)
+  // Regra oficial Clean Slate: Os únicos recursos da loja são Estoque e Fiados a Receber
+  const totalCompanyEquity = (stockAssetRetail || 0) + totalFiadoPending;
   const stockAssetProfit = (stockAssetRetail || 0) - (stockAssetCost || 0);
 
   // Métricas de Eficiência Comercial & Ticket Médio (HISTÓRICO COMPLETO)
@@ -3024,8 +3034,12 @@ export default function FinanceDashboard() {
               <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Wallet className="size-4 text-emerald-400" /> Caixa Real Calculado
               </span>
-              <span className="text-[10px] font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 px-2 py-0.5 rounded-full">
-                Posição Atual
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                realCash === 0 
+                  ? "bg-amber-500/20 border border-amber-500/40 text-amber-300"
+                  : "bg-emerald-500/20 border border-emerald-500/40 text-emerald-300"
+              }`}>
+                {realCash === 0 ? "Caixa Zerado (Novo Ciclo)" : "Posição Atual"}
               </span>
             </div>
 
@@ -3040,7 +3054,7 @@ export default function FinanceDashboard() {
 
             <div className="pt-2.5 border-t border-emerald-500/20 text-[10px] text-white/50 flex flex-col gap-1">
               <span className="text-white/70">Fat. total ({formatBRL(allTimeMetrics.grossRevenue)}) − Recompras ({formatBRL(totalStockPurchases)})</span>
-              <span className="text-emerald-400/80 font-medium">⚡ Calculado pelo sistema (não é saldo bancário direto). Não reinicia no dia 14.</span>
+              <span className="text-amber-400/90 font-medium">⚡ Caixa Real em R$ 0,00. Recursos ativos: Estoque e Fiados a Receber.</span>
             </div>
           </div>
 
