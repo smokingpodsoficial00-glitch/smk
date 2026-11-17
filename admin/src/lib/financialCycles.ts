@@ -326,8 +326,9 @@ export function calculateMetricsForCycle(
   const freightRepurchases = Number(cycleRepurchases.reduce((sum, r) => sum + (Number(r.freight_amount) || 0), 0).toFixed(2));
   const totalInvestedRepurchases = Number((stockPurchases + freightRepurchases).toFixed(2));
 
-  // Caixa Real do ciclo: Zerado conforme reestruturação oficial (recursos da empresa residem em Estoque e Fiados)
-  const realCash = 0;
+  // Caixa Real do ciclo: reflete o dinheiro vivo acumulado a partir do Marco Zero
+  const newPhaseCash = calculateNewPhaseRealCash(cycleOrders, cycleRepurchases, cyclePartnerTransactions);
+  const realCash = newPhaseCash.realCash;
 
   const averageTicket = totalOrders > 0 ? Number((revenueSum / totalOrders).toFixed(2)) : 0;
   const averagePricePerPod = podsSoldSum > 0 ? Number((revenueSum / podsSoldSum).toFixed(2)) : 0;
@@ -677,9 +678,88 @@ export interface AllTimeFinancialMetrics {
   freightRepurchases: number;
   totalInvestedRepurchases: number;
   realCash: number;
+  newPhaseRevenue?: number;
+  newPhaseOutflows?: number;
 }
 
 export const CAIXA_REAL_RESET_KEY = "smk_caixa_real_zeroed_v1";
+
+/**
+ * Timestamp do Marco Zero da Reestruturação da SMK (16/11/2026 às 20:14:00 Brasília / 23:14:00 UTC)
+ * Faturamento histórico anterior congelado como ponto de partida (R$ 23.427,56)
+ */
+export const CLEAN_SLATE_RESET_TIMESTAMP = 1794870840000;
+export const BASELINE_HISTORICAL_REVENUE = 23427.56;
+
+export function calculateNewPhaseRealCash(
+  orders: any[] = [],
+  repurchases: any[] = [],
+  partnerTransactions: any[] = []
+): {
+  realCash: number;
+  newPhaseRevenue: number;
+  newPhaseOutflows: number;
+  newOrdersCount: number;
+} {
+  let newOrdersRevenue = 0;
+  let newOrdersCount = 0;
+  let allPaidRevenueSum = 0;
+
+  for (const order of orders || []) {
+    if (!order || order.delivery_status === "CANCELADO" || order.status === "CANCELADO") continue;
+    const amt = parseFloat(order.total_amount) || 0;
+    const isPendingFiado = isOrderFiadoPending(order);
+
+    if (!isPendingFiado) {
+      allPaidRevenueSum += amt;
+    }
+
+    const rawDate = order.created_at || order.date;
+    if (!rawDate) continue;
+    const orderTime = new Date(rawDate).getTime();
+    if (orderTime >= CLEAN_SLATE_RESET_TIMESTAMP) {
+      newOrdersCount++;
+      if (!isPendingFiado) {
+        newOrdersRevenue += amt;
+      }
+    }
+  }
+
+  // Faturamento recebido na nova fase (vendas novas pós-reset ou receita acima da linha de base)
+  const revenueAboveBaseline = Math.max(0, Number((allPaidRevenueSum - BASELINE_HISTORICAL_REVENUE).toFixed(2)));
+  const effectiveNewRevenue = Math.max(newOrdersRevenue, revenueAboveBaseline);
+
+  let newPhaseOutflows = 0;
+  for (const r of repurchases || []) {
+    if (!r) continue;
+    const rawDate = r.created_at || r.purchase_date;
+    if (!rawDate) continue;
+    const repTime = new Date(rawDate).getTime();
+    if (repTime > CLEAN_SLATE_RESET_TIMESTAMP) {
+      newPhaseOutflows += (parseFloat(r.stock_purchase_amount) || 0) + (parseFloat(r.freight_amount) || 0);
+    }
+  }
+
+  for (const tx of partnerTransactions || []) {
+    if (!tx) continue;
+    const rawDate = tx.created_at || tx.date;
+    if (!rawDate) continue;
+    const txTime = new Date(rawDate).getTime();
+    if (txTime > CLEAN_SLATE_RESET_TIMESTAMP) {
+      if (['RETIRADA_CAPITAL', 'DISTRIBUICAO_LUCRO', 'PRO_LABORE', 'DESPESA_OPERACIONAL'].includes(tx.type)) {
+        newPhaseOutflows += (parseFloat(tx.amount) || 0);
+      }
+    }
+  }
+
+  const realCash = Math.max(0, Number((effectiveNewRevenue - newPhaseOutflows).toFixed(2)));
+  return {
+    realCash,
+    newPhaseRevenue: Number(effectiveNewRevenue.toFixed(2)),
+    newPhaseOutflows: Number(newPhaseOutflows.toFixed(2)),
+    newOrdersCount,
+  };
+}
 
 /**
  * Verifica se o Caixa Real está configurado para o estado zerado (Marco Zero / Clean Slate)
@@ -805,10 +885,12 @@ export function calculateAllTimeMetrics(
   const operationalCash = (revenueSum + nationalShippingProfitSum) - stockPurchases;
 
   // Caixa Real Atual (Tesouraria / Dinheiro em Caixa Vivo)
-  // Conforme determinação oficial de reestruturação (Clean Slate):
-  // O Caixa Real da empresa está cravado em R$ 0,00.
-  // Os únicos ativos de dinheiro da empresa são o Estoque Físico e os Fiados a Receber.
-  const realCash = 0;
+  // Conforme determinação de reestruturação:
+  // No Marco Zero (16/11/2026), o saldo passado foi zerado (R$ 0,00).
+  // A partir do Marco Zero, toda nova venda recebida (Pix/dinheiro) soma no Caixa Real,
+  // e qualquer nova recompra/despesa subtrai.
+  const newPhaseCashData = calculateNewPhaseRealCash(validOrders, repurchases, partnerTransactions);
+  const realCash = newPhaseCashData.realCash;
 
   const averageTicket = totalOrders > 0 ? Number((revenueSum / totalOrders).toFixed(2)) : 0;
   const averagePricePerPod = podsSoldSum > 0 ? Number((revenueSum / podsSoldSum).toFixed(2)) : 0;
@@ -830,6 +912,8 @@ export function calculateAllTimeMetrics(
     freightRepurchases,
     totalInvestedRepurchases,
     realCash,
+    newPhaseRevenue: newPhaseCashData.newPhaseRevenue,
+    newPhaseOutflows: newPhaseCashData.newPhaseOutflows,
   };
 }
 

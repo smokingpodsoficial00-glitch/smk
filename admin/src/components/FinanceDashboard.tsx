@@ -1589,9 +1589,8 @@ export default function FinanceDashboard() {
   }, [allValidOrders, repurchases, persistedProductCosts, partnerTransactions, partnersList]);
 
   // CAIXA REAL ATUAL: Posição patrimonial viva da empresa (NÃO reinicia no dia 14)
-  // Conforme regra fundamental: Faturamento total acumulado - total pago em recompras
-  // Caixa Real oficial cravado em 0.00 (Clean Slate / Reestruturação)
-  const realCash = 0;
+  // Conforme regra fundamental Clean Slate: Inicia em R$ 0,00 no Marco Zero e acumula novas vendas recebidas da nova fase
+  const realCash = allTimeMetrics.realCash;
   const totalStockPurchases = allTimeMetrics.stockPurchases;
   const totalFreightRepurchases = allTimeMetrics.freightRepurchases;
   const totalInvestedRepurchases = allTimeMetrics.totalInvestedRepurchases;
@@ -3039,7 +3038,7 @@ export default function FinanceDashboard() {
                   ? "bg-amber-500/20 border border-amber-500/40 text-amber-300"
                   : "bg-emerald-500/20 border border-emerald-500/40 text-emerald-300"
               }`}>
-                {realCash === 0 ? "Caixa Zerado (Novo Ciclo)" : "Posição Atual"}
+                {realCash === 0 ? "Caixa Zerado (Novo Ciclo)" : "Posição Atual Viva"}
               </span>
             </div>
 
@@ -3048,13 +3047,17 @@ export default function FinanceDashboard() {
                 {formatBRL(realCash)}
               </div>
               <p className="text-xs font-semibold text-emerald-400/90 mt-1">
-                Posição financeira atual calculada pelo sistema
+                {realCash > 0 ? "Saldo líquido em dinheiro vivo da nova fase" : "Caixa inicial zerado no Marco Zero (16/11/2026)"}
               </p>
             </div>
 
             <div className="pt-2.5 border-t border-emerald-500/20 text-[10px] text-white/50 flex flex-col gap-1">
-              <span className="text-white/70">Fat. total ({formatBRL(allTimeMetrics.grossRevenue)}) − Recompras ({formatBRL(totalStockPurchases)})</span>
-              <span className="text-amber-400/90 font-medium">⚡ Caixa Real em R$ 0,00. Recursos ativos: Estoque e Fiados a Receber.</span>
+              <span className="text-white/70">
+                Novas Vendas Recebidas ({formatBRL(allTimeMetrics.newPhaseRevenue || 0)}) − Saídas ({formatBRL(allTimeMetrics.newPhaseOutflows || 0)})
+              </span>
+              <span className="text-emerald-400/90 font-medium">
+                ⚡ Marco Zero aplicado em 16/11/2026. Caixa Real acumulando novas vendas em tempo real.
+              </span>
             </div>
           </div>
 
@@ -3435,6 +3438,12 @@ export default function FinanceDashboard() {
               <span>Caixa Real ({formatBRL(realCash)})</span>
               <span className="mx-1">+</span>
               <span>Estoque ({formatBRL(stockAssetRetail)})</span>
+              {totalFiadoPending > 0 && (
+                <>
+                  <span className="mx-1">+</span>
+                  <span className="text-amber-400">Fiados ({formatBRL(totalFiadoPending)})</span>
+                </>
+              )}
             </div>
           </div>
         </div>

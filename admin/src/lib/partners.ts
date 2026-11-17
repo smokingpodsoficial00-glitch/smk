@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { isOrderNational, extractNationalInfo } from "./nationalSales";
 import { isCompanyEntityPartner, isCompanyExpenseTransaction } from "./partnerPayroll";
-import { calculateAllTimeMetrics } from "./financialCycles";
+import { calculateAllTimeMetrics, calculateNewPhaseRealCash } from "./financialCycles";
 
 export type PartnerTransactionType = 
   | 'APORTE'              // Entrada de capital novo do sócio na empresa (Altera Capital e % de Equity)
@@ -878,9 +878,11 @@ export function calculatePartnersFinancials(params: {
     totalNetCapitalInvested += net;
   }
 
-  // 5. PATRIMÔNIO REAL TOTAL DA LOJA (ESTOQUE FÍSICO + FIADOS A RECEBER)
-  // Com o Caixa Real em R$ 0,00, a única riqueza viva da empresa é o Estoque e os Fiados
-  const companyEconomicEquity = Number(((totalStockRetailSum || 0) + (totalFiadosPending || 0)).toFixed(2));
+  // 5. PATRIMÔNIO REAL TOTAL DA LOJA (CAIXA REAL VIVO + ESTOQUE FÍSICO + FIADOS A RECEBER)
+  // O Caixa Real da nova fase acumula as vendas recebidas após o Marco Zero
+  const newPhaseCash = calculateNewPhaseRealCash(orders, repurchases, transactions);
+  const currentLiveCash = newPhaseCash.realCash;
+  const companyEconomicEquity = Number(((currentLiveCash || 0) + (totalStockRetailSum || 0) + (totalFiadosPending || 0)).toFixed(2));
 
   // 6. DISTRIBUIÇÃO DAS FATIAS DE EQUITY (50% cada sócio ativo para Clean Slate)
   const hasDefinedCapital = totalNetCapitalInvested > 0;
