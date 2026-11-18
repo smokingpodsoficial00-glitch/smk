@@ -188,33 +188,6 @@ export function DashboardLayout() {
             </NavLink>
           )}
 
-          {/* Sócios & Equity */}
-          {canAccess('socios') && (
-            <NavLink 
-              to="/socios"
-              title={collapsed ? "Sócios & Equity" : undefined}
-              className={({ isActive }) =>
-                `flex items-center gap-3 py-2.5 transition-all cursor-pointer w-full text-xs font-semibold ${
-                  collapsed ? 'justify-center px-3 rounded-xl' : 'pr-4'
-                } ${
-                  isActive 
-                    ? 'bg-white/10 text-white font-extrabold border-l-2 border-white pl-3.5 shadow-[0_0_15px_rgba(255,255,255,0.15)]' 
-                    : 'text-white/60 hover:bg-white/5 hover:text-white border-l-2 border-transparent pl-4'
-                }`
-              }
-            >
-              <Scale className="size-4 shrink-0 text-white/80" />
-              {!collapsed && (
-                <span className="truncate flex items-center gap-2">
-                  Sócios
-                  <span className="text-[9px] bg-white/10 text-white border border-white/20 px-1.5 py-0.5 rounded-full font-bold shadow-sm">
-                    EQUITY
-                  </span>
-                </span>
-              )}
-            </NavLink>
-          )}
-
           {/* Vendas do SaaS */}
           {canAccess('gestao-saas') && (
             <NavLink 
@@ -402,22 +375,7 @@ export function DashboardLayout() {
                       <span className="text-xs font-semibold truncate">Financeiro</span>
                     </NavLink>
                   )}
-                  {canAccess('socios') && (
-                    <NavLink
-                      to="/socios"
-                      onClick={() => setIsMoreSheetOpen(false)}
-                      className={({ isActive }) =>
-                        `flex items-center gap-2.5 p-3 rounded-2xl border transition-all ${
-                          isActive 
-                            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 font-bold' 
-                            : 'bg-white/5 border-white/5 text-white/80 hover:bg-white/10'
-                        }`
-                      }
-                    >
-                      <Scale className="size-4 shrink-0 text-white/70" />
-                      <span className="text-xs font-semibold truncate">Sócios & Equity</span>
-                    </NavLink>
-                  )}
+
                 </div>
               </div>
 
