@@ -685,10 +685,10 @@ export interface AllTimeFinancialMetrics {
 export const CAIXA_REAL_RESET_KEY = "smk_caixa_real_zeroed_v1";
 
 /**
- * Timestamp do Marco Zero da Reestruturação da SMK (16/11/2026 às 20:14:00 Brasília / 23:14:00 UTC)
- * Faturamento histórico anterior congelado como ponto de partida (R$ 23.427,56)
+ * Timestamp do Marco Zero da Reestruturação da SMK (18/11/2026 às 00:00:00 Brasília)
+ * Ponto de partida oficial da nova fase da operação.
  */
-export const CLEAN_SLATE_RESET_TIMESTAMP = 1794870840000;
+export const CLEAN_SLATE_RESET_TIMESTAMP = 1794970800000;
 export const BASELINE_HISTORICAL_REVENUE = 23427.56;
 
 export function calculateNewPhaseRealCash(
@@ -720,7 +720,30 @@ export function calculateNewPhaseRealCash(
     if (orderTime >= CLEAN_SLATE_RESET_TIMESTAMP) {
       newOrdersCount++;
       if (!isPendingFiado) {
-        newOrdersRevenue += amt;
+        // Exclui frete local repassado ao motoboy
+        const shippingFee = parseFloat(order.shipping_fee || 0);
+        const isNational = isOrderNational(order);
+        let motoboyShippingFee = isNational ? 0 : shippingFee;
+
+        let prodRevenue = 0;
+        const items = Array.isArray(order.items) ? order.items : [];
+        if (items.length > 0) {
+          for (const item of items) {
+            const qty = Number(item.quantity) || 1;
+            const p = Number(item.price || item.unit_price) || 0;
+            prodRevenue += qty * p;
+          }
+        } else {
+          prodRevenue = Math.max(0, amt - motoboyShippingFee);
+        }
+
+        let natMargin = 0;
+        if (isNational) {
+          const info = extractNationalInfo(order);
+          natMargin = Math.max(0, (info.shippingFeeCharged || shippingFee) - (info.shippingCostReal || 0));
+        }
+
+        newOrdersRevenue += (prodRevenue + natMargin);
       }
     }
   }

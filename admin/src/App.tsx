@@ -260,7 +260,7 @@ export default function App() {
           {activeTab === 'estoque' && <SupplyChainDashboard />}
           {activeTab === 'clientes' && <CRMDashboard />}
           {activeTab === 'marketing' && <MarketingModule />}
-          {activeTab === 'socios' && <PartnersDashboard />}
+          {activeTab === 'socios' && <FinanceDashboard initialTab="socios" />}
           {activeTab === 'configuracoes' && <SettingsPage />}
         </Suspense>
       </main>

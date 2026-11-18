@@ -137,7 +137,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'socios',
-        element: <SuspenseWrap><PartnersDashboard /></SuspenseWrap>,
+        element: <SuspenseWrap><FinanceDashboard initialTab="socios" /></SuspenseWrap>,
       },
       {
         path: 'tarefas',

@@ -438,6 +438,7 @@ export function calculatePayrollOverview(params: {
   allTimeNetProfit: number;
   currentCycleId: string;
   historicalCycleMetrics?: Array<{ cycleId: string; netProfit: number }>;
+  realCashAvailable?: number;
 }): PayrollOverview {
   const {
     config,
@@ -447,6 +448,7 @@ export function calculatePayrollOverview(params: {
     allTimeNetProfit,
     currentCycleId,
     historicalCycleMetrics = [],
+    realCashAvailable = 0,
   } = params;
 
   const realPartners = filterRealHumanPartners(partners);
@@ -458,32 +460,110 @@ export function calculatePayrollOverview(params: {
   const activeReinvestmentPct = periodMode === "CYCLE" ? activeCycleRule.reinvestmentPct : normalized.reinvestmentPct;
   const activePartnerPcts = periodMode === "CYCLE" ? activeCycleRule.partnerPcts : normalized.partnerPcts;
 
-  // Clean Slate & Regime de Caixa Real Zerado:
-  // Como o Caixa Real da empresa está cravado em R$ 0,00 (falência / reestruturação), não existe dinheiro em caixa
-  // para saques de pró-labore nem aporte para o fundo de reinvestimento da loja.
-  // Todo o patrimônio restante reside exclusivamente em Estoque e Fiados a Receber.
-  const partnerItems: PartnerPayrollItem[] = realPartners.map((partner) => ({
-    partner,
-    salaryPct: Number(activePartnerPcts[partner.id] ?? 0),
-    grossSalaryGenerated: 0,
-    salaryPaidInPeriod: 0,
-    availableToReceive: 0,
-    totalSalaryPaidAllTime: 0,
-    carriedOverPendingSalary: 0,
-  }));
+  const baseNetProfit = periodMode === "CYCLE" ? cycleNetProfit : allTimeNetProfit;
 
-  const totalPartnersPct = Number(realPartners.reduce((s, p) => s + Number(activePartnerPcts[p.id] ?? 0), 0).toFixed(2));
+  // 1. Processar Histórico de Ciclos para apurar saldo acumulado e carregar compensações
+  const partnerCarryOverMap = new Map<string, number>();
+  let totalReinvestmentAccumulated = 0;
+
+  for (const p of realPartners) {
+    partnerCarryOverMap.set(p.id, 0);
+  }
+
+  if (historicalCycleMetrics.length > 0) {
+    const chronologicalCycles = [...historicalCycleMetrics].sort((a, b) => a.cycleId.localeCompare(b.cycleId));
+    for (const hCycle of chronologicalCycles) {
+      const hRule = getRuleForCycle(hCycle.cycleId, normalized, realPartners);
+      const hProfit = hCycle.netProfit || 0;
+
+      // Reinvestimento da loja
+      totalReinvestmentAccumulated += (hProfit * hRule.reinvestmentPct) / 100;
+
+      // Sócios
+      for (const p of realPartners) {
+        const pct = hRule.partnerPcts[p.id] ?? 0;
+        const generated = (hProfit * pct) / 100;
+        const currentAccum = partnerCarryOverMap.get(p.id) || 0;
+        partnerCarryOverMap.set(p.id, currentAccum + generated);
+      }
+    }
+  }
+
+  // 2. Apurar saques já realizados (PRO_LABORE) por sócio
+  const partnerPaidMap = new Map<string, number>();
+  const partnerCyclePaidMap = new Map<string, number>();
+
+  for (const p of realPartners) {
+    partnerPaidMap.set(p.id, 0);
+    partnerCyclePaidMap.set(p.id, 0);
+  }
+
+  for (const tx of transactions || []) {
+    if (!tx || !tx.partner_id) continue;
+    if (tx.type === 'PRO_LABORE' || tx.type === 'DISTRIBUICAO_LUCRO') {
+      const amt = Number(tx.amount) || 0;
+      const prevAll = partnerPaidMap.get(tx.partner_id) || 0;
+      partnerPaidMap.set(tx.partner_id, prevAll + amt);
+
+      const txDate = tx.date || tx.created_at;
+      if (txDate) {
+        const c = getCycleForDate(txDate);
+        if (c.id === currentCycleId) {
+          const prevCycle = partnerCyclePaidMap.get(tx.partner_id) || 0;
+          partnerCyclePaidMap.set(tx.partner_id, prevCycle + amt);
+        }
+      }
+    }
+  }
+
+  // 3. Montar itens da folha por sócio
+  let totalPartnersGenerated = 0;
+  let totalPartnersPaid = 0;
+  let totalPartnersAvailable = 0;
+
+  const partnerItems: PartnerPayrollItem[] = realPartners.map((partner) => {
+    const salaryPct = Number(activePartnerPcts[partner.id] ?? 0);
+    const grossSalaryGenerated = Number(((baseNetProfit * salaryPct) / 100).toFixed(2));
+    const salaryPaidAllTime = Number((partnerPaidMap.get(partner.id) || 0).toFixed(2));
+    const salaryPaidInPeriod = Number((partnerCyclePaidMap.get(partner.id) || 0).toFixed(2));
+
+    const historicalAccumulatedGenerated = historicalCycleMetrics.length > 0
+      ? Number((partnerCarryOverMap.get(partner.id) || 0).toFixed(2))
+      : grossSalaryGenerated;
+
+    const netBalance = Number((historicalAccumulatedGenerated - salaryPaidAllTime).toFixed(2));
+    const availableToReceive = Math.max(0, netBalance);
+
+    totalPartnersGenerated += grossSalaryGenerated;
+    totalPartnersPaid += salaryPaidInPeriod;
+    totalPartnersAvailable += availableToReceive;
+
+    return {
+      partner,
+      salaryPct,
+      grossSalaryGenerated,
+      salaryPaidInPeriod,
+      availableToReceive,
+      totalSalaryPaidAllTime: salaryPaidAllTime,
+      carriedOverPendingSalary: netBalance,
+    };
+  });
+
+  const reinvestmentAmount = Number(((baseNetProfit * activeReinvestmentPct) / 100).toFixed(2));
+  const totalPartnersPct = Number(
+    realPartners.reduce((s, p) => s + Number(activePartnerPcts[p.id] ?? 0), 0).toFixed(2)
+  );
 
   return {
     periodMode,
-    baseNetProfit: 0,
+    baseNetProfit: Number(baseNetProfit.toFixed(2)),
     reinvestmentPct: activeReinvestmentPct,
-    reinvestmentAmount: 0,
-    totalReinvestmentAccumulated: 0,
+    reinvestmentAmount,
+    totalReinvestmentAccumulated: Number(totalReinvestmentAccumulated.toFixed(2)),
     totalPartnersPct,
-    totalPartnersGenerated: 0,
-    totalPartnersPaid: 0,
-    totalPartnersAvailable: 0,
+    totalPartnersGenerated: Number(totalPartnersGenerated.toFixed(2)),
+    totalPartnersPaid: Number(totalPartnersPaid.toFixed(2)),
+    totalPartnersAvailable: Number(totalPartnersAvailable.toFixed(2)),
     partnerItems,
   };
 }

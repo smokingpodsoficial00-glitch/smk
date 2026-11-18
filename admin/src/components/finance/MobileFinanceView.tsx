@@ -1183,7 +1183,7 @@ function MobileFinanceViewComponent({
               </div>
 
               <div className="pt-2 border-t border-emerald-500/20 text-[10px] text-white/60 leading-relaxed">
-                ⚡ <strong>Calculado pelo sistema:</strong> Faturamento total acumulado ({formatBRL(allTimeMetrics.grossRevenue)}) − Recompras de estoque ({formatBRL(totalStockPurchases)}). <span className="text-emerald-300 font-bold">Não zera no dia 14.</span>
+                ⚡ <strong>Posição de Caixa Oficial:</strong> Entradas líquidas recebidas − Saídas pagas. <span className="text-emerald-300 font-bold">Saldo real em dinheiro vivo.</span>
               </div>
             </div>
 

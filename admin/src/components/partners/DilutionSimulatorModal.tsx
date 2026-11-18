@@ -39,13 +39,13 @@ export function DilutionSimulatorModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#141416]">
           <div className="flex items-center gap-2.5">
-            <div className="size-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-              <Calculator className="size-5 text-purple-400" />
+            <div className="size-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+              <Calculator className="size-5 text-emerald-400" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
                 Simulador de Aportes & Projeção Societária
-                <span className="text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold flex items-center gap-1">
                   <Zap className="size-2.5" />
                   Margem: {simulation.officialMarginPct.toFixed(1)}%
                 </span>
@@ -72,7 +72,7 @@ export function DilutionSimulatorModal({
               <select
                 value={selectedPartnerId}
                 onChange={(e) => setSelectedPartnerId(e.target.value)}
-                className="w-full bg-[#1c1c1f] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500/50 transition-all cursor-pointer"
+                className="w-full bg-[#1c1c1f] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-all cursor-pointer"
               >
                 {activePartners.map((p) => {
                   const m = currentOverview.partnerMetrics.find(metric => metric.partner.id === p.id);
@@ -98,7 +98,7 @@ export function DilutionSimulatorModal({
                   value={aporteInput}
                   onChange={(e) => setAporteInput(e.target.value)}
                   placeholder="Ex: 1000,00"
-                  className="w-full bg-[#1c1c1f] border border-white/10 rounded-xl pl-10 pr-3.5 py-2 text-xs text-white font-mono placeholder:text-white/30 focus:outline-none focus:border-purple-500/50 transition-all"
+                  className="w-full bg-[#1c1c1f] border border-white/10 rounded-xl pl-10 pr-3.5 py-2 text-xs text-white font-mono placeholder:text-white/30 focus:outline-none focus:border-emerald-500/50 transition-all"
                 />
               </div>
             </div>
@@ -113,7 +113,7 @@ export function DilutionSimulatorModal({
                   value={newPartnerName}
                   onChange={(e) => setNewPartnerName(e.target.value)}
                   placeholder="Ex: Terceiro Sócio"
-                  className="w-full bg-[#1c1c1f] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-purple-500/50 transition-all"
+                  className="w-full bg-[#1c1c1f] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-emerald-500/50 transition-all"
                 />
               </div>
             )}
@@ -139,12 +139,12 @@ export function DilutionSimulatorModal({
               </span>
             </div>
 
-            <div className="bg-purple-500/10 border border-purple-500/20 p-3.5 rounded-xl text-center space-y-1">
-              <span className="text-[10px] text-purple-300 uppercase font-bold tracking-wider">= Novo Capital Total</span>
-              <div className="text-sm sm:text-base font-extrabold text-purple-200 font-mono">
+            <div className="bg-emerald-500/10 border border-emerald-500/20 p-3.5 rounded-xl text-center space-y-1">
+              <span className="text-[10px] text-emerald-300 uppercase font-bold tracking-wider">= Novo Capital Total</span>
+              <div className="text-sm sm:text-base font-extrabold text-emerald-200 font-mono">
                 {formatBRL(simulation.totalNetCapitalAfter)}
               </div>
-              <span className="text-[9px] text-purple-300/70 block">Base de Recalibração</span>
+              <span className="text-[9px] text-emerald-300/70 block">Base de Recalibração</span>
             </div>
           </div>
 
@@ -152,7 +152,7 @@ export function DilutionSimulatorModal({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <Sparkles className="size-3.5 text-purple-400" />
+                <Sparkles className="size-3.5 text-emerald-400" />
                 <span>Nova Composição & Projeções por Sócio</span>
               </h3>
               <span className="text-[10px] text-emerald-400 font-mono">Soma: 100.00%</span>
@@ -175,13 +175,13 @@ export function DilutionSimulatorModal({
                     return (
                       <tr 
                         key={p.partnerId} 
-                        className={`transition-all ${p.isTarget ? 'bg-purple-500/10 font-bold' : 'hover:bg-white/5'}`}
+                        className={`transition-all ${p.isTarget ? 'bg-emerald-500/10 font-bold' : 'hover:bg-white/5'}`}
                       >
                         <td className="py-2.5 px-3 text-white flex items-center gap-1.5">
-                          {p.isTarget && <span className="size-1.5 rounded-full bg-purple-400" />}
+                          {p.isTarget && <span className="size-1.5 rounded-full bg-emerald-400" />}
                           <span>{p.name}</span>
                           {p.isTarget && (
-                            <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1 py-0.2 rounded border border-purple-500/30">
+                            <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1 py-0.2 rounded border border-emerald-500/30">
                               Aporte
                             </span>
                           )}
@@ -190,7 +190,7 @@ export function DilutionSimulatorModal({
                           {formatBRL(p.capitalAfter)}
                         </td>
                         <td className="py-2.5 px-3 text-center font-mono font-bold">
-                          <span className={p.isTarget ? 'text-emerald-400' : 'text-amber-400'}>
+                          <span className={p.isTarget ? 'text-emerald-400' : 'text-zinc-200'}>
                             {p.equityPctAfter.toFixed(2)}%
                           </span>
                           {diffPct !== 0 && (
@@ -216,7 +216,7 @@ export function DilutionSimulatorModal({
           {/* Informação da Simulação */}
           <div className="p-3.5 bg-white/5 border border-white/10 rounded-xl text-[11px] text-white/70 space-y-1">
             <div className="font-bold text-white flex items-center gap-1.5">
-              <Info className="size-3.5 text-purple-400" />
+              <Info className="size-3.5 text-emerald-400" />
               <span>Simulação Dinâmica com Margem de {simulation.officialMarginPct.toFixed(1)}%</span>
             </div>
             <p className="leading-relaxed">

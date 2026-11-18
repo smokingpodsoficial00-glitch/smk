@@ -1,7 +1,19 @@
 import { supabase } from "@/lib/supabase";
 import { isOrderNational, extractNationalInfo } from "./nationalSales";
 import { isCompanyEntityPartner, isCompanyExpenseTransaction } from "./partnerPayroll";
-import { calculateAllTimeMetrics, calculateNewPhaseRealCash } from "./financialCycles";
+import {
+  calculateUnifiedFinancials,
+  type UnifiedFinancialOverview,
+  type StockValuationOverview,
+  type RealCashOverview,
+  type OperationalEquityOverview,
+  type CapTableOverview,
+  type PartnerEquityShare,
+  calculateStockValuation,
+  calculateRealCashOverview,
+  calculateCapTable
+} from "./unifiedFinancialEngine";
+import { buildDefaultPayrollConfig, type PayrollConfig } from "./partnerPayroll";
 
 export type PartnerTransactionType = 
   | 'APORTE'              // Entrada de capital novo do sócio na empresa (Altera Capital e % de Equity)
@@ -33,11 +45,38 @@ export interface PartnerTransaction {
   partner_name?: string | null;
   type: PartnerTransactionType;
   amount: number;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD (Data efetiva)
   description: string;
-  destination_category: string;
+  destination_category: string; // Origem/destino financeiro (CAIXA_GERAL, ESTOQUE, PAGO_PELO_SOCIO, CONTA_SOCIO, OPERACAO, FUNDO_REINVESTIMENTO)
+  payment_status?: 'PAGO' | 'PENDENTE' | null; // Status de pagamento quando aplicável
   idempotency_key?: string | null;
   created_at: string;
+}
+
+export interface PartnerTransactionIntegrityIssue {
+  transactionId: string;
+  issueType:
+    | 'MISSING_OR_FOREIGN_COMPANY_ID'
+    | 'UNLINKED_PARTNER_ID'
+    | 'UNCLASSIFIED_TYPE_OR_CATEGORY'
+    | 'INVALID_AMOUNT_OR_DATE'
+    | 'DUPLICATE_CANDIDATE'
+    | 'PERSONAL_PARTNER_EXPENSE';
+  description: string;
+  transaction: PartnerTransaction;
+}
+
+export interface PartnerTransactionIntegrityReport {
+  totalEvaluated: number;
+  validCount: number;
+  issuesCount: number;
+  missingCompanyId: PartnerTransactionIntegrityIssue[];
+  unlinkedPartnerTransactions: PartnerTransactionIntegrityIssue[];
+  unclassifiedOrInvalidType: PartnerTransactionIntegrityIssue[];
+  invalidAmountOrDate: PartnerTransactionIntegrityIssue[];
+  duplicateCandidates: PartnerTransactionIntegrityIssue[];
+  personalPartnerExpenses: PartnerTransactionIntegrityIssue[];
+  isFullyConsistent: boolean;
 }
 
 export interface PartnerFinancialMetrics {
@@ -265,14 +304,17 @@ export function saveLocalPartners(partners: Partner[], companyId?: string) {
 }
 
 export function getLocalPartnerTransactions(companyId?: string): PartnerTransaction[] {
-  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const isMatrix = !companyId || companyId === DEFAULT_COMPANY_ID;
+  const key = isMatrix ? LOCAL_STORAGE_TRANSACTIONS_KEY : `${companyId}_${LOCAL_STORAGE_TRANSACTIONS_KEY}`;
   try {
-    localStorage.removeItem(LOCAL_STORAGE_TRANSACTIONS_KEY);
-    localStorage.removeItem(`${targetCompanyId}_${LOCAL_STORAGE_TRANSACTIONS_KEY}`);
-    localStorage.removeItem("smk_partner_transactions");
-    localStorage.removeItem("smk_partner_transactions_v2");
-    localStorage.removeItem("smk_partner_transactions_v3");
-    localStorage.removeItem("smk_partner_transactions_v4");
+    const raw = localStorage.getItem(key);
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+        return parsed.filter((tx: any) => !tx.company_id || tx.company_id === targetCompanyId);
+      }
+    }
   } catch (e) {}
   return [];
 }
@@ -443,32 +485,31 @@ export async function deletePartner(partnerId: string, companyId?: string): Prom
   return true;
 }
 
-// ─── Operações de Transações Societárias (Supabase Primário) ────────────────
+// ─── Operações de Transações Societárias (Supabase Primário — Leitura Segura e Não-Destrutiva) ───
 
 export async function fetchPartnerTransactions(companyId?: string): Promise<PartnerTransaction[]> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
   try {
-    // Limpeza mandatória de todas as transações de sócios no Supabase para o Clean Slate
-    await supabase
+    const { data, error } = await supabase
       .from("smoking_partner_transactions")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+      .select("*")
+      .eq("company_id", targetCompanyId)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (!error && Array.isArray(data)) {
+      saveLocalPartnerTransactions(data as PartnerTransaction[], targetCompanyId);
+      return data as PartnerTransaction[];
+    }
+
+    if (error) {
+      console.warn("[Partners] Erro ao buscar transações de sócios no Supabase (ativando fallback local preservado):", error.message);
+    }
   } catch (e: any) {
-    console.warn("[Partners] Exceção ao limpar transações de sócios no Supabase:", e?.message || e);
+    console.warn("[Partners] Exceção ao consultar transações de sócios no Supabase (ativando fallback local preservado):", e?.message || e);
   }
 
-  // Limpa todos os caches locais
-  try {
-    localStorage.removeItem(LOCAL_STORAGE_TRANSACTIONS_KEY);
-    localStorage.removeItem(`${targetCompanyId}_${LOCAL_STORAGE_TRANSACTIONS_KEY}`);
-    localStorage.removeItem("smk_partner_transactions");
-    localStorage.removeItem("smk_partner_transactions_v2");
-    localStorage.removeItem("smk_partner_transactions_v3");
-    localStorage.removeItem("smk_partner_transactions_v4");
-  } catch (e) {}
-
-  saveLocalPartnerTransactions([], targetCompanyId);
-  return [];
+  return getLocalPartnerTransactions(targetCompanyId);
 }
 
 const inFlightTransactions = new Map<string, Promise<PartnerTransaction>>();
@@ -499,9 +540,38 @@ export async function createPartnerTransaction(payload: {
   date?: string;
   description: string;
   destinationCategory?: string;
+  paymentStatus?: 'PAGO' | 'PENDENTE' | null;
   idempotencyKey?: string;
 }): Promise<PartnerTransaction> {
   const targetCompanyId = payload.companyId || DEFAULT_COMPANY_ID;
+  const numericAmount = Number(payload.amount);
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    throw new Error("O valor da movimentação deve ser um número válido maior que zero.");
+  }
+  const typeConfig = TRANSACTION_TYPE_CONFIG[payload.type];
+  if (!typeConfig) {
+    throw new Error(`Tipo de movimentação inválido: ${payload.type}`);
+  }
+  if (typeConfig.isPartnerSpecific && !payload.partnerId) {
+    throw new Error(`A movimentação do tipo ${payload.type} exige a identificação do sócio (partnerId).`);
+  }
+
+  const effectiveDate = payload.date && /^\d{4}-\d{2}-\d{2}/.test(payload.date)
+    ? payload.date
+    : new Date().toISOString().split("T")[0];
+
+  const defaultDestinationByType: Record<PartnerTransactionType, string> = {
+    APORTE: 'CAIXA_GERAL',
+    RETIRADA_CAPITAL: 'CAIXA_GERAL',
+    PRO_LABORE: 'CAIXA_GERAL',
+    DISTRIBUICAO_LUCRO: 'CAIXA_GERAL',
+    DESPESA_OPERACIONAL: 'CAIXA_GERAL',
+    COMPRA_ESTOQUE: 'ESTOQUE',
+    REINVESTIMENTO_LUCRO: 'FUNDO_REINVESTIMENTO',
+  };
+  const resolvedDestinationCategory =
+    payload.destinationCategory?.trim() || defaultDestinationByType[payload.type] || 'CAIXA_GERAL';
+
   const idempotencyKey = payload.idempotencyKey?.trim();
   const cacheKey = idempotencyKey ? `${targetCompanyId}:${idempotencyKey}` : '';
 
@@ -556,10 +626,10 @@ export async function createPartnerTransaction(payload: {
       company_id: targetCompanyId,
       partner_id: payload.partnerId || null,
       type: payload.type,
-      amount: Math.max(0, Number(payload.amount) || 0),
-      date: payload.date || new Date().toISOString().split("T")[0],
+      amount: Number(numericAmount.toFixed(2)),
+      date: effectiveDate,
       description: payload.description.trim(),
-      destination_category: payload.destinationCategory || 'ESTOQUE',
+      destination_category: resolvedDestinationCategory,
     };
 
     if (idempotencyKey) {
@@ -724,30 +794,145 @@ export async function deletePartnerTransaction(transactionId: string, companyId?
 }
 
 /**
- * Exclui e zera todas as movimentações de sócios da empresa (Clean Slate)
+ * Auditoria de Integridade de Movimentações Societárias e Financeiras (Somente Leitura)
+ * Identifica movimentações sem company_id, sem vínculo válido de sócio, sem classificação,
+ * com valores/datas inválidos, possíveis duplicidades e despesas pagas pessoalmente por sócios.
  */
-export async function clearAllPartnerTransactions(companyId?: string): Promise<boolean> {
-  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
-  try {
-    await supabase
-      .from("smoking_partner_transactions")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
-  } catch (e: any) {
-    console.warn("[Partners] Exceção ao limpar transações de sócios:", e?.message || e);
+export function auditPartnerTransactionsIntegrity(
+  transactions: PartnerTransaction[],
+  partners: Partner[],
+  companyId: string = DEFAULT_COMPANY_ID
+): PartnerTransactionIntegrityReport {
+  const missingCompanyId: PartnerTransactionIntegrityIssue[] = [];
+  const unlinkedPartnerTransactions: PartnerTransactionIntegrityIssue[] = [];
+  const unclassifiedOrInvalidType: PartnerTransactionIntegrityIssue[] = [];
+  const invalidAmountOrDate: PartnerTransactionIntegrityIssue[] = [];
+  const duplicateCandidates: PartnerTransactionIntegrityIssue[] = [];
+  const personalPartnerExpenses: PartnerTransactionIntegrityIssue[] = [];
+
+  const validTypes = new Set<string>(Object.keys(TRANSACTION_TYPE_CONFIG));
+  const partnerIdSet = new Set<string>((partners || []).map(p => p.id));
+  const seenFingerprints = new Map<string, string>();
+  const seenIdempotencyKeys = new Map<string, string>();
+  const transactionsWithIssues = new Set<string>();
+
+  for (const tx of transactions || []) {
+    const txId = tx.id || 'UNKNOWN_ID';
+
+    // 1. Verificar company_id
+    if (!tx.company_id || tx.company_id !== companyId) {
+      missingCompanyId.push({
+        transactionId: txId,
+        issueType: 'MISSING_OR_FOREIGN_COMPANY_ID',
+        description: !tx.company_id
+          ? 'Movimentação sem company_id definido.'
+          : `Movimentação pertence a outro company_id (${tx.company_id}).`,
+        transaction: tx,
+      });
+      transactionsWithIssues.add(txId);
+    }
+
+    // 2. Verificar tipo e categoria de origem/destino
+    if (!tx.type || !validTypes.has(tx.type) || !tx.destination_category || !tx.destination_category.trim()) {
+      unclassifiedOrInvalidType.push({
+        transactionId: txId,
+        issueType: 'UNCLASSIFIED_TYPE_OR_CATEGORY',
+        description: `Tipo (${tx.type || 'vazio'}) ou origem/destino (${tx.destination_category || 'vazio'}) sem classificação válida.`,
+        transaction: tx,
+      });
+      transactionsWithIssues.add(txId);
+    }
+
+    // 3. Verificar vínculo com sócio quando aplicável
+    const typeConfig = tx.type ? TRANSACTION_TYPE_CONFIG[tx.type] : undefined;
+    if (typeConfig?.isPartnerSpecific) {
+      if (!tx.partner_id || (!partnerIdSet.has(tx.partner_id) && tx.partner_id !== 'p1-eduardo' && tx.partner_id !== 'p2-gabriel')) {
+        unlinkedPartnerTransactions.push({
+          transactionId: txId,
+          issueType: 'UNLINKED_PARTNER_ID',
+          description: `Movimentação societária (${tx.type}) sem vínculo válido de partner_id (${tx.partner_id || 'NULL'}).`,
+          transaction: tx,
+        });
+        transactionsWithIssues.add(txId);
+      }
+    }
+
+    // 4. Verificar valor e data efetiva
+    const amt = Number(tx.amount);
+    const hasValidDate = typeof tx.date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(tx.date);
+    if (!Number.isFinite(amt) || amt <= 0 || !hasValidDate) {
+      invalidAmountOrDate.push({
+        transactionId: txId,
+        issueType: 'INVALID_AMOUNT_OR_DATE',
+        description: `Valor (${tx.amount}) ou data efetiva (${tx.date || 'vazia'}) inválidos.`,
+        transaction: tx,
+      });
+      transactionsWithIssues.add(txId);
+    }
+
+    // 5. Verificar duplicidades (por idempotency_key ou assinatura exata no mesmo dia)
+    if (tx.idempotency_key) {
+      const idemKey = `${tx.company_id || companyId}:${tx.idempotency_key}`;
+      if (seenIdempotencyKeys.has(idemKey)) {
+        duplicateCandidates.push({
+          transactionId: txId,
+          issueType: 'DUPLICATE_CANDIDATE',
+          description: `Chave de idempotência duplicada (${tx.idempotency_key}) com registro ${seenIdempotencyKeys.get(idemKey)}.`,
+          transaction: tx,
+        });
+        transactionsWithIssues.add(txId);
+      } else {
+        seenIdempotencyKeys.set(idemKey, txId);
+      }
+    }
+
+    const fingerprint = `${tx.company_id || ''}|${tx.partner_id || ''}|${tx.type || ''}|${Number(tx.amount || 0).toFixed(2)}|${(tx.date || '').slice(0, 10)}|${(tx.description || '').trim().toLowerCase()}`;
+    if (seenFingerprints.has(fingerprint)) {
+      duplicateCandidates.push({
+        transactionId: txId,
+        issueType: 'DUPLICATE_CANDIDATE',
+        description: `Possível lançamento duplicado (mesmo sócio, tipo, valor, data e descrição do registro ${seenFingerprints.get(fingerprint)}).`,
+        transaction: tx,
+      });
+      transactionsWithIssues.add(txId);
+    } else {
+      seenFingerprints.set(fingerprint, txId);
+    }
+
+    // 6. Identificar despesas pagas pessoalmente por sócios (exigem classificação explícita)
+    if (
+      tx.type === 'DESPESA_OPERACIONAL' &&
+      (tx.destination_category === 'PAGO_PELO_SOCIO' || (tx.partner_id && !isCompanyExpenseTransaction(tx, partners)))
+    ) {
+      personalPartnerExpenses.push({
+        transactionId: txId,
+        issueType: 'PERSONAL_PARTNER_EXPENSE',
+        description: `Despesa operacional associada ao sócio (${tx.partner_id || tx.partner_name || 'N/A'}) — requer classificação explícita (empresa vs reembolso/aporte).`,
+        transaction: tx,
+      });
+    }
   }
 
-  try {
-    localStorage.removeItem(LOCAL_STORAGE_TRANSACTIONS_KEY);
-    localStorage.removeItem(`${targetCompanyId}_${LOCAL_STORAGE_TRANSACTIONS_KEY}`);
-    localStorage.removeItem("smk_partner_transactions");
-    localStorage.removeItem("smk_partner_transactions_v2");
-    localStorage.removeItem("smk_partner_transactions_v3");
-    localStorage.removeItem("smk_partner_transactions_v4");
-  } catch (e) {}
+  const totalEvaluated = (transactions || []).length;
+  const issuesCount =
+    missingCompanyId.length +
+    unlinkedPartnerTransactions.length +
+    unclassifiedOrInvalidType.length +
+    invalidAmountOrDate.length +
+    duplicateCandidates.length;
 
-  saveLocalPartnerTransactions([], targetCompanyId);
-  return true;
+  return {
+    totalEvaluated,
+    validCount: Math.max(0, totalEvaluated - transactionsWithIssues.size),
+    issuesCount,
+    missingCompanyId,
+    unlinkedPartnerTransactions,
+    unclassifiedOrInvalidType,
+    invalidAmountOrDate,
+    duplicateCandidates,
+    personalPartnerExpenses,
+    isFullyConsistent: issuesCount === 0,
+  };
 }
 
 // ─── Motor Financeiro Unificado (FONTE ÚNICA DE VERDADE DO FINANCEIRO) ──────
@@ -761,217 +946,101 @@ export function calculatePartnersFinancials(params: {
   operationalExpenses?: number;
   repurchases?: any[];
   totalFiadosPending?: number;
+  payrollConfig?: PayrollConfig;
+  companyId?: string;
 }): CompanyFinancialOverview {
   const {
-    partners,
-    transactions,
-    orders,
-    products,
-    persistedCosts,
+    partners = [],
+    transactions = [],
+    orders = [],
+    products = [],
+    persistedCosts = {},
     operationalExpenses = 0,
     repurchases = [],
-    totalFiadosPending = 0
+    totalFiadosPending = 0,
+    payrollConfig,
+    companyId = DEFAULT_COMPANY_ID
   } = params;
 
-  // 1. DRE OFICIAL & TESOURARIA: Delegar ao motor oficial do Financeiro (Fonte Única de Verdade)
-  const allTimeMetrics = calculateAllTimeMetrics(
+  const activePayrollConfig = payrollConfig || buildDefaultPayrollConfig(partners);
+
+  // Executa os cálculos centrais no Motor Financeiro Unificado
+  const unified = calculateUnifiedFinancials({
+    companyId,
     orders,
+    products,
     repurchases,
-    persistedCosts,
-    transactions,
-    partners
-  );
+    partners,
+    partnerTransactions: transactions,
+    payrollConfig: activePayrollConfig,
+    persistedCosts
+  });
 
-  const revenueSum = allTimeMetrics.grossRevenue;
-  const cmvSum = allTimeMetrics.cmv;
-  const shippingSum = allTimeMetrics.logisticsFee;
-  const podsSoldSum = allTimeMetrics.totalPodsSold;
-  const totalOrdersCount = allTimeMetrics.totalOrders;
-  const stockPurchases = allTimeMetrics.stockPurchases;
-  const realCash = allTimeMetrics.realCash;
-
-  // Custos operacionais da empresa lançados via Movimentações + valor de marketing complementar se houver
-  const totalOperationalExpenses = Number((allTimeMetrics.companyExpenses + (operationalExpenses || 0)).toFixed(2));
-  const realNetProfitPostMarketing = Number((allTimeMetrics.netProfit - (operationalExpenses || 0)).toFixed(2));
-  const netProfitMarginPct = revenueSum > 0 ? (realNetProfitPostMarketing / revenueSum) * 100 : 0;
-
-  // 2. ESTOQUE OFICIAL: Unidades, Custo na Prateleira e Valor de Venda (Idêntico ao FinanceDashboard.tsx)
-  let totalStockCostSum = 0;
-  let totalStockRetailSum = 0;
-  let totalUnitsSum = 0;
-
-  const pCosts = (persistedCosts || {}) as Record<string, number>;
-  const dCosts = (DEFAULT_MODEL_COSTS || {}) as Record<string, number>;
-
-  for (const p of products || []) {
-    const stock = Number(p.stock) || 0;
-    const price = Number(p.price) || 0;
-    if (stock > 0 && p.is_active !== false) {
-      const brandName = (p.brand || "").trim();
-      const modelName = (p.name || "").trim();
-      const groupKey = `${brandName.toLowerCase()}__${modelName.toLowerCase()}`;
-
-      let unitCost = Number(p.cost_price) || 0;
-      if (!unitCost && p.id && pCosts[p.id]) unitCost = pCosts[p.id];
-      if (!unitCost && groupKey && pCosts[groupKey]) unitCost = pCosts[groupKey];
-      if (!unitCost && groupKey && dCosts[groupKey]) unitCost = dCosts[groupKey];
-      if (!unitCost) unitCost = 65;
-
-      totalStockCostSum += stock * unitCost;
-      totalStockRetailSum += stock * price;
-      totalUnitsSum += stock;
-    }
-  }
-
-  const stockAssetProfit = Math.max(0, totalStockRetailSum - totalStockCostSum);
-
-  // 3. DETERMINAÇÃO DA MARGEM OFICIAL ATIVA DO NEGÓCIO
-  let officialProfitMarginPct = 0;
-  if (revenueSum > 0) {
-    officialProfitMarginPct = (realNetProfitPostMarketing / revenueSum) * 100;
-  } else if (totalStockRetailSum > 0) {
-    officialProfitMarginPct = ((totalStockRetailSum - totalStockCostSum) / totalStockRetailSum) * 100;
-  } else {
-    officialProfitMarginPct = 21.0;
-  }
-
-  // 4. TESOURARIA & CAIXA OFICIAL
-  const netCashAvailable = Math.max(0, revenueSum - shippingSum - totalOperationalExpenses);
-
-  // 4.1 APURAÇÃO DOS SÓCIOS: Capital Líquido (Aportes - Retiradas de Capital)
-  // Filtra apenas sócios pessoas físicas (ignora perfil fictício "Smoking Pods" caso ainda exista)
-  const activePartners = (partners || []).filter(p => p.is_active !== false && !isCompanyEntityPartner(p.name));
-  const partnerCapitalMap: Record<string, {
-    grossContributed: number;
-    withdrawn: number;
-    netInvested: number;
-    dividends: number;
-    proLabore: number;
-  }> = {};
-
-  let totalNetCapitalInvested = 0;
-
-  for (const partner of activePartners) {
-    const partnerTx = (transactions || []).filter(t => t.partner_id === partner.id);
-    let gross = 0;
-    let withdr = 0;
-    let div = 0;
-    let pro = 0;
-
-    for (const tx of partnerTx) {
-      const amt = Number(tx.amount) || 0;
-      if (tx.type === 'APORTE') gross += amt;
-      if (tx.type === 'RETIRADA_CAPITAL') withdr += amt;
-      if (tx.type === 'DISTRIBUICAO_LUCRO') div += amt;
-      if (tx.type === 'PRO_LABORE') pro += amt;
-    }
-
-    const net = gross - withdr;
-    partnerCapitalMap[partner.id] = {
-      grossContributed: gross,
-      withdrawn: withdr,
-      netInvested: net,
-      dividends: div,
-      proLabore: pro
-    };
-
-    totalNetCapitalInvested += net;
-  }
-
-  // 5. PATRIMÔNIO REAL TOTAL DA LOJA (CAIXA REAL VIVO + ESTOQUE FÍSICO + FIADOS A RECEBER)
-  // O Caixa Real da nova fase acumula as vendas recebidas após o Marco Zero
-  const newPhaseCash = calculateNewPhaseRealCash(orders, repurchases, transactions);
-  const currentLiveCash = newPhaseCash.realCash;
-  const companyEconomicEquity = Number(((currentLiveCash || 0) + (totalStockRetailSum || 0) + (totalFiadosPending || 0)).toFixed(2));
-
-  // 6. DISTRIBUIÇÃO DAS FATIAS DE EQUITY (50% cada sócio ativo para Clean Slate)
-  const hasDefinedCapital = totalNetCapitalInvested > 0;
-  let totalEquitySum = 0;
-  let companyTotalProjectedProfit = 0;
-  let companyTotalProjectedEquity = 0;
-
-  const equalSharePct = activePartners.length > 0 ? (100 / activePartners.length) : 50;
+  const activePartners = partners.filter(p => p.is_active !== false && !isCompanyEntityPartner(p.name));
+  const hasDefinedCapital = unified.capTable.isCapTableCalculable;
 
   const partnerMetrics: PartnerFinancialMetrics[] = activePartners.map(partner => {
-    const cap = partnerCapitalMap[partner.id] || {
-      grossContributed: 0,
-      withdrawn: 0,
-      netInvested: 0,
-      dividends: 0,
-      proLabore: 0
-    };
+    const share = unified.capTable.partnerShares.find(s => s.partner.id === partner.id);
+    const equityPct = share ? share.equityPercentage : 0;
+    const netCapitalInvested = share ? share.netCapitalInvested : 0;
+    const grossCapitalContributed = share ? share.grossCapitalContributed : 0;
+    const capitalWithdrawn = share ? share.capitalWithdrawn : 0;
+    const proLaboreReceived = share ? share.proLaboreReceived : 0;
+    const dividendsReceived = share ? share.dividendsReceived : 0;
 
-    // No Clean Slate (sem aportes antigos), cada sócio ativo detém fatia igualitária (50%)
-    const equityPct = hasDefinedCapital ? (cap.netInvested / totalNetCapitalInvested) * 100 : equalSharePct;
-    totalEquitySum += equityPct;
-
-    // Fatia Econômica Real do Patrimônio da Empresa (50% de Estoque + Fiados)
-    const partnerEconomicEquity = Number((companyEconomicEquity * (equityPct / 100)).toFixed(2));
-    const projectedProfit = 0;
-    const projectedEconomicEquity = partnerEconomicEquity;
-    const projectedROI = 0;
-
-    companyTotalProjectedProfit += projectedProfit;
-    companyTotalProjectedEquity += projectedEconomicEquity;
-    
-    // Rendimento Operacional Atribuído e Retorno Zerados (reestruturação oficial)
-    const economicProfitShare = 0;
-    const simplifiedROI = 0;
-    const economicGain = 0;
-
-    // Fatias de Estoque
-    const stockCostShare = totalStockCostSum * (equityPct / 100);
-    const stockRetailShare = totalStockRetailSum * (equityPct / 100);
-    const stockPodUnitsEquivalent = totalUnitsSum * (equityPct / 100);
+    const partnerEconomicEquity = share ? share.shareOfOperationalEquity : 0;
+    const stockCostShare = share ? share.shareOfStockAtCost : 0;
+    const stockRetailShare = share ? share.shareOfStockAtRetail : 0;
+    const stockPodUnitsEquivalent = unified.stock.totalUnitsInStock > 0 && hasDefinedCapital
+      ? Number(((unified.stock.totalUnitsInStock * equityPct) / 100).toFixed(1))
+      : 0;
 
     return {
       partner,
       equityPercentage: equityPct,
-      grossCapitalContributed: cap.grossContributed,
-      capitalWithdrawn: cap.withdrawn,
-      netCapitalInvested: cap.netInvested,
-      dividendsReceived: cap.dividends,
-      proLaboreReceived: cap.proLabore,
-      officialProfitMarginPct,
-      projectedProfit,
-      projectedEconomicEquity,
-      projectedROI,
+      grossCapitalContributed,
+      capitalWithdrawn,
+      netCapitalInvested,
+      dividendsReceived,
+      proLaboreReceived,
+      officialProfitMarginPct: unified.profitMargin,
+      projectedProfit: 0,
+      projectedEconomicEquity: partnerEconomicEquity,
+      projectedROI: 0,
       partnerEconomicEquity,
-      economicProfitShare,
-      economicGain,
-      simplifiedROI,
+      economicProfitShare: 0,
+      economicGain: 0,
+      simplifiedROI: 0,
       stockCostShare,
       stockRetailShare,
       stockPodUnitsEquivalent
     };
   });
 
-  const isCapTableBalanced = true;
-
   return {
-    grossRevenue: revenueSum,
-    realCash,
-    stockPurchases,
-    cmv: cmvSum,
-    logisticsFee: shippingSum,
-    operationalExpenses: totalOperationalExpenses,
-    netProfitRealized: realNetProfitPostMarketing,
-    netProfitMarginPct,
-    officialProfitMarginPct,
-    retainedProfit: Math.max(0, realNetProfitPostMarketing),
-    totalOrdersCount,
-    totalPodsSold: podsSoldSum,
-    companyTotalProjectedProfit,
-    companyTotalProjectedEquity,
-    stockAssetUnits: totalUnitsSum,
-    stockAssetCost: totalStockCostSum,
-    stockAssetRetail: totalStockRetailSum,
-    stockPotentialGrossMargin: stockAssetProfit,
-    netCashAvailable,
-    companyEconomicEquity,
-    totalNetCapitalInvested,
-    totalEquitySum,
-    isCapTableBalanced,
+    grossRevenue: unified.grossRevenue,
+    realCash: unified.cash.realCash,
+    stockPurchases: unified.allTimeMetrics.stockPurchases,
+    cmv: unified.cmv,
+    logisticsFee: unified.logisticsFee,
+    operationalExpenses: unified.companyExpenses + (operationalExpenses || 0),
+    netProfitRealized: unified.netProfit,
+    netProfitMarginPct: unified.profitMargin,
+    officialProfitMarginPct: unified.profitMargin,
+    retainedProfit: Math.max(0, unified.netProfit),
+    totalOrdersCount: unified.totalOrders,
+    totalPodsSold: unified.totalPodsSold,
+    companyTotalProjectedProfit: 0,
+    companyTotalProjectedEquity: unified.equity.operationalEquityAtCost,
+    stockAssetUnits: unified.stock.totalUnitsInStock,
+    stockAssetCost: unified.stock.stockAssetCost,
+    stockAssetRetail: unified.stock.stockAssetRetail,
+    stockPotentialGrossMargin: unified.stock.commercialPotentialMargin,
+    netCashAvailable: Math.max(0, unified.cash.realCash),
+    companyEconomicEquity: unified.equity.operationalEquityAtCost,
+    totalNetCapitalInvested: unified.capTable.totalNetCapitalInvested,
+    totalEquitySum: unified.capTable.isCapTableCalculable ? 100 : 0,
+    isCapTableBalanced: true,
     hasDefinedCapital,
     partnerMetrics
   };

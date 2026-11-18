@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   DollarSign,
   TrendingDown,
@@ -45,6 +45,17 @@ import {
   Globe,
   Route,
   Building2,
+  Users,
+  Banknote,
+  Search,
+  ArrowDownRight,
+  AlertTriangle,
+  Calculator,
+  Edit3,
+  UserPlus,
+  Minus,
+  ExternalLink,
+  RefreshCw,
 } from "lucide-react";
 import { formatBRL } from "@/lib/cart";
 import { supabase } from "@/lib/supabase";
@@ -55,7 +66,7 @@ import { NationalSalesModal } from "./NationalSalesModal";
 import { ManualSaleModal } from "./ManualSaleModal";
 import { WeeklyGoalsModal } from "./WeeklyGoalsModal";
 import { NewTransactionModal } from "./partners/NewTransactionModal";
-import { isOrderNational } from "@/lib/nationalSales";
+import { isOrderNational, extractNationalInfo } from "@/lib/nationalSales";
 import { isOrderFiadoPending } from "@/lib/fiadoSales";
 import { isCaixaRealReset, setCaixaRealReset } from "@/lib/financialCycles";
 import {
@@ -73,6 +84,28 @@ import {
 } from "../lib/stockRepurchases";
 import { RepurchaseComparisonModal } from "./finance/RepurchaseComparisonModal";
 import { RegisterStockModal } from "./stock/RegisterStockModal";
+import {
+  calculateUnifiedFinancials,
+  type UnifiedFinancialOverview,
+} from "@/lib/unifiedFinancialEngine";
+import {
+  loadLocalPayrollConfig,
+  saveLocalPayrollConfig,
+  savePayrollConfigToSupabase,
+  type PayrollConfig,
+  type PartnerPayrollItem,
+} from "@/lib/partnerPayroll";
+import {
+  deletePartnerTransaction,
+  type Partner,
+  type PartnerTransaction,
+  type PartnerTransactionType,
+  calculatePartnersFinancials,
+} from "@/lib/partners";
+import { NewPartnerModal } from "./partners/NewPartnerModal";
+import { PayrollConfigModal } from "./partners/PayrollConfigModal";
+import { DilutionSimulatorModal } from "./partners/DilutionSimulatorModal";
+
 import {
   type CycleDefinition,
   type CycleFinancialMetrics,
@@ -92,6 +125,7 @@ import {
   generateHistoricalSemesters,
   generateHistoricalYears,
   filterValidOrders,
+  CLEAN_SLATE_RESET_TIMESTAMP,
 } from "../lib/financialCycles";
 
 interface OrderItem {
@@ -1100,7 +1134,36 @@ import {
 } from "@/lib/financeCache";
 export { invalidateFinanceCache };
 
-export default function FinanceDashboard() {
+function formatRelativeTime(dateString: string): string {
+  try {
+    const diffMs = Date.now() - new Date(dateString).getTime();
+    if (diffMs < 0) return "Agora";
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    if (diffMins < 1) return "Agora mesmo";
+    if (diffMins < 60) return `Há ${diffMins} min`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours === 1) return "Há 1 hora";
+    if (diffHours < 24) return `Há ${diffHours} horas`;
+    return "Ontem";
+  } catch {
+    return dateString;
+  }
+}
+
+function formatOrderClockTime(dateString: string): string {
+  try {
+    const d = new Date(dateString);
+    return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+  } catch {
+    return "";
+  }
+}
+
+export default function FinanceDashboard({
+  initialTab,
+}: {
+  initialTab?: "visao-geral" | "24h" | "patrimonio" | "socios" | "faturamento" | "dre" | "caixa" | "pro-labore" | "resultados";
+} = {}) {
   const { user, company, companyUser, loading: authLoading, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
 
@@ -1152,24 +1215,59 @@ export default function FinanceDashboard() {
   );
   const [isWeeklyGoalsModalOpen, setIsWeeklyGoalsModalOpen] = useState(false);
 
-  // Financial Metrics State (Correspondente ao Ciclo Vigente)
-  const [grossRevenue, setGrossRevenue] = useState(0);
-  const [cmv, setCmv] = useState(0);
-  const [companyExpenses, setCompanyExpenses] = useState(0);
+  // ── Módulo Ativo dos Módulos Financeiros Integrados SMK ──
+  const [mainTab, setMainTab] = useState<"visao-geral" | "24h" | "patrimonio" | "socios" | "faturamento">(() => {
+    if (initialTab === "24h") return "24h";
+    if (initialTab === "socios" || initialTab === "pro-labore") return "socios";
+    if (initialTab === "patrimonio") return "patrimonio";
+    if (initialTab === "resultados") return "faturamento";
+    return "visao-geral";
+  });
+
+  useEffect(() => {
+    if (initialTab) {
+      if (initialTab === "24h") {
+        setMainTab("24h");
+      } else if (initialTab === "socios" || initialTab === "pro-labore") {
+        setMainTab("socios");
+      } else if (initialTab === "patrimonio") {
+        setMainTab("patrimonio");
+      } else if (initialTab === "resultados") {
+        setMainTab("faturamento");
+      } else {
+        setMainTab("visao-geral");
+      }
+    }
+  }, [initialTab]);
+
+  // Aba Últimas 24 Horas
+  const [search24h, setSearch24h] = useState<string>("");
+  const [filterPayment24h, setFilterPayment24h] = useState<string>("TODOS");
+
+  // Modais de Sócios & Tesouraria
+  const [isNewTxModalOpen, setIsNewTxModalOpen] = useState(false);
+  const [newTxDefaultType, setNewTxDefaultType] = useState<PartnerTransactionType>('APORTE');
+  const [newTxDefaultPartnerId, setNewTxDefaultPartnerId] = useState<string | undefined>(undefined);
+  const [newTxDefaultAmount, setNewTxDefaultAmount] = useState<number | undefined>(undefined);
+  const [isNewPartnerModalOpen, setIsNewPartnerModalOpen] = useState(false);
+  const [isPayrollConfigModalOpen, setIsPayrollConfigModalOpen] = useState(false);
+  const [isDilutionModalOpen, setIsDilutionModalOpen] = useState(false);
+
+  // Extrato de Movimentações
+  const [txFilterType, setTxFilterType] = useState<string>("TODOS");
+  const [txSearchQuery, setTxSearchQuery] = useState<string>("");
+  const [txToDelete, setTxToDelete] = useState<PartnerTransaction | null>(null);
+  const [isDeletingTx, setIsDeletingTx] = useState(false);
+
+  // Folha de Pagamento Config
+  const [payrollConfig, setPayrollConfig] = useState<PayrollConfig>(() =>
+    loadLocalPayrollConfig(company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5", [])
+  );
+
+  // Raw Orders State (Preservado para contagem oficial de fiados pendentes e pedidos válidos)
+  const [rawOrdersList, setRawOrdersList] = useState<any[]>([]);
   const [partnersList, setPartnersList] = useState<any[]>([]);
   const [isCompanyExpenseModalOpen, setIsCompanyExpenseModalOpen] = useState(false);
-  const [logisticsFee, setLogisticsFee] = useState(0);
-  const [netProfit, setNetProfit] = useState(0);
-  const [profitMargin, setProfitMargin] = useState(0);
-  const [totalOrders, setTotalOrders] = useState(0);
-  const [totalPodsSold, setTotalPodsSold] = useState(0);
-  const [brandSales, setBrandSales] = useState<Array<{ brand: string; count: number; revenue: number }>>([]);
-  const [modelProfits, setModelProfits] = useState<ModelProfitItem[]>([]);
-
-  // Stock Asset State (Inventário Físico na Prateleira)
-  const [stockAssetCost, setStockAssetCost] = useState(0);
-  const [stockAssetRetail, setStockAssetRetail] = useState(0);
-  const [stockAssetUnits, setStockAssetUnits] = useState(0);
 
   // Recompra de Estoque & Caixa Real State (Módulo Independente)
   const [repurchases, setRepurchases] = useState<StockRepurchase[]>([]);
@@ -1212,8 +1310,31 @@ export default function FinanceDashboard() {
     } catch (e) {}
   };
 
-  const fetchFinanceData = async (isRetry = false, forceRefresh = false) => {
+  const hasLoadedOnceRef = useRef(false);
+  const fetchInFlightRef = useRef(false);
+  const pendingRefreshRef = useRef(false);
+  const fetchFinanceDataRef = useRef<(isRetry?: boolean, forceRefresh?: boolean) => Promise<void>>(async () => {});
+
+  const fetchFinanceData = async (isRetry = false, forceRefresh = false): Promise<void> => {
     if (authLoading) return;
+    // Single-flight: evita consultas sobrepostas; se chegar evento durante a busca, agenda 1 nova rodada
+    if (fetchInFlightRef.current && !isRetry) {
+      pendingRefreshRef.current = true;
+      return;
+    }
+    fetchInFlightRef.current = true;
+    try {
+      await fetchFinanceDataInner(isRetry, forceRefresh);
+    } finally {
+      fetchInFlightRef.current = false;
+      if (pendingRefreshRef.current) {
+        pendingRefreshRef.current = false;
+        fetchFinanceDataRef.current(false, true);
+      }
+    }
+  };
+
+  const fetchFinanceDataInner = async (isRetry = false, forceRefresh = false): Promise<void> => {
 
     if (!user || !company?.id || !companyUser) {
       setFinanceError({
@@ -1234,7 +1355,9 @@ export default function FinanceDashboard() {
         cached.companyId === targetCompanyId &&
         now - cached.timestamp < FINANCE_CACHE_TTL_MS;
 
-      if (!hasFreshCache) {
+      // Spinner de tela cheia SOMENTE no primeiro carregamento.
+      // Atualizações em segundo plano (realtime/refresh) mantêm a tela visível.
+      if (!hasFreshCache && !hasLoadedOnceRef.current) {
         setLoading(true);
       }
       setFinanceError(null);
@@ -1370,6 +1493,7 @@ export default function FinanceDashboard() {
 
       setRepurchases(loadedRepurchases);
       setFinanceProductsList(productsData || []);
+      setRawOrdersList(rawOrders || []);
       const validOrders = filterValidOrders(rawOrders);
       setAllValidOrders(validOrders);
       setPersistedProductCosts(persistedCosts);
@@ -1377,86 +1501,11 @@ export default function FinanceDashboard() {
       setPartnerTransactions(loadedPartnerTxs);
       setPartnersList(loadedPartners);
 
-      // 1. Estoque Físico na Prateleira
-      let totalStockCostSum = 0;
-      let totalStockRetailSum = 0;
-      let totalUnitsSum = 0;
-
-      if (productsData) {
-        for (const p of productsData) {
-          const stock = Number(p.stock) || 0;
-          const price = Number(p.price) || 0;
-
-          if (stock > 0) {
-            const pCosts = (persistedCosts || {}) as Record<string, number>;
-            const dCosts = (DEFAULT_MODEL_COSTS || {}) as Record<string, number>;
-            const brandName = (p.brand || "").trim();
-            const modelName = (p.name || "").trim();
-            const groupKey = `${brandName.toLowerCase()}__${modelName.toLowerCase()}`;
-
-            let unitCost = Number(p.cost_price) || 0;
-            if (!unitCost && p.id && pCosts[p.id]) unitCost = pCosts[p.id];
-            if (!unitCost && groupKey && pCosts[groupKey]) unitCost = pCosts[groupKey];
-            if (!unitCost && groupKey && dCosts[groupKey]) unitCost = dCosts[groupKey];
-            if (!unitCost) unitCost = 65; // Custo médio padrão
-
-            totalStockCostSum += stock * unitCost;
-            totalStockRetailSum += stock * price;
-            totalUnitsSum += stock;
-          }
-        }
-      }
-
-      setStockAssetCost(totalStockCostSum);
-      setStockAssetRetail(totalStockRetailSum);
-      setStockAssetUnits(totalUnitsSum);
-
-      // 2. Identificar e Apurar o Ciclo Atual Vigente (Regra 14 -> 13 em America/Sao_Paulo)
+      // Identificar Ciclo Vigente e Sincronizar Metas
       const curCycle = getCurrentCycle();
       setCurrentCycle(curCycle);
-
-      // Sincronizar Metas Semanais/Mensais da empresa diretamente do Supabase (compartilhado entre todos os sócios)
       const syncedGoals = syncWeeklyGoalsFromOrders(rawOrders, targetCompanyId, curCycle.id);
       setWeeklyGoalsConfig(syncedGoals);
-
-      const curCycleMetrics = calculateMetricsForCycle(
-        curCycle,
-        validOrders,
-        loadedRepurchases,
-        persistedCosts,
-        loadedPartnerTxs,
-        loadedPartners
-      );
-      setGrossRevenue(curCycleMetrics.grossRevenue);
-      setCmv(curCycleMetrics.cmv);
-      setCompanyExpenses(curCycleMetrics.companyExpenses || 0);
-      setLogisticsFee(curCycleMetrics.logisticsFee);
-      setNetProfit(curCycleMetrics.netProfit);
-      setProfitMargin(curCycleMetrics.profitMargin);
-      setTotalOrders(curCycleMetrics.totalOrders);
-      setTotalPodsSold(curCycleMetrics.totalPodsSold);
-
-      // 3. Vendas por Marca no Ciclo Vigente
-      const brandMap: Record<string, { count: number; revenue: number }> = {};
-      for (const order of curCycleMetrics.orders) {
-        const items: OrderItem[] = Array.isArray(order.items) ? order.items : [];
-        for (const item of items) {
-          const qty = Number(item.quantity) || 1;
-          const brand = (item.brand || "OUTROS").toUpperCase();
-          const itemPrice = Number(item.price || item.unit_price) || 0;
-          if (!brandMap[brand]) {
-            brandMap[brand] = { count: 0, revenue: 0 };
-          }
-          brandMap[brand].count += qty;
-          brandMap[brand].revenue += qty * itemPrice;
-        }
-      }
-      const brandList = Object.entries(brandMap).map(([brand, data]) => ({
-        brand,
-        count: data.count,
-        revenue: data.revenue,
-      }));
-      setBrandSales(brandList);
 
       // 4. Gerar Histórico de Longo Prazo (Mensal, Trimestral, Semestral e Anual)
       const historicalMonths = generateHistoricalMonthlyCycles(
@@ -1492,6 +1541,7 @@ export default function FinanceDashboard() {
       }
 
       setHasLoadedSuccessfully(true);
+      hasLoadedOnceRef.current = true;
       setFinanceError(null);
     } catch (err: any) {
       console.error("[FinanceDashboard] Erro ao calcular inteligência financeira:", err);
@@ -1502,6 +1552,9 @@ export default function FinanceDashboard() {
       setLoading(false);
     }
   };
+
+  // Mantém o ref sempre apontando para a versão mais recente (evita closure velha no realtime)
+  fetchFinanceDataRef.current = fetchFinanceData;
 
   const loadRepurchasesData = async (targetCompanyId: string) => {
     try {
@@ -1556,44 +1609,132 @@ export default function FinanceDashboard() {
     }
 
     // Busca consolidada inicial (já busca ordens, produtos leves, recompras, sócios e custos em paralelo)
-    fetchFinanceData();
+    fetchFinanceDataRef.current();
 
-    // Debounce de 300ms para listeners Realtime evitando rajadas concorrentes de queries
+    // Debounce para listeners Realtime: agrupa rajadas (ex.: venda = pedido + baixa de estoque) em 1 só recarga silenciosa
     let debounceTimer: any = null;
     const handleRealtimeChange = () => {
       invalidateFinanceCache();
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        fetchFinanceData(false, true);
-      }, 300);
+        fetchFinanceDataRef.current(false, true);
+      }, 1500);
     };
 
-    const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+    const targetCompanyId = company.id;
+    const companyFilter = `company_id=eq.${targetCompanyId}`;
     const financeChannel = supabase
       .channel(`finance_realtime_${targetCompanyId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders" }, handleRealtimeChange)
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products" }, handleRealtimeChange)
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_stock_repurchases" }, handleRealtimeChange)
-      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partner_transactions" }, handleRealtimeChange)
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_orders", filter: companyFilter }, handleRealtimeChange)
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_products", filter: companyFilter }, handleRealtimeChange)
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_stock_repurchases", filter: companyFilter }, handleRealtimeChange)
+      .on("postgres_changes", { event: "*", schema: "public", table: "smoking_partner_transactions", filter: companyFilter }, handleRealtimeChange)
       .subscribe();
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(financeChannel);
     };
-  }, [user, company?.id, companyUser, authLoading]);
+    // Dependências PRIMITIVAS: renovação de token do Supabase recria o objeto `user`
+    // e antes disso disparava recarga completa + nova assinatura realtime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, company?.id, !!companyUser, authLoading]);
 
-  // ── All-Time Metrics (Histórico Completo para Eficiência Comercial & Caixa Real Atual) ──
-  const allTimeMetrics = useMemo(() => {
-    return calculateAllTimeMetrics(allValidOrders, repurchases, persistedProductCosts, partnerTransactions, partnersList, company?.id);
-  }, [allValidOrders, repurchases, persistedProductCosts, partnerTransactions, partnersList]);
+  // ── MOTOR FINANCEIRO UNIFICADO SMK (FONTE ÚNICA DA VERDADE) ──
+  const targetCompanyId = company?.id || "d7e1c479-32b4-40b8-b2d7-42fe4db1f8b5";
+  const unified = useMemo<UnifiedFinancialOverview>(() => {
+    return calculateUnifiedFinancials({
+      companyId: targetCompanyId,
+      orders: rawOrdersList.length > 0 ? rawOrdersList : allValidOrders,
+      products: financeProductsList,
+      repurchases,
+      partners: partnersList,
+      partnerTransactions,
+      payrollConfig,
+      persistedCosts: persistedProductCosts,
+      cleanSlateTimestamp: CLEAN_SLATE_RESET_TIMESTAMP,
+    });
+  }, [
+    targetCompanyId,
+    rawOrdersList,
+    allValidOrders,
+    financeProductsList,
+    repurchases,
+    partnersList,
+    partnerTransactions,
+    payrollConfig,
+    persistedProductCosts,
+  ]);
 
-  // CAIXA REAL ATUAL: Posição patrimonial viva da empresa (NÃO reinicia no dia 14)
-  // Conforme regra fundamental Clean Slate: Inicia em R$ 0,00 no Marco Zero e acumula novas vendas recebidas da nova fase
-  const realCash = allTimeMetrics.realCash;
+  // Indicadores Oficiais Mapeados Diretamente do Motor Unificado
+  const grossRevenue = unified.grossRevenue;
+  const cmv = unified.cmv;
+  const companyExpenses = unified.companyExpenses;
+  const logisticsFee = unified.logisticsFee;
+  const netProfit = unified.netProfit;
+  const profitMargin = unified.profitMargin;
+  const totalOrders = unified.totalOrders;
+  const totalPodsSold = unified.totalPodsSold;
+  const brandSales = unified.brandSales;
+  const realCash = unified.cash.realCash;
+  const stockAssetCost = unified.stock.stockAssetCost;
+  const stockAssetRetail = unified.stock.stockAssetRetail;
+  const stockAssetUnits = unified.stock.totalUnitsInStock;
+  const totalFiadoPending = unified.accountsReceivable;
+  const allTimeMetrics = unified.allTimeMetrics;
   const totalStockPurchases = allTimeMetrics.stockPurchases;
   const totalFreightRepurchases = allTimeMetrics.freightRepurchases;
   const totalInvestedRepurchases = allTimeMetrics.totalInvestedRepurchases;
+
+  // Overview para simuladores e compatibilidade
+  const financialsOverview = useMemo(() => {
+    return calculatePartnersFinancials({
+      partners: partnersList,
+      transactions: partnerTransactions,
+      orders: rawOrdersList.length > 0 ? rawOrdersList : allValidOrders,
+      products: financeProductsList,
+      persistedCosts: persistedProductCosts,
+      repurchases,
+      companyId: targetCompanyId,
+      payrollConfig,
+    });
+  }, [partnersList, partnerTransactions, rawOrdersList, allValidOrders, financeProductsList, persistedProductCosts, repurchases, targetCompanyId, payrollConfig]);
+
+  // Handler para exclusão segura de movimentações no Extrato
+  const handleConfirmDeleteTx = async () => {
+    if (!txToDelete) return;
+    try {
+      setIsDeletingTx(true);
+      await deletePartnerTransaction(txToDelete.id, targetCompanyId);
+      setTxToDelete(null);
+      await fetchFinanceData(false, true);
+    } catch (err: any) {
+      alert("Erro ao excluir movimentação: " + (err?.message || "Erro desconhecido"));
+    } finally {
+      setIsDeletingTx(false);
+    }
+  };
+
+  // Filtro de Transações para o Extrato
+  const filteredTransactions = useMemo(() => {
+    let list = [...partnerTransactions];
+    if (txFilterType !== "TODOS") {
+      list = list.filter((tx) => tx.type === txFilterType);
+    }
+    if (txSearchQuery.trim()) {
+      const q = txSearchQuery.toLowerCase().trim();
+      list = list.filter((tx) => {
+        const desc = (tx.description || "").toLowerCase();
+        const partnerName = (tx.partner_name || "").toLowerCase();
+        return desc.includes(q) || partnerName.includes(q);
+      });
+    }
+    return list.sort((a, b) => {
+      const dateA = a.date || a.created_at || "";
+      const dateB = b.date || b.created_at || "";
+      return dateB.localeCompare(dateA);
+    });
+  }, [partnerTransactions, txFilterType, txSearchQuery]);
 
   // Sincronizar configuração de Metas Semanais
   useEffect(() => {
@@ -1650,6 +1791,132 @@ export default function FinanceDashboard() {
       dailyPaceNeeded,
     };
   }, [weeklyPerformances, weeklyGoalsConfig.monthlyTarget, currentCycle.endDateStr]);
+
+  // ─── Apuração em Tempo Real: Janela Móvel de 24 Horas ────────────────────
+  const last24hData = useMemo(() => {
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+
+    const orders24hRaw = (allValidOrders || []).filter((order: any) => {
+      if (!order.created_at) return false;
+      const orderTime = new Date(order.created_at).getTime();
+      return orderTime >= oneDayAgo && orderTime <= now + 60000;
+    }).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    let totalRevenue = 0;
+    let totalCMV = 0;
+    let totalPods = 0;
+    const uniqueClientsSet = new Set<string>();
+
+    const enrichedOrders = orders24hRaw.map((order: any) => {
+      let orderRevenue = 0;
+      let orderCMV = 0;
+      let orderPods = 0;
+
+      const items = Array.isArray(order.items) ? order.items : [];
+      for (const item of items) {
+        const qty = Number(item.quantity) || 1;
+        const brand = (item.brand || "OUTROS").toUpperCase();
+        const modelName = (item.name || "POD").toUpperCase();
+        const itemPrice = Number(item.price || item.unit_price) || 0;
+        const modelKey = (item.modelKey || `${brand}__${modelName}`).toLowerCase();
+
+        let itemCost = Number(item.cost_price || item.costPrice) || 0;
+        if (!itemCost && item.product_id && persistedProductCosts[item.product_id]) {
+          itemCost = persistedProductCosts[item.product_id];
+        }
+        if (!itemCost && modelKey && DEFAULT_MODEL_COSTS[modelKey]) {
+          itemCost = DEFAULT_MODEL_COSTS[modelKey];
+        }
+        if (!itemCost) itemCost = 65;
+
+        orderRevenue += qty * itemPrice;
+        orderCMV += qty * itemCost;
+        orderPods += qty;
+      }
+
+      const shippingFee = parseFloat(order.shipping_fee || 0);
+      const isNational = isOrderNational(order);
+      let nationalShippingProfit = 0;
+      let motoboyShippingFee = 0;
+      if (isNational) {
+        const info = extractNationalInfo(order);
+        const shipCharged = info.shippingFeeCharged || shippingFee;
+        const shipCost = info.shippingCostReal || 0;
+        nationalShippingProfit = Math.max(0, shipCharged - shipCost);
+      } else {
+        motoboyShippingFee = shippingFee;
+      }
+
+      // Faturamento líquido dos produtos (Sem taxa de frete repassada ao motoboy)
+      const baseProductRevenue = orderRevenue > 0
+        ? orderRevenue
+        : Math.max(0, (Number(order.total_amount) || 0) - motoboyShippingFee);
+
+      const finalRevenue = Number((baseProductRevenue + nationalShippingProfit).toFixed(2));
+      const orderNetProfit = Number((finalRevenue - orderCMV).toFixed(2));
+      const orderMarginPct = finalRevenue > 0 ? (orderNetProfit / finalRevenue) * 100 : 0;
+
+      totalRevenue += finalRevenue;
+      totalCMV += orderCMV;
+      totalPods += orderPods;
+
+      const clientKey = (order.client_phone || order.client_name || order.id || "").toLowerCase().trim();
+      if (clientKey) uniqueClientsSet.add(clientKey);
+
+      return {
+        ...order,
+        computedRevenue: finalRevenue,
+        computedCMV: orderCMV,
+        computedNetProfit: orderNetProfit,
+        computedMarginPct: orderMarginPct,
+        computedPods: orderPods,
+        shippingFeePassedThrough: motoboyShippingFee,
+      };
+    });
+
+    const netProfit = totalRevenue - totalCMV;
+    const marginPct = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+    const avgTicket = enrichedOrders.length > 0 ? totalRevenue / enrichedOrders.length : 0;
+
+    return {
+      orders: enrichedOrders,
+      totalRevenue: Number(totalRevenue.toFixed(2)),
+      totalCMV: Number(totalCMV.toFixed(2)),
+      netProfit: Number(netProfit.toFixed(2)),
+      marginPct: Number(marginPct.toFixed(1)),
+      ordersCount: enrichedOrders.length,
+      totalPods,
+      avgTicket: Number(avgTicket.toFixed(2)),
+      uniqueClientsCount: uniqueClientsSet.size,
+    };
+  }, [allValidOrders, persistedProductCosts]);
+
+  const filtered24hOrders = useMemo(() => {
+    return last24hData.orders.filter((order: any) => {
+      if (filterPayment24h !== "TODOS") {
+        const method = (order.payment_method || "").toUpperCase();
+        if (filterPayment24h === "PIX" && !method.includes("PIX")) return false;
+        if (filterPayment24h === "CARTAO" && !method.includes("CART") && !method.includes("CRED") && !method.includes("DEB")) return false;
+        if (filterPayment24h === "DINHEIRO" && !method.includes("DINH") && !method.includes("ESPEC")) return false;
+        if (filterPayment24h === "FIADO" && !isOrderFiadoPending(order)) return false;
+      }
+
+      if (search24h.trim()) {
+        const q = search24h.toLowerCase().trim();
+        const clientName = (order.client_name || "").toLowerCase();
+        const clientPhone = (order.client_phone || "").toLowerCase();
+        const itemsStr = Array.isArray(order.items)
+          ? order.items.map((i: any) => `${i.name || ''} ${i.flavor || ''}`).join(' ').toLowerCase()
+          : '';
+        if (!clientName.includes(q) && !clientPhone.includes(q) && !itemsStr.includes(q)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [last24hData.orders, search24h, filterPayment24h]);
 
   // Seletores Memoizados para a Área de Faturamento a Longo Prazo
   const selectedMonthlyMetric = useMemo(() => {
@@ -2332,16 +2599,11 @@ export default function FinanceDashboard() {
   const netCashAvailable = Math.max(0, (grossRevenue || 0) - (logisticsFee || 0) - numericMarketingSpent);
   const realNetProfitPostMarketing = (netProfit || 0) - numericMarketingSpent;
   
-  // Total a Receber em Fiados Pendentes
-  const totalFiadoPending = useMemo(() => {
-    return (allValidOrders || [])
-      .filter(isOrderFiadoPending)
-      .reduce((sum: number, o: any) => sum + (parseFloat(o.total_amount || 0) || 0), 0);
-  }, [allValidOrders]);
+  // totalFiadoPending centralizado no Motor Unificado
 
   // Patrimônio Real Total da Loja = Estoque Físico Atual + Fiados a Receber (Caixa Real em R$ 0,00)
   // Regra oficial Clean Slate: Os únicos recursos da loja são Estoque e Fiados a Receber
-  const totalCompanyEquity = (stockAssetRetail || 0) + totalFiadoPending;
+  const totalCompanyEquity = (realCash || 0) + (stockAssetRetail || 0) + totalFiadoPending;
   const stockAssetProfit = (stockAssetRetail || 0) - (stockAssetCost || 0);
 
   // Métricas de Eficiência Comercial & Ticket Médio (HISTÓRICO COMPLETO)
@@ -2524,7 +2786,124 @@ export default function FinanceDashboard() {
         </div>
       )}
 
-      {/* ━━━ BLOCO 1: CICLO ATUAL (14 → 13) ━━━━━━━━━━━━━━ */}
+            {/* ━━━ BARRA DE NAVEGAÇÃO DOS 4 MÓDULOS FINANCEIROS INTEGRADOS SMK ━━━ */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-white/10 no-scrollbar">
+        <button
+          type="button"
+          onClick={() => setMainTab("visao-geral")}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            mainTab === "visao-geral"
+              ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+              : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/5"
+          }`}
+        >
+          <Sparkles className="size-4" />
+          <span>Visão Geral</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab("24h")}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            mainTab === "24h"
+              ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+              : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/5"
+          }`}
+        >
+          <Clock className="size-4" />
+          <span>Últimas 24 Horas</span>
+          {last24hData.ordersCount > 0 && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+              mainTab === "24h" ? "bg-black/25 text-black" : "bg-emerald-500/20 text-emerald-400"
+            }`}>
+              {last24hData.ordersCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab("patrimonio")}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            mainTab === "patrimonio"
+              ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+              : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/5"
+          }`}
+        >
+          <Boxes className="size-4" />
+          <span>Patrimônio & Estoque</span>
+          {unified.stock.hasIncompleteCostEvaluation && (
+            <span className="size-2 rounded-full bg-amber-400" title="Produtos sem custo apurado" />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab("socios")}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            mainTab === "socios"
+              ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+              : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/5"
+          }`}
+        >
+          <Users className="size-4" />
+          <span>Sócios & Pró-Labore</span>
+          {!unified.capTable.isCapTableCalculable && (
+            <span className="size-2 rounded-full bg-rose-400" title="Participação não calculável" />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab("faturamento")}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            mainTab === "faturamento"
+              ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+              : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/5"
+          }`}
+        >
+          <TrendingUp className="size-4" />
+          <span>Faturamento & Ciclos</span>
+        </button>
+      </div>
+      {/* ━━━ ABA 1: VISÃO GERAL (CAIXA REAL, CICLO ATUAL, ESTOQUE NA PRATELEIRA & EFICIÊNCIA COMERCIAL) ━━━ */}
+      {mainTab === "visao-geral" && (
+        <div className="space-y-6">
+        {/* ━━━ CAIXA REAL OFICIAL (DESTAQUE NO TOPO) ━━━ */}
+        <div className={`p-6 rounded-3xl border-2 space-y-3 relative overflow-hidden shadow-xl transition-all ${
+          unified.cash.isNegative
+            ? "bg-rose-500/10 border-rose-500/40"
+            : "bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-black/80 border-emerald-500/40 shadow-emerald-950/20"
+        }`}>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className={`text-xs font-black uppercase tracking-wider flex items-center gap-2 ${
+              unified.cash.isNegative ? "text-rose-400" : "text-emerald-400"
+            }`}>
+              <Wallet className="size-5" />
+              <span>Caixa Real Oficial da Empresa</span>
+            </span>
+            <span className={`text-[11px] font-bold px-3 py-1 rounded-full border ${
+              unified.cash.isNegative
+                ? "bg-rose-500/20 text-rose-300 border-rose-500/30"
+                : "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+            }`}>
+              {unified.cash.isNegative ? "Déficit Real em Caixa" : "Superávit Real em Caixa"}
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 pt-1">
+            <div className={`text-3xl sm:text-4xl font-black tracking-tight ${
+              unified.cash.isNegative ? "text-rose-400" : "text-emerald-300"
+            }`}>
+              {formatBRL(unified.cash.realCash)}
+            </div>
+            <p className="text-xs text-white/50">
+              Posição real de liquidez disponível em dinheiro líquido apurada por transações efetivas.
+            </p>
+          </div>
+        </div>
+
+{/* ━━━ BLOCO 1: CICLO ATUAL (14 → 13) ━━━━━━━━━━━━━━ */}
       <div className="bg-[#0e0e10] sm:bg-transparent border border-white/15 sm:border-0 rounded-3xl p-4 sm:p-0 space-y-4 sm:space-y-3 shadow-xl sm:shadow-none">
         <div className="flex items-center justify-between border-b border-white/10 sm:border-0 pb-3 sm:pb-0">
           <span className="text-xs font-bold text-white/80 sm:text-white/60 uppercase tracking-wider">
@@ -2652,7 +3031,1398 @@ export default function FinanceDashboard() {
         </div>
       </div>
 
-      {/* ━━━ NOVO BLOCO: 🎯 METAS SEMANAIS DO CICLO (SEMANA 1 A 4) — Visível apenas no Computador ━━━━━━━━━━━━━━ */}
+{/* ━━━ BLOCO 2: PATRIMÔNIO & ESTOQUE NA PRATELEIRA (Visível apenas no Computador) ━━━━━━━━━━━━━━ */}
+      <div className="hidden md:block bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Landmark className="size-5 text-white" />
+              <span>Patrimônio & Estoque na Prateleira</span>
+            </h3>
+            <p className="text-xs text-white/50 mt-0.5">
+              Capital imobilizado em mercadorias no armazém e investimentos em tráfego.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 items-stretch">
+          {/* Card 1: Custo dos Pods na Prateleira */}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-white/30 transition-all min-w-0">
+            <div className="space-y-1.5 sm:space-y-2">
+              <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
+                <Box className="size-4 text-white/70 shrink-0" /> Custo Prateleira
+              </span>
+              <div className="text-lg sm:text-xl xl:text-2xl font-extrabold text-white truncate">
+                {formatBRL(stockAssetCost)}
+              </div>
+            </div>
+            <p className="text-xs text-white/50 truncate mt-2">
+              {stockAssetUnits} unidades no armazém.
+            </p>
+          </div>
+
+          {/* Card 2: Valor Potencial de Venda */}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-white/30 transition-all min-w-0">
+            <div className="space-y-1.5 sm:space-y-2">
+              <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
+                <DollarSign className="size-4 text-white/70 shrink-0" /> Venda do Estoque
+              </span>
+              <div className="text-lg sm:text-xl xl:text-2xl font-extrabold text-white truncate">
+                {formatBRL(stockAssetRetail)}
+              </div>
+            </div>
+            <p className="text-xs text-white/50 truncate mt-2">
+              Valor bruto na venda das {stockAssetUnits} unidades.
+            </p>
+          </div>
+
+          {/* Card 3: Lucro Potencial do Estoque */}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-white/30 transition-all min-w-0">
+            <div className="space-y-1.5 sm:space-y-2">
+              <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
+                <TrendingUp className="size-4 text-emerald-400 shrink-0" /> Lucro Potencial
+              </span>
+              <div className="text-lg sm:text-xl xl:text-2xl font-extrabold text-emerald-400 truncate">
+                {formatBRL(stockAssetProfit)}
+              </div>
+            </div>
+            <p className="text-xs text-white/50 truncate mt-2">
+              Lucro ao liquidar o estoque.
+            </p>
+          </div>
+
+          {/* Card 4: Investimento em Marketing (Editável) */}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-col justify-between relative hover:border-white/30 transition-all min-w-0">
+            <div className="space-y-1.5 sm:space-y-2">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
+                  <Megaphone className="size-4 text-white/70 shrink-0" /> Anúncios / Ads
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingMarketing(!isEditingMarketing)}
+                  className="text-[10px] text-white/80 hover:text-white hover:underline font-bold shrink-0"
+                >
+                  {isEditingMarketing ? "Salvar" : "Editar"}
+                </button>
+              </div>
+
+              {isEditingMarketing ? (
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="text"
+                    value={marketingSpent || ""}
+                    onChange={(e) => saveMarketingInvestment(e.target.value)}
+                    placeholder="Ex: 50.00"
+                    className="w-full bg-black/60 border border-white/30 rounded-xl px-2.5 py-1 text-xs font-bold text-white focus:outline-none focus:border-white/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingMarketing(false)}
+                    className="p-1.5 rounded-xl bg-white text-black hover:bg-white/90 transition-colors shrink-0"
+                  >
+                    <Check className="size-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="text-lg sm:text-xl xl:text-2xl font-extrabold text-white truncate">
+                  {formatBRL(numericMarketingSpent)}
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-white/50 truncate mt-2">
+              Total investido em tráfego pago.
+            </p>
+          </div>
+
+          {/* Card 5: Patrimônio Total da Loja (Caixa Real + Estoque) */}
+          <div className="bg-gradient-to-br from-white/10 to-emerald-500/10 border border-white/30 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-white/50 transition-all min-w-0">
+            <div className="space-y-1.5 sm:space-y-2">
+              <span className="text-[11px] text-white uppercase font-extrabold tracking-wider flex items-center gap-1.5">
+                <Landmark className="size-4 text-white shrink-0" />
+                <span className="leading-tight">Patrimônio Total da Loja</span>
+              </span>
+              <div className="text-xl sm:text-2xl xl:text-2.5xl font-black text-white tracking-tight truncate">
+                {formatBRL(totalCompanyEquity)}
+              </div>
+            </div>
+            <div className="mt-2 text-[11px] text-white/70 font-medium leading-snug">
+              <span>Caixa Real ({formatBRL(realCash)})</span>
+              <span className="mx-1">+</span>
+              <span>Estoque ({formatBRL(stockAssetRetail)})</span>
+              {totalFiadoPending > 0 && (
+                <>
+                  <span className="mx-1">+</span>
+                  <span className="text-amber-400">Fiados ({formatBRL(totalFiadoPending)})</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+{/* ━━━ BLOCO DEDICADO: 🎯 EFICIÊNCIA COMERCIAL (HISTÓRICO COMPLETO) ━━━━━━━━━━━━━━ */}
+      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-xl hover:border-white/25 transition-all">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-white/10 pb-3.5 sm:pb-4">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Target className="size-5 text-white shrink-0" />
+              <span>Eficiência Comercial</span>
+            </h3>
+            <p className="text-xs text-white/50 mt-0.5">
+              Médias acumuladas de venda e rentabilidade no histórico completo ({allTimeMetrics.totalOrders} pedidos).
+            </p>
+          </div>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="text-[11px] sm:text-xs font-semibold text-white/70 bg-white/5 px-3 py-1 rounded-xl border border-white/10">
+              Histórico Completo
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+          {/* Card 1: Ticket Médio */}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[10px] sm:text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <ReceiptText className="size-3.5 sm:size-4 text-white/70 shrink-0" />
+              <span className="truncate">Ticket Médio</span>
+            </span>
+            <div className="text-xl sm:text-3xl font-extrabold text-white">
+              {formatBRL(averageTicket)}
+            </div>
+            <p className="text-[11px] sm:text-xs text-white/50">
+              Valor médio por compra
+            </p>
+            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
+              Fat. ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalOrders} ped
+            </div>
+          </div>
+
+          {/* Card 2: Margem Média Líquida (%) */}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[10px] sm:text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <Percent className="size-3.5 sm:size-4 text-emerald-400 shrink-0" />
+              <span className="truncate">Margem Média</span>
+            </span>
+            <div className="text-xl sm:text-3xl font-extrabold text-emerald-400">
+              {averageNetMarginPercent.toFixed(1)}%
+            </div>
+            <p className="text-[11px] sm:text-xs text-white/50">
+              Margem líquida média
+            </p>
+            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
+              Lucro Líquido ÷ Faturamento
+            </div>
+          </div>
+
+          {/* Card 3: Margem por Pedido */}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[10px] sm:text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="size-3.5 sm:size-4 text-emerald-400 shrink-0" />
+              <span className="truncate">Lucro / Pedido</span>
+            </span>
+            <div className="text-xl sm:text-3xl font-extrabold text-emerald-300">
+              {formatBRL(averageNetProfitPerOrder)}
+            </div>
+            <p className="text-[11px] sm:text-xs text-white/50">
+              Ganho médio por pedido
+            </p>
+            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
+              Lucro ({formatBRL(allTimeMetrics.netProfit)}) ÷ {allTimeMetrics.totalOrders} ped
+            </div>
+          </div>
+
+          {/* Card 4: Preço Médio por Unidade */}
+          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
+            <span className="text-[10px] sm:text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <Box className="size-3.5 sm:size-4 text-white/70 shrink-0" />
+              <span className="truncate">Preço / Unidade</span>
+            </span>
+            <div className="text-xl sm:text-3xl font-extrabold text-white">
+              {formatBRL(averagePricePerPod)}
+            </div>
+            <p className="text-[11px] sm:text-xs text-white/50">
+              Preço médio por unidade
+            </p>
+            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
+              Fat. ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalPodsSold} un
+            </div>
+          </div>
+        </div>
+      </div>
+        </div>
+      )}
+
+      {/* ━━━ ABA: ÚLTIMAS 24 HORAS (AO VIVO) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {mainTab === "24h" && (
+        <div className="space-y-6">
+          {/* Header Executivo 24h */}
+          <div className="p-6 bg-gradient-to-r from-emerald-500/10 via-black to-emerald-500/5 border border-emerald-500/30 rounded-3xl space-y-2 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <div className="p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                    <Clock className="size-5" />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
+                    Histórico de Vendas em Tempo Real (Últimas 24 Horas)
+                  </h3>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                    <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                    Ao Vivo · 24h Móveis
+                  </span>
+                </div>
+                <p className="text-xs text-white/60">
+                  Visão consolidada de faturamento, margem líquida real, custo de reposição e clientes atendidos nas últimas 24 horas.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchFinanceData(false, true)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  title="Atualizar dados agora"
+                >
+                  <RefreshCw className="size-3.5 text-emerald-400" />
+                  <span>Atualizar</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Grid de 4 Cards Centrais 24h */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: Faturamento 24h */}
+            <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-2 shadow-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
+                  Faturamento (24h)
+                </span>
+                <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+                  <DollarSign className="size-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-white">
+                {formatBRL(last24hData.totalRevenue)}
+              </div>
+              <p className="text-xs text-white/40">
+                Ticket Médio: <strong className="text-white/80">{formatBRL(last24hData.avgTicket)}</strong> / pedido
+              </p>
+            </div>
+
+            {/* Card 2: Lucro Líquido Real 24h */}
+            <div className="bg-[#0e0e10] border border-emerald-500/30 rounded-2xl p-5 space-y-2 shadow-lg bg-emerald-500/[0.03]">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
+                  Lucro Líquido Real (24h)
+                </span>
+                <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+                  <TrendingUp className="size-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-emerald-400">
+                {formatBRL(last24hData.netProfit)}
+              </div>
+              <p className="text-xs text-emerald-400/80">
+                Margem Líquida Real: <strong>{last24hData.marginPct.toFixed(1)}%</strong>
+              </p>
+            </div>
+
+            {/* Card 3: Custo de Reposição (CMV 24h) */}
+            <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-2 shadow-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-rose-300 uppercase tracking-wider">
+                  Custo Reposição (24h)
+                </span>
+                <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400">
+                  <Boxes className="size-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-rose-400">
+                {formatBRL(last24hData.totalCMV)}
+              </div>
+              <p className="text-xs text-white/40">
+                Custo de aquisição dos produtos vendidos
+              </p>
+            </div>
+
+            {/* Card 4: Volume & Clientes 24h */}
+            <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-2 shadow-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
+                  Volume de Saída (24h)
+                </span>
+                <div className="p-1.5 rounded-lg bg-white/5 text-white/70">
+                  <ShoppingBag className="size-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-white">
+                {last24hData.totalPods} <span className="text-xs font-semibold text-white/50">pods</span>
+              </div>
+              <p className="text-xs text-white/40">
+                <strong className="text-white/80">{last24hData.ordersCount}</strong> pedidos · <strong className="text-white/80">{last24hData.uniqueClientsCount}</strong> clientes
+              </p>
+            </div>
+          </div>
+
+          {/* Tabela / Feed de Clientes e Pedidos das Últimas 24 Horas */}
+          <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-6 space-y-4 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div>
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <ShoppingBag className="size-4 text-emerald-400" />
+                  <span>Últimos Clientes & Pedidos (Ordem Cronológica)</span>
+                  <span className="text-[10px] bg-white/10 text-white/70 px-2 py-0.5 rounded-full font-mono">
+                    {filtered24hOrders.length}
+                  </span>
+                </h4>
+                <p className="text-xs text-white/50 mt-0.5">
+                  Lista detalhada de cada venda finalizada nas últimas 24 horas com lucro apurado por pedido.
+                </p>
+              </div>
+
+              {/* Filtros e Busca */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="size-3.5 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={search24h}
+                    onChange={(e) => setSearch24h(e.target.value)}
+                    placeholder="Buscar cliente, telefone ou pod..."
+                    className="bg-black/60 border border-white/15 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-emerald-500/50 transition-all w-48 sm:w-60"
+                  />
+                </div>
+
+                <select
+                  value={filterPayment24h}
+                  onChange={(e) => setFilterPayment24h(e.target.value)}
+                  className="bg-black/60 border border-white/15 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-all cursor-pointer"
+                >
+                  <option value="TODOS">Todos Pagamentos</option>
+                  <option value="PIX">PIX</option>
+                  <option value="CARTAO">Cartão</option>
+                  <option value="DINHEIRO">Dinheiro</option>
+                  <option value="FIADO">Fiado / Pendente</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Lista dos Pedidos */}
+            {filtered24hOrders.length === 0 ? (
+              <div className="py-12 px-4 text-center border border-white/10 rounded-2xl bg-black/40 space-y-3">
+                <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-white/40">
+                  <Clock className="size-6" />
+                </div>
+                <div className="space-y-1 max-w-md mx-auto">
+                  <p className="text-sm font-semibold text-white/80">Nenhum pedido registrado nas últimas 24 horas</p>
+                  <p className="text-xs text-white/40">
+                    Assim que uma venda for concluída no PDV, Checkout ou cadastrada manualmente, ela aparecerá aqui instantaneamente com seu faturamento e lucro apurados.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filtered24hOrders.map((order: any) => {
+                  const items = Array.isArray(order.items) ? order.items : [];
+                  const isFiado = isOrderFiadoPending(order);
+                  const isNational = isOrderNational(order);
+                  const clientPhoneClean = (order.client_phone || '').replace(/\D/g, '');
+                  const waLink = clientPhoneClean ? `https://wa.me/55${clientPhoneClean}` : null;
+
+                  return (
+                    <div
+                      key={order.id || order.created_at}
+                      className="bg-black/50 border border-white/10 hover:border-white/25 rounded-2xl p-4 transition-all space-y-3 group"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-2.5">
+                        <div className="flex items-center gap-3">
+                          <div className="size-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xs shrink-0">
+                            {(order.client_name || "C").slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h5 className="text-sm font-bold text-white tracking-tight">
+                                {order.client_name || "Cliente sem nome"}
+                              </h5>
+                              {waLink && (
+                                <a
+                                  href={waLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[11px] text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1 hover:underline"
+                                  title="Abrir WhatsApp do cliente"
+                                >
+                                  <span>{order.client_phone}</span>
+                                  <ExternalLink className="size-2.5" />
+                                </a>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-white/40 flex items-center gap-1.5">
+                              <span>Pedido #{String(order.id || '').slice(0, 8)}</span>
+                              <span>·</span>
+                              <span className="text-white/60 font-medium">
+                                {formatOrderClockTime(order.created_at)} ({formatRelativeTime(order.created_at)})
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {isFiado && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                              Fiado a Receber
+                            </span>
+                          )}
+                          {isNational && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                              Envio Nacional
+                            </span>
+                          )}
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/5 text-white/70 border border-white/10 uppercase">
+                            {order.payment_method || "PIX"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Itens e Financeiro do Pedido */}
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        {/* Lista de Pods */}
+                        <div className="space-y-1 flex-1">
+                          <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider">
+                            Produtos Comprados ({order.computedPods} un):
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {items.map((item: any, idx: number) => (
+                              <span
+                                key={idx}
+                                className="text-xs bg-white/5 border border-white/10 rounded-lg px-2.5 py-1 text-white/80"
+                              >
+                                <strong className="text-emerald-400">{item.quantity || 1}x</strong> {item.name || item.brand || "Pod"} {item.flavor ? `— ${item.flavor}` : ""}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Bloco de Valores do Pedido */}
+                        <div className="flex items-center gap-4 border-t md:border-t-0 md:border-l border-white/10 pt-2 md:pt-0 md:pl-5 shrink-0">
+                          <div>
+                            <span className="text-[10px] text-white/40 uppercase block font-bold">Faturamento</span>
+                            <span className="text-sm font-black text-white">{formatBRL(order.computedRevenue)}</span>
+                            {order.shippingFeePassedThrough > 0 && (
+                              <span className="text-[9px] text-white/40 block font-normal">
+                                +{formatBRL(order.shippingFeePassedThrough)} motoboy
+                              </span>
+                            )}
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] text-white/40 uppercase block font-bold">Custo (CMV)</span>
+                            <span className="text-sm font-bold text-rose-400">-{formatBRL(order.computedCMV)}</span>
+                          </div>
+
+                          <div className="bg-emerald-500/10 border border-emerald-500/25 px-3 py-1.5 rounded-xl text-right">
+                            <span className="text-[10px] text-emerald-400/80 uppercase block font-bold">Lucro Líquido</span>
+                            <span className="text-sm font-black text-emerald-400">+{formatBRL(order.computedNetProfit)}</span>
+                            <span className="text-[10px] text-emerald-300 block font-mono">
+                              {order.computedMarginPct.toFixed(1)}% margem
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ━━━ ABA 2: PATRIMÔNIO & ESTOQUE FÍSICO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {mainTab === "patrimonio" && (
+        <div className="space-y-6">
+          {/* Cabeçalho do Bloco */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+            <div>
+              <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <Boxes className="size-5 text-emerald-400" />
+                <span>Patrimônio & Avaliação do Estoque</span>
+              </h3>
+              <p className="text-xs text-white/50 mt-0.5">
+                Demonstrativo oficial dos 6 blocos patrimoniais. Separação rigorosa entre dinheiro em caixa, mercadoria imobilizada e contas a receber.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsRegisterStockModalOpen(true)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              >
+                <Plus className="size-3.5 stroke-[3]" />
+                <span>Cadastrar Estoque / Custo</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Banner de Alerta Crítico quando houver produtos sem custo real apurado */}
+          {unified.stock.hasIncompleteCostEvaluation && (
+            <div className="p-5 bg-amber-500/10 border-2 border-amber-500/40 rounded-2xl space-y-2 text-amber-200">
+              <div className="flex items-center gap-2.5">
+                <AlertCircle className="size-5 text-amber-400 shrink-0" />
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-amber-400">
+                  Atenção: Patrimônio a Custo com Dados Pendentes
+                </h4>
+              </div>
+              <p className="text-xs leading-relaxed text-amber-200/90">
+                Existem <strong>{unified.stock.missingCostProducts.length} produtos</strong> com unidades disponíveis em estoque sem custo unitário real de aquisição cadastrado.
+                Conforme a regra oficial da auditoria SMK, <strong>não utilizamos custos fixos arbitrários de R$ 65 nem estimativas silenciosas</strong>.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {unified.stock.missingCostProducts.map((p) => (
+                  <span
+                    key={p.id}
+                    className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 font-mono text-xs border border-amber-500/30"
+                  >
+                    {p.name} ({p.stock} un sem custo)
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Os 6 Cards Oficiais Exigidos no Diagnóstico e Auditoria */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 sm:gap-4 items-stretch">
+            {/* 1. Caixa Real */}
+            <div className={`border rounded-2xl p-4 flex flex-col justify-between transition-all ${
+              unified.cash.isNegative
+                ? "bg-rose-500/10 border-rose-500/30"
+                : "bg-black/40 border-white/15 hover:border-emerald-500/40"
+            }`}>
+              <div className="space-y-1.5">
+                <span className="text-[10px] uppercase font-bold text-white/60 tracking-wider block">
+                  1. Caixa Real
+                </span>
+                <div className={`text-xl font-black ${
+                  unified.cash.isNegative ? "text-rose-400" : "text-emerald-400"
+                }`}>
+                  {formatBRL(unified.cash.realCash)}
+                </div>
+              </div>
+              <p className="text-[10px] text-white/50 pt-2 border-t border-white/10">
+                Liquidez efetiva
+              </p>
+            </div>
+
+            {/* 2. Estoque a Custo */}
+            <div className="bg-black/40 border border-white/15 hover:border-white/30 rounded-2xl p-4 flex flex-col justify-between transition-all">
+              <div className="space-y-1.5">
+                <span className="text-[10px] uppercase font-bold text-white/60 tracking-wider block">
+                  2. Estoque a Custo
+                </span>
+                <div className="text-xl font-black text-white">
+                  {formatBRL(unified.stock.stockAssetCost)}
+                </div>
+              </div>
+              <p className="text-[10px] text-white/50 pt-2 border-t border-white/10">
+                {unified.stock.totalUnitsInStock} unidades a preço de compra
+              </p>
+            </div>
+
+            {/* 3. Estoque a Preço de Venda */}
+            <div className="bg-black/40 border border-white/15 hover:border-white/30 rounded-2xl p-4 flex flex-col justify-between transition-all">
+              <div className="space-y-1.5">
+                <span className="text-[10px] uppercase font-bold text-white/60 tracking-wider block">
+                  3. Estoque a Venda
+                </span>
+                <div className="text-xl font-black text-white">
+                  {formatBRL(unified.stock.stockAssetRetail)}
+                </div>
+              </div>
+              <p className="text-[10px] text-white/50 pt-2 border-t border-white/10">
+                Valor bruto na prateleira
+              </p>
+            </div>
+
+            {/* 4. Contas a Receber (Fiados) */}
+            <div className="bg-black/40 border border-white/15 hover:border-amber-500/30 rounded-2xl p-4 flex flex-col justify-between transition-all">
+              <div className="space-y-1.5">
+                <span className="text-[10px] uppercase font-bold text-amber-300 tracking-wider block">
+                  4. Contas a Receber
+                </span>
+                <div className="text-xl font-black text-amber-400">
+                  {formatBRL(unified.accountsReceivable)}
+                </div>
+              </div>
+              <p className="text-[10px] text-white/50 pt-2 border-t border-white/10">
+                Fiados em aberto
+              </p>
+            </div>
+
+            {/* 5. Patrimônio Operacional a Custo */}
+            <div className="bg-gradient-to-br from-emerald-500/10 via-black/40 to-black/60 border border-emerald-500/40 rounded-2xl p-4 flex flex-col justify-between shadow-lg">
+              <div className="space-y-1.5">
+                <span className="text-[10px] uppercase font-extrabold text-emerald-400 tracking-wider block">
+                  5. Patrimônio a Custo
+                </span>
+                <div className="text-xl font-black text-emerald-300">
+                  {formatBRL(unified.equity.operationalEquityAtCost)}
+                </div>
+              </div>
+              <p className="text-[10px] text-white/50 pt-2 border-t border-white/10">
+                Caixa Real + Estoque a Custo
+              </p>
+            </div>
+
+            {/* 6. Potencial Comercial */}
+            <div className="bg-black/40 border border-white/15 hover:border-white/30 rounded-2xl p-4 flex flex-col justify-between transition-all">
+              <div className="space-y-1.5">
+                <span className="text-[10px] uppercase font-bold text-white/60 tracking-wider block">
+                  6. Potencial Comercial
+                </span>
+                <div className="text-xl font-black text-white">
+                  {formatBRL(unified.equity.commercialPotential)}
+                </div>
+              </div>
+              <p className="text-[10px] text-white/50 pt-2 border-t border-white/10">
+                Margem embutida: {unified.stock.commercialPotentialMarginPct.toFixed(1)}%
+              </p>
+            </div>
+          </div>
+
+          {/* Histórico e Métricas de Recompras de Estoque */}
+          <div className="space-y-4 pt-4 border-t border-white/10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <PackagePlus className="size-4 text-emerald-400" />
+                  <span>Histórico de Recompras e Fretes de Reposição</span>
+                </h4>
+                <p className="text-xs text-white/50 mt-0.5">
+                  Registro de mercadorias adquiridas para reposição física do estoque.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRepurchaseForComparison(null);
+                    setIsRepurchaseComparisonOpen(true);
+                  }}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <GitCompare className="size-4 text-emerald-400" />
+                  <span>Comparativo de Recompras</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenRepurchaseModal}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                >
+                  <Plus className="size-3.5 stroke-[3]" />
+                  <span>Nova Recompra</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2">
+                <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider flex items-center gap-1.5">
+                  <Boxes className="size-4 text-white/70" /> Total Pago em Mercadorias
+                </span>
+                <div className="text-2xl font-black text-white">
+                  {formatBRL(totalStockPurchases)}
+                </div>
+                <p className="text-xs text-white/50">
+                  {repurchases.length} reposições cadastradas
+                </p>
+              </div>
+
+              <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-2">
+                <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider flex items-center gap-1.5">
+                  <Truck className="size-4 text-white/70" /> Fretes Pagos aos Fornecedores
+                </span>
+                <div className="text-2xl font-black text-white">
+                  {formatBRL(totalFreightRepurchases)}
+                </div>
+                <p className="text-xs text-white/50">
+                  Fretes das reposições
+                </p>
+              </div>
+            </div>
+
+            {/* Tabela de Histórico de Recompras */}
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-white/80 uppercase tracking-wider flex items-center gap-2">
+              <History className="size-4 text-white/60" />
+              <span>Histórico de Recompras de Estoque</span>
+              <span className="text-[10px] bg-white/10 text-white/70 px-2 py-0.5 rounded-full">
+                {repurchases.length}
+              </span>
+            </h4>
+          </div>
+
+          {enrichedRepurchases.length === 0 ? (
+            <div className="bg-black/20 border border-dashed border-white/10 rounded-2xl p-8 text-center space-y-3">
+              <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-white/40">
+                <PackagePlus className="size-6" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white/70">Nenhuma recompra de estoque registrada ainda</p>
+                <p className="text-xs text-white/40 mt-0.5">
+                  Registre as reposições de produtos pagas aos fornecedores para acompanhar o Caixa Real da loja.
+                </p>
+              </div>
+              <button
+                onClick={handleOpenRepurchaseModal}
+                className="inline-flex items-center gap-1.5 text-xs font-bold bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded-xl border border-white/15 transition-all cursor-pointer"
+              >
+                <Plus className="size-3.5" />
+                <span>Registrar Primeira Recompra</span>
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/40">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-white/10 bg-white/5 text-white/60 font-bold uppercase tracking-wider">
+                    <th className="py-3.5 px-5">Data</th>
+                    <th className="py-3.5 px-5 text-right">Estoque (Produtos)</th>
+                    <th className="py-3.5 px-5 text-right">Frete Reposição</th>
+                    <th className="py-3.5 px-5 text-right">Total Desembolsado</th>
+                    <th className="py-3.5 px-5 text-right">Lucro da Compra</th>
+                    <th className="py-3.5 px-5 text-center">Nosso ROI</th>
+                    <th className="py-3.5 px-5 text-right">Crescimento vs Anterior</th>
+                    <th className="py-3.5 px-5 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 font-medium">
+                  {enrichedRepurchases.map((rep) => {
+                    const formattedDate = rep.purchase_date
+                      ? new Date(rep.purchase_date + "T00:00:00").toLocaleDateString("pt-BR")
+                      : "—";
+                    return (
+                      <tr key={rep.id} className="hover:bg-white/5 transition-colors">
+                        <td className="py-4 px-5 font-mono font-bold text-white/90 whitespace-nowrap">
+                          {formattedDate}
+                        </td>
+                        <td className="py-4 px-5 text-right font-extrabold text-white text-sm whitespace-nowrap">
+                          {formatBRL(rep.stock_purchase_amount)}
+                        </td>
+                        <td className="py-4 px-5 text-right font-bold text-white/70 whitespace-nowrap">
+                          {rep.freight_amount > 0 ? formatBRL(rep.freight_amount) : "R$ 0,00"}
+                        </td>
+                        <td className="py-4 px-5 text-right font-black text-amber-300 text-sm whitespace-nowrap">
+                          {formatBRL(rep.total_repurchase_amount)}
+                        </td>
+                        <td className="py-4 px-5 text-right font-mono font-extrabold text-emerald-400 text-sm whitespace-nowrap">
+                          +{formatBRL(rep.projectedProfit)}
+                        </td>
+                        <td className="py-4 px-5 text-center whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-xs font-bold">
+                            +{rep.markupPct.toFixed(1)}%
+                          </span>
+                        </td>
+                        <td className="py-4 px-5 text-right font-mono font-bold whitespace-nowrap">
+                          {rep.profitGrowthPct != null && rep.profitGrowthDiff != null ? (
+                            <span className={rep.profitGrowthDiff >= 0 ? "text-emerald-400" : "text-amber-400"}>
+                              {rep.profitGrowthDiff >= 0 ? "▲ +" : "▼ "}
+                              {rep.profitGrowthPct.toFixed(1)}%
+                            </span>
+                          ) : (
+                            <span className="text-white/30 text-[10px]">1ª Recompra</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-5 text-center whitespace-nowrap">
+                          <div className="inline-flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedRepurchaseForComparison(rep.id);
+                                setIsRepurchaseComparisonOpen(true);
+                              }}
+                              title="Comparar esta recompra com a anterior"
+                              className="h-8 px-3 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1.5 text-[11px] font-bold transition-all active:scale-95 cursor-pointer"
+                            >
+                              <GitCompare className="size-3.5" />
+                              <span>Comparar</span>
+                            </button>
+                            <button
+                              onClick={() => setRepurchaseToDelete(rep)}
+                              title="Excluir Recompra"
+                              className="size-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 inline-flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+          </div>
+        </div>
+      )}
+
+      {/* ━━━ ABA 3: SÓCIOS & PRÓ-LABORE (CAP TABLE OFICIAL, SALÁRIOS & EXTRATO DE MOVIMENTAÇÕES) ━━━ */}
+      {mainTab === "socios" && (
+        <div className="space-y-6">
+          {/* Banner da Nova Regra Oficial */}
+          <div className="p-5 bg-gradient-to-r from-emerald-500/10 via-black to-emerald-500/5 border border-emerald-500/30 rounded-2xl space-y-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-xs font-extrabold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                <Scale className="size-4 text-emerald-400" />
+                Nova Regra Oficial de Participação dos Sócios
+              </span>
+              <span className="text-[11px] font-mono text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                Capital Líquido = Aportes − Retiradas de Capital
+              </span>
+            </div>
+            <p className="text-xs text-white/70 leading-relaxed">
+              A participação percentual de cada sócio é calculada estritamente pela proporção do seu <strong>Capital Líquido Individual</strong> sobre o <strong>Capital Líquido Total</strong>.
+              Pró-labore, distribuição de lucro e custos da empresa <strong>NÃO alteram a participação societária</strong>.
+            </p>
+          </div>
+
+          {/* Indicadores Centrais do Cap Table */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-2">
+              <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
+                Capital Líquido Total
+              </span>
+              <div className="text-2xl font-black text-white">
+                {formatBRL(unified.capTable.totalNetCapitalInvested)}
+              </div>
+              <p className="text-xs text-white/40">
+                Aportes ({formatBRL(unified.capTable.totalGrossContributed)}) − Retiradas ({formatBRL(unified.capTable.totalWithdrawn)})
+              </p>
+            </div>
+
+            <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-2">
+              <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
+                Total de Aportes
+              </span>
+              <div className="text-2xl font-black text-emerald-400">
+                +{formatBRL(unified.capTable.totalGrossContributed)}
+              </div>
+              <p className="text-xs text-white/40">
+                Dinheiro ({formatBRL(unified.capTable.totalCashContributed)}) + Mercadoria ({formatBRL(unified.capTable.totalStockContributed)})
+              </p>
+            </div>
+
+            <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-2">
+              <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider">
+                Total de Retiradas
+              </span>
+              <div className="text-2xl font-black text-rose-400">
+                -{formatBRL(unified.capTable.totalWithdrawn)}
+              </div>
+              <p className="text-xs text-white/40">
+                Devolução de capital investido
+              </p>
+            </div>
+
+            <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-5 space-y-2">
+              <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
+                Status do Cap Table
+              </span>
+              <div className="text-base font-bold text-white">
+                {unified.capTable.isCapTableCalculable ? (
+                  <span className="text-emerald-400 flex items-center gap-1.5">
+                    <CheckCircle2 className="size-4" /> 100% Consolidado
+                  </span>
+                ) : (
+                  <span className="text-rose-400 flex items-center gap-1.5">
+                    <AlertTriangle className="size-4" /> Não Calculável
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-white/40">
+                {unified.capTable.partnerShares.length} sócios ativos cadastrados
+              </p>
+            </div>
+          </div>
+
+          {/* Barra de Ações Rápidas de Sócios */}
+          <div className="bg-[#0e0e10] border border-white/15 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-white/70 uppercase tracking-wider">Ações Executivas:</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsNewPartnerModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <UserPlus className="size-3.5 text-emerald-400" />
+                <span>Novo Sócio</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setNewTxDefaultType('APORTE');
+                  setNewTxDefaultPartnerId(undefined);
+                  setNewTxDefaultAmount(undefined);
+                  setIsNewTxModalOpen(true);
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Plus className="size-3.5 text-emerald-400" />
+                <span>Registrar Aporte</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setNewTxDefaultType('RETIRADA_CAPITAL');
+                  setNewTxDefaultPartnerId(undefined);
+                  setNewTxDefaultAmount(undefined);
+                  setIsNewTxModalOpen(true);
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Minus className="size-3.5 text-rose-400" />
+                <span>Retirada de Capital</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsPayrollConfigModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Percent className="size-3.5 text-emerald-400" />
+                <span>Configurar % (Salários & Reinvestimento)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsDilutionModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Calculator className="size-3.5 text-emerald-400" />
+                <span>Simulador de Diluição</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Banner da Base de Lucro do Ciclo & Fatia da Empresa */}
+          <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-6 space-y-4 shadow-xl">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <Banknote className="size-5 text-emerald-400" />
+                  <span>Distribuição de Pró-Labore & Reinvestimento da Loja</span>
+                </h3>
+                <p className="text-xs text-white/50 mt-0.5">
+                  Divisão automática do Lucro Líquido Real apurado no ciclo ({currentCycle.startDateStr.slice(0, 5)} → {currentCycle.endDateStr.slice(0, 5)}) entre reinvestimento da empresa e pró-labore dos sócios.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-white/60">Base Apurada:</span>
+                <span className="text-base font-black text-emerald-400">
+                  {formatBRL(unified.payroll.baseNetProfit)}
+                </span>
+              </div>
+            </div>
+
+            {/* Fatia da Empresa (Fundo de Reinvestimento) */}
+            <div className="bg-black/40 border border-white/10 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold shrink-0">
+                  <Building2 className="size-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-white">Fatia da Empresa (Fundo de Reinvestimento)</h4>
+                    <button
+                      type="button"
+                      onClick={() => setIsPayrollConfigModalOpen(true)}
+                      className="text-xs font-black text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 px-2.5 py-0.5 rounded-full cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center gap-1 shadow-sm"
+                      title="Clique para alterar a porcentagem de reinvestimento da loja"
+                    >
+                      <span>{unified.payroll.reinvestmentPct}%</span>
+                      <Edit3 className="size-2.5 opacity-80" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-white/50">
+                    Aporte retido automaticamente do lucro líquido para giro de estoque e novas reposições.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-6">
+                <div>
+                  <span className="text-[10px] text-white/40 uppercase font-bold tracking-wider block">Retido no Ciclo</span>
+                  <span className="text-xl font-black text-emerald-400">{formatBRL(unified.payroll.reinvestmentAmount)}</span>
+                </div>
+                <div className="border-l border-white/10 pl-6">
+                  <span className="text-[10px] text-white/40 uppercase font-bold tracking-wider block">Saldo Acumulado</span>
+                  <span className="text-xl font-black text-white">{formatBRL(unified.payroll.totalReinvestmentAccumulated)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Grid de Cards Unificados dos Sócios (Equity + Pró-Labore + Ações) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {unified.capTable.partnerShares.map((share) => {
+              const item = unified.payroll.partnerItems.find((p: PartnerPayrollItem) => p.partner.id === share.partner.id);
+              const hasAvailable = item ? item.availableToReceive > 0 : false;
+              const hasCash = (unified.cash.realCash || 0) > 0;
+              const canWithdraw = hasAvailable && hasCash;
+              const isNegative = item ? item.availableToReceive < 0 : false;
+
+              return (
+                <div
+                  key={share.partner.id}
+                  className="bg-[#0e0e10] border border-white/15 hover:border-white/25 rounded-2xl p-5 space-y-4 transition-all flex flex-col justify-between"
+                >
+                  <div className="space-y-4">
+                    {/* Header do Sócio */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="size-10 rounded-xl flex items-center justify-center font-black text-sm text-white shrink-0 shadow-md"
+                          style={{ backgroundColor: share.partner.avatar_color || '#10b981' }}
+                        >
+                          {share.partner.name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-white tracking-tight flex items-center gap-1.5">
+                            {share.partner.name}
+                          </h4>
+                          <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-white/50">
+                            <span>Sócio Cotista</span>
+                            {item && (
+                              <>
+                                <span>·</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsPayrollConfigModalOpen(true)}
+                                  className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-semibold hover:underline cursor-pointer transition-colors bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-0.5 rounded-md border border-emerald-500/20"
+                                  title="Clique para alterar a porcentagem de pró-labore deste sócio"
+                                >
+                                  <span>Pró-labore: {item.salaryPct}%</span>
+                                  <Edit3 className="size-2.5 opacity-80" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1">
+                        {share.isEquityCalculable ? (
+                          <span className="text-xs font-black text-emerald-400 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 shadow-sm" title="Participação societária oficial calculada pelo capital líquido">
+                            {share.equityPercentage.toFixed(2)}%
+                          </span>
+                        ) : (
+                          <span className="text-xs font-semibold text-rose-400 px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center gap-1">
+                            <AlertTriangle className="size-3" />
+                            <span>Não calculável</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Capital Investido Líquido */}
+                    <div className="bg-black/60 p-4 rounded-xl border border-white/10 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-white/50">Capital Líquido Investido:</span>
+                        <span className="text-white font-bold">{formatBRL(share.netCapitalInvested)}</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10 text-[11px]">
+                        <div>
+                          <span className="text-white/40 block">Aportes:</span>
+                          <span className="font-semibold text-emerald-400">+{formatBRL(share.grossCapitalContributed)}</span>
+                        </div>
+                        <div>
+                          <span className="text-white/40 block">Retiradas:</span>
+                          <span className="font-semibold text-rose-400">-{formatBRL(share.capitalWithdrawn)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Fatias Patrimoniais Proporcionais */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-black/40 p-2.5 rounded-xl border border-white/5 space-y-0.5">
+                        <span className="text-[10px] text-white/40 block">Patrimônio Proporcional</span>
+                        <span className="font-bold text-white">
+                          {share.isEquityCalculable ? formatBRL(share.shareOfOperationalEquity) : "—"}
+                        </span>
+                      </div>
+
+                      <div className="bg-black/40 p-2.5 rounded-xl border border-white/5 space-y-0.5">
+                        <span className="text-[10px] text-white/40 block">Fatia do Caixa Real</span>
+                        <span className="font-bold text-emerald-400">
+                          {share.isEquityCalculable ? formatBRL(share.shareOfRealCash) : "—"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Os 4 Níveis Transparentes de Pró-Labore / Salário */}
+                    {item && (
+                      <div className="space-y-2 bg-black/60 p-3.5 rounded-xl border border-white/10 text-xs">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
+                          <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider flex items-center gap-1.5">
+                            <Banknote className="size-3.5 text-emerald-400" />
+                            <span>Pró-Labore do Ciclo</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setIsPayrollConfigModalOpen(true)}
+                            className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-mono font-bold cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-sm"
+                            title="Clique para alterar a porcentagem de pró-labore"
+                          >
+                            <span>{item.salaryPct}% do lucro</span>
+                            <Edit3 className="size-2.5 opacity-80" />
+                          </button>
+                        </div>
+
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-white/50">1. Gerado no Ciclo:</span>
+                          <span className="font-bold text-white">{formatBRL(item.grossSalaryGenerated)}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-white/50">2. Saldo de Ciclos Anteriores:</span>
+                          <span className={`font-mono font-bold ${(item.carriedOverPendingSalary || 0) < 0 ? "text-rose-400" : "text-white/80"}`}>
+                            {(item.carriedOverPendingSalary || 0) < 0 ? "-" : "+"}{formatBRL(Math.abs(item.carriedOverPendingSalary || 0))}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-white/50">3. Total Já Sacado:</span>
+                          <span className="font-mono font-bold text-white/80">-{formatBRL(item.totalSalaryPaidAllTime)}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center pt-2 border-t border-white/10">
+                          <span className="text-xs font-bold text-white">4. Disponível para Receber:</span>
+                          <span className={`text-sm font-black ${
+                            isNegative ? "text-rose-400" : canWithdraw ? "text-emerald-400" : "text-white/50"
+                          }`}>
+                            {formatBRL(item.availableToReceive)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Ações do Card */}
+                  <div className="space-y-2 pt-3 border-t border-white/10">
+                    {item && (
+                      <button
+                        type="button"
+                        disabled={!canWithdraw}
+                        onClick={() => {
+                          setNewTxDefaultType('PRO_LABORE');
+                          setNewTxDefaultPartnerId(item.partner.id);
+                          setNewTxDefaultAmount(item.availableToReceive > 0 ? item.availableToReceive : undefined);
+                          setIsNewTxModalOpen(true);
+                        }}
+                        className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          canWithdraw
+                            ? "bg-emerald-500 hover:bg-emerald-400 text-black cursor-pointer shadow-md active:scale-95"
+                            : "bg-white/5 border border-white/10 text-white/30 cursor-not-allowed"
+                        }`}
+                      >
+                        <Banknote className="size-3.5" />
+                        <span>{canWithdraw ? "Receber / Sacar Salário" : !hasCash && hasAvailable ? "Caixa Zerado / Sem Saldo em Conta" : isNegative ? "Saldo Devedor (Bloqueado)" : "Sem Saldo para Sacar"}</span>
+                      </button>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewTxDefaultType('APORTE');
+                          setNewTxDefaultPartnerId(share.partner.id);
+                          setNewTxDefaultAmount(undefined);
+                          setIsNewTxModalOpen(true);
+                        }}
+                        className="py-1.5 px-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="size-3" />
+                        <span>+ Aporte</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewTxDefaultType('RETIRADA_CAPITAL');
+                          setNewTxDefaultPartnerId(share.partner.id);
+                          setNewTxDefaultAmount(undefined);
+                          setIsNewTxModalOpen(true);
+                        }}
+                        className="py-1.5 px-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Minus className="size-3" />
+                        <span>- Retirada</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Extrato Completo de Movimentações Registradas na Base da Área de Sócios */}
+          {/* Extrato Completo de Movimentações */}
+          <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-6 space-y-4 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div>
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <History className="size-4 text-emerald-400" />
+                  <span>Extrato de Movimentações Registradas</span>
+                  <span className="text-[10px] bg-white/10 text-white/70 px-2 py-0.5 rounded-full font-mono">
+                    {filteredTransactions.length}
+                  </span>
+                </h4>
+                <p className="text-xs text-white/50 mt-0.5">
+                  Histórico unificado de movimentações financeiras com auditoria e exclusão segura.
+                </p>
+              </div>
+
+              {/* Filtros do Extrato */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="size-3.5 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={txSearchQuery}
+                    onChange={(e) => setTxSearchQuery(e.target.value)}
+                    placeholder="Buscar sócio ou descrição..."
+                    className="bg-black/60 border border-white/15 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-emerald-500/50 transition-all w-44 sm:w-56"
+                  />
+                </div>
+
+                <select
+                  value={txFilterType}
+                  onChange={(e) => setTxFilterType(e.target.value)}
+                  className="bg-black/60 border border-white/15 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-all cursor-pointer"
+                >
+                  <option value="TODOS">Todas as Categorias</option>
+                  <option value="APORTE">🟢 Aportes de Capital</option>
+                  <option value="RETIRADA_CAPITAL">🔴 Retiradas de Capital</option>
+                  <option value="PRO_LABORE">💸 Salários / Pró-labore</option>
+                  <option value="DESPESA_OPERACIONAL">🏢 Custos Operacionais</option>
+                  <option value="COMPRA_ESTOQUE">📦 Compras de Estoque</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Tabela do Extrato */}
+            <div className="border border-white/10 rounded-2xl overflow-hidden bg-black/40">
+              {filteredTransactions.length === 0 ? (
+                <div className="p-10 text-center text-xs text-white/50 space-y-2">
+                  <p>Nenhuma movimentação encontrada para os filtros selecionados.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10 text-white/50 text-[10px] uppercase font-bold bg-white/5">
+                        <th className="py-3 px-4">Data</th>
+                        <th className="py-3 px-4">Categoria / Tipo</th>
+                        <th className="py-3 px-4">Sócio / Origem</th>
+                        <th className="py-3 px-4">Descrição</th>
+                        <th className="py-3 px-4 text-right">Valor (R$)</th>
+                        <th className="py-3 px-4 text-center">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {filteredTransactions.map((tx) => {
+                        const isEntry = tx.type === 'APORTE';
+                        const isRetirada = tx.type === 'RETIRADA_CAPITAL';
+                        const isSalary = tx.type === 'PRO_LABORE' || tx.type === 'DISTRIBUICAO_LUCRO';
+                        const isExpense = tx.type === 'DESPESA_OPERACIONAL';
+
+                        return (
+                          <tr key={tx.id} className="hover:bg-white/5 transition-all">
+                            <td className="py-3 px-4 font-mono text-white/60 whitespace-nowrap">
+                              {(tx.date || tx.created_at || '').slice(0, 10).split('-').reverse().join('/')}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              {isEntry ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                  <ArrowDownRight className="size-3" />
+                                  Aporte (Entrada)
+                                </span>
+                              ) : isRetirada ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                                  <TrendingDown className="size-3" />
+                                  Retirada de Capital
+                                </span>
+                              ) : isSalary ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                  <Banknote className="size-3" />
+                                  Salário / Pró-labore
+                                </span>
+                              ) : isExpense ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700">
+                                  <Building2 className="size-3" />
+                                  Custo Operacional
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md bg-white/5 text-white/70 border border-white/10">
+                                  {tx.type}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 font-semibold text-white whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-white font-medium">
+                                <span className={`size-1.5 rounded-full ${
+                                  isEntry ? "bg-emerald-400" : isRetirada ? "bg-rose-400" : isSalary ? "bg-emerald-300" : "bg-zinc-400"
+                                }`} />
+                                {tx.partner_name || "Smoking Pods"}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-white/70 max-w-[240px] truncate" title={tx.description}>
+                              {tx.description || "—"}
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono font-bold whitespace-nowrap">
+                              <span className={isEntry ? "text-emerald-400" : isRetirada ? "text-rose-400" : "text-white"}>
+                                {isEntry ? "+" : "-"}{formatBRL(tx.amount)}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => setTxToDelete(tx)}
+                                className="p-1.5 rounded-lg hover:bg-rose-500/10 text-white/40 hover:text-rose-400 transition-colors cursor-pointer"
+                                title="Excluir movimentação"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ━━━ ABA 4: FATURAMENTO & CICLOS (METAS SEMANAIS, HISTÓRICO & DRE EXECUTIVO) ━━━━━━━━━━ */}
+      {mainTab === "faturamento" && (
+        <div className="space-y-6">
+{/* ━━━ NOVO BLOCO: 🎯 METAS SEMANAIS DO CICLO (SEMANA 1 A 4) — Visível apenas no Computador ━━━━━━━━━━━━━━ */}
       <div className="hidden md:block bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
         {/* Cabeçalho da Seção de Metas */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
@@ -2988,468 +4758,7 @@ export default function FinanceDashboard() {
         </div>
       </div>
 
-      {/* ━━━ NOVO BLOCO: 📦 RECOMPRA DE ESTOQUE & CAIXA REAL (MÓDULO INDEPENDENTE — Visível apenas no Computador) ━━━━━━━━━━━━━━ */}
-      <div data-tour="financeiro-recompra-caixa" className="hidden md:block bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
-        {/* Cabeçalho da Seção */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-          <div>
-            <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-              <PackagePlus className="size-5 text-white" />
-              <span>Recompra de Estoque & Caixa Real</span>
-            </h3>
-            <p className="text-xs text-white/50 mt-0.5">
-              Controle de desembolsos para reposição de mercadorias, fretes de fornecedores e saldo real remanescente em caixa.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedRepurchaseForComparison(null);
-                setIsRepurchaseComparisonOpen(true);
-              }}
-              className="inline-flex items-center gap-2 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition-all active:scale-95 cursor-pointer"
-            >
-              <GitCompare className="size-4 text-emerald-400" />
-              <span>Comparativo de Recompras</span>
-            </button>
-
-            <button
-              onClick={handleOpenRepurchaseModal}
-              data-tour="btn-registrar-recompra"
-              className="inline-flex items-center gap-2 bg-white hover:bg-slate-100 text-black font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)] transition-all active:scale-95 cursor-pointer"
-            >
-              <Plus className="size-4 stroke-[3]" />
-              <span>Registrar Recompra</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 3 Cards de Indicadores de Recompra */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Card 1: CAIXA REAL CALCULADO (Posição Atual Viva - Não Reinicia no Dia 14) */}
-          <div className="bg-gradient-to-b from-emerald-500/15 via-emerald-500/5 to-black/60 border-2 border-emerald-500/50 rounded-2xl p-5 space-y-3 relative overflow-hidden shadow-xl shadow-emerald-950/20 hover:border-emerald-400 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Wallet className="size-4 text-emerald-400" /> Caixa Real Calculado
-              </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                realCash === 0 
-                  ? "bg-amber-500/20 border border-amber-500/40 text-amber-300"
-                  : "bg-emerald-500/20 border border-emerald-500/40 text-emerald-300"
-              }`}>
-                {realCash === 0 ? "Caixa Zerado (Novo Ciclo)" : "Posição Atual Viva"}
-              </span>
-            </div>
-
-            <div>
-              <div className="text-2xl sm:text-3xl font-black text-emerald-300 tracking-tight">
-                {formatBRL(realCash)}
-              </div>
-              <p className="text-xs font-semibold text-emerald-400/90 mt-1">
-                {realCash > 0 ? "Saldo líquido em dinheiro vivo da nova fase" : "Caixa inicial zerado no Marco Zero (16/11/2026)"}
-              </p>
-            </div>
-
-            <div className="pt-2.5 border-t border-emerald-500/20 text-[10px] text-white/50 flex flex-col gap-1">
-              <span className="text-white/70">
-                Novas Vendas Recebidas ({formatBRL(allTimeMetrics.newPhaseRevenue || 0)}) − Saídas ({formatBRL(allTimeMetrics.newPhaseOutflows || 0)})
-              </span>
-              <span className="text-emerald-400/90 font-medium">
-                ⚡ Marco Zero aplicado em 16/11/2026. Caixa Real acumulando novas vendas em tempo real.
-              </span>
-            </div>
-          </div>
-
-          {/* Card 2: RECOMPRAS DE ESTOQUE */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-3 hover:border-white/30 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider flex items-center gap-1.5">
-                <Boxes className="size-4 text-white/70" /> Recompras de Estoque
-              </span>
-              <div className="size-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/70">
-                <Box className="size-4" />
-              </div>
-            </div>
-
-            <div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-white">
-                {formatBRL(totalStockPurchases)}
-              </div>
-              <p className="text-xs font-medium text-white/50 mt-1">
-                Total pago em produtos para reposição
-              </p>
-            </div>
-
-            <div className="pt-2.5 border-t border-white/10 text-[10px] text-white/40">
-              {repurchases.length} {repurchases.length === 1 ? 'reposição registrada' : 'reposições registradas'}
-            </div>
-          </div>
-
-          {/* Card 3: FRETES DE REPOSIÇÃO */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-5 space-y-3 hover:border-white/30 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider flex items-center gap-1.5">
-                <Truck className="size-4 text-white/70" /> Fretes de Reposição
-              </span>
-              <div className="size-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/70">
-                <Truck className="size-4" />
-              </div>
-            </div>
-
-            <div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-white">
-                {formatBRL(totalFreightRepurchases)}
-              </div>
-              <p className="text-xs font-medium text-white/50 mt-1">
-                Total gasto com frete dos fornecedores
-              </p>
-            </div>
-
-            <div className="pt-2.5 border-t border-white/10 text-[10px] text-white/40">
-              Fretes registrados nas reposições de estoque
-            </div>
-          </div>
-        </div>
-
-        {/* Tabela de Histórico de Recompras */}
-        <div className="space-y-3 pt-2">
-          <div className="flex items-center justify-between">
-            <h4 className="text-xs font-bold text-white/80 uppercase tracking-wider flex items-center gap-2">
-              <History className="size-4 text-white/60" />
-              <span>Histórico de Recompras de Estoque</span>
-              <span className="text-[10px] bg-white/10 text-white/70 px-2 py-0.5 rounded-full">
-                {repurchases.length}
-              </span>
-            </h4>
-          </div>
-
-          {enrichedRepurchases.length === 0 ? (
-            <div className="bg-black/20 border border-dashed border-white/10 rounded-2xl p-8 text-center space-y-3">
-              <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-white/40">
-                <PackagePlus className="size-6" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-white/70">Nenhuma recompra de estoque registrada ainda</p>
-                <p className="text-xs text-white/40 mt-0.5">
-                  Registre as reposições de produtos pagas aos fornecedores para acompanhar o Caixa Real da loja.
-                </p>
-              </div>
-              <button
-                onClick={handleOpenRepurchaseModal}
-                className="inline-flex items-center gap-1.5 text-xs font-bold bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded-xl border border-white/15 transition-all cursor-pointer"
-              >
-                <Plus className="size-3.5" />
-                <span>Registrar Primeira Recompra</span>
-              </button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/40">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-white/10 bg-white/5 text-white/60 font-bold uppercase tracking-wider">
-                    <th className="py-3.5 px-5">Data</th>
-                    <th className="py-3.5 px-5 text-right">Estoque (Produtos)</th>
-                    <th className="py-3.5 px-5 text-right">Frete Reposição</th>
-                    <th className="py-3.5 px-5 text-right">Total Desembolsado</th>
-                    <th className="py-3.5 px-5 text-right">Lucro da Compra</th>
-                    <th className="py-3.5 px-5 text-center">Nosso ROI</th>
-                    <th className="py-3.5 px-5 text-right">Crescimento vs Anterior</th>
-                    <th className="py-3.5 px-5 text-center">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 font-medium">
-                  {enrichedRepurchases.map((rep) => {
-                    const formattedDate = rep.purchase_date
-                      ? new Date(rep.purchase_date + "T00:00:00").toLocaleDateString("pt-BR")
-                      : "—";
-                    return (
-                      <tr key={rep.id} className="hover:bg-white/5 transition-colors">
-                        <td className="py-4 px-5 font-mono font-bold text-white/90 whitespace-nowrap">
-                          {formattedDate}
-                        </td>
-                        <td className="py-4 px-5 text-right font-extrabold text-white text-sm whitespace-nowrap">
-                          {formatBRL(rep.stock_purchase_amount)}
-                        </td>
-                        <td className="py-4 px-5 text-right font-bold text-white/70 whitespace-nowrap">
-                          {rep.freight_amount > 0 ? formatBRL(rep.freight_amount) : "R$ 0,00"}
-                        </td>
-                        <td className="py-4 px-5 text-right font-black text-amber-300 text-sm whitespace-nowrap">
-                          {formatBRL(rep.total_repurchase_amount)}
-                        </td>
-                        <td className="py-4 px-5 text-right font-mono font-extrabold text-emerald-400 text-sm whitespace-nowrap">
-                          +{formatBRL(rep.projectedProfit)}
-                        </td>
-                        <td className="py-4 px-5 text-center whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-xs font-bold">
-                            +{rep.markupPct.toFixed(1)}%
-                          </span>
-                        </td>
-                        <td className="py-4 px-5 text-right font-mono font-bold whitespace-nowrap">
-                          {rep.profitGrowthPct != null && rep.profitGrowthDiff != null ? (
-                            <span className={rep.profitGrowthDiff >= 0 ? "text-emerald-400" : "text-amber-400"}>
-                              {rep.profitGrowthDiff >= 0 ? "▲ +" : "▼ "}
-                              {rep.profitGrowthPct.toFixed(1)}%
-                            </span>
-                          ) : (
-                            <span className="text-white/30 text-[10px]">1ª Recompra</span>
-                          )}
-                        </td>
-                        <td className="py-4 px-5 text-center whitespace-nowrap">
-                          <div className="inline-flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedRepurchaseForComparison(rep.id);
-                                setIsRepurchaseComparisonOpen(true);
-                              }}
-                              title="Comparar esta recompra com a anterior"
-                              className="h-8 px-3 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1.5 text-[11px] font-bold transition-all active:scale-95 cursor-pointer"
-                            >
-                              <GitCompare className="size-3.5" />
-                              <span>Comparar</span>
-                            </button>
-                            <button
-                              onClick={() => setRepurchaseToDelete(rep)}
-                              title="Excluir Recompra"
-                              className="size-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 inline-flex items-center justify-center transition-all active:scale-95 cursor-pointer"
-                            >
-                              <Trash2 className="size-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ━━━ BLOCO DEDICADO: 🎯 EFICIÊNCIA COMERCIAL (HISTÓRICO COMPLETO) ━━━━━━━━━━━━━━ */}
-      <div className="bg-[#0e0e10] border border-white/15 rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-xl hover:border-white/25 transition-all">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-white/10 pb-3.5 sm:pb-4">
-          <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Target className="size-5 text-white shrink-0" />
-              <span>Eficiência Comercial</span>
-            </h3>
-            <p className="text-xs text-white/50 mt-0.5">
-              Médias acumuladas de venda e rentabilidade no histórico completo ({allTimeMetrics.totalOrders} pedidos).
-            </p>
-          </div>
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <span className="text-[11px] sm:text-xs font-semibold text-white/70 bg-white/5 px-3 py-1 rounded-xl border border-white/10">
-              Histórico Completo
-            </span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-          {/* Card 1: Ticket Médio */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[10px] sm:text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <ReceiptText className="size-3.5 sm:size-4 text-white/70 shrink-0" />
-              <span className="truncate">Ticket Médio</span>
-            </span>
-            <div className="text-xl sm:text-3xl font-extrabold text-white">
-              {formatBRL(averageTicket)}
-            </div>
-            <p className="text-[11px] sm:text-xs text-white/50">
-              Valor médio por compra
-            </p>
-            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
-              Fat. ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalOrders} ped
-            </div>
-          </div>
-
-          {/* Card 2: Margem Média Líquida (%) */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[10px] sm:text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <Percent className="size-3.5 sm:size-4 text-emerald-400 shrink-0" />
-              <span className="truncate">Margem Média</span>
-            </span>
-            <div className="text-xl sm:text-3xl font-extrabold text-emerald-400">
-              {averageNetMarginPercent.toFixed(1)}%
-            </div>
-            <p className="text-[11px] sm:text-xs text-white/50">
-              Margem líquida média
-            </p>
-            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
-              Lucro Líquido ÷ Faturamento
-            </div>
-          </div>
-
-          {/* Card 3: Margem por Pedido */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[10px] sm:text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <TrendingUp className="size-3.5 sm:size-4 text-emerald-400 shrink-0" />
-              <span className="truncate">Lucro / Pedido</span>
-            </span>
-            <div className="text-xl sm:text-3xl font-extrabold text-emerald-300">
-              {formatBRL(averageNetProfitPerOrder)}
-            </div>
-            <p className="text-[11px] sm:text-xs text-white/50">
-              Ganho médio por pedido
-            </p>
-            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-emerald-400/70 font-medium">
-              Lucro ({formatBRL(allTimeMetrics.netProfit)}) ÷ {allTimeMetrics.totalOrders} ped
-            </div>
-          </div>
-
-          {/* Card 4: Preço Médio por Unidade */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 hover:border-white/30 transition-all">
-            <span className="text-[10px] sm:text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5">
-              <Box className="size-3.5 sm:size-4 text-white/70 shrink-0" />
-              <span className="truncate">Preço / Unidade</span>
-            </span>
-            <div className="text-xl sm:text-3xl font-extrabold text-white">
-              {formatBRL(averagePricePerPod)}
-            </div>
-            <p className="text-[11px] sm:text-xs text-white/50">
-              Preço médio por unidade
-            </p>
-            <div className="hidden sm:block pt-2 border-t border-white/10 text-[10px] text-white/40 font-medium">
-              Fat. ({formatBRL(allTimeMetrics.grossRevenue)}) ÷ {allTimeMetrics.totalPodsSold} un
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ━━━ BLOCO 2: PATRIMÔNIO & ESTOQUE NA PRATELEIRA (Visível apenas no Computador) ━━━━━━━━━━━━━━ */}
-      <div className="hidden md:block bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl hover:border-white/25 transition-all">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
-          <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Landmark className="size-5 text-white" />
-              <span>Patrimônio & Estoque na Prateleira</span>
-            </h3>
-            <p className="text-xs text-white/50 mt-0.5">
-              Capital imobilizado em mercadorias no armazém e investimentos em tráfego.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 items-stretch">
-          {/* Card 1: Custo dos Pods na Prateleira */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-white/30 transition-all min-w-0">
-            <div className="space-y-1.5 sm:space-y-2">
-              <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
-                <Box className="size-4 text-white/70 shrink-0" /> Custo Prateleira
-              </span>
-              <div className="text-lg sm:text-xl xl:text-2xl font-extrabold text-white truncate">
-                {formatBRL(stockAssetCost)}
-              </div>
-            </div>
-            <p className="text-xs text-white/50 truncate mt-2">
-              {stockAssetUnits} unidades no armazém.
-            </p>
-          </div>
-
-          {/* Card 2: Valor Potencial de Venda */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-white/30 transition-all min-w-0">
-            <div className="space-y-1.5 sm:space-y-2">
-              <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
-                <DollarSign className="size-4 text-white/70 shrink-0" /> Venda do Estoque
-              </span>
-              <div className="text-lg sm:text-xl xl:text-2xl font-extrabold text-white truncate">
-                {formatBRL(stockAssetRetail)}
-              </div>
-            </div>
-            <p className="text-xs text-white/50 truncate mt-2">
-              Valor bruto na venda das {stockAssetUnits} unidades.
-            </p>
-          </div>
-
-          {/* Card 3: Lucro Potencial do Estoque */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-white/30 transition-all min-w-0">
-            <div className="space-y-1.5 sm:space-y-2">
-              <span className="text-[11px] text-emerald-400 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
-                <TrendingUp className="size-4 text-emerald-400 shrink-0" /> Lucro Potencial
-              </span>
-              <div className="text-lg sm:text-xl xl:text-2xl font-extrabold text-emerald-400 truncate">
-                {formatBRL(stockAssetProfit)}
-              </div>
-            </div>
-            <p className="text-xs text-white/50 truncate mt-2">
-              Lucro ao liquidar o estoque.
-            </p>
-          </div>
-
-          {/* Card 4: Investimento em Marketing (Editável) */}
-          <div className="bg-black/40 border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-col justify-between relative hover:border-white/30 transition-all min-w-0">
-            <div className="space-y-1.5 sm:space-y-2">
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-[11px] text-white/70 uppercase font-bold tracking-wider flex items-center gap-1.5 truncate">
-                  <Megaphone className="size-4 text-white/70 shrink-0" /> Anúncios / Ads
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsEditingMarketing(!isEditingMarketing)}
-                  className="text-[10px] text-white/80 hover:text-white hover:underline font-bold shrink-0"
-                >
-                  {isEditingMarketing ? "Salvar" : "Editar"}
-                </button>
-              </div>
-
-              {isEditingMarketing ? (
-                <div className="flex items-center gap-2 pt-1">
-                  <input
-                    type="text"
-                    value={marketingSpent || ""}
-                    onChange={(e) => saveMarketingInvestment(e.target.value)}
-                    placeholder="Ex: 50.00"
-                    className="w-full bg-black/60 border border-white/30 rounded-xl px-2.5 py-1 text-xs font-bold text-white focus:outline-none focus:border-white/50"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingMarketing(false)}
-                    className="p-1.5 rounded-xl bg-white text-black hover:bg-white/90 transition-colors shrink-0"
-                  >
-                    <Check className="size-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <div className="text-lg sm:text-xl xl:text-2xl font-extrabold text-white truncate">
-                  {formatBRL(numericMarketingSpent)}
-                </div>
-              )}
-            </div>
-
-            <p className="text-xs text-white/50 truncate mt-2">
-              Total investido em tráfego pago.
-            </p>
-          </div>
-
-          {/* Card 5: Patrimônio Total da Loja (Caixa Real + Estoque) */}
-          <div className="bg-gradient-to-br from-white/10 to-emerald-500/10 border border-white/30 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-white/50 transition-all min-w-0">
-            <div className="space-y-1.5 sm:space-y-2">
-              <span className="text-[11px] text-white uppercase font-extrabold tracking-wider flex items-center gap-1.5">
-                <Landmark className="size-4 text-white shrink-0" />
-                <span className="leading-tight">Patrimônio Total da Loja</span>
-              </span>
-              <div className="text-xl sm:text-2xl xl:text-2.5xl font-black text-white tracking-tight truncate">
-                {formatBRL(totalCompanyEquity)}
-              </div>
-            </div>
-            <div className="mt-2 text-[11px] text-white/70 font-medium leading-snug">
-              <span>Caixa Real ({formatBRL(realCash)})</span>
-              <span className="mx-1">+</span>
-              <span>Estoque ({formatBRL(stockAssetRetail)})</span>
-              {totalFiadoPending > 0 && (
-                <>
-                  <span className="mx-1">+</span>
-                  <span className="text-amber-400">Fiados ({formatBRL(totalFiadoPending)})</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ━━━ NOVO BLOCO: 📈 FATURAMENTO A LONGO PRAZO (2 ABAS: HISTÓRICO & EVOLUÇÃO) ━━━━━━━━━━━━━━ */}
+{/* ━━━ NOVO BLOCO: 📈 FATURAMENTO A LONGO PRAZO (2 ABAS: HISTÓRICO & EVOLUÇÃO) ━━━━━━━━━━━━━━ */}
       <div data-tour="financeiro-longo-prazo" className="bg-[#0e0e10] border border-white/15 rounded-3xl p-4 sm:p-6 space-y-5 sm:space-y-6 shadow-xl hover:border-white/25 transition-all">
         {/* Cabeçalho do Bloco: Abas Principais [ Histórico ] [ Evolução ] [ Mês a Mês ] */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 border-b border-white/10 pb-4">
@@ -4447,7 +5756,7 @@ export default function FinanceDashboard() {
         )}
       </div>
 
-      {/* ━━━ BLOCO 4: DEMONSTRATIVO DE RESULTADO (DRE EXECUTIVO — Visível apenas no Computador) ━━━━━━━━━━━━━━ */}
+{/* ━━━ BLOCO 4: DEMONSTRATIVO DE RESULTADO (DRE EXECUTIVO — Visível apenas no Computador) ━━━━━━━━━━━━━━ */}
       <div className="hidden md:block bg-[#0e0e10] border border-white/15 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl hover:border-white/25 transition-all">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
@@ -4552,8 +5861,120 @@ export default function FinanceDashboard() {
           </table>
         </div>
       </div>
+        </div>
+      )}
 
-      {/* ━━━ MODAL: REGISTRAR RECOMPRA DE ESTOQUE ━━━━━━━━━━━━━━━━━━━━━━━━ */}
+
+{/* ━━━ MODAL: NOVO LANÇAMENTO (APORTE / RETIRADA / PRÓ-LABORE / CUSTO) ━━━ */}
+      {isNewTxModalOpen && (
+        <NewTransactionModal
+          isOpen={isNewTxModalOpen}
+          onClose={() => setIsNewTxModalOpen(false)}
+          onTransactionCreated={() => {
+            fetchFinanceData(false, true);
+          }}
+          partners={partnersList}
+          companyId={targetCompanyId}
+          defaultType={newTxDefaultType}
+          defaultPartnerId={newTxDefaultPartnerId}
+          defaultAmount={newTxDefaultAmount}
+        />
+      )}
+
+      {/* ━━━ MODAL: CADASTRAR NOVO SÓCIO ━━━ */}
+      {isNewPartnerModalOpen && (
+        <NewPartnerModal
+          isOpen={isNewPartnerModalOpen}
+          onClose={() => setIsNewPartnerModalOpen(false)}
+          onPartnerCreated={() => {
+            fetchFinanceData(false, true);
+          }}
+          companyId={targetCompanyId}
+          currentTotalNetCapital={unified.capTable.totalNetCapitalInvested}
+        />
+      )}
+
+      {/* ━━━ MODAL: CONFIGURAÇÃO DE SALÁRIOS & REINVESTIMENTO ━━━ */}
+      {isPayrollConfigModalOpen && (
+        <PayrollConfigModal
+          isOpen={isPayrollConfigModalOpen}
+          onClose={() => setIsPayrollConfigModalOpen(false)}
+          currentConfig={payrollConfig}
+          partners={partnersList}
+          cycleNetProfit={unified.netProfit}
+          allTimeNetProfit={unified.allTimeMetrics.netProfit}
+          onSave={async (newCfg: PayrollConfig) => {
+            setPayrollConfig(newCfg);
+            saveLocalPayrollConfig(newCfg, targetCompanyId);
+            await savePayrollConfigToSupabase(newCfg, targetCompanyId);
+            await fetchFinanceData(false, true);
+          }}
+        />
+      )}
+
+      {/* ━━━ MODAL: SIMULADOR DE DILUIÇÃO / APORTES ━━━ */}
+      {isDilutionModalOpen && (
+        <DilutionSimulatorModal
+          isOpen={isDilutionModalOpen}
+          onClose={() => setIsDilutionModalOpen(false)}
+          currentOverview={financialsOverview}
+          existingPartners={partnersList}
+        />
+      )}
+
+      {/* ━━━ MODAL: CONFIRMAR EXCLUSÃO DE MOVIMENTAÇÃO NO EXTRATO ━━━ */}
+      {txToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0e0e10] border border-red-500/30 rounded-3xl w-full max-w-sm p-6 space-y-4 shadow-2xl relative overflow-hidden">
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
+                <Trash2 className="size-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Excluir Movimentação?</h3>
+                <p className="text-xs text-white/50">Esta ação irá recalcular o Caixa e o Cap Table</p>
+              </div>
+            </div>
+
+            <div className="bg-black/40 border border-white/10 rounded-xl p-3 text-xs space-y-1">
+              <div className="flex justify-between">
+                <span className="text-white/60">Data:</span>
+                <span className="text-white font-bold">{txToDelete.date || txToDelete.created_at?.slice(0, 10)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-white/60">Descrição:</span>
+                <span className="text-white font-bold truncate max-w-[180px]">{txToDelete.description || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-white/60">Valor:</span>
+                <span className="text-white font-bold">{formatBRL(txToDelete.amount)}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isDeletingTx}
+                onClick={() => setTxToDelete(null)}
+                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-white/70 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingTx}
+                onClick={handleConfirmDeleteTx}
+                className="px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-400 text-white text-xs font-bold shadow-lg shadow-red-500/20 transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
+              >
+                {isDeletingTx && <Loader2 className="size-3.5 animate-spin" />}
+                <span>Excluir Definitivamente</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+{/* ━━━ MODAL: REGISTRAR RECOMPRA DE ESTOQUE ━━━━━━━━━━━━━━━━━━━━━━━━ */}
       {isRepurchaseModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-[#0e0e10] border border-white/20 rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl relative overflow-hidden">

@@ -126,7 +126,7 @@ export function InvestmentSimulatorModal({
                   onClick={() => setViewMode('BASE')}
                   className={`py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                     viewMode === 'BASE'
-                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold'
                       : 'text-white/50 hover:text-white'
                   }`}
                 >
@@ -184,7 +184,7 @@ export function InvestmentSimulatorModal({
 
               <div className="bg-white/5 p-3 rounded-xl border border-white/5 space-y-1">
                 <span className="text-[10px] text-white/50 uppercase font-semibold">Giro Mensal de Capital</span>
-                <p className="text-sm font-bold text-purple-300 font-mono">
+                <p className="text-sm font-bold text-zinc-200 font-mono">
                   {indicators.monthlyCapitalTurnover.toFixed(2)}x ao mês
                 </p>
                 <span className="text-[9px] text-white/40 block">Capacidade de conversão</span>
@@ -225,14 +225,14 @@ export function InvestmentSimulatorModal({
                 <span className="text-[9px] text-white/40 block">Vendas movimentadas</span>
               </div>
 
-              <div className="bg-purple-500/10 border border-purple-500/20 p-3.5 rounded-xl text-center space-y-1">
-                <span className="text-[10px] text-purple-300 uppercase font-bold tracking-wider">
+              <div className="bg-emerald-500/10 border border-emerald-500/20 p-3.5 rounded-xl text-center space-y-1">
+                <span className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider">
                   Lucro Operacional Estimado
                 </span>
-                <div className="text-base sm:text-lg font-extrabold text-purple-200 font-mono">
+                <div className="text-base sm:text-lg font-extrabold text-emerald-300 font-mono">
                   +{formatBRL(viewMode === 'BASE' ? projection.totalProjectedYield : projection.totalConservativeYield)}
                 </div>
-                <span className="text-[9px] text-purple-300/70 block font-mono">
+                <span className="text-[9px] text-emerald-300/70 block font-mono">
                   Crescimento: +{viewMode === 'BASE' ? projection.effectiveGrowthPct.toFixed(2) : projection.conservativeGrowthPct.toFixed(2)}%
                 </span>
               </div>
