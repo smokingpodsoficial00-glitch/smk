@@ -540,6 +540,31 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
     };
   }, [query, brand, selectedCategorySlug, models, sortBy, categoryMappings]);
 
+  // Agrupamento por marcas quando o catálogo principal estiver em exibição normal
+  const groupedCatalogByBrand = useMemo(() => {
+    // Se estiver no modo específico de Mais Vendidos, busca ou marca filtrada pelo dropdown, não divide em seções de marca
+    if (isOnlyMaisVendidosMode || brand || query.trim()) {
+      return null;
+    }
+
+    const groups: { brand: string; models: PodModel[] }[] = [];
+    const map = new Map<string, PodModel[]>();
+
+    for (const m of mainCatalogModels) {
+      const b = (m.brand || "Outros").trim();
+      const existing = map.get(b);
+      if (existing) {
+        existing.push(m);
+      } else {
+        const list = [m];
+        map.set(b, list);
+        groups.push({ brand: b, models: list });
+      }
+    }
+
+    return groups;
+  }, [mainCatalogModels, isOnlyMaisVendidosMode, brand, query]);
+
   return (
     <div className="min-h-screen pb-safe">
       <Hero 
@@ -573,7 +598,7 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
                   <Star className="size-4 text-amber-400 fill-amber-400" />
                   <h2 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider">Mais Vendidos</h2>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-5">
                   {topFeaturedModels.map(m => (
                     <ProductCard key={m.name} model={m} onClick={() => setSelectedModelName(m.name)} />
                   ))}
@@ -581,26 +606,51 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
               </div>
             )}
 
-            {/* Seção 2: Todos os Produtos / Restante do Catálogo */}
+            {/* Seção 2: Catálogo Dividido por Marcas (ou Grade Única quando há busca/filtro) */}
             {mainCatalogModels.length > 0 && (
-              <div className="space-y-4">
-                {topFeaturedModels.length > 0 && (
-                  <div className="flex items-center gap-2 border-b border-white/10 pb-2.5 pt-2">
-                    <h2 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider">Todos os Produtos</h2>
+              <>
+                {groupedCatalogByBrand ? (
+                  <div className="space-y-8">
+                    {groupedCatalogByBrand.map(group => (
+                      <div key={group.brand} className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2.5 pt-2">
+                          <div className="flex items-center gap-2">
+                            <span className="size-2 rounded-full bg-primary" />
+                            <h2 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider">{group.brand}</h2>
+                          </div>
+                          <span className="text-[11px] text-muted-foreground font-medium">
+                            {group.models.length} {group.models.length === 1 ? "modelo" : "modelos"}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-5">
+                          {group.models.map(m => (
+                            <ProductCard key={m.name} model={m} onClick={() => setSelectedModelName(m.name)} />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {topFeaturedModels.length > 0 && (
+                      <div className="flex items-center gap-2 border-b border-white/10 pb-2.5 pt-2">
+                        <h2 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider">Todos os Produtos</h2>
+                      </div>
+                    )}
+                    {isOnlyMaisVendidosMode && (
+                      <div className="flex items-center gap-2 border-b border-white/10 pb-2.5">
+                        <Star className="size-4 text-amber-400 fill-amber-400" />
+                        <h2 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider">Mais Vendidos</h2>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-5">
+                      {mainCatalogModels.map(m => (
+                        <ProductCard key={m.name} model={m} onClick={() => setSelectedModelName(m.name)} />
+                      ))}
+                    </div>
                   </div>
                 )}
-                {isOnlyMaisVendidosMode && (
-                  <div className="flex items-center gap-2 border-b border-white/10 pb-2.5">
-                    <Star className="size-4 text-amber-400 fill-amber-400" />
-                    <h2 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider">Mais Vendidos</h2>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {mainCatalogModels.map(m => (
-                    <ProductCard key={m.name} model={m} onClick={() => setSelectedModelName(m.name)} />
-                  ))}
-                </div>
-              </div>
+              </>
             )}
           </div>
         )}
