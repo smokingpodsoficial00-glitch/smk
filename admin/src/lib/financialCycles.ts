@@ -7,7 +7,7 @@
 
 import { isOrderNational, extractNationalInfo } from "./nationalSales";
 import { isCompanyExpenseTransaction } from "./partnerPayroll";
-import { isOrderFiadoPending } from "./fiadoSales";
+import { isOrderFiadoPending, extractFiadoInfo } from "./fiadoSales";
 
 export interface CycleDefinition {
   id: string; // Ex: "2026-08"
@@ -709,9 +709,12 @@ export function calculateNewPhaseRealCash(
     if (!order || order.delivery_status === "CANCELADO" || order.status === "CANCELADO") continue;
     const amt = parseFloat(order.total_amount) || 0;
     const isPendingFiado = isOrderFiadoPending(order);
+    const fiadoInfo = isPendingFiado ? extractFiadoInfo(order) : null;
 
     if (!isPendingFiado) {
       allPaidRevenueSum += amt;
+    } else if (fiadoInfo && fiadoInfo.upfrontPaid > 0) {
+      allPaidRevenueSum += fiadoInfo.upfrontPaid;
     }
 
     const rawDate = order.created_at || order.date;
@@ -744,6 +747,8 @@ export function calculateNewPhaseRealCash(
         }
 
         newOrdersRevenue += (prodRevenue + natMargin);
+      } else if (fiadoInfo && fiadoInfo.upfrontPaid > 0) {
+        newOrdersRevenue += fiadoInfo.upfrontPaid;
       }
     }
   }

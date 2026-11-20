@@ -9,6 +9,7 @@ export interface FiadoSaleInfo {
   dueDateFormatted: string; // "DD/MM/YYYY"
   amountOwed: number; // Quanto o cliente deve no fiado
   upfrontPaid: number; // Quanto foi pago de entrada no ato (se houver)
+  upfrontMethod?: string | null; // "PIX" | "DINHEIRO" | "CARTAO"
   paidAt: string | null;
   paidMethod: string | null;
   daysUntilDue: number; // < 0 atrasado, 0 vence hoje, > 0 no prazo
@@ -143,6 +144,7 @@ export function extractFiadoInfo(order: any): FiadoSaleInfo {
       dueDateFormatted: "",
       amountOwed: 0,
       upfrontPaid: orderTotal,
+      upfrontMethod: null,
       paidAt: null,
       paidMethod: null,
       daysUntilDue: 0,
@@ -155,9 +157,30 @@ export function extractFiadoInfo(order: any): FiadoSaleInfo {
   let dueDate = "";
   let amountOwed = orderTotal;
   let hasExplicitAmount = false;
+  let explicitUpfrontPaid: number | null = null;
+  let upfrontMethod: string | null = null;
   let paidAt: string | null = null;
   let paidMethod: string | null = null;
 
+  // 1. Checa atributos no nível do pedido
+  if (order.fiado_status === "PAGO" || order.fiadoStatus === "PAGO") status = "PAGO";
+  if (order.fiado_due_date || order.fiadoDueDate) dueDate = String(order.fiado_due_date || order.fiadoDueDate).slice(0, 10);
+  if (order.fiado_amount_owed !== undefined && order.fiado_amount_owed !== null) {
+    const parsed = Number(order.fiado_amount_owed);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      amountOwed = parsed;
+      hasExplicitAmount = true;
+    }
+  }
+  if (order.fiado_upfront_paid !== undefined && order.fiado_upfront_paid !== null) {
+    const parsed = Number(order.fiado_upfront_paid);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      explicitUpfrontPaid = parsed;
+    }
+  }
+  if (order.fiado_upfront_method) upfrontMethod = String(order.fiado_upfront_method);
+
+  // 2. Checa atributos nos itens do pedido
   if (Array.isArray(order.items)) {
     for (const item of order.items) {
       if (item && (item.is_fiado || item.isFiado || item.real_payment_method === "FIADO")) {
@@ -177,6 +200,16 @@ export function extractFiadoInfo(order: any): FiadoSaleInfo {
             hasExplicitAmount = true;
           }
         }
+        const rawUpfront = item.fiado_upfront_paid ?? item.fiadoUpfrontPaid;
+        if (rawUpfront !== undefined && rawUpfront !== null && explicitUpfrontPaid === null) {
+          const parsedUpfront = Number(rawUpfront);
+          if (Number.isFinite(parsedUpfront) && parsedUpfront >= 0) {
+            explicitUpfrontPaid = parsedUpfront;
+          }
+        }
+        if (item.fiado_upfront_method || item.fiadoUpfrontMethod) {
+          upfrontMethod = String(item.fiado_upfront_method || item.fiadoUpfrontMethod);
+        }
         if (item.fiado_paid_at || item.fiadoPaidAt) {
           paidAt = String(item.fiado_paid_at || item.fiadoPaidAt);
         }
@@ -188,7 +221,9 @@ export function extractFiadoInfo(order: any): FiadoSaleInfo {
   }
 
   const clampedOwed = Math.max(0, Math.min(orderTotal > 0 ? orderTotal : amountOwed, amountOwed));
-  const upfrontPaid = Math.max(0, Number((orderTotal - clampedOwed).toFixed(2)));
+  const upfrontPaid = explicitUpfrontPaid !== null 
+    ? explicitUpfrontPaid 
+    : Math.max(0, Number((orderTotal - clampedOwed).toFixed(2)));
   const daysUntilDue = dueDate ? calculateDaysUntilDue(dueDate) : 0;
   const isOverdue = status === "PENDENTE" && Boolean(dueDate) && daysUntilDue < 0;
   const isDueToday = status === "PENDENTE" && Boolean(dueDate) && daysUntilDue === 0;
@@ -199,7 +234,8 @@ export function extractFiadoInfo(order: any): FiadoSaleInfo {
     dueDate,
     dueDateFormatted: formatIsoDateBR(dueDate),
     amountOwed: Number(clampedOwed.toFixed(2)),
-    upfrontPaid,
+    upfrontPaid: Number(upfrontPaid.toFixed(2)),
+    upfrontMethod,
     paidAt,
     paidMethod,
     daysUntilDue,

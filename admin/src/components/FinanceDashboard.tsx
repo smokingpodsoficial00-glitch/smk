@@ -67,7 +67,7 @@ import { ManualSaleModal } from "./ManualSaleModal";
 import { WeeklyGoalsModal } from "./WeeklyGoalsModal";
 import { NewTransactionModal } from "./partners/NewTransactionModal";
 import { isOrderNational, extractNationalInfo } from "@/lib/nationalSales";
-import { isOrderFiadoPending } from "@/lib/fiadoSales";
+import { isOrderFiadoPending, extractFiadoInfo } from "@/lib/fiadoSales";
 import { isCaixaRealReset, setCaixaRealReset } from "@/lib/financialCycles";
 import {
   type WeeklyGoalsConfig,
@@ -3473,7 +3473,13 @@ export default function FinanceDashboard({
                         <div className="flex items-center gap-2 flex-wrap">
                           {isFiado && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                              Fiado a Receber
+                              {(() => {
+                                const info = extractFiadoInfo(order);
+                                if (info.upfrontPaid > 0) {
+                                  return `Fiado (Entrada: ${formatBRL(info.upfrontPaid)} / Restante: ${formatBRL(info.amountOwed)})`;
+                                }
+                                return `Fiado a Receber (${formatBRL(info.amountOwed)})`;
+                              })()}
                             </span>
                           )}
                           {isNational && (

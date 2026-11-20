@@ -47,6 +47,8 @@ export interface AdminOrder {
  fiadoDueDate?: string;
  fiadoDueDateFormatted?: string;
  fiadoAmountOwed?: number;
+ fiadoUpfrontPaid?: number;
+ fiadoUpfrontMethod?: string | null;
  fiadoPaidAt?: string | null;
  fiadoPaidMethod?: string | null;
  fiadoDaysUntilDue?: number;
@@ -177,6 +179,8 @@ export default function KanbanBoard() {
  fiadoDueDate: fiadoInfo.dueDate,
  fiadoDueDateFormatted: fiadoInfo.dueDateFormatted,
  fiadoAmountOwed: fiadoInfo.amountOwed,
+ fiadoUpfrontPaid: fiadoInfo.upfrontPaid,
+ fiadoUpfrontMethod: fiadoInfo.upfrontMethod,
  fiadoPaidAt: fiadoInfo.paidAt,
  fiadoPaidMethod: fiadoInfo.paidMethod,
  fiadoDaysUntilDue: fiadoInfo.daysUntilDue,
@@ -1101,7 +1105,9 @@ export default function KanbanBoard() {
  const cleanPhone = (order.phone || '').replace(/\D/g, '');
  const whatsappPhone = cleanPhone ? (cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`) : '';
  const itemsSummary = order.items.map(i => `${i.quantity}x ${i.flavor} (${i.model})`).join(', ');
- const whatsappMessage = `Olá ${order.clientName}! Tudo bem? Passando para lembrar do pagamento referente ao seu pedido #${order.id} (${itemsSummary}) no valor de ${formatBRL(amountOwed)}, combinado para ${order.fiadoDueDateFormatted || 'hoje'}. Posso te enviar a chave Pix?`;
+ const whatsappMessage = (order.fiadoUpfrontPaid && order.fiadoUpfrontPaid > 0)
+ ? `Olá ${order.clientName}! Tudo bem? Passando para lembrar do valor restante referente ao seu pedido #${order.id} (${itemsSummary}). Foi paga a entrada de ${formatBRL(order.fiadoUpfrontPaid)} e ficou o restante de ${formatBRL(amountOwed)} combinado para ${order.fiadoDueDateFormatted || 'hoje'}. Posso te enviar a chave Pix?`
+ : `Olá ${order.clientName}! Tudo bem? Passando para lembrar do pagamento referente ao seu pedido #${order.id} (${itemsSummary}) no valor de ${formatBRL(amountOwed)}, combinado para ${order.fiadoDueDateFormatted || 'hoje'}. Posso te enviar a chave Pix?`;
  const payMethodChoice = selectedFiadoPayMethod[order.realId] || 'PIX';
 
  return (
@@ -1186,11 +1192,16 @@ export default function KanbanBoard() {
 
  <div>
  <span className="text-[10px] uppercase font-semibold text-muted-foreground block">
- Valor a Pagar
+ {order.fiadoUpfrontPaid && order.fiadoUpfrontPaid > 0 ? "Restante a Pagar" : "Valor a Pagar"}
  </span>
- <div className="text-lg font-bold text-emerald-400 mt-0.5">
+ <div className="text-lg font-bold text-amber-400 mt-0.5">
  {formatBRL(amountOwed)}
  </div>
+ {order.fiadoUpfrontPaid && order.fiadoUpfrontPaid > 0 && (
+ <span className="text-[10px] text-emerald-400 block font-medium">
+ (Entrada: {formatBRL(order.fiadoUpfrontPaid)} paga)
+ </span>
+ )}
  </div>
  </div>
 

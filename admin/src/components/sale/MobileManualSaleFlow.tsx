@@ -153,6 +153,8 @@ export function MobileManualSaleFlow({
   const [paymentMethod, setPaymentMethod] = useState<"PIX" | "DINHEIRO" | "CARTAO" | "FIADO">("PIX");
   const [fiadoDueDate, setFiadoDueDate] = useState<string>(() => getFutureDateIso(7));
   const [fiadoIncludesShipping, setFiadoIncludesShipping] = useState<boolean>(true);
+  const [fiadoPaidUpfront, setFiadoPaidUpfront] = useState<string>("");
+  const [fiadoUpfrontMethod, setFiadoUpfrontMethod] = useState<"PIX" | "DINHEIRO" | "CARTAO">("PIX");
   const [shippingFee, setShippingFee] = useState<string>("0");
   const [shippingCost, setShippingCost] = useState<string>("0");
   const [autoAddToMarketingList, setAutoAddToMarketingList] = useState(true);
@@ -559,9 +561,18 @@ export function MobileManualSaleFlow({
   const grandTotal = subtotal + numericShippingFee;
   const estimatedProfit = subtotal - totalCost + (numericShippingFee - numericShippingCost);
 
-  const fiadoAmountOwedCalc = useMemo(() => {
+  const numericUpfrontPaid = useMemo(() => {
+    const raw = parseFloat(fiadoPaidUpfront.replace(",", ".")) || 0;
+    return Math.max(0, raw);
+  }, [fiadoPaidUpfront]);
+
+  const fiadoBaseTotal = useMemo(() => {
     return fiadoIncludesShipping ? grandTotal : subtotal;
   }, [fiadoIncludesShipping, grandTotal, subtotal]);
+
+  const fiadoAmountOwedCalc = useMemo(() => {
+    return Math.max(0, Number((fiadoBaseTotal - numericUpfrontPaid).toFixed(2)));
+  }, [fiadoBaseTotal, numericUpfrontPaid]);
 
   // Validação para avançar do Passo 1 para o Passo 2
   const handleProceedToProducts = () => {
@@ -657,6 +668,8 @@ export function MobileManualSaleFlow({
             fiado_status: "PENDENTE",
             fiado_due_date: fiadoDueDate,
             fiado_amount_owed: Number(numericFiadoOwed.toFixed(2)),
+            fiado_upfront_paid: Number(numericUpfrontPaid.toFixed(2)),
+            fiado_upfront_method: numericUpfrontPaid > 0 ? fiadoUpfrontMethod : undefined,
             fiado_includes_shipping: Boolean(fiadoIncludesShipping),
           }),
           ...(isNationalSale && {
@@ -1547,11 +1560,111 @@ export function MobileManualSaleFlow({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs pt-2 border-t border-white/5">
-                    <span className="text-zinc-400">Total a receber no fiado:</span>
-                    <span className="font-bold text-white">
-                      R$ {fiadoAmountOwedCalc.toFixed(2).replace(".", ",")}
-                    </span>
+                  {/* Campo de Entrada / Pagamento Parcial no Ato */}
+                  <div className="pt-2 border-t border-white/10 space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] text-zinc-300 font-medium">
+                          Quanto foi pago agora? (Entrada)
+                        </label>
+                        {numericUpfrontPaid > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setFiadoPaidUpfront("")}
+                            className="text-[10px] text-zinc-400 hover:text-white"
+                          >
+                            Zerar entrada
+                          </button>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-white/40">
+                          R$
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={fiadoPaidUpfront}
+                          onChange={(e) => setFiadoPaidUpfront(e.target.value.replace(/[^0-9.,]/g, ""))}
+                          placeholder="0,00 (Ex: 50,00)"
+                          className="w-full bg-[#1c1c20] border border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50 font-bold placeholder:text-zinc-600"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className="text-[10px] text-zinc-500">Atalhos:</span>
+                        <button
+                          type="button"
+                          onClick={() => setFiadoPaidUpfront((fiadoBaseTotal * 0.3).toFixed(2).replace(".", ","))}
+                          className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-zinc-300 border border-white/10"
+                        >
+                          30% (R$ {(fiadoBaseTotal * 0.3).toFixed(2).replace(".", ",")})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFiadoPaidUpfront((fiadoBaseTotal * 0.5).toFixed(2).replace(".", ","))}
+                          className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-zinc-300 border border-white/10"
+                        >
+                          50% (R$ {(fiadoBaseTotal * 0.5).toFixed(2).replace(".", ",")})
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] text-zinc-300 font-medium block mb-1">
+                        Forma da Entrada {numericUpfrontPaid > 0 ? "(Entra no Caixa)" : "(se houver)"}
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(["PIX", "DINHEIRO", "CARTAO"] as const).map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setFiadoUpfrontMethod(m)}
+                            disabled={numericUpfrontPaid <= 0}
+                            className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all text-center ${
+                              numericUpfrontPaid <= 0
+                                ? "opacity-30 cursor-not-allowed bg-black/20 text-zinc-600 border-white/5"
+                                : fiadoUpfrontMethod === m
+                                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                                : "bg-[#1c1c20] text-zinc-400 border-white/10"
+                            }`}
+                          >
+                            {m === "CARTAO" ? "Cartão" : m === "DINHEIRO" ? "Dinheiro" : "Pix"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Resumo da Divisão */}
+                  <div className="pt-2 border-t border-white/10 space-y-1.5 text-xs">
+                    {numericUpfrontPaid > 0 ? (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span>Total da Venda:</span>
+                          <span className="font-semibold text-white">R$ {grandTotal.toFixed(2).replace(".", ",")}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-emerald-400 font-medium">
+                          <span>Pago agora ({fiadoUpfrontMethod}):</span>
+                          <span className="font-bold">
+                            R$ {numericUpfrontPaid.toFixed(2).replace(".", ",")}
+                            <span className="text-[10px] text-emerald-300/80 font-normal ml-1">(Entra no Caixa)</span>
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-amber-300 font-bold bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-xl">
+                          <span>Restante no fiado ({formatIsoDateBR(fiadoDueDate)}):</span>
+                          <span className="text-sm font-black text-amber-300">
+                            R$ {fiadoAmountOwedCalc.toFixed(2).replace(".", ",")}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-400">Total a receber no fiado ({formatIsoDateBR(fiadoDueDate)}):</span>
+                        <span className="font-bold text-white text-sm">
+                          R$ {fiadoAmountOwedCalc.toFixed(2).replace(".", ",")}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

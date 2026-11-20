@@ -108,6 +108,8 @@ export function ManualSaleModal({
   const [paymentMethod, setPaymentMethod] = useState("PIX");
   const [fiadoDueDate, setFiadoDueDate] = useState<string>(() => getFutureDateIso(7));
   const [fiadoIncludesShipping, setFiadoIncludesShipping] = useState<boolean>(true);
+  const [fiadoPaidUpfront, setFiadoPaidUpfront] = useState<string>("");
+  const [fiadoUpfrontMethod, setFiadoUpfrontMethod] = useState<"PIX" | "DINHEIRO" | "CARTAO">("PIX");
   const [shippingFee, setShippingFee] = useState<string>("0"); // Cobrado do cliente
   const [shippingCost, setShippingCost] = useState<string>("0"); // Custo real pago ao motoboy/Uber
   const [autoAddToMarketingList, setAutoAddToMarketingList] = useState(true);
@@ -477,10 +479,21 @@ export function ManualSaleModal({
   // Lucro Total Líquido
   const estimatedProfit = productProfit + shippingProfit;
 
-  // Valor devido no fiado: se inclui frete, grandTotal; se frete adiantado, apenas subtotal dos produtos
-  const fiadoAmountOwedCalc = useMemo(() => {
+  // Entrada paga agora no fiado
+  const numericUpfrontPaid = useMemo(() => {
+    const raw = parseFloat(fiadoPaidUpfront.replace(",", ".")) || 0;
+    return Math.max(0, raw);
+  }, [fiadoPaidUpfront]);
+
+  // Base a cobrar no fiado antes de descontar a entrada (com ou sem frete)
+  const fiadoBaseTotal = useMemo(() => {
     return fiadoIncludesShipping ? grandTotal : subtotal;
   }, [fiadoIncludesShipping, grandTotal, subtotal]);
+
+  // Valor devido restante no fiado após abater a entrada
+  const fiadoAmountOwedCalc = useMemo(() => {
+    return Math.max(0, Number((fiadoBaseTotal - numericUpfrontPaid).toFixed(2)));
+  }, [fiadoBaseTotal, numericUpfrontPaid]);
 
   // Cliente Selecionado a partir de smoking_clients
   const selectedClient = useMemo(() => {
@@ -676,6 +689,8 @@ export function ManualSaleModal({
             fiado_status: "PENDENTE",
             fiado_due_date: fiadoDueDate,
             fiado_amount_owed: Number(numericFiadoOwed.toFixed(2)),
+            fiado_upfront_paid: Number(numericUpfrontPaid.toFixed(2)),
+            fiado_upfront_method: numericUpfrontPaid > 0 ? fiadoUpfrontMethod : undefined,
             fiado_includes_shipping: Boolean(fiadoIncludesShipping),
           }),
           ...(isNationalSale && {
@@ -799,6 +814,8 @@ export function ManualSaleModal({
         setPaymentMethod("PIX");
         setFiadoDueDate(getFutureDateIso(7));
         setFiadoIncludesShipping(true);
+        setFiadoPaidUpfront("");
+        setFiadoUpfrontMethod("PIX");
         setSuccessMessage("");
       }, 1000);
     } catch (err: any) {
@@ -1566,16 +1583,133 @@ export function ManualSaleModal({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs pt-1 border-t border-white/5">
-                    <span className="text-muted-foreground">Valor a receber no fiado:</span>
-                    <span className="font-bold text-white">
-                      R$ {fiadoAmountOwedCalc.toFixed(2).replace(".", ",")}
-                      {!fiadoIncludesShipping && numericShippingFee > 0 && (
-                        <span className="text-[10px] text-emerald-400 ml-1.5 font-normal">
-                          (+ R$ {numericShippingFee.toFixed(2).replace(".", ",")} frete pago agora)
+                  {/* Campo de Entrada / Pagamento Parcial no Ato */}
+                  <div className="pt-2 border-t border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] text-silver font-medium">
+                          Quanto foi pago agora? (Entrada)
+                        </label>
+                        {numericUpfrontPaid > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setFiadoPaidUpfront("")}
+                            className="text-[10px] text-white/40 hover:text-white transition-colors cursor-pointer"
+                          >
+                            Zerar entrada
+                          </button>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-white/40">
+                          R$
                         </span>
-                      )}
-                    </span>
+                        <input
+                          type="text"
+                          value={fiadoPaidUpfront}
+                          onChange={(e) => setFiadoPaidUpfront(e.target.value.replace(/[^0-9.,]/g, ""))}
+                          placeholder="0,00 (Ex: 50,00)"
+                          className="w-full bg-black/50 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-400 font-bold placeholder:text-white/20"
+                        />
+                      </div>
+                      {/* Atalhos rápidos de entrada */}
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <span className="text-[10px] text-white/30">Atalhos:</span>
+                        <button
+                          type="button"
+                          onClick={() => setFiadoPaidUpfront((fiadoBaseTotal * 0.3).toFixed(2).replace(".", ","))}
+                          className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/10 transition-colors cursor-pointer"
+                        >
+                          30% (R$ {(fiadoBaseTotal * 0.3).toFixed(2).replace(".", ",")})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFiadoPaidUpfront((fiadoBaseTotal * 0.5).toFixed(2).replace(".", ","))}
+                          className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/10 transition-colors cursor-pointer"
+                        >
+                          50% (R$ {(fiadoBaseTotal * 0.5).toFixed(2).replace(".", ",")})
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] text-silver font-medium block mb-1">
+                        Forma da Entrada {numericUpfrontPaid > 0 ? "(Recebida no Caixa)" : "(se houver)"}
+                      </label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {(["PIX", "DINHEIRO", "CARTAO"] as const).map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setFiadoUpfrontMethod(m)}
+                            disabled={numericUpfrontPaid <= 0}
+                            className={`py-2 px-2 rounded-xl text-[11px] font-bold border transition-all text-center cursor-pointer ${
+                              numericUpfrontPaid <= 0
+                                ? "opacity-40 cursor-not-allowed bg-black/20 text-white/30 border-white/5"
+                                : fiadoUpfrontMethod === m
+                                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm"
+                                : "bg-black/30 text-white/50 border-white/10 hover:text-white"
+                            }`}
+                          >
+                            {m === "CARTAO" ? "Cartão" : m === "DINHEIRO" ? "Dinheiro" : "Pix"}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-white/40 mt-1.5">
+                        {numericUpfrontPaid > 0
+                          ? `R$ ${numericUpfrontPaid.toFixed(2).replace(".", ",")} entra no Caixa Real via ${fiadoUpfrontMethod}.`
+                          : "Digite o valor pago agora para definir a forma da entrada."}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Resumo da Divisão: Pago Agora vs Restante no Fiado */}
+                  <div className="pt-2.5 border-t border-white/10 space-y-1.5 text-xs">
+                    {numericUpfrontPaid > 0 ? (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-white/60">
+                          <span>Total da Venda:</span>
+                          <span className="font-semibold text-white">
+                            R$ {grandTotal.toFixed(2).replace(".", ",")}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-emerald-400 font-medium">
+                          <span className="flex items-center gap-1.5">
+                            <span className="size-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />
+                            Pago agora no ato ({fiadoUpfrontMethod}):
+                          </span>
+                          <span className="font-bold">
+                            R$ {numericUpfrontPaid.toFixed(2).replace(".", ",")}
+                            <span className="text-[10px] text-emerald-300/80 font-normal ml-1">
+                              (Entra no Caixa Real)
+                            </span>
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-amber-300 font-bold bg-amber-500/10 border border-amber-500/25 px-3 py-2 rounded-xl">
+                          <span className="flex items-center gap-1.5 text-xs">
+                            <Calendar className="size-3.5 text-amber-400" />
+                            Restante a receber no fiado ({formatIsoDateBR(fiadoDueDate)}):
+                          </span>
+                          <span className="text-sm font-black text-amber-300">
+                            R$ {fiadoAmountOwedCalc.toFixed(2).replace(".", ",")}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          Valor total a receber no fiado ({formatIsoDateBR(fiadoDueDate)}):
+                        </span>
+                        <span className="font-bold text-white text-sm">
+                          R$ {fiadoAmountOwedCalc.toFixed(2).replace(".", ",")}
+                          {!fiadoIncludesShipping && numericShippingFee > 0 && (
+                            <span className="text-[10px] text-emerald-400 ml-1.5 font-normal">
+                              (+ R$ {numericShippingFee.toFixed(2).replace(".", ",")} frete pago agora)
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

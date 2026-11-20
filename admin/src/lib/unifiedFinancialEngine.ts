@@ -23,7 +23,7 @@ import {
   MONTH_NAMES
 } from "./financialCycles";
 import { isOrderNational, extractNationalInfo } from "./nationalSales";
-import { isOrderFiadoPending } from "./fiadoSales";
+import { isOrderFiadoPending, extractFiadoInfo } from "./fiadoSales";
 import {
   type Partner,
   type PartnerTransaction,
@@ -224,7 +224,8 @@ export function extractOrdersContext(orders: any[] = []): {
   for (const o of validOrders) {
     if (isOrderFiadoPending(o)) {
       pendingFiadoOrders.push(o);
-      totalFiadoPending += Number(parseFloat(o.total_amount || 0).toFixed(2)) || 0;
+      const fiadoInfo = extractFiadoInfo(o);
+      totalFiadoPending += fiadoInfo.amountOwed;
     } else {
       paidOrders.push(o);
     }
@@ -340,16 +341,34 @@ export function calculateRealCashOverview(params: {
   const recentInflows: RealCashInflowItem[] = [];
   const recentOutflows: RealCashOutflowItem[] = [];
 
-  // 1. Entradas: Vendas Efetivamente Recebidas (exclui pedidos cancelados e fiados pendentes)
+  // 1. Entradas: Vendas Efetivamente Recebidas (exclui pedidos cancelados; fiados pendentes entram com a entrada paga no ato)
   for (const o of orders) {
     if (!o) continue;
     const isCancelled = o.delivery_status === "CANCELADO" || o.status === "CANCELADO";
-    const isPendingFiado = isOrderFiadoPending(o);
-    if (isCancelled || isPendingFiado) continue;
+    if (isCancelled) continue;
 
     const rawDate = o.created_at || o.date;
     const orderTime = rawDate ? new Date(rawDate).getTime() : 0;
     if (cleanSlateTimestamp > 0 && orderTime < cleanSlateTimestamp) continue;
+
+    const isPendingFiado = isOrderFiadoPending(o);
+    const fiadoInfo = isPendingFiado ? extractFiadoInfo(o) : null;
+
+    // Se for fiado em aberto, o caixa recebe apenas o valor da entrada paga no ato (se houver)
+    if (isPendingFiado) {
+      const upfront = fiadoInfo?.upfrontPaid || 0;
+      if (upfront > 0) {
+        paidOrdersRevenue += upfront;
+        recentInflows.push({
+          id: o.id || `order_${recentInflows.length}`,
+          date: rawDate ? rawDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+          type: 'VENDA',
+          description: `Entrada Fiado ${o.client_name ? `- ${o.client_name}` : ''}`.trim(),
+          amount: upfront,
+        });
+      }
+      continue;
+    }
 
     // Receita de produtos retida na empresa (frete local de motoboy é repassado ao entregador)
     const shippingFee = parseFloat(o.shipping_fee || 0);
