@@ -90,8 +90,14 @@ export interface RealCashOverview {
   recentInflows: RealCashInflowItem[];
   recentOutflows: RealCashOutflowItem[];
   cleanSlateActive: boolean;
+  // Subdivisão analítica da composição do Caixa Real
+  cashStockCost: number; // Custo de reposição (CMV de vendas retido no caixa para recompras)
+  cashNetProfit: number; // Lucro líquido real (fatia de lucro livre no caixa)
+  cashStockCostPct: number; // % do caixa destinado à reposição
+  cashNetProfitPct: number; // % do caixa que é lucro líquido livre
   breakdown: {
     paidOrdersRevenue: number;
+    paidOrdersCost: number; // CMV total das vendas computadas no caixa
     cashCapitalAportes: number;
     stockRepurchasesPaid: number;
     stockFreightPaid: number;
@@ -326,10 +332,12 @@ export function calculateRealCashOverview(params: {
   repurchases: any[];
   partnerTransactions: any[];
   cleanSlateTimestamp?: number;
+  persistedCosts?: Record<string, number>;
 }): RealCashOverview {
-  const { orders = [], repurchases = [], partnerTransactions = [], cleanSlateTimestamp = 0 } = params;
+  const { orders = [], repurchases = [], partnerTransactions = [], cleanSlateTimestamp = 0, persistedCosts = {} } = params;
 
   let paidOrdersRevenue = 0;
+  let paidOrdersCost = 0; // CMV acumulado dos pedidos recebidos no caixa
   let cashCapitalAportes = 0;
   let stockRepurchasesPaid = 0;
   let stockFreightPaid = 0;
@@ -340,6 +348,25 @@ export function calculateRealCashOverview(params: {
 
   const recentInflows: RealCashInflowItem[] = [];
   const recentOutflows: RealCashOutflowItem[] = [];
+
+  // Helper local para resolver o custo unitário (CMV) de um item
+  const resolveItemUnitCost = (item: any): number => {
+    const rawCost = Number(item?.cost_price ?? item?.unit_cost ?? 0);
+    if (rawCost > 0) return rawCost;
+    const prodId = item?.product_id || item?.id;
+    if (prodId && persistedCosts[prodId] && Number(persistedCosts[prodId]) > 0) {
+      return Number(persistedCosts[prodId]);
+    }
+    const name = String(item?.name || item?.product_name || "").toLowerCase().trim();
+    if (name) {
+      for (const [key, val] of Object.entries(persistedCosts)) {
+        if (key.toLowerCase().trim() === name && Number(val) > 0) {
+          return Number(val);
+        }
+      }
+    }
+    return 0;
+  };
 
   // 1. Entradas: Vendas Efetivamente Recebidas (exclui pedidos cancelados; fiados pendentes entram com a entrada paga no ato)
   for (const o of orders) {
@@ -354,11 +381,38 @@ export function calculateRealCashOverview(params: {
     const isPendingFiado = isOrderFiadoPending(o);
     const fiadoInfo = isPendingFiado ? extractFiadoInfo(o) : null;
 
+    // Calcular CMV total dos itens deste pedido
+    const items = Array.isArray(o.items) ? o.items : [];
+    let orderCMV = 0;
+    let prodRevenue = 0;
+
+    if (items.length > 0) {
+      for (const item of items) {
+        const qty = Number(item.quantity) || 1;
+        const itemPrice = Number(item.price || item.unit_price) || 0;
+        prodRevenue += qty * itemPrice;
+        orderCMV += qty * resolveItemUnitCost(item);
+      }
+    } else {
+      const shippingFee = parseFloat(o.shipping_fee || 0);
+      const isNational = isOrderNational(o);
+      const motoboyFee = isNational ? 0 : shippingFee;
+      const totalAmt = Number(parseFloat(o.total_amount || 0).toFixed(2)) || 0;
+      prodRevenue = Math.max(0, totalAmt - motoboyFee);
+      // Sem itens detalhados, estimar CMV se orderCMV ainda for 0
+      const directCost = Number(o.cost_amount || o.cmv || 0);
+      orderCMV = directCost > 0 ? directCost : 0;
+    }
+
     // Se for fiado em aberto, o caixa recebe apenas o valor da entrada paga no ato (se houver)
     if (isPendingFiado) {
       const upfront = fiadoInfo?.upfrontPaid || 0;
       if (upfront > 0) {
         paidOrdersRevenue += upfront;
+        // Alocar proporção da entrada paga para cobrir primeiro o custo de reposição
+        const proportionalCost = prodRevenue > 0 ? Math.min(upfront, (orderCMV / prodRevenue) * upfront) : Math.min(upfront, orderCMV);
+        paidOrdersCost += proportionalCost;
+
         recentInflows.push({
           id: o.id || `order_${recentInflows.length}`,
           date: rawDate ? rawDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
@@ -374,32 +428,17 @@ export function calculateRealCashOverview(params: {
     const shippingFee = parseFloat(o.shipping_fee || 0);
     const isNational = isOrderNational(o);
     let nationalShippingProfit = 0;
-    let motoboyShippingFee = 0;
     if (isNational) {
       const info = extractNationalInfo(o);
       const shipCharged = info.shippingFeeCharged || shippingFee;
       const shipCost = info.shippingCostReal || 0;
       nationalShippingProfit = Math.max(0, shipCharged - shipCost);
-    } else {
-      motoboyShippingFee = shippingFee;
-    }
-
-    let prodRevenue = 0;
-    const items = Array.isArray(o.items) ? o.items : [];
-    if (items.length > 0) {
-      for (const item of items) {
-        const qty = Number(item.quantity) || 1;
-        const itemPrice = Number(item.price || item.unit_price) || 0;
-        prodRevenue += qty * itemPrice;
-      }
-    } else {
-      const totalAmt = Number(parseFloat(o.total_amount || 0).toFixed(2)) || 0;
-      prodRevenue = Math.max(0, totalAmt - motoboyShippingFee);
     }
 
     const orderCashRetained = Number((prodRevenue + nationalShippingProfit).toFixed(2));
     if (orderCashRetained > 0) {
       paidOrdersRevenue += orderCashRetained;
+      paidOrdersCost += orderCMV;
       recentInflows.push({
         id: o.id || `order_${recentInflows.length}`,
         date: rawDate ? rawDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
@@ -547,6 +586,29 @@ export function calculateRealCashOverview(params: {
   // SALDO REAL: NÃO ESCONDER NÚMEROS NEGATIVOS COM Math.max(0)
   const realCash = Number((totalInflows - totalOutflows).toFixed(2));
 
+  // ── SUBDIVISÃO MATEMÁTICA DO CAIXA REAL: CUSTO DE REPOSIÇÃO vs LUCRO LÍQUIDO REAL ──
+  // Recompras pagas pelo caixa consom prioritariamente a provisão de custo de mercadoria
+  const totalRepurchasesPaid = Number((stockRepurchasesPaid + stockFreightPaid).toFixed(2));
+  const unspentStockCost = Number(Math.max(0, paidOrdersCost - totalRepurchasesPaid).toFixed(2));
+
+  // O custo de reposição no caixa não pode exceder o saldo real disponível (se caixa for positivo)
+  let cashStockCost = 0;
+  let cashNetProfit = 0;
+
+  if (realCash > 0) {
+    cashStockCost = Number(Math.min(realCash, unspentStockCost).toFixed(2));
+    // Lucro líquido real livre no caixa = Saldo real - Custo retido para reposição
+    // Garante que cashStockCost + cashNetProfit === realCash exatamente no centavo
+    cashNetProfit = Number((realCash - cashStockCost).toFixed(2));
+  } else {
+    // Se o caixa estiver negativo ou zerado, não há dinheiro líquido livre nem de custo
+    cashStockCost = 0;
+    cashNetProfit = realCash;
+  }
+
+  const cashStockCostPct = realCash > 0 ? Number(((cashStockCost / realCash) * 100).toFixed(1)) : 0;
+  const cashNetProfitPct = realCash > 0 ? Number(((cashNetProfit / realCash) * 100).toFixed(1)) : 0;
+
   return {
     realCash,
     isNegative: realCash < 0,
@@ -557,8 +619,13 @@ export function calculateRealCashOverview(params: {
     recentInflows: recentInflows.sort((a, b) => b.date.localeCompare(a.date)),
     recentOutflows: recentOutflows.sort((a, b) => b.date.localeCompare(a.date)),
     cleanSlateActive: cleanSlateTimestamp > 0,
+    cashStockCost,
+    cashNetProfit,
+    cashStockCostPct,
+    cashNetProfitPct,
     breakdown: {
       paidOrdersRevenue: Number(paidOrdersRevenue.toFixed(2)),
+      paidOrdersCost: Number(paidOrdersCost.toFixed(2)),
       cashCapitalAportes: Number(cashCapitalAportes.toFixed(2)),
       stockRepurchasesPaid: Number(stockRepurchasesPaid.toFixed(2)),
       stockFreightPaid: Number(stockFreightPaid.toFixed(2)),
@@ -944,6 +1011,7 @@ export function calculateUnifiedFinancials(params: {
     repurchases,
     partnerTransactions,
     cleanSlateTimestamp,
+    persistedCosts,
   });
 
   // 4. Patrimônio Operacional Integrado

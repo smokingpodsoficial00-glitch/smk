@@ -5,6 +5,7 @@ import {
   TrendingUp,
   Truck,
   Box,
+  Package,
   Loader2,
   PieChart,
   ShoppingBag,
@@ -2869,37 +2870,86 @@ export default function FinanceDashboard({
       {/* ━━━ ABA 1: VISÃO GERAL (CAIXA REAL, CICLO ATUAL, ESTOQUE NA PRATELEIRA & EFICIÊNCIA COMERCIAL) ━━━ */}
       {mainTab === "visao-geral" && (
         <div className="space-y-6">
-        {/* ━━━ CAIXA REAL OFICIAL (DESTAQUE NO TOPO) ━━━ */}
-        <div className={`p-6 rounded-3xl border-2 space-y-3 relative overflow-hidden shadow-xl transition-all ${
-          unified.cash.isNegative
-            ? "bg-rose-500/10 border-rose-500/40"
-            : "bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-black/80 border-emerald-500/40 shadow-emerald-950/20"
-        }`}>
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <span className={`text-xs font-black uppercase tracking-wider flex items-center gap-2 ${
-              unified.cash.isNegative ? "text-rose-400" : "text-emerald-400"
-            }`}>
-              <Wallet className="size-5" />
-              <span>Caixa Real Oficial da Empresa</span>
-            </span>
-            <span className={`text-[11px] font-bold px-3 py-1 rounded-full border ${
-              unified.cash.isNegative
-                ? "bg-rose-500/20 text-rose-300 border-rose-500/30"
-                : "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-            }`}>
-              {unified.cash.isNegative ? "Déficit Real em Caixa" : "Superávit Real em Caixa"}
-            </span>
+        {/* ━━━ CAIXA REAL OFICIAL & SUBDIVISÃO DE REPOSIÇÃO E LUCRO (3 CARDS LADO A LADO) ━━━ */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4">
+          {/* Card 1: Caixa Real Oficial */}
+          <div className={`p-5 sm:p-6 rounded-3xl border-2 space-y-3 relative overflow-hidden shadow-xl transition-all ${
+            unified.cash.isNegative
+              ? "bg-rose-500/10 border-rose-500/40"
+              : "bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-black/80 border-emerald-500/40 shadow-emerald-950/20"
+          }`}>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className={`text-xs font-black uppercase tracking-wider flex items-center gap-2 ${
+                unified.cash.isNegative ? "text-rose-400" : "text-emerald-400"
+              }`}>
+                <Wallet className="size-5" />
+                <span>Caixa Real Oficial</span>
+              </span>
+              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                unified.cash.isNegative
+                  ? "bg-rose-500/20 text-rose-300 border-rose-500/30"
+                  : "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+              }`}>
+                {unified.cash.isNegative ? "Déficit Real" : "Superávit Real"}
+              </span>
+            </div>
+
+            <div className="pt-1">
+              <div className={`text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight ${
+                unified.cash.isNegative ? "text-rose-400" : "text-emerald-300"
+              }`}>
+                {formatBRL(unified.cash.realCash)}
+              </div>
+              <p className="text-[11px] text-white/50 mt-1.5 leading-snug">
+                Liquidez total disponível em dinheiro líquido na empresa.
+              </p>
+            </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 pt-1">
-            <div className={`text-3xl sm:text-4xl font-black tracking-tight ${
-              unified.cash.isNegative ? "text-rose-400" : "text-emerald-300"
-            }`}>
-              {formatBRL(unified.cash.realCash)}
+          {/* Card 2: Custo de Reposição no Caixa */}
+          <div className="bg-[#0e0e10] border border-amber-500/30 hover:border-amber-500/50 rounded-3xl p-5 sm:p-6 space-y-3 relative overflow-hidden shadow-xl transition-all">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-xs font-black uppercase tracking-wider flex items-center gap-2 text-amber-400">
+                <Package className="size-5" />
+                <span>Custo Reposição (Caixa)</span>
+              </span>
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-500/10 text-amber-300 border-amber-500/30">
+                {unified.cash.realCash > 0 ? `${unified.cash.cashStockCostPct}% do caixa` : "Fundo de Giro"}
+              </span>
             </div>
-            <p className="text-xs text-white/50">
-              Posição real de liquidez disponível em dinheiro líquido apurada por transações efetivas.
-            </p>
+
+            <div className="pt-1">
+              <div className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-amber-300">
+                {formatBRL(unified.cash.cashStockCost)}
+              </div>
+              <p className="text-[11px] text-white/50 mt-1.5 leading-snug">
+                Fatia retida no caixa para recompra dos pods vendidos.
+              </p>
+            </div>
+          </div>
+
+          {/* Card 3: Lucro Líquido Real no Caixa */}
+          <div className="bg-[#0e0e10] border border-emerald-500/30 hover:border-emerald-500/50 rounded-3xl p-5 sm:p-6 space-y-3 relative overflow-hidden shadow-xl transition-all">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-xs font-black uppercase tracking-wider flex items-center gap-2 text-emerald-400">
+                <TrendingUp className="size-5" />
+                <span>Lucro Líquido Real (Caixa)</span>
+              </span>
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-300 border-emerald-500/30">
+                {unified.cash.realCash > 0 ? `${unified.cash.cashNetProfitPct}% do caixa` : "Margem Livre"}
+              </span>
+            </div>
+
+            <div className="pt-1">
+              <div className={`text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight ${
+                unified.cash.cashNetProfit < 0 ? "text-rose-400" : "text-emerald-300"
+              }`}>
+                {formatBRL(unified.cash.cashNetProfit)}
+              </div>
+              <p className="text-[11px] text-white/50 mt-1.5 leading-snug">
+                Lucro limpo disponível no caixa para pró-labore ou sócios.
+              </p>
+            </div>
           </div>
         </div>
 
