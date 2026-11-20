@@ -512,8 +512,8 @@ function Menu({ onBackToHub }: { onBackToHub: () => void }) {
 
     const top4 = starredAll.slice(0, 4);
 
-    // Seção Todos os Produtos: Todos os modelos RESTANTES (sem os 4 que já estão no topo)
-    const rest = baseList.filter(m => !top4.some(top => top.name === m.name));
+    // Seção Todos os Produtos: Todos os modelos da marca (incluindo os Mais Vendidos como clone em sua respectiva marca)
+    const rest = baseList;
     
     let sortedRest = rest;
     if (sortBy === 'price-asc') {
