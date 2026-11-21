@@ -5,7 +5,7 @@ import { useCart } from "@/lib/cart";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { BrandDropdown } from "@/components/BrandDropdown";
 import { SortDropdown, type SortOption } from "@/components/SortDropdown";
-import { PromoSlider } from "@/components/PromoSlider";
+import { BlackFridayBanner } from "@/components/BlackFridayBanner";
 
 interface HeroProps {
   query: string;
@@ -88,8 +88,8 @@ export function Hero({
         </p>
       </div>
 
-      {/* Banner Deslizante de Descontos & Incentivo de Grupo / Indicação */}
-      <PromoSlider />
+      {/* Banner Oficial Black Friday (Canva) com botões mapeados */}
+      <BlackFridayBanner />
 
       {/* Barra de Pesquisa Destacada */}
       <div className="mt-8 sm:mt-10 max-w-xl mx-auto">
