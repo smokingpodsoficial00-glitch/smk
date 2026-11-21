@@ -39,6 +39,7 @@ export function Hero({
   const brandList = brands && brands.length > 0 ? brands : (BRANDS as unknown as string[]);
 
   const storeName = config?.store_name || "Smoking Pods";
+  const vipGroupUrl = (config as any)?.vip_group_url || "https://chat.whatsapp.com/Bk2rFAAgHlvKgc8pQANqYg";
 
   useEffect(() => {
     if (storeName) {
@@ -136,6 +137,21 @@ export function Hero({
               onBrandChange(activeBrand === b ? null : b);
             }}
           />
+
+          {/* Botão Minimalista para o Grupo VIP */}
+          <a
+            href={vipGroupUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 border cursor-pointer select-none whitespace-nowrap bg-emerald-500/10 text-emerald-400 border-emerald-500/25 hover:bg-emerald-500/20 hover:border-emerald-500/50 hover:text-emerald-300 shrink-0"
+            title="Entrar no Grupo VIP do WhatsApp"
+          >
+            <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-emerald-500"></span>
+            </span>
+            <span>Grupo VIP</span>
+          </a>
         </div>
 
         {/* Ordenação à direita: [ ⇅ Padrão ▾ ] (no mobile) / [ ⇅ Ordenar por: Padrão ▾ ] (no desktop) */}
