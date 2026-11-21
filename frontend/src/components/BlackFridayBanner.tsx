@@ -14,10 +14,10 @@ export function BlackFridayBanner() {
     : "#";
 
   return (
-    <div className="mt-6 sm:mt-8 max-w-4xl mx-auto w-full px-2">
+    <div className="mt-6 sm:mt-8 max-w-5xl xl:max-w-6xl mx-auto w-full px-2 sm:px-4">
       <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden border border-white/15 shadow-[0_12px_48px_rgba(0,0,0,0.85)] bg-black/60 group">
         
-        {/* Imagem Oficial Criada no Canva */}
+        {/* Imagem Oficial Criada no Canva com botões ampliados */}
         <img
           src="/black-friday-banner.jpg"
           alt="Black Friday Smoking Pods"
@@ -29,7 +29,7 @@ export function BlackFridayBanner() {
           href={vipGroupUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="absolute left-[45.5%] top-[43.5%] w-[22.5%] h-[12.5%] rounded-full cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-emerald-400/80 hover:bg-emerald-500/10 active:scale-95 z-20"
+          className="absolute left-[43%] top-[43%] w-[26.5%] h-[13.5%] rounded-full cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-emerald-400/80 hover:bg-emerald-500/10 active:scale-95 z-20"
           title="Entrar no Grupo VIP do WhatsApp"
           aria-label="Entrar no Grupo VIP"
         />
@@ -39,7 +39,7 @@ export function BlackFridayBanner() {
           href={indicateUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="absolute left-[45.5%] top-[56.5%] w-[22.5%] h-[12.5%] rounded-full cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-emerald-400/80 hover:bg-emerald-500/10 active:scale-95 z-20"
+          className="absolute left-[43%] top-[56.5%] w-[26.5%] h-[13.5%] rounded-full cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-emerald-400/80 hover:bg-emerald-500/10 active:scale-95 z-20"
           title="Indicar amigos e garantir R$ 5 OFF"
           aria-label="Aqui para Indicar"
         />
