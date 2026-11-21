@@ -36,7 +36,7 @@ export function BrandDropdown({ brands, activeBrand, onSelectBrand }: BrandDropd
   const isBrandActive = !!activeBrand;
 
   return (
-    <div className="relative inline-block text-left" ref={dropdownRef}>
+    <div className="relative inline-block text-left shrink-0" ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setOpen(prev => !prev)}

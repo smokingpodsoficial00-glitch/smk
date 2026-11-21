@@ -106,9 +106,9 @@ export function Hero({
       </div>
 
       {/* Barra Unificada de Filtros e Ordenação na Mesma Linha */}
-      <div className="mt-5 sm:mt-8 flex items-center justify-between gap-1 sm:gap-2.5 w-full">
-        {/* Filtros à esquerda: [ Todas ] [ ⭐ Mais Vendidos ] [ Marcas ▾ ] */}
-        <div className="flex items-center gap-1 sm:gap-2.5 min-w-0">
+      <div className="mt-5 sm:mt-8 flex items-center justify-between gap-1.5 sm:gap-2.5 w-full">
+        {/* Filtros à esquerda com scroll horizontal suave no mobile sem sobreposição */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1 overflow-x-auto scrollbar-none py-1 pr-1">
           <Pill 
             label="Todas" 
             active={activeBrand === null && (!activeCategory || activeCategory === null)} 
@@ -155,7 +155,7 @@ export function Hero({
         </div>
 
         {/* Ordenação à direita: [ ⇅ Padrão ▾ ] (no mobile) / [ ⇅ Ordenar por: Padrão ▾ ] (no desktop) */}
-        <div className="shrink-0">
+        <div className="shrink-0 pl-1">
           <SortDropdown value={sortBy} onChange={onSortChange} />
         </div>
       </div>
@@ -167,7 +167,7 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
   return (
     <button
       onClick={onClick}
-      className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 border cursor-pointer select-none whitespace-nowrap ${
+      className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 border cursor-pointer select-none whitespace-nowrap shrink-0 ${
         active 
           ? "bg-white text-black font-semibold border-white shadow-[0_0_14px_rgba(255,255,255,0.28)]"
           : "glass text-white/90 border-white/10 hover:bg-elevated hover:border-white/20 hover:text-white"
@@ -182,7 +182,7 @@ function CategoryPill({ children, active, onClick }: { children: React.ReactNode
   return (
     <button
       onClick={onClick}
-      className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 border cursor-pointer select-none flex items-center whitespace-nowrap ${
+      className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 border cursor-pointer select-none flex items-center whitespace-nowrap shrink-0 ${
         active 
           ? "bg-white text-black font-semibold border-white shadow-[0_0_14px_rgba(255,255,255,0.28)]"
           : "glass text-white/90 border-white/10 hover:bg-elevated hover:border-white/20 hover:text-white"
