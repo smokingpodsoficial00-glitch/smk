@@ -5,6 +5,7 @@ import { useCart } from "@/lib/cart";
 import { useStoreConfig } from "@/lib/useStoreConfig";
 import { BrandDropdown } from "@/components/BrandDropdown";
 import { SortDropdown, type SortOption } from "@/components/SortDropdown";
+import { PromoSlider } from "@/components/PromoSlider";
 
 interface HeroProps {
   query: string;
@@ -86,6 +87,9 @@ export function Hero({
           Pedido finalizado em segundos pelo WhatsApp.
         </p>
       </div>
+
+      {/* Banner Deslizante de Descontos & Incentivo de Grupo / Indicação */}
+      <PromoSlider />
 
       {/* Barra de Pesquisa Destacada */}
       <div className="mt-8 sm:mt-10 max-w-xl mx-auto">
