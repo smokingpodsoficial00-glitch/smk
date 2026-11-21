@@ -92,10 +92,10 @@ export function Hero({
       {/* Banner Oficial Black Friday (Canva) com botões mapeados */}
       <BlackFridayBanner />
 
-      {/* Barra de Pesquisa Destacada */}
-      <div className="mt-8 sm:mt-10 max-w-xl mx-auto">
-        <div className="glass-strong rounded-full flex items-center gap-3 px-5 py-3.5 border border-white/10 focus-within:border-white/60 focus-within:shadow-[0_0_20px_rgba(255,255,255,0.15)] transition-all">
-          <Search className="size-4 text-muted-foreground shrink-0" />
+      {/* Barra de Pesquisa Destacada - Largura alinhada com o Banner no Desktop */}
+      <div className="mt-6 sm:mt-8 max-w-5xl xl:max-w-6xl mx-auto w-full px-2 sm:px-4">
+        <div className="glass-strong rounded-full flex items-center gap-3 px-5 sm:px-6 py-3.5 sm:py-4 border border-white/10 focus-within:border-white/60 focus-within:shadow-[0_0_20px_rgba(255,255,255,0.15)] transition-all">
+          <Search className="size-4 sm:size-5 text-muted-foreground shrink-0" />
           <input
             value={query}
             onChange={e => onQueryChange(e.target.value)}
