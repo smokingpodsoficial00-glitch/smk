@@ -128,7 +128,9 @@ export function FollowUpsTab() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                      phone: phoneFormatted,
                       number: phoneFormatted,
+                      name: targetItem.client_name,
                       text: msg,
                       companyId: company?.id
                     })
@@ -233,7 +235,9 @@ export function FollowUpsTab() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            phone: phoneFormatted,
             number: phoneFormatted,
+            name: item.client_name,
             text: msg,
             companyId: company?.id
           })
