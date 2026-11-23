@@ -48,7 +48,7 @@ export function getActiveBackendCompany(): string | null {
     } catch {}
   }
 
-  return null;
+  return OFFICIAL_BACKEND_COMPANY_ID;
 }
 
 /** Chave de localStorage isolada por empresa (evita vazamento entre contas no mesmo navegador). */
@@ -133,10 +133,15 @@ export async function legacyFetch(path: string, init?: RequestInit): Promise<Res
   }
 }
 
-// Remove caches legados NÃO isolados por empresa (podiam conter dados de outra conta)
+// Remove caches legados NÃO isolados por empresa (podiam conter dados de outra conta ou URLs antigas de túnel)
 if (typeof window !== 'undefined') {
   try {
     ['smoking_broadcast_lists_v1', 'smoking_marketing_campaigns_v1', 'SP_MARKETING_CONTACTS', 'SP_MARKETING_GROUPS', 'SP_CUSTOM_BACKEND_URL']
       .forEach((k) => localStorage.removeItem(k));
+    Object.keys(localStorage).forEach((k) => {
+      if (k.startsWith('SP_CUSTOM_BACKEND_URL')) {
+        localStorage.removeItem(k);
+      }
+    });
   } catch {}
 }

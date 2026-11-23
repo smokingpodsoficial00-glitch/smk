@@ -220,9 +220,7 @@ export default function MarketingModule() {
     setWhatsAppConnected(false);
     setQrCodeImageUrl(null);
     setWhatsAppSessionStatus('DISCONNECTED');
-    if (company?.id) {
-      checkWhatsAppStatus();
-    }
+    checkWhatsAppStatus();
   }, [company?.id]);
 
   // Polling ativo APENAS enquanto o modal de conexão estiver aberto e não conectado (intervalo suave de 2.5s)
@@ -282,8 +280,11 @@ export default function MarketingModule() {
 
   const handleRefreshQr = async () => {
     setQrLoading(true);
+    consecutiveFailuresRef.current = 0;
     try {
-      await legacyFetch(`/api/whatsapp/connect`, { method: 'POST' });
+      await legacyFetch(`/api/whatsapp/connect`, { method: 'POST' }).catch(() => null);
+      await checkWhatsAppStatus();
+    } catch {
       await checkWhatsAppStatus();
     } finally {
       setQrLoading(false);
