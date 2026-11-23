@@ -3,7 +3,7 @@ import {
   Calendar, Clock, CheckCircle2, AlertTriangle, MessageSquare, 
   Plus, Search, Filter, Trash2, Edit3, ArrowRight, Phone,
   Sparkles, Check, DollarSign, Package, RefreshCw, Layers, XCircle,
-  ShieldCheck, X, Zap
+  ShieldCheck, X, Zap, Send, Loader2
 } from 'lucide-react';
 import { 
   fetchFollowUps, 
@@ -24,6 +24,7 @@ import { runFollowUpsValidationSuite, type FollowUpsTestSuiteReport } from '@/li
 import { useAuth } from '@/contexts/AuthContext';
 import { NewFollowUpModal } from './NewFollowUpModal';
 import { supabase } from '@/lib/supabase';
+import { legacyFetch } from '@/lib/backend';
 
 export function FollowUpsTab() {
   const { company } = useAuth();
@@ -32,6 +33,7 @@ export function FollowUpsTab() {
   const [isSyncingEngine, setIsSyncingEngine] = useState(false);
   const [syncEngineFeedback, setSyncEngineFeedback] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [sendingId, setSendingId] = useState<string | null>(null);
   const [selectedClientForModal, setSelectedClientForModal] = useState<any | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [testReport, setTestReport] = useState<FollowUpsTestSuiteReport | null>(null);
@@ -131,6 +133,58 @@ export function FollowUpsTab() {
       setSyncEngineFeedback(`⚠️ Erro ao sincronizar esteira: ${err?.message || err}`);
     } finally {
       setIsSyncingEngine(false);
+    }
+  };
+
+  const handleForceAutomaticSend = async (item: FollowUpItem) => {
+    const rawPhone = item.client_phone;
+    if (!rawPhone) {
+      alert('Telefone do cliente não encontrado.');
+      return;
+    }
+    const cleanPhone = String(rawPhone).replace(/\D/g, '');
+    const phoneFormatted = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    const msg = item.whatsappMessage || `Fala, ${item.client_name}! Tranquilo? Passando pra ver como tá seu pod!`;
+
+    setSendingId(item.id);
+    try {
+      // Tenta disparo automático direto via motor Baileys do backend
+      let sentViaBackend = false;
+      try {
+        const res = await legacyFetch('/api/marketing/send-direct', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            number: phoneFormatted,
+            text: msg,
+            companyId: company?.id
+          })
+        });
+        if (res.ok) {
+          const resData = await res.json().catch(() => ({}));
+          if (resData.success) {
+            sentViaBackend = true;
+          }
+        }
+      } catch (backendErr) {
+        console.warn('Backend offline ou túnel indisponível para envio automático:', backendErr);
+      }
+
+      if (sentViaBackend) {
+        await completeFollowUp(item.id, company?.id);
+        await loadData();
+        alert(`🚀 Disparo automático enviado com sucesso para ${item.client_name} (${phoneFormatted})!\n\nStatus atualizado para: ENVIADO.`);
+      } else {
+        // Fallback assistido: abre o WhatsApp com a mensagem pronta e já marca como enviado
+        const waUrl = `https://wa.me/${phoneFormatted}?text=${encodeURIComponent(msg)}`;
+        window.open(waUrl, '_blank');
+        await completeFollowUp(item.id, company?.id);
+        await loadData();
+      }
+    } catch (err: any) {
+      alert(`Erro ao processar disparo: ${err.message || err}`);
+    } finally {
+      setSendingId(null);
     }
   };
 
@@ -479,14 +533,25 @@ export function FollowUpsTab() {
                       {/* 5. Ação WhatsApp (Enviar Manualmente em 1 Clique) */}
                       <td className="px-5 py-4 text-right">
                         <div className="inline-flex items-center gap-2">
-                          {/* Botão de Marcar como Enviado / Venda Fechada */}
+                          {/* Botão Forçar Disparo Automático Agora */}
                           {!isCompleted && !isCancelled && (
                             <button
-                              onClick={() => handleComplete(item.id)}
-                              className="p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 transition-colors cursor-pointer"
-                              title="Registrar como Enviado / Venda Fechada"
+                              onClick={() => handleForceAutomaticSend(item)}
+                              disabled={sendingId === item.id}
+                              className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-black px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer disabled:opacity-50"
+                              title="Forçar Disparo Automático Imediato"
                             >
-                              <Check className="size-4 stroke-[2.5]" />
+                              {sendingId === item.id ? (
+                                <>
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                  <span>Enviando...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Send className="size-3.5" />
+                                  <span>Forçar Envio</span>
+                                </>
+                              )}
                             </button>
                           )}
 
@@ -495,12 +560,13 @@ export function FollowUpsTab() {
                             href={waUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_12px_rgba(16,185,129,0.15)] cursor-pointer hover:bg-emerald-500 hover:text-black"
+                            className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer"
                             title="Enviar Mensagem Manualmente no WhatsApp"
                           >
-                            <MessageSquare className="size-3.5" />
-                            <span>WhatsApp</span>
+                            <MessageSquare className="size-3.5 text-emerald-400" />
+                            <span>Manual (Zap)</span>
                           </a>
+
 
                           {/* Excluir da esteira */}
                           <button
