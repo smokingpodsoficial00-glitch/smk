@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Calendar, Clock, CheckCircle2, AlertTriangle, MessageSquare, 
   Plus, Search, Filter, Trash2, Edit3, ArrowRight, Phone,
@@ -35,6 +35,8 @@ export function FollowUpsTab() {
   const [syncEngineFeedback, setSyncEngineFeedback] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const autoDispatchInProgressRef = useRef(false);
+  const autoDispatchedIdsRef = useRef<Set<string>>(new Set());
   const [editingItem, setEditingItem] = useState<FollowUpItem | null>(null);
   const [editedMessage, setEditedMessage] = useState<string>('');
   const [selectedVariationIdx, setSelectedVariationIdx] = useState<number>(0);
@@ -98,6 +100,66 @@ export function FollowUpsTab() {
         }
       }
       setFollowUps(data);
+
+      // 🚀 DISPARO AUTOMÁTICO 100%: Quando o ciclo de 3 semanas bate 100% (diasDiff === 0 e status pendente),
+      // o sistema dispara automaticamente para o WhatsApp conectado no motor backend
+      if (!autoDispatchInProgressRef.current) {
+        const readyToAutoDispatch = data.filter(
+          item => item.status === 'pendente' &&
+                  (item.daysDiff === 0 || (item.daysDiff || 0) < 0) &&
+                  !autoDispatchedIdsRef.current.has(item.id)
+        );
+
+        if (readyToAutoDispatch.length > 0) {
+          autoDispatchInProgressRef.current = true;
+          (async () => {
+            try {
+              for (const targetItem of readyToAutoDispatch) {
+                autoDispatchedIdsRef.current.add(targetItem.id);
+                const rawPhone = targetItem.client_phone;
+                if (!rawPhone) continue;
+                const cleanPhone = String(rawPhone).replace(/\D/g, '');
+                const phoneFormatted = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+                const msg = targetItem.whatsappMessage || `Fala, ${targetItem.client_name}! Tranquilo? Passando pra ver como tá seu pod!`;
+
+                let sentViaBackend = false;
+                try {
+                  const res = await legacyFetch('/api/marketing/send-direct', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      number: phoneFormatted,
+                      text: msg,
+                      companyId: company?.id
+                    })
+                  });
+                  if (res.ok) {
+                    const resData = await res.json().catch(() => ({}));
+                    if (resData.success) {
+                      sentViaBackend = true;
+                    }
+                  }
+                } catch (bErr) {
+                  console.warn('Backend motor offline:', bErr);
+                }
+
+                if (sentViaBackend) {
+                  await completeFollowUp(targetItem.id, company?.id);
+                  console.log(`🚀 [AutoDispatch 100%] Disparo automático enviado com sucesso para ${targetItem.client_name} (${phoneFormatted})`);
+                }
+              }
+              // Atualiza os dados na tela se algum foi disparado
+              const refreshed = await fetchFollowUps(company?.id);
+              setFollowUps(refreshed);
+            } catch (autoErr) {
+              console.error('Erro no auto-disparo de 100%:', autoErr);
+            } finally {
+              autoDispatchInProgressRef.current = false;
+            }
+          })();
+        }
+      }
+
     } catch (e) {
       console.error("Erro ao carregar follow-ups:", e);
     } finally {
