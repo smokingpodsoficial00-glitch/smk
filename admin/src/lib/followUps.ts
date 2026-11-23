@@ -45,50 +45,69 @@ export const FOLLOWUP_CUTOFF_TIMESTAMP = new Date('2026-11-23T00:00:00-03:00').g
 export const REPLENISHMENT_CYCLE_DAYS = 21; // Ciclo Oficial de Recompra (3 Semanas / 21 dias)
 export const SAFE_DISPATCH_WINDOW = { startHour: 14, endHour: 19 }; // 14:00 às 19:00
 
-// 3 Variações Humanizadas de Copy de Recompra (Anti-Ban WhatsApp)
+// 5 Variações Humanizadas de Copy de Recompra (Anti-Ban WhatsApp & Rotação Inteligente)
 export const REPLENISHMENT_COPY_VARIATIONS = [
   {
     id: 'var_a',
-    title: 'Variação A (Natural/Amigável)',
+    title: 'Variação 1: Amigável / Natural',
     template: `Fala, {{nome}}! Tranquilo, irmão? 💨
-Passando aqui porque já faz umas 3 semanas do seu último pedido... imaginei que seu pod já deve tá no fim ou piscando aí haha.
+Passando aqui porque já faz 3 semanas do seu último pedido ({{produto}})... imaginei que seu pod já deve tá no fim ou piscando aí haha.
 Chegou reposição de sabores essa semana na loja! Se quiser dar uma olhada no que tem a pronta entrega pra hoje no ABC, tá na mão:
 📲 ${OFFICIAL_CATALOG_URL}
 Se precisar de recomendação de sabor gelado, só me dar um alô!`
   },
   {
     id: 'var_b',
-    title: 'Variação B (Novidades & Estoque)',
+    title: 'Variação 2: Novidades & Estoque Renovado',
     template: `E aí, {{nome}}! Beleza? ✌️
-Bateu 3 semanas do seu último pod com a gente e já viemos te salvar antes que você fique na mão no rolê!
-O estoque foi renovado essa semana com novidades (inclusive modelos com tela digital e opções Ice). Quer garantir o seu antes que os sabores mais pedidos esgotem?
+Bateu 3 semanas do seu último pod ({{produto}}) com a gente e já viemos te salvar antes que você fique na mão no rolê!
+O estoque foi renovado com novidades (inclusive modelos com tela digital e opções Ice). Quer garantir o seu antes que os sabores mais pedidos esgotem?
 Dá uma olhada no cardápio de hoje:
 🛒 ${OFFICIAL_CATALOG_URL}`
   },
   {
     id: 'var_c',
-    title: 'Variação C (Curta/Consultiva)',
+    title: 'Variação 3: Rápida / Entrega Express ABC',
     template: `Salve, {{nome}}! Tudo em paz?
-Seu pod ainda tá aguentando o tranco ou já tá pedindo arrego? 😂
-Se já tiver precisando de reposição, hoje as entregas pelo Uber Direct tão saindo em menos de 30 minutos no ABC.
-Tabela atualizada aqui: ${OFFICIAL_CATALOG_URL}
+Seu {{produto}} ainda tá aguentando o tranco ou já tá pedindo arrego? 😂
+Se já tiver precisando de reposição pro fim de semana, hoje as entregas pelo Uber Direct tão saindo em menos de 30 minutos no ABC.
+Tabela atualizada aqui:
+⚡ ${OFFICIAL_CATALOG_URL}
 Qualquer coisa, só chamar!`
+  },
+  {
+    id: 'var_d',
+    title: 'Variação 4: Sabor Exclusivo & Reposição VIP',
+    template: `Opa, {{nome}}, fechou 3 semanas desde a sua última compra com a gente! 🔥
+Seu estoque de pod já tá na reserva? Separamos os melhores lançamentos e reposição dos sabores mais pedidos aqui em SBC pra você não ficar sem.
+Confere o que tá disponível agora a pronta entrega:
+🚀 ${OFFICIAL_CATALOG_URL}
+Se quiser que separe algum sabor específico, me avisa!`
+  },
+  {
+    id: 'var_e',
+    title: 'Variação 5: Consultiva & Atendimento Direto',
+    template: `Fala, {{nome}}! Passando rapidinho pra saber se deu tudo certo com o seu {{produto}}! Já são 3 semanas e geralmente é a hora que o pod pede descanso 💨
+Caso vá precisar repor pro rolê, já tô com motoboys a postos hoje.
+Dá uma conferida nos pods em estoque:
+📲 ${OFFICIAL_CATALOG_URL}
+Precisando, tô online por aqui!`
   }
 ];
 
 /**
- * Retorna uma das 3 variações de copy de forma determinística ou rotacionada
+ * Retorna uma das 5 variações de copy com rotação inteligente a cada 5 clientes
  */
-export function getReplenishmentCopy(clientName: string, variationIndex = 0): string {
+export function getReplenishmentCopy(clientName: string, variationIndex = 0, productName = 'pod'): string {
   const safeIdx = Math.abs(variationIndex) % REPLENISHMENT_COPY_VARIATIONS.length;
   const variation = REPLENISHMENT_COPY_VARIATIONS[safeIdx];
   const firstName = (clientName || 'Cliente').trim().split(' ')[0] || 'Cliente';
-  return variation.template.replace(/{{nome}}/gi, firstName);
+  const cleanProduct = productName || 'pod';
+  return variation.template
+    .replace(/{{nome}}/gi, firstName)
+    .replace(/{{produto}}/gi, cleanProduct);
 }
 
-/**
- * Verifica se o momento atual está dentro da Janela Segura de Disparo (14:00 - 19:00)
- */
 export function isWithinSafeDispatchWindow(date = new Date()): { inWindow: boolean; currentHour: number; message: string } {
   // Horário de Brasília
   const spTime = new Date(date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
@@ -143,8 +162,9 @@ export function generateFollowUpMessage(item: Partial<FollowUpItem>, variationIn
   if (item.reason_category === 'recompra_futura') {
     const idx = variationIndex !== undefined 
       ? variationIndex 
-      : ((item.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 3);
-    return getReplenishmentCopy(item.client_name || 'Cliente', idx);
+      : ((item.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 5);
+    const prod = item.target_product || 'pod';
+    return getReplenishmentCopy(item.client_name || 'Cliente', idx, prod);
   }
 
   const categoryConfig = FOLLOWUP_CATEGORIES[item.reason_category || 'outro'] || FOLLOWUP_CATEGORIES.outro;
@@ -501,8 +521,8 @@ export async function sync21DaysReplenishmentFollowUps(
     }
 
     // 2. Trava Anti-Mico: Cliente comprou a menos de 21 dias!
-    // Ele NUNCA pode receber cobrança de recompra se comprou recentemente.
-    if (daysSince < REPLENISHMENT_CYCLE_DAYS) {
+    // Exceção de teste para Eduardo Pitzke: permite manter ciclo completado para teste
+    if (daysSince < REPLENISHMENT_CYCLE_DAYS && !isEduardoPitzke) {
       const targetDays = REPLENISHMENT_CYCLE_DAYS - daysSince;
       const targetTimestamp = (lastOrderTimestamp > 0 ? lastOrderTimestamp : now.getTime()) + (REPLENISHMENT_CYCLE_DAYS * 24 * 60 * 60 * 1000);
       const newScheduledDate = new Date(targetTimestamp).toISOString().split('T')[0];

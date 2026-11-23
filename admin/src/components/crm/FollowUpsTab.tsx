@@ -11,6 +11,7 @@ import {
   cancelFollowUp,
   deleteFollowUp, 
   createFollowUp, 
+  updateFollowUp, 
   FOLLOWUP_CATEGORIES, 
   isWithinSafeDispatchWindow,
   sync21DaysReplenishmentFollowUps,
@@ -34,6 +35,9 @@ export function FollowUpsTab() {
   const [syncEngineFeedback, setSyncEngineFeedback] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<FollowUpItem | null>(null);
+  const [editedMessage, setEditedMessage] = useState<string>('');
+  const [selectedVariationIdx, setSelectedVariationIdx] = useState<number>(0);
   const [selectedClientForModal, setSelectedClientForModal] = useState<any | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [testReport, setTestReport] = useState<FollowUpsTestSuiteReport | null>(null);
@@ -52,16 +56,28 @@ export function FollowUpsTab() {
       await sync21DaysReplenishmentFollowUps(liveClients, company?.id);
       let data = await fetchFollowUps(company?.id);
 
-      // Garante que o cliente de teste Eduardo Pitzke esteja registrado na esteira
-      const hasEduardo = data.some(f => (f.client_name || '').toLowerCase().includes('eduardo') || (f.client_name || '').toLowerCase().includes('pitzke'));
-      if (!hasEduardo) {
+      // Forja o cliente de teste Eduardo Pitzke com ciclo de 3 semanas 100% completo para teste imediato
+      const eduardoIndex = data.findIndex(f => (f.client_name || '').toLowerCase().includes('eduardo') || (f.client_name || '').toLowerCase().includes('pitzke'));
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (eduardoIndex !== -1) {
+        // Se já existe e ainda está em data futura, atualiza a data para hoje (100% carregado)
+        const eduItem = data[eduardoIndex];
+        if (eduItem.status === 'pendente' && eduItem.scheduled_date !== todayStr) {
+          await updateFollowUp(eduItem.id, {
+            scheduled_date: todayStr,
+            reason_description: 'Ciclo de 3 semanas completo hoje! Pronto para teste de envio oficial.'
+          }, company?.id);
+          eduItem.scheduled_date = todayStr;
+          eduItem.daysDiff = 0;
+        }
+      } else {
         const eduardoClient = liveClients.find(c => (c.name || '').toLowerCase().includes('eduardo') || (c.name || '').toLowerCase().includes('pitzke'));
         const eduardoPhone = eduardoClient?.phone || '5511951741181';
         const eduardoProduct = eduardoClient?.lastProduct || 'Pod Descartável 20k Puffs';
         const eduardoFlavor = eduardoClient?.lastFlavor || 'Ice';
-        const targetDays = 21;
+        // Forja ciclo de 3 semanas completado hoje (diasDiff = 0) para teste imediato de envio
         const now = new Date();
-        const scheduledDate = new Date(now.getTime() + (targetDays * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+        const scheduledDate = now.toISOString().split('T')[0];
 
         const createdEduardo = await createFollowUp({
           company_id: company?.id,
@@ -69,7 +85,7 @@ export function FollowUpsTab() {
           client_name: 'Eduardo Pitzke',
           client_phone: eduardoPhone,
           reason_category: 'recompra_futura',
-          reason_description: 'Pedido concluído. Contagem de 3 semanas (21 dias) iniciada para teste oficial da esteira.',
+          reason_description: 'Ciclo de 3 semanas completo hoje! Pronto para teste de envio oficial.',
           target_product: eduardoProduct,
           target_flavor: eduardoFlavor,
           target_puffs: 20000,
@@ -136,7 +152,7 @@ export function FollowUpsTab() {
     }
   };
 
-  const handleForceAutomaticSend = async (item: FollowUpItem) => {
+  const handleForceAutomaticSend = async (item: FollowUpItem, customTextOverride?: string) => {
     const rawPhone = item.client_phone;
     if (!rawPhone) {
       alert('Telefone do cliente não encontrado.');
@@ -436,7 +452,7 @@ export function FollowUpsTab() {
                   const totalDays = 21;
                   const daysLeft = Math.max(0, item.daysDiff ?? 0);
                   const elapsedDays = Math.max(0, Math.min(totalDays, totalDays - daysLeft));
-                  const progressPct = isCompleted ? 100 : Math.round((elapsedDays / totalDays) * 100);
+                  const progressPct = (isCompleted || daysLeft === 0) ? 100 : Math.round((elapsedDays / totalDays) * 100);
 
                   const phoneClean = String(item.client_phone || '').replace(/\D/g, '');
                   const phoneFormatted = phoneClean.startsWith('55') ? phoneClean : `55${phoneClean}`;
@@ -533,6 +549,22 @@ export function FollowUpsTab() {
                       {/* 5. Ação WhatsApp (Enviar Manualmente em 1 Clique) */}
                       <td className="px-5 py-4 text-right">
                         <div className="inline-flex items-center gap-2">
+                                                    {/* Botão Editar Mensagem / Escolher Variação */}
+                          {!isCompleted && !isCancelled && (
+                            <button
+                              onClick={() => {
+                                setEditingItem(item);
+                                setEditedMessage(item.whatsappMessage || '');
+                                const currentIdx = ((item.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 5);
+                                setSelectedVariationIdx(currentIdx);
+                              }}
+                              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 transition-colors cursor-pointer"
+                              title="Visualizar ou Personalizar Mensagem antes do Envio"
+                            >
+                              <Edit3 className="size-4" />
+                            </button>
+                          )}
+
                           {/* Botão Forçar Disparo Automático Agora */}
                           {!isCompleted && !isCancelled && (
                             <button
@@ -583,6 +615,126 @@ export function FollowUpsTab() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+
+            {/* Modal de Personalização e Troca de Variação da Mensagem */}
+      {editingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-[#0e0e10] border border-white/10 rounded-2xl w-full max-w-xl flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+                  <Sparkles className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Personalizar Mensagem de Disparo</h3>
+                  <p className="text-xs text-white/50">
+                    Cliente: <strong>{editingItem.client_name}</strong> • Último Pod: <strong>{editingItem.target_product || 'Pod Descartável'}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingItem(null)}
+                className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              {/* Seletor das 5 Variações Inteligentes */}
+              <div className="space-y-1.5">
+                <label className="text-white/70 font-bold uppercase tracking-wider text-[11px] flex items-center justify-between">
+                  <span>Alternar entre as 5 Copies Humanizadas:</span>
+                  <span className="text-emerald-400 font-mono text-[10px]">Anti-Ban WhatsApp</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-1.5">
+                  {REPLENISHMENT_COPY_VARIATIONS.map((v, i) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedVariationIdx(i);
+                        const newText = v.template
+                          .replace(/{{nome}}/gi, (editingItem.client_name || 'Cliente').trim().split(' ')[0])
+                          .replace(/{{produto}}/gi, editingItem.target_product || 'pod');
+                        setEditedMessage(newText);
+                      }}
+                      className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                        selectedVariationIdx === i
+                          ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 font-bold'
+                          : 'bg-[#141414] border-white/5 text-white/50 hover:text-white hover:border-white/10'
+                      }`}
+                    >
+                      <div className="text-[10px] font-bold">Variação {i + 1}</div>
+                      <div className="text-[9px] text-white/40 truncate">{v.title.split(':')[1]?.trim() || v.title}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Caixa de Edição da Mensagem */}
+              <div className="space-y-1.5">
+                <label className="text-white/70 font-bold uppercase tracking-wider text-[11px]">
+                  Texto que será enviado no WhatsApp:
+                </label>
+                <textarea
+                  rows={8}
+                  value={editedMessage}
+                  onChange={(e) => setEditedMessage(e.target.value)}
+                  placeholder="Edite o texto da mensagem aqui..."
+                  className="w-full bg-[#141414] border border-white/10 rounded-xl p-3.5 text-xs text-white leading-relaxed focus:outline-none focus:border-emerald-500 resize-none font-sans"
+                />
+              </div>
+
+              {/* Botões do Modal */}
+              <div className="flex items-center justify-between pt-3 border-t border-white/5 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingItem(null)}
+                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 text-xs font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {/* Salvar na Esteira */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!editingItem) return;
+                      await updateFollowUp(editingItem.id, {
+                        whatsappMessage: editedMessage
+                      }, company?.id);
+                      setFollowUps(prev => prev.map(f => f.id === editingItem.id ? { ...f, whatsappMessage: editedMessage } : f));
+                      setEditingItem(null);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Salvar Texto
+                  </button>
+
+                  {/* Enviar Agora com o Texto Editado */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!editingItem) return;
+                      const target = editingItem;
+                      setEditingItem(null);
+                      await handleForceAutomaticSend(target, editedMessage);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer"
+                  >
+                    <Send className="size-3.5" />
+                    <span>Enviar Agora</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
       )}
