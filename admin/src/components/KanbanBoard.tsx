@@ -15,6 +15,7 @@ import { deleteOrderWithStockRestoration } from"@/lib/orders";
 import { invalidateFinanceCache } from "@/lib/financeCache";
 import { invalidateLiveClientsCache } from "@/lib/crm";
 import { invalidateSalesHistoryCache } from "@/lib/salesHistory";
+import { scheduleOrderReplenishmentFollowUp } from "@/lib/followUps";
 import {
   extractFiadoInfo,
   getOrderDisplayPaymentMethod,
@@ -377,6 +378,20 @@ export default function KanbanBoard() {
  ...paymentUpdate
  })
  .eq('id', realId);
+ }
+
+ // 💨 ESTEIRA OFICIAL DE RECOMPRA AUTOMÁTICA (21 DIAS):
+ // Se o pedido foi concluído/entregue, agenda imediatamente o follow-up de 3 semanas com loading
+ if (newDeliveryStatus === 'CONCLUIDO' || newDeliveryStatus === 'ENTREGUE') {
+   if (currentOrder) {
+     scheduleOrderReplenishmentFollowUp({
+       id: currentOrder.realId || currentOrder.id,
+       client_name: currentOrder.clientName,
+       client_phone: currentOrder.phone,
+       items: currentOrder.items,
+       company_id: company?.id
+     }, company?.id).catch(e => console.warn('[FollowUp] Erro ao agendar recompra automática de 21d:', e));
+   }
  }
 
  // Disparar Webhook caso despache para Rota com validação e segurança reforçada

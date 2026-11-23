@@ -561,3 +561,68 @@ export async function sync21DaysReplenishmentFollowUps(
     cancelledRecentBuyerCount
   };
 }
+
+/**
+ * Registra ou atualiza imediatamente o Follow-up de 21 dias (3 Semanas)
+ * sempre que um pedido for concluído/entregue no sistema.
+ */
+export async function scheduleOrderReplenishmentFollowUp(order: any, companyId?: string): Promise<FollowUpItem | null> {
+  if (!order) return null;
+  const targetCompanyId = companyId || order.company_id || DEFAULT_COMPANY_ID;
+
+  const rawPhone = order.client_phone || order.phone;
+  if (!rawPhone || String(rawPhone).startsWith('__SYSTEM_')) return null;
+
+  const cleanPhone = String(rawPhone).replace(/\D/g, '');
+  const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+  const clientName = (order.client_name || order.customer_name || 'Cliente').trim();
+
+  // Extrai primeiro produto/sabor do pedido
+  const items = Array.isArray(order.items) ? order.items : [];
+  const firstItem = items.length > 0 ? items[0] : null;
+  const targetProduct = firstItem ? `${firstItem.name || firstItem.model || 'Pod'} ${firstItem.flavor || ''}`.trim() : (order.product_name || 'Pod');
+  const targetFlavor = firstItem?.flavor || null;
+  const targetPuffs = Number(firstItem?.puffs) || undefined;
+
+  // Data de agendamento: exatamente 21 dias a partir de hoje
+  const now = new Date();
+  const targetDate = new Date(now.getTime() + (REPLENISHMENT_CYCLE_DAYS * 24 * 60 * 60 * 1000));
+  const scheduledDate = targetDate.toISOString().split('T')[0];
+
+  // Busca se já existe um follow-up de recompra pendente para este cliente
+  const allFollowUps = await fetchFollowUps(targetCompanyId);
+  const existing = allFollowUps.find(f => {
+    const fPhone = String(f.client_phone || '').replace(/\D/g, '');
+    return f.status === 'pendente' && f.reason_category === 'recompra_futura' && fPhone === cleanPhone;
+  });
+
+  if (existing) {
+    // Trava Anti-Mico: o cliente acabou de comprar! Reinicia o contador de 3 semanas
+    await updateFollowUp(existing.id, {
+      scheduled_date: scheduledDate,
+      order_id: order.id || existing.order_id,
+      target_product: targetProduct,
+      target_flavor: targetFlavor,
+      target_puffs: targetPuffs || null,
+      reason_description: `Contador reiniciado: compra concluída hoje (${targetProduct}). 3 semanas de contagem regressiva.`,
+      updated_at: new Date().toISOString()
+    }, targetCompanyId);
+    return existing;
+  }
+
+  // Cria novo agendamento com o loading de 3 semanas
+  return await createFollowUp({
+    company_id: targetCompanyId,
+    client_id: order.client_id || order.customer_id || null,
+    client_name: clientName,
+    client_phone: formattedPhone,
+    reason_category: 'recompra_futura',
+    reason_description: `Compra concluída hoje (${targetProduct}). Aguardando ciclo de 3 semanas para disparo de recompra.`,
+    target_product: targetProduct,
+    target_flavor: targetFlavor,
+    target_puffs: targetPuffs,
+    scheduled_date: scheduledDate,
+    scheduled_time: '15:00',
+    order_id: order.id || null
+  });
+}

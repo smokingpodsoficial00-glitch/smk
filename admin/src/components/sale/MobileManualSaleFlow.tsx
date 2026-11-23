@@ -9,6 +9,7 @@ import { notifyMobileSale } from "@/lib/saleNotifications";
 import { validateCartStockAvailability, executeAtomicSaleWithStockLock } from "@/lib/stockValidation";
 import { invalidateSaleCatalogCache } from "../ManualSaleModal";
 import { invalidateFinanceCache } from "@/lib/financeCache";
+import { scheduleOrderReplenishmentFollowUp } from "@/lib/followUps";
 import {
   ShoppingCart,
   User,
@@ -759,6 +760,17 @@ export function MobileManualSaleFlow({
         isNationalSale,
         nationalState: isNationalSale ? nationalState : undefined,
       });
+
+      // 8. Esteira Oficial de Follow-Up Automático (3 Semanas / 21 Dias):
+      if (!isFiadoSale && cleanPhoneDigits && !isNoWhatsApp && !formattedPhone.startsWith("INSTA_")) {
+        scheduleOrderReplenishmentFollowUp({
+          id: atomicResult.orderId || null,
+          client_name: clientName.trim(),
+          client_phone: formattedPhone,
+          items,
+          company_id: companyId
+        }, companyId).catch(err => console.warn('[FollowUp] Erro ao agendar recompra automática 21d:', err));
+      }
 
       // 8. Gravar resumo e mudar para a tela de Sucesso
       setSuccessInfo({

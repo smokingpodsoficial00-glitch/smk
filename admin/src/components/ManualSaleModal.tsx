@@ -8,6 +8,7 @@ import { getFutureDateIso, formatIsoDateBR } from "@/lib/fiadoSales";
 import { notifyMobileSale } from "@/lib/saleNotifications";
 import { validateCartStockAvailability, executeAtomicSaleWithStockLock } from "@/lib/stockValidation";
 import { invalidateFinanceCache } from "@/lib/financeCache";
+import { scheduleOrderReplenishmentFollowUp } from "@/lib/followUps";
 import { MobileManualSaleFlow } from "./sale/MobileManualSaleFlow";
 import {
   ShoppingCart,
@@ -784,6 +785,18 @@ export function ManualSaleModal({
         isNationalSale,
         nationalState: isNationalSale ? nationalState : undefined,
       });
+
+      // 7. Esteira Oficial de Follow-Up Automático (3 Semanas / 21 Dias):
+      // Agenda imediatamente a contagem regressiva para recompra com loading
+      if (!isFiadoSale && cleanPhone && !isNoWhatsApp && !formattedPhone.startsWith("INSTA_")) {
+        scheduleOrderReplenishmentFollowUp({
+          id: insertedOrderId || null,
+          client_name: clientName.trim(),
+          client_phone: formattedPhone,
+          items: effectiveItems,
+          company_id: companyId
+        }, companyId).catch(err => console.warn('[FollowUp] Erro ao agendar recompra automática 21d:', err));
+      }
 
       setSuccessMessage(
         isFiadoSale

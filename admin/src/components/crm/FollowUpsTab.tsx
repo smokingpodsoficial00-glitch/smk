@@ -432,11 +432,59 @@ export function FollowUpsTab() {
                   </div>
 
                   {/* Motivo Comercial & Nota Combinada */}
-                  <div className="p-3 bg-[#141414] rounded-xl border border-white/5 space-y-1.5 text-xs">
+                  <div className="p-3 bg-[#141414] rounded-xl border border-white/5 space-y-2 text-xs">
                     <div className="flex items-center justify-between text-white/60">
                       <span className="text-[11px] font-bold text-amber-400/90">{cat.label}</span>
                       <span className="text-[10px] text-white/40 font-mono">Data marcada: {item.scheduled_date}</span>
                     </div>
+
+                    {/* Barra de Progresso / Loading das 3 Semanas (21 dias) */}
+                    {item.reason_category === 'recompra_futura' && !isCancelled && (
+                      <div className="p-2.5 bg-black/60 rounded-xl border border-white/5 space-y-1.5">
+                        {(() => {
+                          const totalDays = 21;
+                          const daysLeft = Math.max(0, item.daysDiff ?? 0);
+                          const elapsedDays = Math.max(0, Math.min(totalDays, totalDays - daysLeft));
+                          const progressPct = isCompleted ? 100 : Math.round((elapsedDays / totalDays) * 100);
+
+                          return (
+                            <>
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-bold text-white/80 flex items-center gap-1.5">
+                                  {isCompleted ? (
+                                    <span className="text-emerald-400 flex items-center gap-1">
+                                      <CheckCircle2 className="size-3.5" /> Disparo & Venda Concluídos
+                                    </span>
+                                  ) : daysLeft === 0 ? (
+                                    <span className="text-amber-400 flex items-center gap-1 animate-pulse">
+                                      <Clock className="size-3.5" /> 3 Semanas Atingidas: Pronto para Disparo
+                                    </span>
+                                  ) : (
+                                    <span className="text-blue-300 flex items-center gap-1">
+                                      <RefreshCw className="size-3 animate-spin text-blue-400" /> Aguardando 3 semanas (restam {daysLeft} dias)
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="font-mono text-[10px] text-white/50">{progressPct}%</span>
+                              </div>
+
+                              <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden border border-white/5">
+                                <div
+                                  className={`h-full transition-all duration-500 rounded-full ${
+                                    isCompleted 
+                                      ? 'bg-emerald-400' 
+                                      : daysLeft === 0 
+                                      ? 'bg-amber-400' 
+                                      : 'bg-gradient-to-r from-blue-500 via-emerald-500 to-emerald-400'
+                                  }`}
+                                  style={{ width: `${progressPct}%` }}
+                                />
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
 
                     {item.reason_description ? (
                       <p className="text-xs text-white/80 font-medium">
@@ -447,8 +495,21 @@ export function FollowUpsTab() {
                     )}
 
                     {item.target_product && (
-                      <div className="text-[11px] text-emerald-400 font-mono pt-1 border-t border-white/5">
-                        🎯 Produto de Interesse: {item.target_product}
+                      <div className="text-[11px] text-emerald-400 font-mono pt-1 border-t border-white/5 flex items-center gap-1.5">
+                        <Package className="size-3" />
+                        <span>Último Produto Comprado: <strong>{item.target_product}</strong></span>
+                      </div>
+                    )}
+
+                    {/* Preview da Copy Exata que será/foi disparada */}
+                    {item.whatsappMessage && (
+                      <div className="p-2.5 bg-[#080808] rounded-lg border border-white/5 text-[11px] text-white/60 space-y-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-white/40 block">
+                          📝 Mensagem Personalizada do Disparo:
+                        </span>
+                        <p className="whitespace-pre-line font-sans text-white/80 leading-relaxed italic line-clamp-3 hover:line-clamp-none transition-all">
+                          {item.whatsappMessage}
+                        </p>
                       </div>
                     )}
                   </div>
