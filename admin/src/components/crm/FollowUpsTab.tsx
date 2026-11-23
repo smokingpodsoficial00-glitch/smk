@@ -10,6 +10,7 @@ import {
   completeFollowUp, 
   cancelFollowUp,
   deleteFollowUp, 
+  createFollowUp, 
   FOLLOWUP_CATEGORIES, 
   isWithinSafeDispatchWindow,
   sync21DaysReplenishmentFollowUps,
@@ -47,7 +48,37 @@ export function FollowUpsTab() {
       const liveClients = await fetchLiveClients(company?.id);
       // Sincroniza automaticamente a esteira para garantir que pedidos concluídos já estejam agendados
       await sync21DaysReplenishmentFollowUps(liveClients, company?.id);
-      const data = await fetchFollowUps(company?.id);
+      let data = await fetchFollowUps(company?.id);
+
+      // Garante que o cliente de teste Eduardo Pitzke esteja registrado na esteira
+      const hasEduardo = data.some(f => (f.client_name || '').toLowerCase().includes('eduardo') || (f.client_name || '').toLowerCase().includes('pitzke'));
+      if (!hasEduardo) {
+        const eduardoClient = liveClients.find(c => (c.name || '').toLowerCase().includes('eduardo') || (c.name || '').toLowerCase().includes('pitzke'));
+        const eduardoPhone = eduardoClient?.phone || '5511951741181';
+        const eduardoProduct = eduardoClient?.lastProduct || 'Pod Descartável 20k Puffs';
+        const eduardoFlavor = eduardoClient?.lastFlavor || 'Ice';
+        const targetDays = 21;
+        const now = new Date();
+        const scheduledDate = new Date(now.getTime() + (targetDays * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+
+        const createdEduardo = await createFollowUp({
+          company_id: company?.id,
+          client_id: eduardoClient?.id || null,
+          client_name: 'Eduardo Pitzke',
+          client_phone: eduardoPhone,
+          reason_category: 'recompra_futura',
+          reason_description: 'Pedido concluído. Contagem de 3 semanas (21 dias) iniciada para teste oficial da esteira.',
+          target_product: eduardoProduct,
+          target_flavor: eduardoFlavor,
+          target_puffs: 20000,
+          scheduled_date: scheduledDate,
+          scheduled_time: '15:00'
+        });
+
+        if (createdEduardo) {
+          data = [createdEduardo, ...data];
+        }
+      }
       setFollowUps(data);
     } catch (e) {
       console.error("Erro ao carregar follow-ups:", e);

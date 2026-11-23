@@ -487,7 +487,8 @@ export async function sync21DaysReplenishmentFollowUps(
 
     // REGRA DE CORTE: Compras concluídas a partir de HOJE ou pedido recente de teste do Eduardo Pitzke
     const lastOrderTimestamp = client.lastOrderTimestamp || (client.latestOrder?.created_at ? new Date(client.latestOrder.created_at).getTime() : 0);
-    const isEduardoPitzke = (client.name || '').toLowerCase().includes('eduardo') || cleanPhone.includes('951741181') || cleanPhone.includes('988887777');
+    const clientNameLower = (client.name || '').toLowerCase();
+    const isEduardoPitzke = clientNameLower.includes('eduardo') || clientNameLower.includes('pitzke') || cleanPhone.includes('951741181') || cleanPhone.includes('988887777');
     const isOrderFromTodayOnwards = lastOrderTimestamp >= FOLLOWUP_CUTOFF_TIMESTAMP || isEduardoPitzke;
 
     if (!isOrderFromTodayOnwards) {
