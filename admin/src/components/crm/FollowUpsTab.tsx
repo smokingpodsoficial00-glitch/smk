@@ -347,9 +347,9 @@ export function FollowUpsTab() {
         </div>
       </div>
 
-      {/* 3. Lista de Cards de Follow-up */}
+      {/* 3. Tabela CRM da Esteira de Recompra (3 Semanas) */}
       {loading ? (
-        <div className="p-12 text-center text-white/50">Carregando agendamentos...</div>
+        <div className="p-12 text-center text-white/50">Carregando esteira de recompra...</div>
       ) : filteredFollowUps.length === 0 ? (
         <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-12 text-center text-white/40 space-y-3">
           <Clock className="size-10 text-white/20 mx-auto" />
@@ -359,207 +359,168 @@ export function FollowUpsTab() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredFollowUps.map(item => {
-            const cat = FOLLOWUP_CATEGORIES[item.reason_category] || FOLLOWUP_CATEGORIES.outro;
-            const isOverdue = (item.daysDiff || 0) < 0 && item.status === 'pendente';
-            const isToday = (item.daysDiff || 0) === 0 && item.status === 'pendente';
-            const isCompleted = item.status === 'concluido';
-            const isCancelled = item.status === 'cancelado';
+        <div className="bg-[#0c0c0c] border border-white/10 rounded-2xl overflow-hidden shadow-xl">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-[10px] text-white/50 uppercase bg-black/60 border-b border-white/10 font-bold tracking-wider">
+                <tr>
+                  <th className="px-5 py-3.5 text-white/60 font-semibold">Cliente & Telefone</th>
+                  <th className="px-5 py-3.5 text-white/60 font-semibold">Progresso (3 Semanas)</th>
+                  <th className="px-5 py-3.5 text-white/60 font-semibold">Última Compra</th>
+                  <th className="px-5 py-3.5 text-white/60 font-semibold text-center">Status do Disparo</th>
+                  <th className="px-5 py-3.5 text-white/60 font-semibold text-right">Ação WhatsApp</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filteredFollowUps.map(item => {
+                  const isCompleted = item.status === 'concluido';
+                  const isCancelled = item.status === 'cancelado';
+                  const isOverdue = (item.daysDiff || 0) < 0 && item.status === 'pendente';
+                  const isToday = (item.daysDiff || 0) === 0 && item.status === 'pendente';
 
-            return (
-              <div 
-                key={item.id}
-                className={`bg-[#0c0c0c] border rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all shadow-md ${
-                  isCancelled
-                    ? 'border-white/5 opacity-50 bg-[#080808]'
-                    : isOverdue 
-                    ? 'border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.08)]' 
-                    : isToday 
-                    ? 'border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.08)]'
-                    : isCompleted
-                    ? 'border-emerald-500/20 bg-emerald-500/5'
-                    : 'border-white/10 hover:border-white/20'
-                }`}
-              >
-                <div className="space-y-3">
-                  
-                  {/* Top Header do Card */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">{cat.icon}</span>
-                      <div>
-                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                          {item.client_name}
-                        </h4>
-                        <div className="text-[11px] text-white/50 font-mono flex items-center gap-1 mt-0.5">
-                          <Phone className="size-3 text-white/40" />
-                          {item.client_phone}
+                  // Cálculo do progresso no ciclo de 3 Semanas (21 dias)
+                  const totalDays = 21;
+                  const daysLeft = Math.max(0, item.daysDiff ?? 0);
+                  const elapsedDays = Math.max(0, Math.min(totalDays, totalDays - daysLeft));
+                  const progressPct = isCompleted ? 100 : Math.round((elapsedDays / totalDays) * 100);
+
+                  const phoneClean = String(item.client_phone || '').replace(/\D/g, '');
+                  const phoneFormatted = phoneClean.startsWith('55') ? phoneClean : `55${phoneClean}`;
+                  const waUrl = item.whatsappUrl || `https://wa.me/${phoneFormatted}?text=${encodeURIComponent(item.whatsappMessage || '')}`;
+
+                  return (
+                    <tr 
+                      key={item.id} 
+                      className={`hover:bg-white/5 transition-colors group ${
+                        isCancelled ? 'opacity-40 bg-[#080808]' : ''
+                      }`}
+                    >
+                      {/* 1. Cliente & Telefone */}
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="size-9 rounded-full bg-[#141414] flex items-center justify-center font-bold text-white border border-white/10 group-hover:border-emerald-500/40 transition-colors">
+                            {(item.client_name || 'C').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-bold text-white group-hover:text-emerald-400 transition-colors flex items-center gap-2">
+                              {item.client_name || 'Cliente'}
+                            </div>
+                            <div className="text-xs text-white/50 font-mono flex items-center gap-1 mt-0.5">
+                              <Phone className="size-3 text-white/40" />
+                              {item.client_phone || 'Sem telefone'}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
+                      </td>
 
-                    {/* Badge de Status / Data */}
-                    <div>
-                      {isCompleted ? (
-                        <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1">
-                          <CheckCircle2 className="size-3" /> Venda Fechada
-                        </span>
-                      ) : isCancelled ? (
-                        <span className="bg-white/10 text-white/50 border border-white/10 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1">
-                          <XCircle className="size-3" /> Cancelado
-                        </span>
-                      ) : isOverdue ? (
-                        <span className="bg-red-500/15 text-red-400 border border-red-500/30 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase animate-pulse flex items-center gap-1">
-                          <AlertTriangle className="size-3" /> Atrasado há {Math.abs(item.daysDiff || 0)}d
-                        </span>
-                      ) : isToday ? (
-                        <span className="bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase flex items-center gap-1">
-                          <Clock className="size-3" /> Disparar Hoje
-                        </span>
-                      ) : (
-                        <span className="bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1">
-                          <Calendar className="size-3" /> Em {item.daysDiff} dias ({item.scheduled_date})
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Motivo Comercial & Nota Combinada */}
-                  <div className="p-3 bg-[#141414] rounded-xl border border-white/5 space-y-2 text-xs">
-                    <div className="flex items-center justify-between text-white/60">
-                      <span className="text-[11px] font-bold text-amber-400/90">{cat.label}</span>
-                      <span className="text-[10px] text-white/40 font-mono">Data marcada: {item.scheduled_date}</span>
-                    </div>
-
-                    {/* Barra de Progresso / Loading das 3 Semanas (21 dias) */}
-                    {item.reason_category === 'recompra_futura' && !isCancelled && (
-                      <div className="p-2.5 bg-black/60 rounded-xl border border-white/5 space-y-1.5">
-                        {(() => {
-                          const totalDays = 21;
-                          const daysLeft = Math.max(0, item.daysDiff ?? 0);
-                          const elapsedDays = Math.max(0, Math.min(totalDays, totalDays - daysLeft));
-                          const progressPct = isCompleted ? 100 : Math.round((elapsedDays / totalDays) * 100);
-
-                          return (
-                            <>
-                              <div className="flex items-center justify-between text-[11px]">
-                                <span className="font-bold text-white/80 flex items-center gap-1.5">
-                                  {isCompleted ? (
-                                    <span className="text-emerald-400 flex items-center gap-1">
-                                      <CheckCircle2 className="size-3.5" /> Disparo & Venda Concluídos
-                                    </span>
-                                  ) : daysLeft === 0 ? (
-                                    <span className="text-amber-400 flex items-center gap-1 animate-pulse">
-                                      <Clock className="size-3.5" /> 3 Semanas Atingidas: Pronto para Disparo
-                                    </span>
-                                  ) : (
-                                    <span className="text-blue-300 flex items-center gap-1">
-                                      <RefreshCw className="size-3 animate-spin text-blue-400" /> Aguardando 3 semanas (restam {daysLeft} dias)
-                                    </span>
-                                  )}
+                      {/* 2. Carregamento de 3 Semanas (% ao decorrer dos dias) */}
+                      <td className="px-5 py-4 min-w-[220px]">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-white/80 flex items-center gap-1.5">
+                              {isCompleted ? (
+                                <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                  <CheckCircle2 className="size-3.5" /> Concluído
                                 </span>
-                                <span className="font-mono text-[10px] text-white/50">{progressPct}%</span>
-                              </div>
+                              ) : daysLeft === 0 ? (
+                                <span className="text-amber-400 font-bold flex items-center gap-1 animate-pulse">
+                                  <Clock className="size-3.5" /> 3 Semanas Atingidas
+                                </span>
+                              ) : (
+                                <span className="text-blue-300 flex items-center gap-1">
+                                  <RefreshCw className="size-3 animate-spin text-blue-400" /> Ciclo de 3 Semanas (faltam {daysLeft}d)
+                                </span>
+                              )}
+                            </span>
+                            <span className="font-mono font-bold text-white/60 text-xs">{progressPct}%</span>
+                          </div>
 
-                              <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden border border-white/5">
-                                <div
-                                  className={`h-full transition-all duration-500 rounded-full ${
-                                    isCompleted 
-                                      ? 'bg-emerald-400' 
-                                      : daysLeft === 0 
-                                      ? 'bg-amber-400' 
-                                      : 'bg-gradient-to-r from-blue-500 via-emerald-500 to-emerald-400'
-                                  }`}
-                                  style={{ width: `${progressPct}%` }}
-                                />
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
+                          <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden border border-white/5">
+                            <div
+                              className={`h-full transition-all duration-500 rounded-full ${
+                                isCompleted 
+                                  ? 'bg-emerald-400' 
+                                  : daysLeft === 0 
+                                  ? 'bg-amber-400' 
+                                  : 'bg-gradient-to-r from-blue-500 via-emerald-500 to-emerald-400'
+                              }`}
+                              style={{ width: `${progressPct}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
 
-                    {item.reason_description ? (
-                      <p className="text-xs text-white/80 font-medium">
-                        "{item.reason_description}"
-                      </p>
-                    ) : (
-                      <p className="text-xs text-white/40 italic">Sem anotação adicional.</p>
-                    )}
+                      {/* 3. Qual foi a Última Compra */}
+                      <td className="px-5 py-4 text-xs min-w-[180px]">
+                        <div className="font-bold text-white truncate max-w-[220px] flex items-center gap-1.5">
+                          <Package className="size-3.5 text-emerald-400 flex-shrink-0" />
+                          <span>{item.target_product || 'Pod Descartável'}</span>
+                        </div>
+                        <div className="text-[11px] text-white/50 mt-0.5 font-mono">
+                          {item.target_flavor ? `Sabor: ${item.target_flavor}` : (item.reason_description ? item.reason_description.slice(0, 45) : 'Compra recente')}
+                        </div>
+                      </td>
 
-                    {item.target_product && (
-                      <div className="text-[11px] text-emerald-400 font-mono pt-1 border-t border-white/5 flex items-center gap-1.5">
-                        <Package className="size-3" />
-                        <span>Último Produto Comprado: <strong>{item.target_product}</strong></span>
-                      </div>
-                    )}
+                      {/* 4. Enviado e Não Enviado (Status do Disparo Automático) */}
+                      <td className="px-5 py-4 text-center">
+                        {isCompleted ? (
+                          <span className="inline-flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+                            <Check className="size-3.5 stroke-[3]" />
+                            Enviado
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 bg-white/5 text-white/50 border border-white/10 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider">
+                            <Clock className="size-3.5 text-white/40" />
+                            Não Enviado
+                          </span>
+                        )}
+                      </td>
 
-                    {/* Preview da Copy Exata que será/foi disparada */}
-                    {item.whatsappMessage && (
-                      <div className="p-2.5 bg-[#080808] rounded-lg border border-white/5 text-[11px] text-white/60 space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-white/40 block">
-                          📝 Mensagem Personalizada do Disparo:
-                        </span>
-                        <p className="whitespace-pre-line font-sans text-white/80 leading-relaxed italic line-clamp-3 hover:line-clamp-none transition-all">
-                          {item.whatsappMessage}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                      {/* 5. Ação WhatsApp (Enviar Manualmente em 1 Clique) */}
+                      <td className="px-5 py-4 text-right">
+                        <div className="inline-flex items-center gap-2">
+                          {/* Botão de Marcar como Enviado / Venda Fechada */}
+                          {!isCompleted && !isCancelled && (
+                            <button
+                              onClick={() => handleComplete(item.id)}
+                              className="p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 transition-colors cursor-pointer"
+                              title="Registrar como Enviado / Venda Fechada"
+                            >
+                              <Check className="size-4 stroke-[2.5]" />
+                            </button>
+                          )}
 
-                </div>
+                          {/* Botão Enviar Manualmente no WhatsApp */}
+                          <a
+                            href={waUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_12px_rgba(16,185,129,0.15)] cursor-pointer hover:bg-emerald-500 hover:text-black"
+                            title="Enviar Mensagem Manualmente no WhatsApp"
+                          >
+                            <MessageSquare className="size-3.5" />
+                            <span>WhatsApp</span>
+                          </a>
 
-                {/* Ações do Card */}
-                <div className="flex items-center justify-between pt-2 border-t border-white/5 gap-2">
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="p-2 rounded-xl text-white/40 hover:text-red-400 hover:bg-white/5 transition-colors cursor-pointer"
-                      title="Excluir Follow-up"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                    {!isCompleted && !isCancelled && (
-                      <button
-                        onClick={() => handleCancel(item.id)}
-                        className="p-2 rounded-xl text-white/40 hover:text-amber-400 hover:bg-white/5 transition-colors cursor-pointer"
-                        title="Cancelar Follow-up"
-                      >
-                        <XCircle className="size-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {!isCompleted && !isCancelled && (
-                      <button
-                        onClick={() => handleComplete(item.id)}
-                        className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                        title="Marcar como Venda Fechada"
-                      >
-                        <Check className="size-3.5 stroke-[3]" />
-                        <span>Venda Fechada</span>
-                      </button>
-                    )}
-
-                    <a
-                      href={item.whatsappUrl || `https://wa.me/${String(item.client_phone).replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)] cursor-pointer"
-                    >
-                      <MessageSquare className="size-3.5" />
-                      <span>Chamar no Zap</span>
-                    </a>
-                  </div>
-                </div>
-
-              </div>
-            );
-          })}
+                          {/* Excluir da esteira */}
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="p-2 rounded-xl text-white/30 hover:text-red-400 hover:bg-white/5 transition-colors cursor-pointer"
+                            title="Remover da esteira"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
+
 
       {/* Modal de Criação */}
       <NewFollowUpModal
