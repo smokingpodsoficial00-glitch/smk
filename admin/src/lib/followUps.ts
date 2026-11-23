@@ -37,6 +37,11 @@ export interface FollowUpItem {
 }
 
 export const OFFICIAL_CATALOG_URL = 'https://smokingproject01.vercel.app/?src=followup21d';
+// DATA DE CORTE OFICIAL: 23/11/2026 (Hoje)
+// Regra Estrita: A esteira de recompra automática SÓ dispara para compras concluídas a partir de HOJE (23/11/2026).
+// NENHUM cliente histórico anterior a essa data receberá disparos de recompra automática.
+export const FOLLOWUP_CUTOFF_DATE_STR = '2026-11-23';
+export const FOLLOWUP_CUTOFF_TIMESTAMP = new Date('2026-11-23T00:00:00-03:00').getTime();
 export const REPLENISHMENT_CYCLE_DAYS = 21; // Ciclo Oficial de Recompra (3 Semanas / 21 dias)
 export const SAFE_DISPATCH_WINDOW = { startHour: 14, endHour: 19 }; // 14:00 às 19:00
 
@@ -480,29 +485,55 @@ export async function sync21DaysReplenishmentFollowUps(
       return fPhone === cleanPhone || (f.client_id && client.id && f.client_id === client.id);
     });
 
-    // 2. Trava Anti-Mico: Cliente comprou a menos de 21 dias!
-    // Ele NUNCA pode receber cobrança de recompra se comprou recentemente.
-    if (daysSince < REPLENISHMENT_CYCLE_DAYS) {
-      if (existing) {
-        // Se tinha agendamento que caiu na data antiga, cancela ou reprograma para nova compra + 21 dias
-        const newTargetDate = new Date(now.getTime() + (REPLENISHMENT_CYCLE_DAYS - daysSince) * 24 * 60 * 60 * 1000);
-        const newScheduledDate = newTargetDate.toISOString().split('T')[0];
+    // REGRA DE CORTE (23/11/2026): Apenas compras concluídas a partir de HOJE entram na esteira de 21 dias!
+    // Para compras anteriores ao corte, NUNCA dispara recompra automática antiga.
+    const lastOrderTimestamp = client.lastOrderTimestamp || (client.latestOrder?.created_at ? new Date(client.latestOrder.created_at).getTime() : 0);
+    const isOrderFromTodayOnwards = lastOrderTimestamp >= FOLLOWUP_CUTOFF_TIMESTAMP;
 
-        if (existing.scheduled_date !== newScheduledDate) {
-          await updateFollowUp(existing.id, {
-            scheduled_date: newScheduledDate,
-            reason_description: `Reprogramado automaticamente: compra recente há ${daysSince}d (trava anti-spam de 21 dias).`
-          }, targetCompanyId);
-          cancelledRecentBuyerCount++;
-        }
+    if (!isOrderFromTodayOnwards) {
+      // Compra histórica anterior a hoje: se houver follow-up automático residual de recompra, cancela
+      if (existing) {
+        await cancelFollowUp(existing.id, targetCompanyId);
+        cancelledRecentBuyerCount++;
       }
       continue;
     }
 
-    // 1. Ciclo de 21 dias atingido ou ultrapassado (pod no fim / inativo):
-    // Se ainda não tem agendamento pendente, cria o follow-up oficial de 21 dias
+    // 2. Trava Anti-Mico: Cliente comprou a menos de 21 dias!
+    // Ele NUNCA pode receber cobrança de recompra se comprou recentemente.
+    if (daysSince < REPLENISHMENT_CYCLE_DAYS) {
+      const targetDays = REPLENISHMENT_CYCLE_DAYS - daysSince;
+      const targetTimestamp = (lastOrderTimestamp > 0 ? lastOrderTimestamp : now.getTime()) + (REPLENISHMENT_CYCLE_DAYS * 24 * 60 * 60 * 1000);
+      const newScheduledDate = new Date(targetTimestamp).toISOString().split('T')[0];
+
+      if (!existing) {
+        // Agenda para exatamente 3 semanas (21 dias) após a compra de hoje
+        await createFollowUp({
+          company_id: targetCompanyId,
+          client_id: client.id || null,
+          client_name: client.name || 'Cliente',
+          client_phone: formattedPhone,
+          reason_category: 'recompra_futura',
+          reason_description: `Agendado automaticamente para 21 dias após a compra de hoje (${client.lastProduct || 'Pod'}). Faltam ${targetDays} dias.`,
+          target_product: client.lastProduct || null,
+          target_flavor: client.lastFlavor || null,
+          target_puffs: client.lastPuffs || null,
+          scheduled_date: newScheduledDate,
+          scheduled_time: '15:00'
+        });
+        createdCount++;
+      } else if (existing.scheduled_date !== newScheduledDate) {
+        await updateFollowUp(existing.id, {
+          scheduled_date: newScheduledDate,
+          reason_description: `Reprogramado automaticamente: compra recente há ${daysSince}d (trava anti-spam de 21 dias).`
+        }, targetCompanyId);
+        cancelledRecentBuyerCount++;
+      }
+      continue;
+    }
+
+    // 1. Ciclo de 21 dias atingido a partir de compras novas:
     if (!existing) {
-      // Data agendada: hoje (se já passou dos 21 dias)
       const scheduledDate = now.toISOString().split('T')[0];
       await createFollowUp({
         company_id: targetCompanyId,
@@ -510,7 +541,7 @@ export async function sync21DaysReplenishmentFollowUps(
         client_name: client.name || 'Cliente',
         client_phone: formattedPhone,
         reason_category: 'recompra_futura',
-        reason_description: `Disparo automático do ciclo de recompra de 21 dias (última compra há ${daysSince} dias).`,
+        reason_description: `Disparo automático do ciclo de recompra de 21 dias (compra realizada a partir de 23/11).`,
         target_product: client.lastProduct || null,
         target_flavor: client.lastFlavor || null,
         target_puffs: client.lastPuffs || null,
