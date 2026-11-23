@@ -146,10 +146,19 @@ export function FollowUpsTab() {
                 }
 
                 if (sentViaBackend) {
-                  await completeFollowUp(targetItem.id, company?.id);
-                  console.log(`🚀 [AutoDispatch 100%] Disparo automático enviado com sucesso para ${targetItem.client_name} (${phoneFormatted})`);
+                  // Marca como concluído (Status: Enviado) e reinicia o contador para mais 3 semanas (21 dias)
+                  const now = new Date();
+                  const nextDate = new Date(now.getTime() + (21 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+                  await updateFollowUp(targetItem.id, {
+                    status: 'concluido',
+                    completed_at: now.toISOString(),
+                    scheduled_date: nextDate,
+                    reason_description: `Disparo enviado com sucesso via WhatsApp! Próximo ciclo de 3 semanas reiniciado para ${nextDate}.`
+                  }, company?.id);
+                  console.log(`🚀 [AutoDispatch 100%] Disparo automático enviado com sucesso para ${targetItem.client_name} (${phoneFormatted})! Ciclo reiniciado para ${nextDate}.`);
                 }
               }
+
               // Atualiza os dados na tela se algum foi disparado
               const refreshed = await fetchFollowUps(company?.id);
               setFollowUps(refreshed);
@@ -253,7 +262,14 @@ export function FollowUpsTab() {
       }
 
       if (sentViaBackend) {
-        await completeFollowUp(item.id, company?.id);
+        const now = new Date();
+        const nextDate = new Date(now.getTime() + (21 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+        await updateFollowUp(item.id, {
+          status: 'concluido',
+          completed_at: now.toISOString(),
+          scheduled_date: nextDate,
+          reason_description: `Disparo enviado com sucesso via WhatsApp! Próximo ciclo de 3 semanas reiniciado para ${nextDate}.`
+        }, company?.id);
         await loadData();
         alert(`🚀 Disparo automático enviado com sucesso para ${item.client_name} (${phoneFormatted})!\n\nStatus atualizado para: ENVIADO.`);
       } else {
