@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { Clock, Send, Loader2, Sparkles, MessageCircle, AlertTriangle, Flame, CheckCircle2, Calendar, Search, X } from "lucide-react";
+import { Clock, Send, Loader2, Sparkles, MessageCircle, AlertTriangle, Flame, CheckCircle2, Calendar, Search, X, Check } from "lucide-react";
 import { fetchLiveClients, invalidateLiveClientsCache, recordReplenishmentAlert, matchesVisualSearch, type RealClient } from "@/lib/crm";
+import { getReplenishmentCopy, isWithinSafeDispatchWindow, sync21DaysReplenishmentFollowUps } from "@/lib/followUps";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -275,8 +276,10 @@ export function PredictiveReplenishment({ onSelectClient }: { onSelectClient: (c
             const errorMsg = alertErrors[item.id];
 
             const phoneClean = item.cleanPhone || item.phone.replace(/\D/g, '');
-            const msg = `E aí ${item.name}! Tudo certo? Vi que já faz um tempinho desde a sua última compra do ${item.lastProduct}. Já quer ir garantindo a sua reposição para não ficar na mão? Me avisa aqui!`;
-            const waUrl = item.whatsappUrl || `https://wa.me/${phoneClean.startsWith('55') ? phoneClean : '55' + phoneClean}?text=${encodeURIComponent(msg)}`;
+            // Rotaciona as 3 variações de copy com link oficial de 21d
+            const copyIndex = (item.id || '').split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0) % 3;
+            const msg = getReplenishmentCopy(item.name, copyIndex);
+            const waUrl = `https://wa.me/${phoneClean.startsWith('55') ? phoneClean : '55' + phoneClean}?text=${encodeURIComponent(msg)}`;
 
             return (
               <div 

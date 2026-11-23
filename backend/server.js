@@ -1826,6 +1826,22 @@ app.post('/api/marketing/campaigns/start-dispatch', async (req, res) => {
             break;
           }
 
+          // Janela Segura de Disparo: 14:00 às 19:00 (evitar manhãs e madrugadas)
+          const nowSP = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+          const currentHour = nowSP.getHours();
+          if (currentHour < 14 || currentHour >= 19) {
+            dispatchState.status = `🌙 Fora da janela segura de disparo (14h às 19h). Horário atual em SP: ${currentHour}h. Aguardando a abertura da janela segura...`;
+            console.log(`[Dispatch][${companyId}] Pausando: horário ${currentHour}h fora da janela segura de 14h às 19h.`);
+            // Aguarda 10 minutos antes de rechecar a janela
+            for (let wait = 0; wait < 600; wait += 10) {
+              if (dispatchState.abortRequested) break;
+              await new Promise(r => setTimeout(r, 10000));
+            }
+            if (dispatchState.abortRequested) break;
+            i--; // Repete o mesmo índice quando retomar
+            continue;
+          }
+
           const contact = targetContacts[i];
           const rawPhone = contact.cleanPhone || contact.phone;
           const normalizedPhone = normalizeMarketingPhone(rawPhone);
@@ -1843,8 +1859,8 @@ app.post('/api/marketing/campaigns/start-dispatch', async (req, res) => {
           }
 
           const formattedMsg = chosenText
-            .replace(/\[Nome\]/gi, contact.name || 'Cliente')
-            .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, cardapioUrl || 'https://smoking-pods.vercel.app')
+            .replace(/\[Nome\]|{{nome}}/gi, (contact.name || 'Cliente').trim().split(' ')[0] || 'Cliente')
+            .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, cardapioUrl || 'https://smokingproject01.vercel.app/?src=followup21d')
             .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, grupoVipUrl || '');
 
           dispatchState.status = `📤 Enviando para ${contact.name || normalizedPhone}...`;
@@ -2339,6 +2355,14 @@ async function runSchedulerForCompany(companyId) {
             const effectiveBatchInterval = camp.batchIntervalMinutes || 35;
 
             for (let i = 0; i < targetContacts.length; i++) {
+              // Janela Segura de Disparo: 14:00 às 19:00 (evitar manhãs e madrugadas)
+              const nowSP = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+              const currentHour = nowSP.getHours();
+              if (currentHour < 14 || currentHour >= 19) {
+                console.log(`⏸️ [Scheduler][${cid}] Fora da janela de disparo (14h-19h). Horário atual: ${currentHour}h. Pausando execução da campanha.`);
+                break;
+              }
+
               const currentConfig = loadMarketingConfig(cid);
               const currentCamp = (currentConfig.campaigns || []).find(c => c.id === camp.id);
               if (!currentCamp || currentCamp.status !== 'active') break;
@@ -2357,8 +2381,8 @@ async function runSchedulerForCompany(companyId) {
               }
 
               const formattedMsg = chosenText
-                .replace(/\[Nome\]/gi, contact.name || 'Cliente')
-                .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smoking-pods.vercel.app')
+                .replace(/\[Nome\]|{{nome}}/gi, (contact.name || 'Cliente').trim().split(' ')[0] || 'Cliente')
+                .replace(/\[LINK_DO_CARDAPIO_VERCEL\]/gi, 'https://smokingproject01.vercel.app/?src=followup21d')
                 .replace(/\[LINK_DO_GRUPO_VIP_WHATSAPP\]/gi, '');
 
               const formattedNumber = formatToBaileysJid(cleanPhone);

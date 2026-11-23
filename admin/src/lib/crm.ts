@@ -812,15 +812,15 @@ export async function fetchLiveClients(companyId?: string): Promise<RealClient[]
           ? (flavorProfile === 'ice' ? 'Mentolado / Ice' : flavorProfile === 'tobacco' ? 'Atabacado / Intenso' : flavorProfile === 'dessert' ? 'Sobremesa / Doce' : 'Frutado / Doce')
           : detectedFlavor.label;
 
-        // Regra Nova e Definitiva: Ciclo de recompra fixo em 14 dias para qualquer produto
-        const expectedCycleDays = 14;
+        // Regra Nova e Definitiva: Ciclo de recompra fixo em 21 dias (3 Semanas) para pods de 20k-40k puffs
+        const expectedCycleDays = 21;
 
         const estimatedDaysLeft = Math.max(0, expectedCycleDays - daysSinceLastOrder);
-        const isEndingSoon = estimatedDaysLeft <= 4 || daysSinceLastOrder >= expectedCycleDays;
+        const isEndingSoon = estimatedDaysLeft <= 5 || daysSinceLastOrder >= expectedCycleDays;
 
         let urgencyLevel: 'urgent' | 'warning' | 'ok' = 'ok';
         if (daysSinceLastOrder >= expectedCycleDays) urgencyLevel = 'urgent';
-        else if (estimatedDaysLeft <= 4) urgencyLevel = 'warning';
+        else if (estimatedDaysLeft <= 5) urgencyLevel = 'warning';
 
         const nextReplenishTimestamp = lastOrderTimestamp + (expectedCycleDays * 24 * 60 * 60 * 1000);
         const nextReplenishmentDate = new Date(nextReplenishTimestamp).toLocaleDateString('pt-BR');

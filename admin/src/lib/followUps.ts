@@ -36,6 +36,70 @@ export interface FollowUpItem {
   daysDiff?: number; // < 0 atrasado, 0 hoje, > 0 futuro
 }
 
+export const OFFICIAL_CATALOG_URL = 'https://smokingproject01.vercel.app/?src=followup21d';
+export const REPLENISHMENT_CYCLE_DAYS = 21; // Ciclo Oficial de Recompra (3 Semanas / 21 dias)
+export const SAFE_DISPATCH_WINDOW = { startHour: 14, endHour: 19 }; // 14:00 às 19:00
+
+// 3 Variações Humanizadas de Copy de Recompra (Anti-Ban WhatsApp)
+export const REPLENISHMENT_COPY_VARIATIONS = [
+  {
+    id: 'var_a',
+    title: 'Variação A (Natural/Amigável)',
+    template: `Fala, {{nome}}! Tranquilo, irmão? 💨
+Passando aqui porque já faz umas 3 semanas do seu último pedido... imaginei que seu pod já deve tá no fim ou piscando aí haha.
+Chegou reposição de sabores essa semana na loja! Se quiser dar uma olhada no que tem a pronta entrega pra hoje no ABC, tá na mão:
+📲 ${OFFICIAL_CATALOG_URL}
+Se precisar de recomendação de sabor gelado, só me dar um alô!`
+  },
+  {
+    id: 'var_b',
+    title: 'Variação B (Novidades & Estoque)',
+    template: `E aí, {{nome}}! Beleza? ✌️
+Bateu 3 semanas do seu último pod com a gente e já viemos te salvar antes que você fique na mão no rolê!
+O estoque foi renovado essa semana com novidades (inclusive modelos com tela digital e opções Ice). Quer garantir o seu antes que os sabores mais pedidos esgotem?
+Dá uma olhada no cardápio de hoje:
+🛒 ${OFFICIAL_CATALOG_URL}`
+  },
+  {
+    id: 'var_c',
+    title: 'Variação C (Curta/Consultiva)',
+    template: `Salve, {{nome}}! Tudo em paz?
+Seu pod ainda tá aguentando o tranco ou já tá pedindo arrego? 😂
+Se já tiver precisando de reposição, hoje as entregas pelo Uber Direct tão saindo em menos de 30 minutos no ABC.
+Tabela atualizada aqui: ${OFFICIAL_CATALOG_URL}
+Qualquer coisa, só chamar!`
+  }
+];
+
+/**
+ * Retorna uma das 3 variações de copy de forma determinística ou rotacionada
+ */
+export function getReplenishmentCopy(clientName: string, variationIndex = 0): string {
+  const safeIdx = Math.abs(variationIndex) % REPLENISHMENT_COPY_VARIATIONS.length;
+  const variation = REPLENISHMENT_COPY_VARIATIONS[safeIdx];
+  const firstName = (clientName || 'Cliente').trim().split(' ')[0] || 'Cliente';
+  return variation.template.replace(/{{nome}}/gi, firstName);
+}
+
+/**
+ * Verifica se o momento atual está dentro da Janela Segura de Disparo (14:00 - 19:00)
+ */
+export function isWithinSafeDispatchWindow(date = new Date()): { inWindow: boolean; currentHour: number; message: string } {
+  // Horário de Brasília
+  const spTime = new Date(date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  const hour = spTime.getHours();
+  const inWindow = hour >= SAFE_DISPATCH_WINDOW.startHour && hour < SAFE_DISPATCH_WINDOW.endHour;
+
+  let message = 'Dentro da janela segura de disparo (14h às 19h).';
+  if (hour < SAFE_DISPATCH_WINDOW.startHour) {
+    message = `Fora da janela de disparo. Os envios abrem às ${SAFE_DISPATCH_WINDOW.startHour}:00 (evita manhãs/madrugadas).`;
+  } else if (hour >= SAFE_DISPATCH_WINDOW.endHour) {
+    message = `Janela de disparo encerrada hoje às ${SAFE_DISPATCH_WINDOW.endHour}:00. Retoma amanhã às ${SAFE_DISPATCH_WINDOW.startHour}:00.`;
+  }
+
+  return { inWindow, currentHour: hour, message };
+}
+
 export const FOLLOWUP_CATEGORIES: Record<FollowUpReasonCategory, { label: string; icon: string; defaultCopy: string }> = {
   sem_dinheiro_salario: {
     label: '💰 Pagamento / Salário (Dia 05 / 5º dia útil)',
@@ -58,9 +122,9 @@ export const FOLLOWUP_CATEGORIES: Record<FollowUpReasonCategory, { label: string
     defaultCopy: 'Fala [Nome]! Consegui uma condição especial no motoboy aqui pra sua região em SBC hoje. Se quiser fechar seu pod agora, já consigo despachar!'
   },
   recompra_futura: {
-    label: '💨 Recompra Marcada (Pod Secando)',
+    label: '💨 Esteira de Recompra (3 Semanas / 21 Dias)',
     icon: '💨',
-    defaultCopy: 'E aí [Nome], beleza? 💨 Passando conforme combinamos pra ver se seu pod já tá no finalzinho das puxadas! Quer garantir o próximo pro fds?'
+    defaultCopy: REPLENISHMENT_COPY_VARIATIONS[0].template
   },
   outro: {
     label: '📝 Outro Motivo Comercial',
@@ -70,12 +134,19 @@ export const FOLLOWUP_CATEGORIES: Record<FollowUpReasonCategory, { label: string
 };
 
 // Gera a mensagem personalizada de WhatsApp
-export function generateFollowUpMessage(item: Partial<FollowUpItem>): string {
+export function generateFollowUpMessage(item: Partial<FollowUpItem>, variationIndex?: number): string {
+  if (item.reason_category === 'recompra_futura') {
+    const idx = variationIndex !== undefined 
+      ? variationIndex 
+      : ((item.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 3);
+    return getReplenishmentCopy(item.client_name || 'Cliente', idx);
+  }
+
   const categoryConfig = FOLLOWUP_CATEGORIES[item.reason_category || 'outro'] || FOLLOWUP_CATEGORIES.outro;
   let baseCopy = categoryConfig.defaultCopy;
 
-  const clientName = item.client_name || 'Cliente';
-  let formatted = baseCopy.replace(/\[Nome\]/gi, clientName);
+  const clientName = (item.client_name || 'Cliente').trim().split(' ')[0] || 'Cliente';
+  let formatted = baseCopy.replace(/\[Nome\]|{{nome}}/gi, clientName);
 
   if (item.target_product || item.target_flavor) {
     const prodDesc = [item.target_product, item.target_flavor].filter(Boolean).join(' - ');
@@ -359,4 +430,103 @@ export async function deleteFollowUp(id: string, companyId?: string): Promise<bo
 
   deleteLocalFollowUp(id);
   return true;
+}
+
+// 7. Sincronização Inteligente do Ciclo de Recompra (21 dias com Trava Anti-Spam)
+export interface SyncReplenishmentResult {
+  totalProcessed: number;
+  createdCount: number;
+  updatedCount: number;
+  cancelledRecentBuyerCount: number;
+}
+
+/**
+ * Varre os clientes do CRM e sincroniza a esteira oficial de 21 dias:
+ * - Gatilho: exatos 21 dias após a data da última compra concluída.
+ * - Trava Anti-Mico / Anti-Spam: se comprou a menos de 21 dias, cancela qualquer agendamento pendente
+ *   e reprograma para última_compra + 21 dias.
+ */
+export async function sync21DaysReplenishmentFollowUps(
+  clients: any[],
+  companyId?: string
+): Promise<SyncReplenishmentResult> {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const currentFollowUps = await fetchFollowUps(targetCompanyId);
+  const pendingReplenishments = currentFollowUps.filter(
+    f => f.reason_category === 'recompra_futura' && f.status === 'pendente'
+  );
+
+  let createdCount = 0;
+  let updatedCount = 0;
+  let cancelledRecentBuyerCount = 0;
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  for (const client of clients) {
+    if (!client) continue;
+
+    const rawPhone = client.phone || client.cleanPhone;
+    if (!rawPhone) continue;
+    const cleanPhone = String(rawPhone).replace(/\D/g, '');
+    const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+
+    const daysSince = Number(client.daysSinceLastOrder);
+    if (isNaN(daysSince)) continue;
+
+    // Encontra follow-up de recompra pendente existente para este telefone
+    const existing = pendingReplenishments.find(f => {
+      const fPhone = String(f.client_phone || '').replace(/\D/g, '');
+      return fPhone === cleanPhone || (f.client_id && client.id && f.client_id === client.id);
+    });
+
+    // 2. Trava Anti-Mico: Cliente comprou a menos de 21 dias!
+    // Ele NUNCA pode receber cobrança de recompra se comprou recentemente.
+    if (daysSince < REPLENISHMENT_CYCLE_DAYS) {
+      if (existing) {
+        // Se tinha agendamento que caiu na data antiga, cancela ou reprograma para nova compra + 21 dias
+        const newTargetDate = new Date(now.getTime() + (REPLENISHMENT_CYCLE_DAYS - daysSince) * 24 * 60 * 60 * 1000);
+        const newScheduledDate = newTargetDate.toISOString().split('T')[0];
+
+        if (existing.scheduled_date !== newScheduledDate) {
+          await updateFollowUp(existing.id, {
+            scheduled_date: newScheduledDate,
+            reason_description: `Reprogramado automaticamente: compra recente há ${daysSince}d (trava anti-spam de 21 dias).`
+          }, targetCompanyId);
+          cancelledRecentBuyerCount++;
+        }
+      }
+      continue;
+    }
+
+    // 1. Ciclo de 21 dias atingido ou ultrapassado (pod no fim / inativo):
+    // Se ainda não tem agendamento pendente, cria o follow-up oficial de 21 dias
+    if (!existing) {
+      // Data agendada: hoje (se já passou dos 21 dias)
+      const scheduledDate = now.toISOString().split('T')[0];
+      await createFollowUp({
+        company_id: targetCompanyId,
+        client_id: client.id || null,
+        client_name: client.name || 'Cliente',
+        client_phone: formattedPhone,
+        reason_category: 'recompra_futura',
+        reason_description: `Disparo automático do ciclo de recompra de 21 dias (última compra há ${daysSince} dias).`,
+        target_product: client.lastProduct || null,
+        target_flavor: client.lastFlavor || null,
+        target_puffs: client.lastPuffs || null,
+        scheduled_date: scheduledDate,
+        scheduled_time: '15:00' // Dentro da janela segura (14h - 19h)
+      });
+      createdCount++;
+    } else {
+      updatedCount++;
+    }
+  }
+
+  return {
+    totalProcessed: clients.length,
+    createdCount,
+    updatedCount,
+    cancelledRecentBuyerCount
+  };
 }

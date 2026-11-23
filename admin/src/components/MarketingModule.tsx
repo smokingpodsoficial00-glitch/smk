@@ -26,6 +26,7 @@ import {
   setMarketingCampaignStatus, 
   type Campaign 
 } from '@/lib/marketingCampaigns';
+import { FollowUpsTab } from './crm/FollowUpsTab';
 
 export type { ContactItem, BroadcastList, Campaign };
 
@@ -55,10 +56,32 @@ const OFFICIAL_TEMPLATES = [
     text: `Opa [Nome], quanto tempo! De boa? 🔥\nSei que fazia um tempinho que estávamos sem nos falar, mas organizamos a casa e *voltamos com tudo!*\n\nComo você é da nossa base das antigas, tô te mandando o *Catálogo Digital atualizado* pra você dar uma olhada nas novidades e produtos que chegaram:\n🔗 [LINK_DO_CARDAPIO_VERCEL]\n\n⚡ *Hoje tamo com prioridade máxima de entrega rápida (30-40 min via Uber Direct).*\n\n🔒 *Se quiser receber ofertas relâmpago e condições exclusivas antes de todo mundo, entra no nosso Grupo VIP:*\n🔗 [LINK_DO_GRUPO_VIP_WHATSAPP]\n\nTô por aqui se precisar de algo, só chamar!`,
   },
   {
+    id: 'recompra_21d_oficial',
+    title: '💨 Esteira de Recompra (3 Semanas / 21 Dias)',
+    badge: 'Oficial • Anti-Ban',
+    text: `Fala, [Nome]! Tranquilo, irmão? 💨
+Passando aqui porque já faz umas 3 semanas do seu último pedido... imaginei que seu pod já deve tá no fim ou piscando aí haha.
+Chegou reposição de sabores essa semana na loja! Se quiser dar uma olhada no que tem a pronta entrega pra hoje no ABC, tá na mão:
+📲 https://smokingproject01.vercel.app/?src=followup21d
+Se precisar de recomendação de sabor gelado, só me dar um alô!`,
+    variations: [
+      `E aí, [Nome]! Beleza? ✌️
+Bateu 3 semanas do seu último pod com a gente e já viemos te salvar antes que você fique na mão no rolê!
+O estoque foi renovado essa semana com novidades (inclusive modelos com tela digital e opções Ice). Quer garantir o seu antes que os sabores mais pedidos esgotem?
+Dá uma olhada no cardápio de hoje:
+🛒 https://smokingproject01.vercel.app/?src=followup21d`,
+      `Salve, [Nome]! Tudo em paz?
+Seu pod ainda tá aguentando o tranco ou já tá pedindo arrego? 😂
+Se já tiver precisando de reposição, hoje as entregas pelo Uber Direct tão saindo em menos de 30 minutos no ABC.
+Tabela atualizada aqui: https://smokingproject01.vercel.app/?src=followup21d
+Qualquer coisa, só chamar!`
+    ]
+  },
+  {
     id: 'reposicao_ativa',
-    title: 'Aviso de Recompra (Reposição)',
+    title: 'Aviso de Recompra Rápido',
     badge: 'Timing de Uso',
-    text: `E aí [Nome]! Tudo certo? ✨\nPelo meu controle aqui, seu último produto já deve estar no final ou precisando de reposição!\n\nPra você não ficar na mão no meio da semana, quer que eu já separe uma novidade pra você?\n\n📦 Cardápio completo no ar: [LINK_DO_CARDAPIO_VERCEL]\nMe avisa aqui qual produto posso agilizar pro seu delivery!`,
+    text: `E aí [Nome]! Tudo certo? ✨\nPelo meu controle aqui, seu último pod já deve estar no final ou precisando de reposição!\n\nPra você não ficar na mão no meio da semana, quer que eu já separe uma novidade pra você?\n\n📦 Cardápio completo no ar: https://smokingproject01.vercel.app/?src=followup21d\nMe avisa aqui qual produto posso agilizar pro seu delivery!`,
   },
   {
     id: 'insta_grupo_vip',
@@ -124,8 +147,8 @@ export default function MarketingModule() {
   // O motor de WhatsApp atual pertence exclusivamente à conta oficial (Smoking Pods)
   const canUseWhatsAppEngine = isLegacyBackendAllowed(company?.id ?? null);
   
-  // Abas do Módulo: 'campaigns' | 'broadcast_lists'
-  const [activeTab, setActiveTab] = useState<'campaigns' | 'broadcast_lists'>('campaigns');
+  // Abas do Módulo: 'campaigns' | 'broadcast_lists' | 'follow_ups'
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'broadcast_lists' | 'follow_ups'>('campaigns');
   
   // Base Global de Contatos e Grupos do WhatsApp
   const [allContacts, setAllContacts] = useState<ContactItem[]>([]);
@@ -665,16 +688,18 @@ export default function MarketingModule() {
     } else {
       setEditingCampaign(null);
       setCampaignFormName('');
-      setCampaignFormMessage(OFFICIAL_TEMPLATES[0].text);
-      setCampaignFormVariations([]);
-      setCampaignFormUseVariations(false);
+      // Seleciona por padrão o template de Recompra 21d oficial
+      const defaultTemplate = OFFICIAL_TEMPLATES.find(t => t.id === 'recompra_21d_oficial') || OFFICIAL_TEMPLATES[0];
+      setCampaignFormMessage(defaultTemplate.text);
+      setCampaignFormVariations((defaultTemplate as any).variations || []);
+      setCampaignFormUseVariations(Boolean((defaultTemplate as any).variations?.length));
       setCampaignFormTargetType('lists');
       const firstListId = broadcastLists.length > 0 ? broadcastLists[0].id : '';
       setCampaignFormSelectedLists(new Set(firstListId ? [firstListId] : []));
       setCampaignFormTargetGroup(whatsAppGroups.length > 0 ? whatsAppGroups[0].id : '');
-      setCampaignFormFrequency(7);
+      setCampaignFormFrequency(1); // Diário para varredura contínua
       setCampaignFormWeekday('QUARTA');
-      setCampaignFormTime('15:00');
+      setCampaignFormTime('15:00'); // Dentro da janela segura (14h às 19h)
       setCampaignFormTime2('18:00');
       setCampaignFormStartDate(new Date().toISOString().split('T')[0]);
       setCampaignFormBatchSize(5);
@@ -1345,6 +1370,18 @@ export default function MarketingModule() {
             <Users className="size-4" />
             <span>Listas de Transmissão ({broadcastLists.length})</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('follow_ups')}
+            className={`pb-2.5 text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 border-b-2 ${
+              activeTab === 'follow_ups'
+                ? 'text-white border-emerald-400 font-bold'
+                : 'text-white/40 hover:text-white/80 border-transparent'
+            }`}
+          >
+            <Clock className="size-4 text-emerald-400" />
+            <span>Esteira de Recompra & Follow-ups</span>
+          </button>
         </div>
       </header>
 
@@ -1800,6 +1837,15 @@ export default function MarketingModule() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ============================================================ */}
+        {/* ABA 3: ESTEIRA OFICIAL DE RECOMPRA AUTOMÁTICA & FOLLOW-UPS */}
+        {/* ============================================================ */}
+        {activeTab === 'follow_ups' && (
+          <div className="space-y-6">
+            <FollowUpsTab />
           </div>
         )}
 
@@ -2371,7 +2417,13 @@ export default function MarketingModule() {
                     <button
                       key={t.id}
                       type="button"
-                      onClick={() => setCampaignFormMessage(t.text)}
+                      onClick={() => {
+                        setCampaignFormMessage(t.text);
+                        if ((t as any).variations && Array.isArray((t as any).variations)) {
+                          setCampaignFormVariations((t as any).variations);
+                          setCampaignFormUseVariations(true);
+                        }
+                      }}
                       className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-white/70 hover:text-white transition-all cursor-pointer"
                     >
                       {t.title}

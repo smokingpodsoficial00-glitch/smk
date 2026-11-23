@@ -3,7 +3,7 @@ import {
   Calendar, Clock, CheckCircle2, AlertTriangle, MessageSquare, 
   Plus, Search, Filter, Trash2, Edit3, ArrowRight, Phone,
   Sparkles, Check, DollarSign, Package, RefreshCw, Layers, XCircle,
-  ShieldCheck, X
+  ShieldCheck, X, Zap
 } from 'lucide-react';
 import { 
   fetchFollowUps, 
@@ -11,9 +11,14 @@ import {
   cancelFollowUp,
   deleteFollowUp, 
   FOLLOWUP_CATEGORIES, 
+  isWithinSafeDispatchWindow,
+  sync21DaysReplenishmentFollowUps,
+  REPLENISHMENT_CYCLE_DAYS,
+  REPLENISHMENT_COPY_VARIATIONS,
   type FollowUpItem, 
   type FollowUpReasonCategory 
 } from '@/lib/followUps';
+import { fetchLiveClients } from '@/lib/crm';
 import { runFollowUpsValidationSuite, type FollowUpsTestSuiteReport } from '@/lib/followUpsTester';
 import { useAuth } from '@/contexts/AuthContext';
 import { NewFollowUpModal } from './NewFollowUpModal';
@@ -23,10 +28,14 @@ export function FollowUpsTab() {
   const { company } = useAuth();
   const [followUps, setFollowUps] = useState<FollowUpItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSyncingEngine, setIsSyncingEngine] = useState(false);
+  const [syncEngineFeedback, setSyncEngineFeedback] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClientForModal, setSelectedClientForModal] = useState<any | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [testReport, setTestReport] = useState<FollowUpsTestSuiteReport | null>(null);
+
+  const windowCheck = isWithinSafeDispatchWindow();
 
   // Filtros
   const [tabFilter, setTabFilter] = useState<'today' | 'overdue' | 'upcoming' | 'all' | 'completed'>('today');
@@ -74,6 +83,23 @@ export function FollowUpsTab() {
   }, [company?.id]);
 
   // Ações
+  const handleSync21DaysEngine = async () => {
+    setIsSyncingEngine(true);
+    setSyncEngineFeedback(null);
+    try {
+      const liveClients = await fetchLiveClients(company?.id);
+      const res = await sync21DaysReplenishmentFollowUps(liveClients, company?.id);
+      await loadData();
+      setSyncEngineFeedback(
+        `✅ Esteira atualizada com sucesso! ${res.totalProcessed} clientes analisados. Novos criados: ${res.createdCount}. Reprogramados com trava anti-spam: ${res.cancelledRecentBuyerCount}.`
+      );
+    } catch (err: any) {
+      setSyncEngineFeedback(`⚠️ Erro ao sincronizar esteira: ${err?.message || err}`);
+    } finally {
+      setIsSyncingEngine(false);
+    }
+  };
+
   const handleComplete = async (id: string) => {
     await completeFollowUp(id, company?.id);
     await loadData();
@@ -127,6 +153,48 @@ export function FollowUpsTab() {
   return (
     <div className="space-y-6">
       
+      {/* Banner de Janela Segura & Esteira Automática de 21 Dias */}
+      <div className="bg-gradient-to-r from-emerald-950/40 via-[#0e0e10] to-[#0e0e10] border border-emerald-500/30 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+        <div className="flex items-start gap-3.5">
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl shrink-0">
+            <Zap className="size-5" />
+          </div>
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                Esteira Oficial de Follow-Up Automático (21 Dias)
+              </h2>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                windowCheck.inWindow
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 animate-pulse'
+                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+              }`}>
+                {windowCheck.inWindow ? '🟢 Janela Segura Aberta (14h-19h)' : '🌙 Fora da Janela (14h-19h)'}
+              </span>
+            </div>
+            <p className="text-xs text-white/60 leading-relaxed max-w-2xl">
+              Gatilho de 21 dias (momento em que o pod de 20k-40k puffs começa a queimar). Com <strong>trava anti-spam</strong> que cancela se o cliente comprou recentemente e <strong>rotação de 3 copies humanizadas</strong>.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleSync21DaysEngine}
+          disabled={isSyncingEngine}
+          className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_20px_rgba(16,185,129,0.25)] shrink-0 disabled:opacity-50"
+        >
+          <RefreshCw className={`size-4 ${isSyncingEngine ? 'animate-spin' : ''}`} />
+          <span>{isSyncingEngine ? 'Varrendo CRM...' : 'Sincronizar Esteira (21 Dias)'}</span>
+        </button>
+      </div>
+
+      {syncEngineFeedback && (
+        <div className="p-3.5 rounded-xl bg-[#0a0a0a] border border-emerald-500/30 text-xs text-emerald-300 flex items-center justify-between gap-2">
+          <span>{syncEngineFeedback}</span>
+          <button onClick={() => setSyncEngineFeedback(null)} className="text-white/40 hover:text-white">✕</button>
+        </div>
+      )}
+
       {/* 1. Header com Métricas & Botão de Criação */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
