@@ -14,8 +14,8 @@
  *   sem adicionar headers customizados (`x-company-id`) que bloqueariam o preflight CORS nos túneis.
  */
 export const OFFICIAL_BACKEND_COMPANY_ID = 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
-export const OFFICIAL_CLOUDFLARE_TUNNEL = 'https://char-spreading-commercial-pensions.trycloudflare.com';
-export const MULTITENANT_CLOUDFLARE_TUNNEL = 'https://suspected-issues-berry-usb.trycloudflare.com';
+export const OFFICIAL_CLOUDFLARE_TUNNEL = 'https://amendments-wings-monday-license.trycloudflare.com';
+export const MULTITENANT_CLOUDFLARE_TUNNEL = 'https://amendments-wings-monday-license.trycloudflare.com';
 
 let activeBackendCompanyId: string | null = null;
 
