@@ -35,6 +35,8 @@ export function FollowUpsTab() {
   const [syncEngineFeedback, setSyncEngineFeedback] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  // Desativa o auto-disparo silencioso de background na montagem para evitar múltiplos envios concorrentes
+  // O disparo automático é acionado de forma segura e pontual
   const autoDispatchInProgressRef = useRef(false);
   const autoDispatchedIdsRef = useRef<Set<string>>(new Set());
   const [editingItem, setEditingItem] = useState<FollowUpItem | null>(null);
@@ -58,26 +60,13 @@ export function FollowUpsTab() {
       await sync21DaysReplenishmentFollowUps(liveClients, company?.id);
       let data = await fetchFollowUps(company?.id);
 
-      // Forja o cliente de teste Eduardo Pitzke com ciclo de 3 semanas 100% completo para teste imediato
+      // Forja o cliente de teste Eduardo Pitzke com ciclo de 3 semanas caso ainda não exista
       const eduardoIndex = data.findIndex(f => (f.client_name || '').toLowerCase().includes('eduardo') || (f.client_name || '').toLowerCase().includes('pitzke'));
-      const todayStr = new Date().toISOString().split('T')[0];
-      if (eduardoIndex !== -1) {
-        // Se já existe e ainda está em data futura, atualiza a data para hoje (100% carregado)
-        const eduItem = data[eduardoIndex];
-        if (eduItem.status === 'pendente' && eduItem.scheduled_date !== todayStr) {
-          await updateFollowUp(eduItem.id, {
-            scheduled_date: todayStr,
-            reason_description: 'Ciclo de 3 semanas completo hoje! Pronto para teste de envio oficial.'
-          }, company?.id);
-          eduItem.scheduled_date = todayStr;
-          eduItem.daysDiff = 0;
-        }
-      } else {
+      if (eduardoIndex === -1) {
         const eduardoClient = liveClients.find(c => (c.name || '').toLowerCase().includes('eduardo') || (c.name || '').toLowerCase().includes('pitzke'));
         const eduardoPhone = eduardoClient?.phone || '5511951741181';
-        const eduardoProduct = eduardoClient?.lastProduct || 'Pod Descartável 20k Puffs';
+        const eduardoProduct = eduardoClient?.lastProduct || 'Pod Descartável';
         const eduardoFlavor = eduardoClient?.lastFlavor || 'Ice';
-        // Forja ciclo de 3 semanas completado hoje (diasDiff = 0) para teste imediato de envio
         const now = new Date();
         const scheduledDate = now.toISOString().split('T')[0];
 
@@ -87,7 +76,7 @@ export function FollowUpsTab() {
           client_name: 'Eduardo Pitzke',
           client_phone: eduardoPhone,
           reason_category: 'recompra_futura',
-          reason_description: 'Ciclo de 3 semanas completo hoje! Pronto para teste de envio oficial.',
+          reason_description: 'Ciclo de 3 semanas completo. Pronto para reposição.',
           target_product: eduardoProduct,
           target_flavor: eduardoFlavor,
           target_puffs: 20000,
@@ -101,75 +90,8 @@ export function FollowUpsTab() {
       }
       setFollowUps(data);
 
-      // 🚀 DISPARO AUTOMÁTICO 100%: Quando o ciclo de 3 semanas bate 100% (diasDiff === 0 e status pendente),
-      // o sistema dispara automaticamente para o WhatsApp conectado no motor backend
-      if (!autoDispatchInProgressRef.current) {
-        const readyToAutoDispatch = data.filter(
-          item => item.status === 'pendente' &&
-                  (item.daysDiff === 0 || (item.daysDiff || 0) < 0) &&
-                  !autoDispatchedIdsRef.current.has(item.id)
-        );
-
-        if (readyToAutoDispatch.length > 0) {
-          autoDispatchInProgressRef.current = true;
-          (async () => {
-            try {
-              for (const targetItem of readyToAutoDispatch) {
-                autoDispatchedIdsRef.current.add(targetItem.id);
-                const rawPhone = targetItem.client_phone;
-                if (!rawPhone) continue;
-                const cleanPhone = String(rawPhone).replace(/\D/g, '');
-                const phoneFormatted = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-                const msg = targetItem.whatsappMessage || `Fala, ${targetItem.client_name}! Tranquilo? Passando pra ver como tá seu pod!`;
-
-                let sentViaBackend = false;
-                try {
-                  const res = await legacyFetch('/api/marketing/send-direct', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      phone: phoneFormatted,
-                      number: phoneFormatted,
-                      name: targetItem.client_name,
-                      text: msg,
-                      companyId: company?.id
-                    })
-                  });
-                  if (res.ok) {
-                    const resData = await res.json().catch(() => ({}));
-                    if (resData.success) {
-                      sentViaBackend = true;
-                    }
-                  }
-                } catch (bErr) {
-                  console.warn('Backend motor offline:', bErr);
-                }
-
-                if (sentViaBackend) {
-                  // Marca como concluído (Status: Enviado) e reinicia o contador para mais 3 semanas (21 dias)
-                  const now = new Date();
-                  const nextDate = new Date(now.getTime() + (21 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
-                  await updateFollowUp(targetItem.id, {
-                    status: 'concluido',
-                    completed_at: now.toISOString(),
-                    scheduled_date: nextDate,
-                    reason_description: `Disparo enviado com sucesso via WhatsApp! Próximo ciclo de 3 semanas reiniciado para ${nextDate}.`
-                  }, company?.id);
-                  console.log(`🚀 [AutoDispatch 100%] Disparo automático enviado com sucesso para ${targetItem.client_name} (${phoneFormatted})! Ciclo reiniciado para ${nextDate}.`);
-                }
-              }
-
-              // Atualiza os dados na tela se algum foi disparado
-              const refreshed = await fetchFollowUps(company?.id);
-              setFollowUps(refreshed);
-            } catch (autoErr) {
-              console.error('Erro no auto-disparo de 100%:', autoErr);
-            } finally {
-              autoDispatchInProgressRef.current = false;
-            }
-          })();
-        }
-      }
+      // Disparo automático em background removido daqui para evitar disparos concorrentes ou em looping.
+      // O disparo é controlado exclusivamente pelo botão e rotina agendada oficial.
 
     } catch (e) {
       console.error("Erro ao carregar follow-ups:", e);
@@ -264,19 +186,27 @@ export function FollowUpsTab() {
       if (sentViaBackend) {
         const now = new Date();
         const nextDate = new Date(now.getTime() + (21 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+        // Mantém pendente para o novo ciclo de 21 dias começar a correr imediatamente na lista, com status de disparo registrado
         await updateFollowUp(item.id, {
-          status: 'concluido',
+          status: 'pendente',
           completed_at: now.toISOString(),
           scheduled_date: nextDate,
           reason_description: `Disparo enviado com sucesso via WhatsApp! Próximo ciclo de 3 semanas reiniciado para ${nextDate}.`
         }, company?.id);
         await loadData();
-        alert(`🚀 Disparo automático enviado com sucesso para ${item.client_name} (${phoneFormatted})!\n\nStatus atualizado para: ENVIADO.`);
+        alert(`🚀 Disparo automático enviado com sucesso para ${item.client_name} (${phoneFormatted})!\n\nStatus atualizado para: ENVIADO. Ciclo de 3 semanas reiniciado.`);
       } else {
         // Fallback assistido: abre o WhatsApp com a mensagem pronta e já marca como enviado
         const waUrl = `https://wa.me/${phoneFormatted}?text=${encodeURIComponent(msg)}`;
         window.open(waUrl, '_blank');
-        await completeFollowUp(item.id, company?.id);
+        const now = new Date();
+        const nextDate = new Date(now.getTime() + (21 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+        await updateFollowUp(item.id, {
+          status: 'pendente',
+          completed_at: now.toISOString(),
+          scheduled_date: nextDate,
+          reason_description: `Disparo manual via WhatsApp! Próximo ciclo de 3 semanas reiniciado para ${nextDate}.`
+        }, company?.id);
         await loadData();
       }
     } catch (err: any) {
@@ -318,7 +248,7 @@ export function FollowUpsTab() {
     if (tabFilter === 'overdue' && (item.status !== 'pendente' || (item.daysDiff || 0) >= 0)) return false;
     if (tabFilter === 'upcoming' && (item.status !== 'pendente' || (item.daysDiff || 0) <= 0)) return false;
     if (tabFilter === 'completed' && item.status !== 'concluido') return false;
-    if (tabFilter === 'all' && item.status === 'concluido') return false;
+    // Em 'all', mantemos todos os clientes na esteira (mesmo os que já foram enviados/concluídos para acompanharmos o novo ciclo de 3 semanas)
 
     // 2. Filtro de Categoria
     if (categoryFilter !== 'all' && item.reason_category !== categoryFilter) return false;
@@ -615,7 +545,7 @@ export function FollowUpsTab() {
 
                       {/* 4. Enviado e Não Enviado (Status do Disparo Automático) */}
                       <td className="px-5 py-4 text-center">
-                        {isCompleted ? (
+                        {(isCompleted || item.completed_at) ? (
                           <span className="inline-flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider shadow-[0_0_10px_rgba(16,185,129,0.15)]">
                             <Check className="size-3.5 stroke-[3]" />
                             Enviado

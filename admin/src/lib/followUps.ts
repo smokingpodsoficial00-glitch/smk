@@ -45,57 +45,42 @@ export const FOLLOWUP_CUTOFF_TIMESTAMP = new Date('2026-11-23T00:00:00-03:00').g
 export const REPLENISHMENT_CYCLE_DAYS = 21; // Ciclo Oficial de Recompra (3 Semanas / 21 dias)
 export const SAFE_DISPATCH_WINDOW = { startHour: 10, endHour: 22 }; // 10:00 às 22:00 (Janela estendida)
 
-// 5 Variações Humanizadas de Copy de Recompra (Anti-Ban WhatsApp & Rotação Inteligente)
+// 5 Variações Curtas, Diretas e Informais de Copy de Recompra (Anti-Ban WhatsApp & Rotação Inteligente)
 export const REPLENISHMENT_COPY_VARIATIONS = [
   {
     id: 'var_a',
-    title: 'Variação 1: Amigável / Últimas Puxadas',
-    template: `Fala, {{nome}}! Tranquilo, irmão? 💨
-Passando aqui porque já bateu 3 semanas do seu último pedido ({{produto}})... imaginei que seu pod já deve tá nas últimas puxadas ou piscando aí haha.
-Não quer garantir o seu próximo antes que fique na mão?
-Chegou reposição de sabores essa semana a pronta entrega aqui no ABC!
-Dá uma olhada no nosso cardápio atualizado:
-📲 ${OFFICIAL_CATALOG_URL}
-Se precisar de recomendação de sabor gelado, só me dar um alô!`
+    title: 'Variação 1: Direta e Informal',
+    template: `Salve, {{nome}}, tudo bem? Vi que faz um tempo desde a sua última compra do seu {{produto}}. Gostaria de já ir separando o seu?
+
+${OFFICIAL_CATALOG_URL}`
   },
   {
     id: 'var_b',
-    title: 'Variação 2: Salvando pro Rolê / Novidades',
-    template: `E aí, {{nome}}! Beleza? ✌️
-Bateu 3 semanas do seu último pod ({{produto}}) com a gente e já viemos te salvar antes que você fique na mão no rolê!
-O pod já tá pedindo arrego? Quer garantir o seu próximo antes que os sabores mais pedidos esgotem?
-O estoque foi renovado com novidades (modelos com tela digital e opções Ice).
-Confere o cardápio de hoje:
-🛒 ${OFFICIAL_CATALOG_URL}`
+    title: 'Variação 2: Rápida / Próximo Pod',
+    template: `Opa, {{nome}}, beleza? Passando pra ver como tá seu {{produto}}. Quer que já deixe o seu próximo separado pra entrega hoje?
+
+${OFFICIAL_CATALOG_URL}`
   },
   {
     id: 'var_c',
-    title: 'Variação 3: Rápida / Entrega Express ABC',
-    template: `Salve, {{nome}}! Tudo em paz?
-Seu {{produto}} ainda tá aguentando o tranco ou já tá nas últimas puxadas? 😂
-Se já tiver precisando garantir o seu próximo, hoje as entregas pelo Uber Direct tão saindo em menos de 30 minutos no ABC.
-Tabela atualizada aqui:
-⚡ ${OFFICIAL_CATALOG_URL}
-Qualquer coisa, só chamar!`
+    title: 'Variação 3: Reposição Simples',
+    template: `Fala, {{nome}}! Tudo certo? Chegando perto da hora de renovar seu {{produto}}. Quer dar uma olhada nos sabores disponíveis e já garantir o seu?
+
+${OFFICIAL_CATALOG_URL}`
   },
   {
     id: 'var_d',
-    title: 'Variação 4: Sabor Exclusivo & Reposição VIP',
-    template: `Opa, {{nome}}, fechou 3 semanas desde a sua última compra com a gente ({{produto}})! 🔥
-Seu pod já tá na reserva? Separamos os melhores lançamentos e reposição dos sabores mais pedidos aqui em SBC pra você não ficar sem. Quer garantir o seu próximo agora?
-Confere o que tá disponível a pronta entrega:
-🚀 ${OFFICIAL_CATALOG_URL}
-Se quiser que separe algum sabor específico, me avisa!`
+    title: 'Variação 4: Separação Express',
+    template: `E aí, {{nome}}, tranquilo? Vi aqui sua última compra do {{produto}}. Quer que eu já agilize e separe o seu próximo pod por aqui?
+
+${OFFICIAL_CATALOG_URL}`
   },
   {
     id: 'var_e',
-    title: 'Variação 5: Consultiva & Atendimento Direto',
-    template: `Fala, {{nome}}! Passando rapidinho pra saber se deu tudo certo com o seu {{produto}}!
-Já são 3 semanas e geralmente é a hora que o pod tá nas últimas puxadas e pede descanso 💨
-Bora garantir o seu próximo pod pro rolê? Já tô com motoboys a postos hoje.
-Dá uma conferida nos pods em estoque:
-📲 ${OFFICIAL_CATALOG_URL}
-Precisando, tô online por aqui!`
+    title: 'Variação 5: Atendimento Rápido',
+    template: `Salve, {{nome}}! Passando rapidinho pra saber do seu {{produto}}. Quer que já separe o seu próximo pod pra hoje?
+
+${OFFICIAL_CATALOG_URL}`
   }
 ];
 
