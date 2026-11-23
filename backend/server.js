@@ -1829,9 +1829,9 @@ app.post('/api/marketing/campaigns/start-dispatch', async (req, res) => {
           // Janela Segura de Disparo: 14:00 às 19:00 (evitar manhãs e madrugadas)
           const nowSP = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
           const currentHour = nowSP.getHours();
-          if (currentHour < 14 || currentHour >= 19) {
-            dispatchState.status = `🌙 Fora da janela segura de disparo (14h às 19h). Horário atual em SP: ${currentHour}h. Aguardando a abertura da janela segura...`;
-            console.log(`[Dispatch][${companyId}] Pausando: horário ${currentHour}h fora da janela segura de 14h às 19h.`);
+          if (currentHour < 10 || currentHour >= 22) {
+            dispatchState.status = `🌙 Fora da janela segura de disparo (10h às 22h). Horário atual em SP: ${currentHour}h. Aguardando a abertura da janela segura...`;
+            console.log(`[Dispatch][${companyId}] Pausando: horário ${currentHour}h fora da janela segura de 10h às 22h.`);
             // Aguarda 10 minutos antes de rechecar a janela
             for (let wait = 0; wait < 600; wait += 10) {
               if (dispatchState.abortRequested) break;
@@ -2358,7 +2358,7 @@ async function runSchedulerForCompany(companyId) {
               // Janela Segura de Disparo: 14:00 às 19:00 (evitar manhãs e madrugadas)
               const nowSP = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
               const currentHour = nowSP.getHours();
-              if (currentHour < 14 || currentHour >= 19) {
+              if (currentHour < 10 || currentHour >= 22) {
                 console.log(`⏸️ [Scheduler][${cid}] Fora da janela de disparo (14h-19h). Horário atual: ${currentHour}h. Pausando execução da campanha.`);
                 break;
               }

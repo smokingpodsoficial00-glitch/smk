@@ -43,7 +43,7 @@ export const OFFICIAL_CATALOG_URL = 'https://smokingproject01.vercel.app/?src=fo
 export const FOLLOWUP_CUTOFF_DATE_STR = '2026-11-23';
 export const FOLLOWUP_CUTOFF_TIMESTAMP = new Date('2026-11-23T00:00:00-03:00').getTime();
 export const REPLENISHMENT_CYCLE_DAYS = 21; // Ciclo Oficial de Recompra (3 Semanas / 21 dias)
-export const SAFE_DISPATCH_WINDOW = { startHour: 14, endHour: 19 }; // 14:00 às 19:00
+export const SAFE_DISPATCH_WINDOW = { startHour: 10, endHour: 22 }; // 10:00 às 22:00 (Janela estendida)
 
 // 5 Variações Humanizadas de Copy de Recompra (Anti-Ban WhatsApp & Rotação Inteligente)
 export const REPLENISHMENT_COPY_VARIATIONS = [
