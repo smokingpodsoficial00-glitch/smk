@@ -38,12 +38,15 @@ export function FollowUpsTab() {
   const windowCheck = isWithinSafeDispatchWindow();
 
   // Filtros
-  const [tabFilter, setTabFilter] = useState<'today' | 'overdue' | 'upcoming' | 'all' | 'completed'>('today');
+  const [tabFilter, setTabFilter] = useState<'all' | 'today' | 'overdue' | 'upcoming' | 'completed'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const loadData = async () => {
     try {
+      const liveClients = await fetchLiveClients(company?.id);
+      // Sincroniza automaticamente a esteira para garantir que pedidos concluídos já estejam agendados
+      await sync21DaysReplenishmentFollowUps(liveClients, company?.id);
       const data = await fetchFollowUps(company?.id);
       setFollowUps(data);
     } catch (e) {
@@ -195,54 +198,29 @@ export function FollowUpsTab() {
         </div>
       )}
 
-      {/* 1. Header com Métricas & Botão de Criação */}
+      {/* 1. Header com Métricas da Esteira Automática */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* Card Hoje */}
+        {/* Card Todos na Esteira */}
         <div 
-          onClick={() => setTabFilter('today')}
+          onClick={() => setTabFilter('all')}
           className={`p-5 rounded-2xl border transition-all cursor-pointer ${
-            tabFilter === 'today'
-              ? 'bg-amber-500/15 border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+            tabFilter === 'all'
+              ? 'bg-emerald-500/15 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
               : 'bg-card border-border hover:border-white/20'
           }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-              <Clock className="size-3.5" />
-              Follow-ups de Hoje
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+              <Zap className="size-3.5" />
+              Total na Esteira
             </span>
-            <span className="size-2 rounded-full bg-amber-400 animate-ping" />
           </div>
-          <div className="text-3xl font-extrabold text-white font-mono">{todayList.length}</div>
-          <p className="text-[11px] text-white/50 mt-1">Clientes para contatar hoje no WhatsApp.</p>
+          <div className="text-3xl font-extrabold text-white font-mono">{followUps.filter(f => f.status !== 'cancelado').length}</div>
+          <p className="text-[11px] text-white/50 mt-1">Clientes cadastrados aguardando ou disparados.</p>
         </div>
 
-        {/* Card Atrasados */}
-        <div 
-          onClick={() => setTabFilter('overdue')}
-          className={`p-5 rounded-2xl border transition-all cursor-pointer ${
-            tabFilter === 'overdue'
-              ? 'bg-red-500/15 border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.15)]'
-              : 'bg-card border-border hover:border-white/20'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-red-400 flex items-center gap-1.5">
-              <AlertTriangle className="size-3.5" />
-              Atrasados / Urgentes
-            </span>
-            {overdueList.length > 0 && (
-              <span className="text-[10px] font-bold bg-red-500 text-white px-2 py-0.5 rounded-full">
-                Ação
-              </span>
-            )}
-          </div>
-          <div className="text-3xl font-extrabold text-red-400 font-mono">{overdueList.length}</div>
-          <p className="text-[11px] text-white/50 mt-1">Passaram da data combinada e não compraram.</p>
-        </div>
-
-        {/* Card Futuros */}
+        {/* Card Futuros (Carregando 3 Semanas) */}
         <div 
           onClick={() => setTabFilter('upcoming')}
           className={`p-5 rounded-2xl border transition-all cursor-pointer ${
@@ -254,11 +232,32 @@ export function FollowUpsTab() {
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
               <Calendar className="size-3.5" />
-              Próximos Agendados
+              Contagem 3 Semanas
             </span>
+            <span className="size-2 rounded-full bg-blue-400 animate-pulse" />
           </div>
           <div className="text-3xl font-extrabold text-white font-mono">{upcomingList.length}</div>
-          <p className="text-[11px] text-white/50 mt-1">Marcados para os próximos dias/salário.</p>
+          <p className="text-[11px] text-white/50 mt-1">Compras recentes aguardando o pod secar.</p>
+        </div>
+
+        {/* Card Hoje / Pronto para Disparo */}
+        <div 
+          onClick={() => setTabFilter('today')}
+          className={`p-5 rounded-2xl border transition-all cursor-pointer ${
+            tabFilter === 'today'
+              ? 'bg-amber-500/15 border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+              : 'bg-card border-border hover:border-white/20'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+              <Clock className="size-3.5" />
+              Disparar Hoje
+            </span>
+            {todayList.length > 0 && <span className="size-2 rounded-full bg-amber-400 animate-ping" />}
+          </div>
+          <div className="text-3xl font-extrabold text-white font-mono">{todayList.length}</div>
+          <p className="text-[11px] text-white/50 mt-1">Atingiram 3 semanas exatas hoje.</p>
         </div>
 
         {/* Card Concluídos */}
@@ -273,11 +272,11 @@ export function FollowUpsTab() {
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
               <CheckCircle2 className="size-3.5" />
-              Vendas Concluídas
+              Envios Concluídos
             </span>
           </div>
           <div className="text-3xl font-extrabold text-emerald-400 font-mono">{completedList.length}</div>
-          <p className="text-[11px] text-white/50 mt-1">Follow-ups que fecharam em Pix.</p>
+          <p className="text-[11px] text-white/50 mt-1">Mensagens entregues e vendas fechadas.</p>
         </div>
 
       </div>
@@ -297,7 +296,7 @@ export function FollowUpsTab() {
           />
         </div>
 
-        {/* Filtro por Categoria + Botão de Criar */}
+        {/* Filtro por Categoria */}
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           
           <select
@@ -305,44 +304,14 @@ export function FollowUpsTab() {
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="bg-[#141414] border border-white/10 text-white text-xs rounded-xl px-3 py-2 cursor-pointer focus:outline-none focus:border-amber-500"
           >
-            <option value="all">📂 Todos os Motivos</option>
+            <option value="all">📂 Todos os Clientes & Status</option>
+            <option value="recompra_futura">💨 Esteira de Recompra (21 Dias)</option>
             <option value="sem_dinheiro_salario">💰 Salário / Dia 05</option>
             <option value="pix_pendente">⚡ Pix Pendente</option>
             <option value="espera_sabor">📦 Espera de Sabor</option>
             <option value="negociacao_frete">🛵 Frete / Entrega</option>
-            <option value="recompra_futura">💨 Recompra Marcada</option>
             <option value="outro">📝 Outros</option>
           </select>
-
-          <button
-            onClick={async () => {
-              setIsValidating(true);
-              try {
-                const rep = await runFollowUpsValidationSuite();
-                setTestReport(rep);
-                await loadData();
-              } finally {
-                setIsValidating(false);
-              }
-            }}
-            disabled={isValidating}
-            className="px-3.5 py-2 bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-            title="Executar Bateria de Testes Controlados do Bloco 9"
-          >
-            <ShieldCheck className="size-4 text-purple-400" />
-            <span>{isValidating ? 'Validando...' : 'Validar Bloco 9'}</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setSelectedClientForModal(null);
-              setIsModalOpen(true);
-            }}
-            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black text-xs font-extrabold rounded-xl flex items-center gap-2 transition-all shadow-[0_0_20px_rgba(245,158,11,0.25)] cursor-pointer"
-          >
-            <Plus className="size-4 stroke-[3]" />
-            <span>+ Novo Follow-up</span>
-          </button>
 
         </div>
       </div>
@@ -352,17 +321,11 @@ export function FollowUpsTab() {
         <div className="p-12 text-center text-white/50">Carregando agendamentos...</div>
       ) : filteredFollowUps.length === 0 ? (
         <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-12 text-center text-white/40 space-y-3">
-          <Calendar className="size-10 text-white/20 mx-auto" />
-          <p className="text-sm font-semibold text-white">Nenhum follow-up encontrado nesta categoria.</p>
+          <Clock className="size-10 text-white/20 mx-auto" />
+          <p className="text-sm font-semibold text-white">Nenhum cliente na esteira no momento.</p>
           <p className="text-xs max-w-md mx-auto">
-            Quando um cliente não puder comprar agora ou prometer comprar no dia do salário, registre aqui para não esquecer!
+            Assim que um pedido for marcado como entregue/concluído, o cliente entra automaticamente nesta esteira com a contagem regressiva de 3 semanas.
           </p>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="mt-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold inline-flex items-center gap-2 cursor-pointer"
-          >
-            <Plus className="size-4" /> Registrar Primeiro Follow-up
-          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

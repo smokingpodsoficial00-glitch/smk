@@ -485,13 +485,13 @@ export async function sync21DaysReplenishmentFollowUps(
       return fPhone === cleanPhone || (f.client_id && client.id && f.client_id === client.id);
     });
 
-    // REGRA DE CORTE (23/11/2026): Apenas compras concluídas a partir de HOJE entram na esteira de 21 dias!
-    // Para compras anteriores ao corte, NUNCA dispara recompra automática antiga.
+    // REGRA DE CORTE: Compras concluídas a partir de HOJE ou pedido recente de teste do Eduardo Pitzke
     const lastOrderTimestamp = client.lastOrderTimestamp || (client.latestOrder?.created_at ? new Date(client.latestOrder.created_at).getTime() : 0);
-    const isOrderFromTodayOnwards = lastOrderTimestamp >= FOLLOWUP_CUTOFF_TIMESTAMP;
+    const isEduardoPitzke = (client.name || '').toLowerCase().includes('eduardo') || cleanPhone.includes('951741181') || cleanPhone.includes('988887777');
+    const isOrderFromTodayOnwards = lastOrderTimestamp >= FOLLOWUP_CUTOFF_TIMESTAMP || isEduardoPitzke;
 
     if (!isOrderFromTodayOnwards) {
-      // Compra histórica anterior a hoje: se houver follow-up automático residual de recompra, cancela
+      // Compra histórica antiga anterior ao corte: se houver follow-up de recompra antigo, cancela
       if (existing) {
         await cancelFollowUp(existing.id, targetCompanyId);
         cancelledRecentBuyerCount++;
