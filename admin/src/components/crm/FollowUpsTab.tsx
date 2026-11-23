@@ -233,7 +233,7 @@ export function FollowUpsTab() {
     }
     const cleanPhone = String(rawPhone).replace(/\D/g, '');
     const phoneFormatted = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-    const msg = item.whatsappMessage || `Fala, ${item.client_name}! Tranquilo? Passando pra ver como tá seu pod!`;
+    const msg = customTextOverride || item.whatsappMessage || `Fala, ${item.client_name}! Tranquilo? Passando pra ver como tá seu pod!`;
 
     setSendingId(item.id);
     try {
@@ -628,32 +628,30 @@ export function FollowUpsTab() {
                         )}
                       </td>
 
-                      {/* 5. Ação WhatsApp (Enviar Manualmente em 1 Clique) */}
+                      {/* 5. Ação WhatsApp (Enviar Manualmente ou Disparo Automático) */}
                       <td className="px-5 py-4 text-right">
-                        <div className="inline-flex items-center gap-2">
-                                                    {/* Botão Editar Mensagem / Escolher Variação */}
-                          {!isCompleted && !isCancelled && (
-                            <button
-                              onClick={() => {
-                                setEditingItem(item);
-                                setEditedMessage(item.whatsappMessage || '');
-                                const currentIdx = ((item.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 5);
-                                setSelectedVariationIdx(currentIdx);
-                              }}
-                              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 transition-colors cursor-pointer"
-                              title="Visualizar ou Personalizar Mensagem antes do Envio"
-                            >
-                              <Edit3 className="size-4" />
-                            </button>
-                          )}
+                        <div className="inline-flex items-center gap-1.5 justify-end">
+                          {/* Botão Ver/Editar Mensagem de Envio */}
+                          <button
+                            onClick={() => {
+                              setEditingItem(item);
+                              setEditedMessage(item.whatsappMessage || '');
+                              const currentIdx = ((item.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 5);
+                              setSelectedVariationIdx(currentIdx);
+                            }}
+                            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 transition-colors cursor-pointer"
+                            title="Ver ou Editar Mensagem / Escolher Variação"
+                          >
+                            <Edit3 className="size-4" />
+                          </button>
 
-                          {/* Botão Forçar Disparo Automático Agora */}
+                          {/* Botão Forçar Disparo Automático (Disparo da IA em 1 clique direto pelo motor) */}
                           {!isCompleted && !isCancelled && (
                             <button
                               onClick={() => handleForceAutomaticSend(item)}
                               disabled={sendingId === item.id}
-                              className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-black px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer disabled:opacity-50"
-                              title="Forçar Disparo Automático Imediato"
+                              className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-black px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer disabled:opacity-50"
+                              title="Forçar Disparo Automático via Motor (Sem abrir WhatsApp)"
                             >
                               {sendingId === item.id ? (
                                 <>
@@ -669,18 +667,16 @@ export function FollowUpsTab() {
                             </button>
                           )}
 
-                          {/* Botão Enviar Manualmente no WhatsApp */}
+                          {/* Botão Manual WhatsApp: Só o ícone de mensagem */}
                           <a
                             href={waUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer"
-                            title="Enviar Mensagem Manualmente no WhatsApp"
+                            className="p-2 rounded-xl bg-white/5 hover:bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 border border-white/10 hover:border-emerald-500/30 transition-all cursor-pointer inline-flex items-center justify-center"
+                            title="Enviar Manualmente no WhatsApp Web / App"
                           >
-                            <MessageSquare className="size-3.5 text-emerald-400" />
-                            <span>Manual (Zap)</span>
+                            <MessageSquare className="size-4" />
                           </a>
-
 
                           {/* Excluir da esteira */}
                           <button
