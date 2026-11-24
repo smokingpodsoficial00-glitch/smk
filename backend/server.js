@@ -1972,6 +1972,9 @@ app.post('/api/marketing/stock-offer-preview', async (req, res) => {
   }
 });
 
+const directSendDedupeMap = new Map();
+const DIRECT_SEND_DEDUPE_MS = 5000;
+
 app.post('/api/marketing/send-direct', async (req, res) => {
   try {
     const companyId = getRequestCompanyId(req);
@@ -2037,6 +2040,28 @@ app.post('/api/marketing/send-direct', async (req, res) => {
         skipped: true,
         reason: 'Contato já recebeu esta campanha anteriormente (proteção anti-ban).'
       });
+    }
+
+    if (!force && !isStockOffer && text) {
+      const dedupeKey = `${companyId}::${targetJid}::${String(text).trim().slice(0, 120)}`;
+      const lastSentAt = directSendDedupeMap.get(dedupeKey);
+      if (lastSentAt && (Date.now() - lastSentAt) < DIRECT_SEND_DEDUPE_MS) {
+        console.log(`🛡️ [Marketing][${companyId}] Disparo duplicado bloqueado para ${targetJid} dentro de ${DIRECT_SEND_DEDUPE_MS}ms.`);
+        return res.json({
+          success: true,
+          deduplicated: true,
+          companyId,
+          targetJid,
+          timestamp: new Date().toISOString()
+        });
+      }
+      directSendDedupeMap.set(dedupeKey, Date.now());
+      if (directSendDedupeMap.size > 500) {
+        const cutoff = Date.now() - DIRECT_SEND_DEDUPE_MS;
+        for (const [k, ts] of directSendDedupeMap.entries()) {
+          if (ts < cutoff) directSendDedupeMap.delete(k);
+        }
+      }
     }
 
     console.log(`📢 [Marketing][${companyId}] Enviando mensagem para ${targetJid} (${name || 'Cliente'})...`);

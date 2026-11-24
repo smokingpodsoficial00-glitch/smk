@@ -17,6 +17,10 @@ import {
   sync21DaysReplenishmentFollowUps,
   REPLENISHMENT_CYCLE_DAYS,
   REPLENISHMENT_COPY_VARIATIONS,
+  DEFAULT_COMPANY_ID,
+  toLocalDateString,
+  normalizeFollowUpPhone,
+  generateFollowUpMessage,
   type FollowUpItem, 
   type FollowUpReasonCategory 
 } from '@/lib/followUps';
@@ -27,6 +31,23 @@ import { NewFollowUpModal } from './NewFollowUpModal';
 import { supabase } from '@/lib/supabase';
 import { legacyFetch } from '@/lib/backend';
 
+// Trava global de módulo para impedir disparos duplicados mesmo em múltiplos renders/cliques rápidos
+const globalForceSendInFlight = new Set<string>();
+const globalRecentSentTimestamps = new Map<string, number>();
+
+function formatLastSentLabel(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function FollowUpsTab() {
   const { company } = useAuth();
   const [followUps, setFollowUps] = useState<FollowUpItem[]>([]);
@@ -35,10 +56,8 @@ export function FollowUpsTab() {
   const [syncEngineFeedback, setSyncEngineFeedback] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
-  // Desativa o auto-disparo silencioso de background na montagem para evitar múltiplos envios concorrentes
-  // O disparo automático é acionado de forma segura e pontual
-  const autoDispatchInProgressRef = useRef(false);
-  const autoDispatchedIdsRef = useRef<Set<string>>(new Set());
+  const loadSeqRef = useRef(0);
+  const suppressRealtimeUntilRef = useRef(0);
   const [editingItem, setEditingItem] = useState<FollowUpItem | null>(null);
   const [editedMessage, setEditedMessage] = useState<string>('');
   const [selectedVariationIdx, setSelectedVariationIdx] = useState<number>(0);
@@ -54,32 +73,46 @@ export function FollowUpsTab() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const loadData = async () => {
+    const seq = ++loadSeqRef.current;
+    const targetCompanyId = company?.id || DEFAULT_COMPANY_ID;
     try {
-      const liveClients = await fetchLiveClients(company?.id);
+      const liveClients = await fetchLiveClients(targetCompanyId);
       // Sincroniza automaticamente a esteira para garantir que pedidos concluídos já estejam agendados
-      await sync21DaysReplenishmentFollowUps(liveClients, company?.id);
-      let data = await fetchFollowUps(company?.id);
+      await sync21DaysReplenishmentFollowUps(liveClients, targetCompanyId);
+      let data = await fetchFollowUps(targetCompanyId);
 
-      // Forja o cliente de teste Eduardo Pitzke com ciclo de 3 semanas caso ainda não exista
-      const eduardoIndex = data.findIndex(f => (f.client_name || '').toLowerCase().includes('eduardo') || (f.client_name || '').toLowerCase().includes('pitzke'));
+      // Garante que o cliente de teste Eduardo Pitzke exista 1 única vez na esteira caso ainda não conste
+      const eduardoIndex = data.findIndex(f => {
+        const nameLower = (f.client_name || '').toLowerCase();
+        const phoneNorm = normalizeFollowUpPhone(f.client_phone);
+        return nameLower.includes('eduardo') || nameLower.includes('pitzke') || phoneNorm.includes('951741181');
+      });
+
       if (eduardoIndex === -1) {
-        const eduardoClient = liveClients.find(c => (c.name || '').toLowerCase().includes('eduardo') || (c.name || '').toLowerCase().includes('pitzke'));
+        const eduardoClient = liveClients.find(c => {
+          const nameLower = (c.name || '').toLowerCase();
+          const phoneNorm = normalizeFollowUpPhone(c.cleanPhone || c.phone);
+          return nameLower.includes('eduardo') || nameLower.includes('pitzke') || phoneNorm.includes('951741181');
+        });
         const eduardoPhone = eduardoClient?.phone || '5511951741181';
-        const eduardoProduct = eduardoClient?.lastProduct || 'Pod Descartável';
-        const eduardoFlavor = eduardoClient?.lastFlavor || 'Ice';
-        const now = new Date();
-        const scheduledDate = now.toISOString().split('T')[0];
+        const eduardoProduct = (eduardoClient?.lastProduct && eduardoClient.lastProduct !== 'Nenhum produto ainda')
+          ? eduardoClient.lastProduct
+          : 'Pod Descartável';
+        const eduardoFlavor = eduardoClient?.lastFlavor && eduardoClient.lastFlavor !== 'Não especificado'
+          ? eduardoClient.lastFlavor
+          : 'Ice';
+        const scheduledDate = toLocalDateString(new Date());
 
         const createdEduardo = await createFollowUp({
-          company_id: company?.id,
+          company_id: targetCompanyId,
           client_id: eduardoClient?.id || null,
-          client_name: 'Eduardo Pitzke',
+          client_name: eduardoClient?.name || 'Eduardo Pitzke',
           client_phone: eduardoPhone,
           reason_category: 'recompra_futura',
           reason_description: 'Ciclo de 3 semanas completo. Pronto para reposição.',
           target_product: eduardoProduct,
           target_flavor: eduardoFlavor,
-          target_puffs: 20000,
+          target_puffs: eduardoClient?.lastPuffs || 20000,
           scheduled_date: scheduledDate,
           scheduled_time: '15:00'
         });
@@ -88,22 +121,23 @@ export function FollowUpsTab() {
           data = [createdEduardo, ...data];
         }
       }
-      setFollowUps(data);
 
-      // Disparo automático em background removido daqui para evitar disparos concorrentes ou em looping.
-      // O disparo é controlado exclusivamente pelo botão e rotina agendada oficial.
-
+      if (seq === loadSeqRef.current) {
+        setFollowUps(data);
+      }
     } catch (e) {
       console.error("Erro ao carregar follow-ups:", e);
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     loadData();
 
-    const targetCompanyId = company?.id || 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
+    const targetCompanyId = company?.id || DEFAULT_COMPANY_ID;
     let debounceTimer: any = null;
     const channel = supabase
       .channel(`crm_follow_ups_${targetCompanyId}`)
@@ -115,10 +149,11 @@ export function FollowUpsTab() {
           table: 'smoking_crm_follow_ups' 
         }, 
         () => {
+          if (Date.now() < suppressRealtimeUntilRef.current) return;
           if (debounceTimer) clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
             loadData();
-          }, 300);
+          }, 400);
         }
       )
       .subscribe();
@@ -133,9 +168,10 @@ export function FollowUpsTab() {
   const handleSync21DaysEngine = async () => {
     setIsSyncingEngine(true);
     setSyncEngineFeedback(null);
+    const targetCompanyId = company?.id || DEFAULT_COMPANY_ID;
     try {
-      const liveClients = await fetchLiveClients(company?.id);
-      const res = await sync21DaysReplenishmentFollowUps(liveClients, company?.id);
+      const liveClients = await fetchLiveClients(targetCompanyId);
+      const res = await sync21DaysReplenishmentFollowUps(liveClients, targetCompanyId);
       await loadData();
       setSyncEngineFeedback(
         `✅ Esteira atualizada com sucesso! ${res.totalProcessed} clientes analisados. Novos criados: ${res.createdCount}. Reprogramados com trava anti-spam: ${res.cancelledRecentBuyerCount}.`
@@ -153,14 +189,39 @@ export function FollowUpsTab() {
       alert('Telefone do cliente não encontrado.');
       return;
     }
-    const cleanPhone = String(rawPhone).replace(/\D/g, '');
-    const phoneFormatted = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-    const msg = customTextOverride || item.whatsappMessage || `Fala, ${item.client_name}! Tranquilo? Passando pra ver como tá seu pod!`;
 
+    const phoneFormatted = normalizeFollowUpPhone(rawPhone);
+    if (!phoneFormatted) {
+      alert('Número de WhatsApp inválido.');
+      return;
+    }
+
+    // Trava síncrona dupla (em voo + cooldown de 8 segundos) para impedir disparos múltiplos
+    const lockKey = `${item.id}::${phoneFormatted}`;
+    if (globalForceSendInFlight.has(lockKey) || globalForceSendInFlight.has(phoneFormatted)) {
+      console.warn('[FollowUps] Disparo duplicado bloqueado (requisição já em andamento):', lockKey);
+      return;
+    }
+    const lastSentMs = globalRecentSentTimestamps.get(phoneFormatted) || 0;
+    if (Date.now() - lastSentMs < 8000) {
+      console.warn('[FollowUps] Cooldown anti-duplicidade ativo para:', phoneFormatted);
+      return;
+    }
+
+    const targetCompanyId = company?.id || DEFAULT_COMPANY_ID;
+    const msg = (customTextOverride && customTextOverride.trim())
+      ? customTextOverride.trim()
+      : (item.whatsappMessage || generateFollowUpMessage(item));
+
+    globalForceSendInFlight.add(lockKey);
+    globalForceSendInFlight.add(phoneFormatted);
     setSendingId(item.id);
+    setSyncEngineFeedback(null);
+
     try {
-      // Tenta disparo automático direto via motor Baileys do backend
       let sentViaBackend = false;
+      let backendErrorMsg = '';
+
       try {
         const res = await legacyFetch('/api/marketing/send-direct', {
           method: 'POST',
@@ -170,48 +231,79 @@ export function FollowUpsTab() {
             number: phoneFormatted,
             name: item.client_name,
             text: msg,
-            companyId: company?.id
+            companyId: targetCompanyId
           })
         });
-        if (res.ok) {
-          const resData = await res.json().catch(() => ({}));
-          if (resData.success) {
-            sentViaBackend = true;
-          }
+        const resData = await res.json().catch(() => ({}));
+        if (res.ok && resData?.success) {
+          sentViaBackend = true;
+        } else {
+          backendErrorMsg = resData?.message || resData?.error || `Erro HTTP ${res.status}`;
         }
-      } catch (backendErr) {
+      } catch (backendErr: any) {
+        backendErrorMsg = backendErr?.message || 'Falha de comunicação com o servidor WhatsApp.';
         console.warn('Backend offline ou túnel indisponível para envio automático:', backendErr);
       }
 
-      if (sentViaBackend) {
-        const now = new Date();
-        const nextDate = new Date(now.getTime() + (21 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
-        // Mantém pendente para o novo ciclo de 21 dias começar a correr imediatamente na lista, com status de disparo registrado
-        await updateFollowUp(item.id, {
-          status: 'pendente',
-          completed_at: now.toISOString(),
-          scheduled_date: nextDate,
-          reason_description: `Disparo enviado com sucesso via WhatsApp! Próximo ciclo de 3 semanas reiniciado para ${nextDate}.`
-        }, company?.id);
-        await loadData();
-        alert(`🚀 Disparo automático enviado com sucesso para ${item.client_name} (${phoneFormatted})!\n\nStatus atualizado para: ENVIADO. Ciclo de 3 semanas reiniciado.`);
-      } else {
-        // Fallback assistido: abre o WhatsApp com a mensagem pronta e já marca como enviado
-        const waUrl = `https://wa.me/${phoneFormatted}?text=${encodeURIComponent(msg)}`;
-        window.open(waUrl, '_blank');
-        const now = new Date();
-        const nextDate = new Date(now.getTime() + (21 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
-        await updateFollowUp(item.id, {
-          status: 'pendente',
-          completed_at: now.toISOString(),
-          scheduled_date: nextDate,
-          reason_description: `Disparo manual via WhatsApp! Próximo ciclo de 3 semanas reiniciado para ${nextDate}.`
-        }, company?.id);
-        await loadData();
+      if (!sentViaBackend) {
+        alert(`⚠️ Não foi possível disparar automaticamente pelo motor WhatsApp.\n\nMotivo: ${backendErrorMsg || 'WhatsApp desconectado ou servidor offline.'}\n\nConecte o WhatsApp no topo da aba Marketing ou use o botão de ícone do WhatsApp para enviar manualmente.`);
+        return;
       }
+
+      globalRecentSentTimestamps.set(phoneFormatted, Date.now());
+      suppressRealtimeUntilRef.current = Date.now() + 2000;
+
+      const now = new Date();
+      const sentIso = now.toISOString();
+      const nextCycleDate = new Date(now.getTime() + (REPLENISHMENT_CYCLE_DAYS * 24 * 60 * 60 * 1000));
+      const nextDate = toLocalDateString(nextCycleDate);
+      const nextSendCount = (item.send_count || 0) + 1;
+      const newDescription = `Disparo #${nextSendCount} enviado em ${formatLastSentLabel(sentIso)}. Novo ciclo de 3 semanas iniciado até ${nextDate}.`;
+
+      await updateFollowUp(item.id, {
+        status: 'pendente',
+        completed_at: sentIso,
+        last_sent_at: sentIso,
+        send_count: nextSendCount,
+        scheduled_date: nextDate,
+        custom_message: customTextOverride !== undefined ? msg : (item.custom_message ?? null),
+        reason_description: newDescription
+      }, targetCompanyId);
+
+      // Atualiza estado em tela imediatamente para manter o cliente visível com 0% e selo "Enviado"
+      setFollowUps(prev =>
+        prev.map(f =>
+          f.id === item.id
+            ? {
+                ...f,
+                status: 'pendente',
+                completed_at: sentIso,
+                last_sent_at: sentIso,
+                send_count: nextSendCount,
+                scheduled_date: nextDate,
+                daysDiff: REPLENISHMENT_CYCLE_DAYS,
+                custom_message: customTextOverride !== undefined ? msg : f.custom_message,
+                whatsappMessage: msg,
+                reason_description: newDescription,
+              }
+            : f
+        )
+      );
+
+      // Se estava filtrando apenas por "Disparar Hoje" ou "Atrasados", volta para "Total na Esteira" para o cliente não sumir da tela!
+      if (tabFilter === 'today' || tabFilter === 'overdue') {
+        setTabFilter('all');
+      }
+
+      setSyncEngineFeedback(
+        `✅ Mensagem única enviada para ${item.client_name} (${phoneFormatted})! Status marcado como ENVIADO e ciclo de 3 semanas zerado para recomeçar.`
+      );
+      await loadData();
     } catch (err: any) {
       alert(`Erro ao processar disparo: ${err.message || err}`);
     } finally {
+      globalForceSendInFlight.delete(lockKey);
+      globalForceSendInFlight.delete(phoneFormatted);
       setSendingId(null);
     }
   };
@@ -239,7 +331,7 @@ export function FollowUpsTab() {
   const overdueList = followUps.filter(f => f.status === 'pendente' && (f.daysDiff || 0) < 0);
   const todayList = followUps.filter(f => f.status === 'pendente' && (f.daysDiff || 0) === 0);
   const upcomingList = followUps.filter(f => f.status === 'pendente' && (f.daysDiff || 0) > 0);
-  const completedList = followUps.filter(f => f.status === 'concluido');
+  const completedList = followUps.filter(f => f.status === 'concluido' || Boolean(f.completed_at) || Boolean(f.last_sent_at));
 
   // Filtragem da Lista
   const filteredFollowUps = followUps.filter(item => {
@@ -247,8 +339,8 @@ export function FollowUpsTab() {
     if (tabFilter === 'today' && (item.status !== 'pendente' || item.daysDiff !== 0)) return false;
     if (tabFilter === 'overdue' && (item.status !== 'pendente' || (item.daysDiff || 0) >= 0)) return false;
     if (tabFilter === 'upcoming' && (item.status !== 'pendente' || (item.daysDiff || 0) <= 0)) return false;
-    if (tabFilter === 'completed' && item.status !== 'concluido') return false;
-    // Em 'all', mantemos todos os clientes na esteira (mesmo os que já foram enviados/concluídos para acompanharmos o novo ciclo de 3 semanas)
+    if (tabFilter === 'completed' && item.status !== 'concluido' && !item.completed_at && !item.last_sent_at) return false;
+    if (tabFilter === 'all' && item.status === 'cancelado') return false;
 
     // 2. Filtro de Categoria
     if (categoryFilter !== 'all' && item.reason_category !== categoryFilter) return false;
@@ -285,11 +377,11 @@ export function FollowUpsTab() {
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 animate-pulse'
                   : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
               }`}>
-                {windowCheck.inWindow ? '🟢 Janela Segura Aberta (14h-19h)' : '🌙 Fora da Janela (14h-19h)'}
+                {windowCheck.inWindow ? '🟢 Janela Segura Aberta (10h-22h)' : '🌙 Fora da Janela (10h-22h)'}
               </span>
             </div>
             <p className="text-xs text-white/60 leading-relaxed max-w-2xl">
-              Gatilho de 21 dias (momento em que o pod de 20k-40k puffs começa a queimar). Com <strong>trava anti-spam</strong> que cancela se o cliente comprou recentemente e <strong>rotação de 3 copies humanizadas</strong>.
+              Gatilho automático de 3 semanas (momento em que o pod começa a acabar). Com <strong>trava anti-spam</strong> se o cliente comprou recentemente e <strong>rotação de 5 copies curtas humanizadas</strong>.
             </p>
           </div>
         </div>
@@ -545,11 +637,18 @@ export function FollowUpsTab() {
 
                       {/* 4. Enviado e Não Enviado (Status do Disparo Automático) */}
                       <td className="px-5 py-4 text-center">
-                        {(isCompleted || item.completed_at) ? (
-                          <span className="inline-flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider shadow-[0_0_10px_rgba(16,185,129,0.15)]">
-                            <Check className="size-3.5 stroke-[3]" />
-                            Enviado
-                          </span>
+                        {(isCompleted || item.completed_at || item.last_sent_at) ? (
+                          <div className="inline-flex flex-col items-center gap-0.5">
+                            <span className="inline-flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+                              <Check className="size-3.5 stroke-[3]" />
+                              Enviado
+                            </span>
+                            {(item.last_sent_at || item.completed_at) && (
+                              <span className="text-[10px] text-white/40 font-mono">
+                                {formatLastSentLabel(item.last_sent_at || item.completed_at)}
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 bg-white/5 text-white/50 border border-white/10 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider">
                             <Clock className="size-3.5 text-white/40" />
@@ -565,7 +664,7 @@ export function FollowUpsTab() {
                           <button
                             onClick={() => {
                               setEditingItem(item);
-                              setEditedMessage(item.whatsappMessage || '');
+                              setEditedMessage(item.whatsappMessage || generateFollowUpMessage(item));
                               const currentIdx = ((item.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 5);
                               setSelectedVariationIdx(currentIdx);
                             }}
@@ -714,10 +813,22 @@ export function FollowUpsTab() {
                     type="button"
                     onClick={async () => {
                       if (!editingItem) return;
+                      const targetCompanyId = company?.id || DEFAULT_COMPANY_ID;
+                      const cleaned = editedMessage.trim();
                       await updateFollowUp(editingItem.id, {
-                        whatsappMessage: editedMessage
-                      }, company?.id);
-                      setFollowUps(prev => prev.map(f => f.id === editingItem.id ? { ...f, whatsappMessage: editedMessage } : f));
+                        custom_message: cleaned || null
+                      }, targetCompanyId);
+                      setFollowUps(prev => prev.map(f => {
+                        if (f.id !== editingItem.id) return f;
+                        const updatedMsg = cleaned || generateFollowUpMessage({ ...f, custom_message: null });
+                        const phoneClean = normalizeFollowUpPhone(f.client_phone);
+                        return {
+                          ...f,
+                          custom_message: cleaned || null,
+                          whatsappMessage: updatedMsg,
+                          whatsappUrl: `https://wa.me/${phoneClean}?text=${encodeURIComponent(updatedMsg)}`
+                        };
+                      }));
                       setEditingItem(null);
                     }}
                     className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all cursor-pointer"
@@ -728,13 +839,14 @@ export function FollowUpsTab() {
                   {/* Enviar Agora com o Texto Editado */}
                   <button
                     type="button"
+                    disabled={sendingId === editingItem.id}
                     onClick={async () => {
                       if (!editingItem) return;
                       const target = editingItem;
                       setEditingItem(null);
                       await handleForceAutomaticSend(target, editedMessage);
                     }}
-                    className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer disabled:opacity-50"
                   >
                     <Send className="size-3.5" />
                     <span>Enviar Agora</span>

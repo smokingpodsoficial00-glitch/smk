@@ -29,11 +29,39 @@ export interface FollowUpItem {
   status: FollowUpStatus;
   order_id?: string | null;
   completed_at?: string | null;
+  last_sent_at?: string | null;
+  send_count?: number;
+  custom_message?: string | null;
   created_at: string;
   updated_at?: string | null;
   whatsappUrl?: string;
   whatsappMessage?: string;
   daysDiff?: number; // < 0 atrasado, 0 hoje, > 0 futuro
+}
+
+const FU_JSON_PREFIX = '__SMK_FU_V2__:';
+
+export function toLocalDateString(date = new Date()): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  } catch {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+}
+
+export function normalizeFollowUpPhone(rawPhone?: string | null): string {
+  if (!rawPhone) return '';
+  const digits = String(rawPhone).replace(/\D/g, '');
+  if (!digits) return '';
+  return digits.startsWith('55') ? digits : `55${digits}`;
 }
 
 export const OFFICIAL_CATALOG_URL = 'https://smokingproject01.vercel.app/?src=followup21d';
@@ -49,36 +77,36 @@ export const SAFE_DISPATCH_WINDOW = { startHour: 10, endHour: 22 }; // 10:00 às
 export const REPLENISHMENT_COPY_VARIATIONS = [
   {
     id: 'var_a',
-    title: 'Variação 1: Direta e Informal',
-    template: `Salve, {{nome}}, tudo bem? Vi que faz um tempo desde a sua última compra do seu {{produto}}. Gostaria de já ir separando o seu?
+    title: 'Variação 1: Direta',
+    template: `Salve, {{nome}}, tudo bem? Eu vi que faz um tempo desde a sua última compra do seu {{produto}}. Gostaria de já ir separando o seu?
 
 ${OFFICIAL_CATALOG_URL}`
   },
   {
     id: 'var_b',
-    title: 'Variação 2: Rápida / Próximo Pod',
-    template: `Opa, {{nome}}, beleza? Passando pra ver como tá seu {{produto}}. Quer que já deixe o seu próximo separado pra entrega hoje?
+    title: 'Variação 2: Rápida',
+    template: `Opa, {{nome}}, beleza? Vi aqui sua última compra do seu {{produto}}. Quer que eu já deixe o seu próximo separado?
 
 ${OFFICIAL_CATALOG_URL}`
   },
   {
     id: 'var_c',
-    title: 'Variação 3: Reposição Simples',
-    template: `Fala, {{nome}}! Tudo certo? Chegando perto da hora de renovar seu {{produto}}. Quer dar uma olhada nos sabores disponíveis e já garantir o seu?
+    title: 'Variação 3: Simples',
+    template: `Fala, {{nome}}, tudo certo? Já faz um tempo que você pegou seu {{produto}}. Quer dar uma olhada no catálogo pra gente separar o próximo?
 
 ${OFFICIAL_CATALOG_URL}`
   },
   {
     id: 'var_d',
-    title: 'Variação 4: Separação Express',
-    template: `E aí, {{nome}}, tranquilo? Vi aqui sua última compra do {{produto}}. Quer que eu já agilize e separe o seu próximo pod por aqui?
+    title: 'Variação 4: Objetiva',
+    template: `E aí, {{nome}}, tranquilo? Passando pra ver se já quer ir separando seu próximo pod depois do {{produto}}.
 
 ${OFFICIAL_CATALOG_URL}`
   },
   {
     id: 'var_e',
-    title: 'Variação 5: Atendimento Rápido',
-    template: `Salve, {{nome}}! Passando rapidinho pra saber do seu {{produto}}. Quer que já separe o seu próximo pod pra hoje?
+    title: 'Variação 5: Direta VIP',
+    template: `Salve, {{nome}}, tudo em paz? Faz um tempo da sua última compra do {{produto}}. Posso já ir separando um novo pra você?
 
 ${OFFICIAL_CATALOG_URL}`
   }
@@ -101,7 +129,7 @@ export function isWithinSafeDispatchWindow(date = new Date()): { inWindow: boole
   const hour = spTime.getHours();
   const inWindow = hour >= SAFE_DISPATCH_WINDOW.startHour && hour < SAFE_DISPATCH_WINDOW.endHour;
 
-  let message = 'Dentro da janela segura de disparo (14h às 19h).';
+  let message = `Dentro da janela segura de disparo (${SAFE_DISPATCH_WINDOW.startHour}h às ${SAFE_DISPATCH_WINDOW.endHour}h).`;
   if (hour < SAFE_DISPATCH_WINDOW.startHour) {
     message = `Fora da janela de disparo. Os envios abrem às ${SAFE_DISPATCH_WINDOW.startHour}:00 (evita manhãs/madrugadas).`;
   } else if (hour >= SAFE_DISPATCH_WINDOW.endHour) {
@@ -146,6 +174,10 @@ export const FOLLOWUP_CATEGORIES: Record<FollowUpReasonCategory, { label: string
 
 // Gera a mensagem personalizada de WhatsApp
 export function generateFollowUpMessage(item: Partial<FollowUpItem>, variationIndex?: number): string {
+  if (item.custom_message && item.custom_message.trim().length > 0) {
+    return item.custom_message;
+  }
+
   if (item.reason_category === 'recompra_futura') {
     const idx = variationIndex !== undefined 
       ? variationIndex 
@@ -175,10 +207,13 @@ export function generateFollowUpMessage(item: Partial<FollowUpItem>, variationIn
 // Calcula a diferença em dias entre a data agendada e hoje
 export function calculateDaysDiff(scheduledDateStr: string): number {
   if (!scheduledDateStr) return 0;
-  const today = new Date();
+  const todayStr = toLocalDateString(new Date());
+  const [ty, tm, td] = todayStr.split('-').map(Number);
+  const today = new Date(ty, tm - 1, td);
   today.setHours(0, 0, 0, 0);
 
   const [year, month, day] = scheduledDateStr.split('-').map(Number);
+  if (!year || !month || !day) return 0;
   const targetDate = new Date(year, month - 1, day);
   targetDate.setHours(0, 0, 0, 0);
 
@@ -186,12 +221,103 @@ export function calculateDaysDiff(scheduledDateStr: string): number {
   return Math.round(diffTime / (1000 * 60 * 60 * 24));
 }
 
+// Helpers de serialização compatíveis com o schema real de smoking_crm_follow_ups (id, company_id, client_id, scheduled_at, note, status, created_at)
+function hydrateFollowUpRow(raw: any): FollowUpItem {
+  let meta: Record<string, any> = {};
+  if (typeof raw?.note === 'string' && raw.note.startsWith(FU_JSON_PREFIX)) {
+    try {
+      meta = JSON.parse(raw.note.slice(FU_JSON_PREFIX.length)) || {};
+    } catch {
+      meta = {};
+    }
+  } else if (typeof raw?.note === 'string' && raw.note.trim()) {
+    meta = { reason_description: raw.note.trim() };
+  }
+
+  let fallbackDate = '';
+  let fallbackTime = '';
+  if (raw?.scheduled_at && !meta.scheduled_date) {
+    const parsed = new Date(raw.scheduled_at);
+    if (!isNaN(parsed.getTime())) {
+      fallbackDate = toLocalDateString(parsed);
+      const spParts = parsed.toLocaleTimeString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+      fallbackTime = spParts;
+    }
+  }
+
+  const rawPhone = raw?.client_phone || meta.client_phone || '';
+  const formattedPhone = normalizeFollowUpPhone(rawPhone);
+
+  return {
+    id: raw.id,
+    company_id: raw.company_id || meta.company_id || DEFAULT_COMPANY_ID,
+    client_id: raw.client_id ?? meta.client_id ?? null,
+    client_phone: formattedPhone || rawPhone,
+    client_name: raw.client_name || meta.client_name || 'Cliente',
+    reason_category: (raw.reason_category || meta.reason_category || 'recompra_futura') as FollowUpReasonCategory,
+    reason_description: raw.reason_description ?? meta.reason_description ?? '',
+    target_product: raw.target_product ?? meta.target_product ?? null,
+    target_flavor: raw.target_flavor ?? meta.target_flavor ?? null,
+    target_puffs: raw.target_puffs ?? meta.target_puffs ?? null,
+    scheduled_date: raw.scheduled_date || meta.scheduled_date || fallbackDate || toLocalDateString(new Date()),
+    scheduled_time: raw.scheduled_time || meta.scheduled_time || fallbackTime || '15:00',
+    status: (raw.status || meta.status || 'pendente') as FollowUpStatus,
+    order_id: raw.order_id ?? meta.order_id ?? null,
+    completed_at: raw.completed_at ?? meta.completed_at ?? null,
+    last_sent_at: raw.last_sent_at ?? meta.last_sent_at ?? raw.completed_at ?? meta.completed_at ?? null,
+    send_count: Number(raw.send_count ?? meta.send_count ?? (raw.completed_at || meta.completed_at ? 1 : 0)) || 0,
+    custom_message: raw.custom_message ?? meta.custom_message ?? null,
+    created_at: raw.created_at || meta.created_at || new Date().toISOString(),
+    updated_at: raw.updated_at || meta.updated_at || raw.created_at || new Date().toISOString(),
+  };
+}
+
+function serializeFollowUpToDbRow(item: Partial<FollowUpItem>, companyId: string) {
+  const scheduledDate = item.scheduled_date || toLocalDateString(new Date());
+  const scheduledTime = item.scheduled_time || '15:00';
+  const safeTime = /^\d{2}:\d{2}$/.test(scheduledTime) ? scheduledTime : '15:00';
+  const scheduledAtIso = `${scheduledDate}T${safeTime}:00-03:00`;
+
+  const meta = {
+    client_phone: normalizeFollowUpPhone(item.client_phone) || item.client_phone || '',
+    client_name: (item.client_name || 'Cliente').trim(),
+    reason_category: item.reason_category || 'outro',
+    reason_description: (item.reason_description || '').trim(),
+    target_product: item.target_product ?? null,
+    target_flavor: item.target_flavor ?? null,
+    target_puffs: item.target_puffs ?? null,
+    scheduled_date: scheduledDate,
+    scheduled_time: safeTime,
+    order_id: item.order_id ?? null,
+    completed_at: item.completed_at ?? null,
+    last_sent_at: item.last_sent_at ?? item.completed_at ?? null,
+    send_count: Number(item.send_count || 0),
+    custom_message: item.custom_message ?? null,
+    updated_at: item.updated_at || new Date().toISOString(),
+  };
+
+  return {
+    company_id: companyId,
+    client_id: item.client_id || null,
+    scheduled_at: scheduledAtIso,
+    status: item.status || 'pendente',
+    note: `${FU_JSON_PREFIX}${JSON.stringify(meta)}`,
+  };
+}
+
 // Helpers seguros para LocalStorage (Fallback / Cache Secundário)
 export function getLocalFollowUps(companyId?: string): FollowUpItem[] {
-  const key = companyId ? `${companyId}_${LOCAL_STORAGE_KEY}` : LOCAL_STORAGE_KEY;
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const key = `${targetCompanyId}_${LOCAL_STORAGE_KEY}`;
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(hydrateFollowUpRow) : [];
   } catch (e) {
     console.warn('[FollowUps] Erro ao ler fallback LocalStorage:', e);
     return [];
@@ -199,7 +325,8 @@ export function getLocalFollowUps(companyId?: string): FollowUpItem[] {
 }
 
 export function saveLocalFollowUps(items: FollowUpItem[], companyId?: string): void {
-  const key = companyId ? `${companyId}_${LOCAL_STORAGE_KEY}` : LOCAL_STORAGE_KEY;
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const key = `${targetCompanyId}_${LOCAL_STORAGE_KEY}`;
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(key, JSON.stringify(items));
@@ -210,38 +337,105 @@ export function saveLocalFollowUps(items: FollowUpItem[], companyId?: string): v
 }
 
 function addLocalFollowUp(item: FollowUpItem, companyId?: string): void {
+  const targetCompanyId = companyId || item.company_id || DEFAULT_COMPANY_ID;
   try {
-    const current = getLocalFollowUps(companyId);
+    const current = getLocalFollowUps(targetCompanyId);
     const updated = [item, ...current.filter(i => i.id !== item.id)];
-    saveLocalFollowUps(updated, companyId);
+    saveLocalFollowUps(updated, targetCompanyId);
   } catch (e) {
     console.warn('[FollowUps] Erro ao adicionar item no cache local:', e);
   }
 }
 
 function updateLocalFollowUp(id: string, updates: Partial<FollowUpItem>, companyId?: string): void {
+  const targetCompanyId = companyId || updates.company_id || DEFAULT_COMPANY_ID;
   try {
-    const current = getLocalFollowUps(companyId);
-    const updated = current.map(item => item.id === id ? { ...item, ...updates } : item);
-    saveLocalFollowUps(updated, companyId);
+    const current = getLocalFollowUps(targetCompanyId);
+    const exists = current.some(item => item.id === id);
+    const updated = exists
+      ? current.map(item => (item.id === id ? { ...item, ...updates } : item))
+      : [{ ...(updates as FollowUpItem), id }, ...current];
+    saveLocalFollowUps(updated, targetCompanyId);
   } catch (e) {
     console.warn('[FollowUps] Erro ao atualizar item no cache local:', e);
   }
 }
 
-function deleteLocalFollowUp(id: string, companyId?: string): void {
+function getDeletedFollowUpIds(companyId: string): Set<string> {
   try {
-    const current = getLocalFollowUps(companyId);
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(`${companyId}_${LOCAL_STORAGE_KEY}_deleted`) : null;
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function markLocalFollowUpDeleted(id: string, companyId: string): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    const set = getDeletedFollowUpIds(companyId);
+    set.add(id);
+    const trimmed = Array.from(set).slice(-200);
+    localStorage.setItem(`${companyId}_${LOCAL_STORAGE_KEY}_deleted`, JSON.stringify(trimmed));
+  } catch {}
+}
+
+function deleteLocalFollowUp(id: string, companyId?: string): void {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  markLocalFollowUpDeleted(id, targetCompanyId);
+  try {
+    const current = getLocalFollowUps(targetCompanyId);
     const updated = current.filter(item => item.id !== id);
-    saveLocalFollowUps(updated, companyId);
+    saveLocalFollowUps(updated, targetCompanyId);
   } catch (e) {
     console.warn('[FollowUps] Erro ao remover item do cache local:', e);
   }
 }
 
+function deduplicateReplenishments(items: FollowUpItem[]): FollowUpItem[] {
+  const seenReplenishPhones = new Map<string, number>();
+  const result: FollowUpItem[] = [];
+
+  for (const item of items) {
+    if (item.reason_category !== 'recompra_futura' || item.status === 'cancelado') {
+      result.push(item);
+      continue;
+    }
+    const phoneKey = normalizeFollowUpPhone(item.client_phone);
+    if (!phoneKey) {
+      result.push(item);
+      continue;
+    }
+    const existingIdx = seenReplenishPhones.get(phoneKey);
+    if (existingIdx === undefined) {
+      seenReplenishPhones.set(phoneKey, result.length);
+      result.push(item);
+    } else {
+      const prev = result[existingIdx];
+      const prevTime = Math.max(
+        prev.last_sent_at ? new Date(prev.last_sent_at).getTime() : 0,
+        prev.completed_at ? new Date(prev.completed_at).getTime() : 0,
+        prev.updated_at ? new Date(prev.updated_at).getTime() : 0
+      );
+      const currTime = Math.max(
+        item.last_sent_at ? new Date(item.last_sent_at).getTime() : 0,
+        item.completed_at ? new Date(item.completed_at).getTime() : 0,
+        item.updated_at ? new Date(item.updated_at).getTime() : 0
+      );
+      if (currTime > prevTime) {
+        result[existingIdx] = item;
+      }
+    }
+  }
+
+  return result;
+}
+
 // Enriquecer items com helpers calculados (WhatsApp url, dias de diferença, cópias formatadas)
 export function enrichFollowUps(items: any[]): FollowUpItem[] {
-  return items.map(item => {
+  return items.map(raw => {
+    const item = hydrateFollowUpRow(raw);
     const cleanPhone = String(item.client_phone || '').replace(/\D/g, '');
     const waNumber = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
     const daysDiff = calculateDaysDiff(item.scheduled_date);
@@ -257,8 +451,8 @@ export function enrichFollowUps(items: any[]): FollowUpItem[] {
       reason_category: (item.reason_category as FollowUpReasonCategory) || 'outro',
       reason_description: item.reason_description || '',
       status: (item.status as FollowUpStatus) || 'pendente',
-      scheduled_date: item.scheduled_date || new Date().toISOString().split('T')[0],
-      scheduled_time: item.scheduled_time || '10:00',
+      scheduled_date: item.scheduled_date || toLocalDateString(new Date()),
+      scheduled_time: item.scheduled_time || '15:00',
       daysDiff,
       whatsappMessage: msg,
       whatsappUrl,
@@ -266,21 +460,44 @@ export function enrichFollowUps(items: any[]): FollowUpItem[] {
   });
 }
 
-// 1. Buscar todos os follow-ups — SUPABASE COMO FONTE PRIMÁRIA
+// 1. Buscar todos os follow-ups — SUPABASE COMO FONTE PRIMÁRIA + MERGE LOCAL RESILIENTE
 export async function fetchFollowUps(companyId?: string): Promise<FollowUpItem[]> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const localItems = getLocalFollowUps(targetCompanyId);
+
   try {
     const { data, error } = await supabase
       .from('smoking_crm_follow_ups')
       .select('*')
       .eq('company_id', targetCompanyId)
-      .order('scheduled_date', { ascending: true });
+      .order('scheduled_at', { ascending: true });
 
-    if (!error && data) {
-      const enriched = enrichFollowUps(data);
-      // Sincroniza cache local com a resposta oficial do Supabase
-      saveLocalFollowUps(data, targetCompanyId);
-      return enriched;
+    if (!error && Array.isArray(data)) {
+      const deletedSet = getDeletedFollowUpIds(targetCompanyId);
+      const remoteItems = data.map(hydrateFollowUpRow).filter(r => !deletedSet.has(r.id));
+      const mergedMap = new Map<string, FollowUpItem>();
+
+      for (const r of remoteItems) {
+        mergedMap.set(r.id, r);
+      }
+      // Preserva itens locais mais recentes ou ainda não sincronizados no remoto (ex: RLS/client_id null)
+      for (const l of localItems) {
+        if (!l?.id || deletedSet.has(l.id)) continue;
+        const remoteMatch = mergedMap.get(l.id);
+        if (!remoteMatch) {
+          mergedMap.set(l.id, l);
+        } else {
+          const lTime = new Date(l.updated_at || l.created_at || 0).getTime();
+          const rTime = new Date(remoteMatch.updated_at || remoteMatch.created_at || 0).getTime();
+          if (lTime > rTime) {
+            mergedMap.set(l.id, l);
+          }
+        }
+      }
+
+      const merged = deduplicateReplenishments(Array.from(mergedMap.values()));
+      saveLocalFollowUps(merged, targetCompanyId);
+      return enrichFollowUps(merged);
     }
 
     if (error) {
@@ -290,10 +507,12 @@ export async function fetchFollowUps(companyId?: string): Promise<FollowUpItem[]
     console.warn('[FollowUps] Exceção ao consultar Supabase (ativando fallback local):', err?.message || err);
   }
 
-  // Fallback seguro se Supabase indisponível
-  const localItems = getLocalFollowUps(targetCompanyId);
-  console.info('[FollowUps] Consumindo cache secundário local:', localItems.length, 'itens.');
-  return enrichFollowUps(localItems);
+  const dedupedLocal = deduplicateReplenishments(localItems);
+  if (dedupedLocal.length !== localItems.length) {
+    saveLocalFollowUps(dedupedLocal, targetCompanyId);
+  }
+  console.info('[FollowUps] Consumindo cache secundário local:', dedupedLocal.length, 'itens.');
+  return enrichFollowUps(dedupedLocal);
 }
 
 // 2. Criar novo Follow-up — GRAVAÇÃO PRIMÁRIA NO SUPABASE
@@ -312,10 +531,10 @@ export async function createFollowUp(item: {
   order_id?: string | null;
 }): Promise<FollowUpItem | null> {
   const targetCompanyId = item.company_id || DEFAULT_COMPANY_ID;
-  const cleanPhone = String(item.client_phone).replace(/\D/g, '');
-  const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+  const formattedPhone = normalizeFollowUpPhone(item.client_phone) || String(item.client_phone || '').replace(/\D/g, '');
+  const nowIso = new Date().toISOString();
 
-  const payload = {
+  const fullItem: Omit<FollowUpItem, 'id'> = {
     company_id: targetCompanyId,
     client_id: item.client_id || null,
     client_phone: formattedPhone,
@@ -325,22 +544,30 @@ export async function createFollowUp(item: {
     target_product: item.target_product || null,
     target_flavor: item.target_flavor || null,
     target_puffs: item.target_puffs ? Number(item.target_puffs) : null,
-    scheduled_date: item.scheduled_date || new Date().toISOString().split('T')[0],
-    scheduled_time: item.scheduled_time || '10:00',
+    scheduled_date: item.scheduled_date || toLocalDateString(new Date()),
+    scheduled_time: item.scheduled_time || '15:00',
     status: 'pendente' as FollowUpStatus,
     order_id: item.order_id || null,
+    completed_at: null,
+    last_sent_at: null,
+    send_count: 0,
+    custom_message: null,
+    created_at: nowIso,
+    updated_at: nowIso,
   };
 
   try {
+    const dbRow = serializeFollowUpToDbRow(fullItem, targetCompanyId);
     const { data, error } = await supabase
       .from('smoking_crm_follow_ups')
-      .insert(payload)
+      .insert(dbRow)
       .select()
       .single();
 
     if (!error && data) {
-      addLocalFollowUp(data);
-      return enrichFollowUps([data])[0];
+      const hydrated = hydrateFollowUpRow(data);
+      addLocalFollowUp(hydrated, targetCompanyId);
+      return enrichFollowUps([hydrated])[0];
     }
 
     if (error) {
@@ -356,58 +583,69 @@ export async function createFollowUp(item: {
     : '00000000-0000-4000-8000-' + String(Date.now()).padStart(12, '0').slice(-12);
 
   const localItem: FollowUpItem = {
-    ...payload,
+    ...fullItem,
     id: localId,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
   };
-  addLocalFollowUp(localItem);
+  addLocalFollowUp(localItem, targetCompanyId);
   return enrichFollowUps([localItem])[0];
 }
 
-// 3. Atualizar Follow-up (Data, Notas, etc.) — SUPABASE PRIMÁRIO
+// 3. Atualizar Follow-up (Data, Notas, etc.) — SUPABASE PRIMÁRIO + CACHE CONSISTENTE
 export async function updateFollowUp(
   id: string, 
   updates: Partial<FollowUpItem>, 
   companyId?: string
 ): Promise<boolean> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
-  const dbUpdates: any = {
-    ...updates,
-    updated_at: new Date().toISOString()
+  const nowIso = new Date().toISOString();
+
+  const cleanUpdates: Partial<FollowUpItem> = { ...updates };
+  delete cleanUpdates.whatsappUrl;
+  delete cleanUpdates.whatsappMessage;
+  delete cleanUpdates.daysDiff;
+  cleanUpdates.updated_at = nowIso;
+
+  // Mescla com o item existente no cache local para preservar todos os metadados no campo `note`
+  const currentLocal = getLocalFollowUps(targetCompanyId);
+  const existing = currentLocal.find(i => i.id === id) || ({ id, company_id: targetCompanyId } as FollowUpItem);
+  const merged: FollowUpItem = {
+    ...existing,
+    ...cleanUpdates,
+    id,
+    company_id: targetCompanyId,
+    updated_at: nowIso,
   };
 
-  // Remove campos calculados e virtuais antes de gravar no banco
-  delete dbUpdates.whatsappUrl;
-  delete dbUpdates.whatsappMessage;
-  delete dbUpdates.daysDiff;
+  // Atualiza cache local imediatamente para UI nunca perder estado
+  updateLocalFollowUp(id, merged, targetCompanyId);
 
   try {
+    const dbRow = serializeFollowUpToDbRow(merged, targetCompanyId);
     const { error } = await supabase
       .from('smoking_crm_follow_ups')
-      .update(dbUpdates)
+      .update(dbRow)
       .eq('id', id)
       .eq('company_id', targetCompanyId);
 
     if (!error) {
-      updateLocalFollowUp(id, dbUpdates);
       return true;
     }
 
-    console.warn('[FollowUps] Erro ao atualizar no Supabase (ativando fallback local):', error.message);
+    console.warn('[FollowUps] Erro ao atualizar no Supabase (mantido em cache local):', error.message);
   } catch (err: any) {
-    console.warn('[FollowUps] Exceção ao atualizar no Supabase (ativando fallback local):', err?.message || err);
+    console.warn('[FollowUps] Exceção ao atualizar no Supabase (mantido em cache local):', err?.message || err);
   }
 
-  updateLocalFollowUp(id, dbUpdates);
   return true;
 }
 
 // 4. Marcar Follow-up como Concluído (Venda Fechada)
 export async function completeFollowUp(id: string, companyId?: string, orderId?: string): Promise<boolean> {
+  const nowIso = new Date().toISOString();
   return updateFollowUp(id, {
     status: 'concluido',
-    completed_at: new Date().toISOString(),
+    completed_at: nowIso,
+    last_sent_at: nowIso,
     ...(orderId ? { order_id: orderId } : {})
   }, companyId);
 }
@@ -423,6 +661,7 @@ export async function cancelFollowUp(id: string, companyId?: string): Promise<bo
 // 6. Excluir Follow-up — SUPABASE PRIMÁRIO
 export async function deleteFollowUp(id: string, companyId?: string): Promise<boolean> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  deleteLocalFollowUp(id, targetCompanyId);
   try {
     const { error } = await supabase
       .from('smoking_crm_follow_ups')
@@ -431,16 +670,14 @@ export async function deleteFollowUp(id: string, companyId?: string): Promise<bo
       .eq('company_id', targetCompanyId);
 
     if (!error) {
-      deleteLocalFollowUp(id);
       return true;
     }
 
-    console.warn('[FollowUps] Erro ao excluir no Supabase (ativando fallback local):', error.message);
+    console.warn('[FollowUps] Erro ao excluir no Supabase (removido localmente):', error.message);
   } catch (err: any) {
-    console.warn('[FollowUps] Exceção ao excluir no Supabase (ativando fallback local):', err?.message || err);
+    console.warn('[FollowUps] Exceção ao excluir no Supabase (removido localmente):', err?.message || err);
   }
 
-  deleteLocalFollowUp(id);
   return true;
 }
 
@@ -455,8 +692,8 @@ export interface SyncReplenishmentResult {
 /**
  * Varre os clientes do CRM e sincroniza a esteira oficial de 21 dias:
  * - Gatilho: exatos 21 dias após a data da última compra concluída.
- * - Trava Anti-Mico / Anti-Spam: se comprou a menos de 21 dias, cancela qualquer agendamento pendente
- *   e reprograma para última_compra + 21 dias.
+ * - Trava Anti-Mico / Anti-Spam: se comprou a menos de 21 dias (e não teve ciclo recém-reiniciado por disparo),
+ *   reprograma para última_compra + 21 dias.
  */
 export async function sync21DaysReplenishmentFollowUps(
   clients: any[],
@@ -464,98 +701,109 @@ export async function sync21DaysReplenishmentFollowUps(
 ): Promise<SyncReplenishmentResult> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
   const currentFollowUps = await fetchFollowUps(targetCompanyId);
-  const pendingReplenishments = currentFollowUps.filter(
-    f => f.reason_category === 'recompra_futura' && f.status === 'pendente'
+  const activeReplenishments = currentFollowUps.filter(
+    f => f.reason_category === 'recompra_futura' && f.status !== 'cancelado'
   );
 
   let createdCount = 0;
   let updatedCount = 0;
   let cancelledRecentBuyerCount = 0;
 
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
+  const nowDate = new Date();
+  const todayStr = toLocalDateString(nowDate);
+  const nowMidnight = new Date(todayStr + 'T00:00:00-03:00').getTime();
 
   for (const client of clients) {
     if (!client) continue;
 
     const rawPhone = client.phone || client.cleanPhone;
     if (!rawPhone) continue;
-    const cleanPhone = String(rawPhone).replace(/\D/g, '');
-    const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    const formattedPhone = normalizeFollowUpPhone(rawPhone);
+    if (!formattedPhone) continue;
 
     const daysSince = Number(client.daysSinceLastOrder);
     if (isNaN(daysSince)) continue;
 
-    // Encontra follow-up de recompra pendente existente para este telefone
-    const existing = pendingReplenishments.find(f => {
-      const fPhone = String(f.client_phone || '').replace(/\D/g, '');
-      return fPhone === cleanPhone || (f.client_id && client.id && f.client_id === client.id);
+    // Encontra follow-up de recompra existente para este telefone (ou client_id)
+    const existing = activeReplenishments.find(f => {
+      const fPhone = normalizeFollowUpPhone(f.client_phone);
+      return (fPhone && fPhone === formattedPhone) || (f.client_id && client.id && f.client_id === client.id);
     });
 
-    // REGRA DE CORTE: Compras concluídas a partir de HOJE ou pedido recente de teste do Eduardo Pitzke
+    // REGRA DE CORTE: Compras concluídas a partir de HOJE ou pedido de teste do Eduardo
     const lastOrderTimestamp = client.lastOrderTimestamp || (client.latestOrder?.created_at ? new Date(client.latestOrder.created_at).getTime() : 0);
     const clientNameLower = (client.name || '').toLowerCase();
-    const isEduardoPitzke = clientNameLower.includes('eduardo') || clientNameLower.includes('pitzke') || cleanPhone.includes('951741181') || cleanPhone.includes('988887777');
+    const isEduardoPitzke = clientNameLower.includes('eduardo') || clientNameLower.includes('pitzke') || formattedPhone.includes('951741181') || formattedPhone.includes('988887777');
     const isOrderFromTodayOnwards = lastOrderTimestamp >= FOLLOWUP_CUTOFF_TIMESTAMP || isEduardoPitzke;
 
     if (!isOrderFromTodayOnwards) {
-      // Compra histórica antiga anterior ao corte: se houver follow-up de recompra antigo, cancela
-      if (existing) {
-        await cancelFollowUp(existing.id, targetCompanyId);
-        cancelledRecentBuyerCount++;
-      }
+      // Não cria novos follow-ups automáticos para compras antigas pré-corte,
+      // mas NUNCA apaga ou cancela um follow-up que já teve envio registrado ou criação manual.
       continue;
     }
 
+    // Proteção de ciclo já disparado/reiniciado: se já foi enviado após a última compra, não sobrescrever a data!
+    if (existing) {
+      const lastSentTs = existing.last_sent_at
+        ? new Date(existing.last_sent_at).getTime()
+        : (existing.completed_at ? new Date(existing.completed_at).getTime() : 0);
+      if (lastSentTs > 0 && lastSentTs >= lastOrderTimestamp) {
+        updatedCount++;
+        continue;
+      }
+    }
+
     // 2. Trava Anti-Mico: Cliente comprou a menos de 21 dias!
-    // Exceção de teste para Eduardo Pitzke: permite manter ciclo completado para teste
+    // Exceção de teste para Eduardo Pitzke: mantém o agendamento atual dele sem sobrescrever
     if (daysSince < REPLENISHMENT_CYCLE_DAYS && !isEduardoPitzke) {
       const targetDays = REPLENISHMENT_CYCLE_DAYS - daysSince;
-      const targetTimestamp = (lastOrderTimestamp > 0 ? lastOrderTimestamp : now.getTime()) + (REPLENISHMENT_CYCLE_DAYS * 24 * 60 * 60 * 1000);
-      const newScheduledDate = new Date(targetTimestamp).toISOString().split('T')[0];
+      const baseTs = lastOrderTimestamp > 0 ? lastOrderTimestamp : nowMidnight;
+      const targetDateObj = new Date(baseTs + (REPLENISHMENT_CYCLE_DAYS * 24 * 60 * 60 * 1000));
+      const newScheduledDate = toLocalDateString(targetDateObj);
 
       if (!existing) {
-        // Agenda para exatamente 3 semanas (21 dias) após a compra de hoje
-        await createFollowUp({
+        const created = await createFollowUp({
           company_id: targetCompanyId,
           client_id: client.id || null,
           client_name: client.name || 'Cliente',
           client_phone: formattedPhone,
           reason_category: 'recompra_futura',
-          reason_description: `Agendado automaticamente para 21 dias após a compra de hoje (${client.lastProduct || 'Pod'}). Faltam ${targetDays} dias.`,
+          reason_description: `Agendado automaticamente para 3 semanas após a compra (${client.lastProduct || 'Pod'}). Faltam ${targetDays} dias.`,
           target_product: client.lastProduct || null,
           target_flavor: client.lastFlavor || null,
           target_puffs: client.lastPuffs || null,
           scheduled_date: newScheduledDate,
           scheduled_time: '15:00'
         });
+        if (created) activeReplenishments.push(created);
         createdCount++;
-      } else if (existing.scheduled_date !== newScheduledDate) {
+      } else if (existing.scheduled_date !== newScheduledDate && !existing.completed_at) {
         await updateFollowUp(existing.id, {
           scheduled_date: newScheduledDate,
-          reason_description: `Reprogramado automaticamente: compra recente há ${daysSince}d (trava anti-spam de 21 dias).`
+          target_product: client.lastProduct || existing.target_product,
+          reason_description: `Reprogramado automaticamente: compra recente há ${daysSince}d (trava anti-spam de 3 semanas).`
         }, targetCompanyId);
         cancelledRecentBuyerCount++;
       }
       continue;
     }
 
-    // 1. Ciclo de 21 dias atingido a partir de compras novas:
+    // 1. Ciclo de 21 dias atingido (ou cliente Eduardo para teste):
     if (!existing) {
-      const scheduledDate = now.toISOString().split('T')[0];
-      await createFollowUp({
+      const created = await createFollowUp({
         company_id: targetCompanyId,
         client_id: client.id || null,
         client_name: client.name || 'Cliente',
         client_phone: formattedPhone,
         reason_category: 'recompra_futura',
-        reason_description: `Disparo automático do ciclo de recompra de 21 dias (compra realizada a partir de 23/11).`,
+        reason_description: `Ciclo de 3 semanas completo (${client.lastProduct || 'Pod'}). Pronto para disparo.`,
         target_product: client.lastProduct || null,
         target_flavor: client.lastFlavor || null,
         target_puffs: client.lastPuffs || null,
-        scheduled_date: scheduledDate,
-        scheduled_time: '15:00' // Dentro da janela segura (14h - 19h)
+        scheduled_date: todayStr,
+        scheduled_time: '15:00'
       });
+      if (created) activeReplenishments.push(created);
       createdCount++;
     } else {
       updatedCount++;
@@ -581,8 +829,8 @@ export async function scheduleOrderReplenishmentFollowUp(order: any, companyId?:
   const rawPhone = order.client_phone || order.phone;
   if (!rawPhone || String(rawPhone).startsWith('__SYSTEM_')) return null;
 
-  const cleanPhone = String(rawPhone).replace(/\D/g, '');
-  const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+  const formattedPhone = normalizeFollowUpPhone(rawPhone);
+  if (!formattedPhone) return null;
   const clientName = (order.client_name || order.customer_name || 'Cliente').trim();
 
   // Extrai primeiro produto/sabor do pedido
@@ -592,21 +840,22 @@ export async function scheduleOrderReplenishmentFollowUp(order: any, companyId?:
   const targetFlavor = firstItem?.flavor || null;
   const targetPuffs = Number(firstItem?.puffs) || undefined;
 
-  // Data de agendamento: exatamente 21 dias a partir de hoje
+  // Data de agendamento: exatamente 21 dias a partir de hoje no fuso local
   const now = new Date();
   const targetDate = new Date(now.getTime() + (REPLENISHMENT_CYCLE_DAYS * 24 * 60 * 60 * 1000));
-  const scheduledDate = targetDate.toISOString().split('T')[0];
+  const scheduledDate = toLocalDateString(targetDate);
 
-  // Busca se já existe um follow-up de recompra pendente para este cliente
+  // Busca se já existe um follow-up de recompra ativo para este cliente
   const allFollowUps = await fetchFollowUps(targetCompanyId);
   const existing = allFollowUps.find(f => {
-    const fPhone = String(f.client_phone || '').replace(/\D/g, '');
-    return f.status === 'pendente' && f.reason_category === 'recompra_futura' && fPhone === cleanPhone;
+    const fPhone = normalizeFollowUpPhone(f.client_phone);
+    return f.status !== 'cancelado' && f.reason_category === 'recompra_futura' && fPhone === formattedPhone;
   });
 
   if (existing) {
     // Trava Anti-Mico: o cliente acabou de comprar! Reinicia o contador de 3 semanas
     await updateFollowUp(existing.id, {
+      status: 'pendente',
       scheduled_date: scheduledDate,
       order_id: order.id || existing.order_id,
       target_product: targetProduct,
