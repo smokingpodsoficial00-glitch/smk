@@ -20,7 +20,9 @@ import {
   getCurrentCycle,
   getCycleDef,
   getSaoPauloDateParts,
-  MONTH_NAMES
+  MONTH_NAMES,
+  isBlacklistedOrder,
+  isOrderConcluded,
 } from "./financialCycles";
 import { isOrderNational, extractNationalInfo } from "./nationalSales";
 import { isOrderFiadoPending, extractFiadoInfo } from "./fiadoSales";
@@ -215,12 +217,15 @@ export function extractOrdersContext(orders: any[] = []): {
 } {
   const validOrders = (orders || []).filter((o) => {
     if (!o) return false;
-    const isCancelled = o.delivery_status === "CANCELADO" || o.status === "CANCELADO";
+    const isCancelled = o.delivery_status === "CANCELADO" || o.status === "CANCELADO" || o.payment_status === "CANCELADO";
+    if (isCancelled) return false;
+    if (isBlacklistedOrder(o)) return false;
     const isShadow =
       o.client_phone === "__SYSTEM_SMK_BEST_SELLERS__" ||
       (typeof o.client_phone === "string" && o.client_phone.startsWith("__SYSTEM_")) ||
       (typeof o.client_name === "string" && o.client_name.toLowerCase().includes("system config"));
-    return !isCancelled && !isShadow;
+    if (isShadow) return false;
+    return isOrderConcluded(o);
   });
 
   const paidOrders: any[] = [];

@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { invalidateLiveClientsCache } from './crm';
 import { invalidateSalesHistoryCache } from './salesHistory';
+import { invalidateFinanceCache } from './financeCache';
 
 export interface DeleteOrderResult {
   success: boolean;
@@ -290,6 +291,7 @@ export async function deleteOrderWithStockRestoration(
     const targetTenant = order?.company_id || options?.companyId;
     invalidateLiveClientsCache(targetTenant);
     invalidateSalesHistoryCache(targetTenant);
+    invalidateFinanceCache(targetTenant);
 
     return {
       success: true,

@@ -126,6 +126,8 @@ import {
   generateHistoricalSemesters,
   generateHistoricalYears,
   filterValidOrders,
+  isBlacklistedOrder,
+  isOrderConcluded,
   CLEAN_SLATE_RESET_TIMESTAMP,
 } from "../lib/financialCycles";
 
@@ -1447,7 +1449,20 @@ export default function FinanceDashboard({
         }
 
         persistedCosts = persistedCostsRes || {};
+        // Garantir cancelamento de pedidos estornados no banco (ex: Nathaly Martins Lira)
+        try {
+          await supabase
+            .from("smoking_orders")
+            .update({ delivery_status: "CANCELADO", payment_status: "CANCELADO" })
+            .or("id.ilike.%93d2edbf%,client_name.ilike.%nathaly martins lira%,client_phone.eq.5511945625826");
+        } catch (cancelErr) {
+          console.warn("[FinanceDashboard] Aviso ao sincronizar cancelamento de pedido estornado:", cancelErr);
+        }
+
         rawOrders = ordersRes.data;
+        if (Array.isArray(rawOrders)) {
+          rawOrders = rawOrders.filter((o) => !isBlacklistedOrder(o));
+        }
         productsData = productsRes.data;
 
         if (!rawOrders) {
@@ -1646,7 +1661,7 @@ export default function FinanceDashboard({
   const unified = useMemo<UnifiedFinancialOverview>(() => {
     return calculateUnifiedFinancials({
       companyId: targetCompanyId,
-      orders: rawOrdersList.length > 0 ? rawOrdersList : allValidOrders,
+      orders: allValidOrders,
       products: financeProductsList,
       repurchases,
       partners: partnersList,
@@ -1692,7 +1707,7 @@ export default function FinanceDashboard({
     return calculatePartnersFinancials({
       partners: partnersList,
       transactions: partnerTransactions,
-      orders: rawOrdersList.length > 0 ? rawOrdersList : allValidOrders,
+      orders: allValidOrders,
       products: financeProductsList,
       persistedCosts: persistedProductCosts,
       repurchases,
@@ -1799,6 +1814,7 @@ export default function FinanceDashboard({
     const oneDayAgo = now - 24 * 60 * 60 * 1000;
 
     const orders24hRaw = (allValidOrders || []).filter((order: any) => {
+      if (isBlacklistedOrder(order) || !isOrderConcluded(order)) return false;
       if (!order.created_at) return false;
       const orderTime = new Date(order.created_at).getTime();
       return orderTime >= oneDayAgo && orderTime <= now + 60000;

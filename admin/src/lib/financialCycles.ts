@@ -209,16 +209,96 @@ export function getCurrentCycle(): CycleDefinition {
 }
 
 /**
- * Filtra pedidos válidos (auditados: exclui CANCELADO e shadow records)
+ * Identifica pedidos estornados ou cancelados explicitamente pelo usuário (ex: Nathaly Martins Lira)
+ */
+export function isBlacklistedOrder(o: any): boolean {
+  if (!o) return false;
+  const id = String(o.id || o.realId || "").toLowerCase();
+  const name = String(o.client_name || o.clientName || "").toLowerCase();
+  const phone = String(o.client_phone || o.phone || "").replace(/\D/g, "");
+
+  if (id.includes("93d2edbf")) return true;
+  if (name.includes("nathaly") || name.includes("natally")) return true;
+  if (phone.includes("5511945625826") || phone === "11945625826") return true;
+
+  return false;
+}
+
+/**
+ * Verifica se um pedido foi efetivamente concluído para efeito contábil/financeiro.
+ * REGRA SMK: O estoque baixa imediatamente na venda, mas o financeiro SÓ considera
+ * pedidos que estejam finalizados na área de Concluídos. Pedidos em aberto (Preparando,
+ * Em Rota, Entregue ou reabertos) NÃO entram no faturamento nem no caixa real.
+ */
+export function isOrderConcluded(o: any): boolean {
+  if (!o) return false;
+  if (o.delivery_status === "CANCELADO" || o.status === "CANCELADO" || o.payment_status === "CANCELADO") {
+    return false;
+  }
+  if (isBlacklistedOrder(o)) {
+    return false;
+  }
+  if (isOrderFiadoPending(o)) {
+    return false;
+  }
+  if (o.client_phone === "__SYSTEM_SMK_BEST_SELLERS__" || (o.client_phone && o.client_phone.startsWith("__SYSTEM_"))) {
+    return false;
+  }
+  if (o.client_name && o.client_name.toLowerCase().includes("system config")) {
+    return false;
+  }
+
+  const deliveryStatus = String(o.delivery_status || "").trim().toUpperCase();
+  const receiptUrl = String(o.receipt_url || "").trim().toUpperCase();
+  const status = String(o.status || "").trim().toUpperCase();
+
+  // Status oficial de concluído na base
+  if (deliveryStatus === "CONCLUIDO" || receiptUrl === "CONCLUIDO" || status === "CONCLUIDO") {
+    return true;
+  }
+
+  // Persistência local no navegador de pedidos concluídos
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const raw = window.localStorage.getItem("smoking_completed_order_ids");
+      if (raw) {
+        const ids = JSON.parse(raw);
+        if (Array.isArray(ids) && (ids.includes(o.id) || ids.includes(o.realId))) {
+          return true;
+        }
+      }
+    }
+  } catch {}
+
+  // Pedidos históricos anteriores ao Marco Zero da Reestruturação (18/11/2026)
+  // que foram finalizados no passado
+  const rawDate = o.created_at || o.date;
+  if (rawDate) {
+    const orderTime = new Date(rawDate).getTime();
+    if (orderTime < CLEAN_SLATE_RESET_TIMESTAMP && (deliveryStatus === "ENTREGUE" || !deliveryStatus || deliveryStatus === "PAGO")) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Filtra pedidos válidos (auditados: estritamente concluídos, não-cancelados e sem shadow records)
  */
 export function filterValidOrders(orders: any[]): any[] {
   return (orders || []).filter(
     (o) =>
+      o &&
       o.delivery_status !== "CANCELADO" &&
+      o.status !== "CANCELADO" &&
+      o.payment_status !== "CANCELADO" &&
+      !isBlacklistedOrder(o) &&
       o.client_phone !== "__SYSTEM_SMK_BEST_SELLERS__" &&
       (!o.client_phone || !o.client_phone.startsWith("__SYSTEM_")) &&
       (!o.client_name || !o.client_name.toLowerCase().includes("system config")) &&
-      !isOrderFiadoPending(o)
+      !isOrderFiadoPending(o) &&
+      isOrderConcluded(o)
   );
 }
 
@@ -706,7 +786,8 @@ export function calculateNewPhaseRealCash(
   let allPaidRevenueSum = 0;
 
   for (const order of orders || []) {
-    if (!order || order.delivery_status === "CANCELADO" || order.status === "CANCELADO") continue;
+    if (!order || order.delivery_status === "CANCELADO" || order.status === "CANCELADO" || order.payment_status === "CANCELADO") continue;
+    if (isBlacklistedOrder(order) || !isOrderConcluded(order)) continue;
     const amt = parseFloat(order.total_amount) || 0;
     const isPendingFiado = isOrderFiadoPending(order);
     const fiadoInfo = isPendingFiado ? extractFiadoInfo(order) : null;

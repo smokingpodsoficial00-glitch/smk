@@ -394,6 +394,11 @@ export default function KanbanBoard() {
    }
  }
 
+ // Invalida caches do financeiro e CRM após alteração de status
+ invalidateFinanceCache(company?.id);
+ invalidateLiveClientsCache(company?.id);
+ invalidateSalesHistoryCache(company?.id);
+
  // Disparar Webhook caso despache para Rota com validação e segurança reforçada
  if (isForwardFromPreparing && !isNationalOrder && shouldNotify) {
  if (currentOrder && currentOrder.phone) {
@@ -427,6 +432,9 @@ export default function KanbanBoard() {
  if (res.success) {
  setOrders(prev => prev.filter(o => o.realId !== realId));
  saveCompletedIds(getCompletedIds().filter(id => id !== realId));
+ invalidateFinanceCache(company?.id);
+ invalidateLiveClientsCache(company?.id);
+ invalidateSalesHistoryCache(company?.id);
  } else {
  alert("Erro ao excluir do banco de dados:" + (res.error || 'Erro desconhecido'));
  }
@@ -1656,9 +1664,9 @@ function OrderCard({
  {order.status === 'PREPARANDO' && (
  <div className="flex gap-2">
  <button 
- onClick={() => onUpdate(order.realId, 'AGUARDANDO_PAGAMENTO')}
- className="bg-[#161616] hover:bg-[#222] text-white/60 hover:text-white text-xs font-semibold px-3 py-2.5 rounded-xl border border-[#2e2e2e] transition-colors shrink-0 cursor-pointer"
- title="Voltar status"
+ onClick={() => onDelete(order.realId)}
+ className="bg-[#161616] hover:bg-red-500/10 text-white/60 hover:text-red-400 text-xs font-semibold px-3 py-2.5 rounded-xl border border-[#2e2e2e] hover:border-red-500/30 transition-colors shrink-0 cursor-pointer flex items-center gap-1.5"
+ title="Cancelar venda e devolver itens ao estoque"
  >
  ← Voltar
  </button>
