@@ -175,7 +175,7 @@ app.post('/api/crm/update-client', async (req, res) => {
 // MULTITENANT RESOLVER & PERSISTÊNCIA DE CAMPANHAS E LISTAS POR LOJA
 // ============================================================
 const OFFICIAL_COMPANY_ID = 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.SMK_DATA_DIR ? path.resolve(process.env.SMK_DATA_DIR) : path.join(__dirname, 'data');
 
 function sanitizeTenantId(rawId) {
   if (!rawId) return OFFICIAL_COMPANY_ID;
@@ -210,6 +210,7 @@ function loadMarketingConfig(companyId = OFFICIAL_COMPANY_ID) {
         lists: [],
         followUps: [],
         deletedFollowUpIds: [],
+        dismissedFollowUpPhones: [],
         sentHistory: { globalSent: [] },
         idempotencyKeys: [],
         lastUpdated: null
@@ -222,6 +223,7 @@ function loadMarketingConfig(companyId = OFFICIAL_COMPANY_ID) {
     if (!parsed.sentHistory) parsed.sentHistory = { globalSent: [] };
     if (!Array.isArray(parsed.followUps)) parsed.followUps = [];
     if (!Array.isArray(parsed.deletedFollowUpIds)) parsed.deletedFollowUpIds = [];
+    if (!Array.isArray(parsed.dismissedFollowUpPhones)) parsed.dismissedFollowUpPhones = [];
     return parsed;
   } catch (err) {
     console.error(`❌ [Marketing][${cid}] Erro ao carregar config:`, err.message);
@@ -231,6 +233,7 @@ function loadMarketingConfig(companyId = OFFICIAL_COMPANY_ID) {
       lists: [],
       followUps: [],
       deletedFollowUpIds: [],
+      dismissedFollowUpPhones: [],
       sentHistory: { globalSent: [] },
       idempotencyKeys: [],
       lastUpdated: null
@@ -2514,17 +2517,42 @@ function buildServerFollowUpMessage(item) {
     .replace(/{{produto}}/gi, product);
 }
 
-function mergeFollowUpsList(existingList = [], incomingList = [], deletedIds = []) {
+function mergeDismissedPhonesList(existing = [], incoming = []) {
+  const byPhone = new Map();
+  for (const entry of [...(Array.isArray(existing) ? existing : []), ...(Array.isArray(incoming) ? incoming : [])]) {
+    if (!entry || !entry.phone) continue;
+    const normPhone = normalizeMarketingPhone(entry.phone);
+    if (!normPhone) continue;
+    const deletedAt = Number(entry.deletedAt) || 0;
+    const prev = byPhone.get(normPhone);
+    if (!prev || deletedAt > prev.deletedAt) {
+      byPhone.set(normPhone, { phone: normPhone, client_id: entry.client_id || prev?.client_id || null, deletedAt });
+    }
+  }
+  return Array.from(byPhone.values()).slice(-500);
+}
+
+function isDismissedByPhone(item, dismissedPhones = []) {
+  if (!item || item.reason_category !== 'recompra_futura') return false;
+  const p = normalizeMarketingPhone(item.client_phone);
+  if (!p) return false;
+  const rec = (dismissedPhones || []).find(d => normalizeMarketingPhone(d.phone) === p);
+  if (!rec) return false;
+  const itemUpdTs = new Date(item.updated_at || item.created_at || 0).getTime();
+  return itemUpdTs <= (Number(rec.deletedAt) || 0);
+}
+
+function mergeFollowUpsList(existingList = [], incomingList = [], deletedIds = [], dismissedPhones = []) {
   const deletedSet = new Set(Array.isArray(deletedIds) ? deletedIds : []);
   const byId = new Map();
 
   for (const item of existingList) {
-    if (!item || !item.id || deletedSet.has(item.id)) continue;
+    if (!item || !item.id || item.deleted_at || deletedSet.has(item.id) || isDismissedByPhone(item, dismissedPhones)) continue;
     byId.set(item.id, item);
   }
 
   for (const inc of incomingList) {
-    if (!inc || !inc.id || deletedSet.has(inc.id)) continue;
+    if (!inc || !inc.id || inc.deleted_at || deletedSet.has(inc.id) || isDismissedByPhone(inc, dismissedPhones)) continue;
     const prev = byId.get(inc.id);
     if (!prev) {
       byId.set(inc.id, inc);
@@ -2587,7 +2615,9 @@ app.get('/api/marketing/followups', (req, res) => {
       success: true,
       serverAutoDispatchActive: true,
       companyId,
-      followUps: config.followUps || []
+      followUps: config.followUps || [],
+      deletedIds: config.deletedFollowUpIds || [],
+      dismissedClients: config.dismissedFollowUpPhones || []
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -2597,15 +2627,17 @@ app.get('/api/marketing/followups', (req, res) => {
 app.post('/api/marketing/followups/sync', (req, res) => {
   try {
     const companyId = getRequestCompanyId(req);
-    const { followUps: incomingList = [], deletedIds = [] } = req.body || {};
+    const { followUps: incomingList = [], deletedIds = [], dismissedClients = [] } = req.body || {};
     if (!Array.isArray(incomingList)) {
       return res.status(400).json({ success: false, error: '"followUps" deve ser um array.' });
     }
     const config = loadMarketingConfig(companyId);
     const combinedDeleted = Array.from(new Set([...(config.deletedFollowUpIds || []), ...(Array.isArray(deletedIds) ? deletedIds : [])])).slice(-300);
-    const merged = mergeFollowUpsList(config.followUps || [], incomingList, combinedDeleted);
+    const combinedDismissed = mergeDismissedPhonesList(config.dismissedFollowUpPhones || [], dismissedClients);
+    const merged = mergeFollowUpsList(config.followUps || [], incomingList, combinedDeleted, combinedDismissed);
 
     config.deletedFollowUpIds = combinedDeleted;
+    config.dismissedFollowUpPhones = combinedDismissed;
     config.followUps = merged;
     saveMarketingConfig(config, companyId);
 
@@ -2618,7 +2650,9 @@ app.post('/api/marketing/followups/sync', (req, res) => {
       success: true,
       serverAutoDispatchActive: true,
       companyId,
-      followUps: merged
+      followUps: merged,
+      deletedIds: combinedDeleted,
+      dismissedClients: combinedDismissed
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -2658,13 +2692,32 @@ app.delete('/api/marketing/followups/:id', (req, res) => {
   try {
     const companyId = getRequestCompanyId(req);
     const { id } = req.params;
+    const rawPhone = req.query?.phone ? String(req.query.phone) : '';
     const config = loadMarketingConfig(companyId);
-    config.followUps = (config.followUps || []).filter(f => f.id !== id);
+
+    const matchedTarget = (config.followUps || []).find(f => f.id === id);
+    const normPhone = normalizeMarketingPhone(rawPhone || matchedTarget?.client_phone || '');
+
+    config.followUps = (config.followUps || []).filter(f => {
+      if (f.id === id) return false;
+      if (normPhone && f.reason_category === 'recompra_futura' && normalizeMarketingPhone(f.client_phone) === normPhone) {
+        return false;
+      }
+      return true;
+    });
+
     if (!Array.isArray(config.deletedFollowUpIds)) config.deletedFollowUpIds = [];
     if (id && !config.deletedFollowUpIds.includes(id)) {
       config.deletedFollowUpIds.push(id);
       config.deletedFollowUpIds = config.deletedFollowUpIds.slice(-300);
     }
+
+    if (normPhone) {
+      config.dismissedFollowUpPhones = mergeDismissedPhonesList(config.dismissedFollowUpPhones || [], [
+        { phone: normPhone, deletedAt: Date.now() }
+      ]);
+    }
+
     saveMarketingConfig(config, companyId);
     return res.json({ success: true, companyId });
   } catch (err) {
@@ -2674,38 +2727,41 @@ app.delete('/api/marketing/followups/:id', (req, res) => {
 
 const runningFollowUpSchedulers = new Set();
 
-async function runFollowUpsSchedulerForCompany(companyId) {
+async function runFollowUpsSchedulerForCompany(companyId, opts = {}) {
   const cid = sanitizeTenantId(companyId);
-  if (runningFollowUpSchedulers.has(cid)) return;
+  if (runningFollowUpSchedulers.has(cid)) return { sentCount: 0, skippedReason: 'already_running' };
   runningFollowUpSchedulers.add(cid);
 
+  let sentCount = 0;
   try {
     const config = loadMarketingConfig(cid);
     const list = Array.isArray(config.followUps) ? config.followUps : [];
-    if (list.length === 0) return;
+    if (list.length === 0) return { sentCount: 0, skippedReason: 'empty' };
 
-    const now = new Date();
+    const now = opts.nowDate instanceof Date ? opts.nowDate : new Date();
+    const delayMs = typeof opts.delayMs === 'number' ? opts.delayMs : 12000;
     const todayStr = getSPDateStr(now);
     const currentHour = getSPHour(now);
     if (currentHour < FOLLOWUP_SAFE_START_HOUR || currentHour >= FOLLOWUP_SAFE_END_HOUR) {
-      return;
+      return { sentCount: 0, skippedReason: 'outside_window' };
     }
 
     const dueIds = list
       .filter(item => {
-        if (!item || item.status !== 'pendente' || item.reason_category !== 'recompra_futura') return false;
+        if (!item || item.deleted_at || item.status !== 'pendente' || item.reason_category !== 'recompra_futura') return false;
+        if (isDismissedByPhone(item, config.dismissedFollowUpPhones || [])) return false;
         if (!item.scheduled_date || item.scheduled_date > todayStr) return false;
         const phone = normalizeMarketingPhone(item.client_phone);
         if (!phone || phone.length < 12) return false;
         const lastSentMs = item.last_sent_at ? new Date(item.last_sent_at).getTime() : 0;
-        if (lastSentMs > 0 && (Date.now() - lastSentMs) < (12 * 60 * 60 * 1000)) return false;
+        if (lastSentMs > 0 && (now.getTime() - lastSentMs) < (12 * 60 * 60 * 1000)) return false;
         const idempKey = `fu_${cid}_${item.id}_${todayStr}`;
         if ((config.idempotencyKeys || []).some(k => k.key === idempKey)) return false;
         return true;
       })
       .map(item => item.id);
 
-    if (dueIds.length === 0) return;
+    if (dueIds.length === 0) return { sentCount: 0, skippedReason: 'none_due' };
 
     const session = getTenantSession(cid);
     if (!session.isWhatsAppReady || !session.sock) {
@@ -2714,7 +2770,7 @@ async function runFollowUpsSchedulerForCompany(companyId) {
       }
     }
     if (!session.isWhatsAppReady || !session.sock) {
-      return;
+      return { sentCount: 0, skippedReason: 'whatsapp_offline' };
     }
 
     for (let i = 0; i < dueIds.length; i++) {
@@ -2725,12 +2781,15 @@ async function runFollowUpsSchedulerForCompany(companyId) {
       if (itemIdx === -1) continue;
 
       const freshItem = freshConfig.followUps[itemIdx];
-      if (!freshItem || freshItem.status !== 'pendente' || !freshItem.scheduled_date || freshItem.scheduled_date > todayStr) {
+      if (!freshItem || freshItem.deleted_at || freshItem.status !== 'pendente' || !freshItem.scheduled_date || freshItem.scheduled_date > todayStr) {
+        continue;
+      }
+      if (isDismissedByPhone(freshItem, freshConfig.dismissedFollowUpPhones || [])) {
         continue;
       }
 
       const lastSentMs = freshItem.last_sent_at ? new Date(freshItem.last_sent_at).getTime() : 0;
-      if (lastSentMs > 0 && (Date.now() - lastSentMs) < (12 * 60 * 60 * 1000)) {
+      if (lastSentMs > 0 && (now.getTime() - lastSentMs) < (12 * 60 * 60 * 1000)) {
         continue;
       }
 
@@ -2739,13 +2798,24 @@ async function runFollowUpsSchedulerForCompany(companyId) {
       if (freshConfig.idempotencyKeys.some(k => k.key === idempKey)) continue;
 
       const phoneDigits = normalizeMarketingPhone(freshItem.client_phone);
-      const formattedJid = formatToBaileysJid(phoneDigits);
+      let formattedJid = formatToBaileysJid(phoneDigits);
+      try {
+        const probeDetails = await resolveCanonicalWhatsAppJid(phoneDigits, cid);
+        if (!probeDetails.valid) {
+          console.warn(`⚠️ [FollowUp Scheduler][${cid}] Número inválido para ${freshItem.client_name} (${phoneDigits}): ${probeDetails.message || probeDetails.error}`);
+          continue;
+        }
+        if (probeDetails.jid) {
+          formattedJid = probeDetails.jid;
+        }
+      } catch {}
+
       const msgText = buildServerFollowUpMessage(freshItem);
 
       // Reserva idempotência antes do disparo para evitar duplicatas em caso de reinício
       freshConfig.idempotencyKeys.push({
         key: idempKey,
-        timestamp: new Date().toISOString(),
+        timestamp: now.toISOString(),
         campaignName: `FollowUp-21d:${freshItem.client_name || phoneDigits}`
       });
       saveMarketingConfig(freshConfig, cid);
@@ -2757,7 +2827,7 @@ async function runFollowUpsSchedulerForCompany(companyId) {
         const postConfig = loadMarketingConfig(cid);
         const postIdx = (postConfig.followUps || []).findIndex(f => f.id === targetId);
         if (postIdx !== -1) {
-          const sentNow = new Date();
+          const sentNow = opts.nowDate instanceof Date ? opts.nowDate : new Date();
           const sentIso = sentNow.toISOString();
           const nextDate = addDaysToSPDateStr(REPLENISHMENT_CYCLE_DAYS_SERVER, sentNow);
           const nextCount = (Number(postConfig.followUps[postIdx].send_count) || 0) + 1;
@@ -2776,10 +2846,12 @@ async function runFollowUpsSchedulerForCompany(companyId) {
             last_sent_at: sentIso,
             send_count: nextCount,
             scheduled_date: nextDate,
+            custom_message: null,
             updated_at: sentIso,
             reason_description: `Disparo automático #${nextCount} enviado em ${timeLabel}. Novo ciclo de 3 semanas iniciado até ${nextDate}.`
           };
           saveMarketingConfig(postConfig, cid);
+          sentCount++;
           console.log(`✅ [FollowUp Scheduler][${cid}] Follow-up enviado para ${freshItem.client_name}! Próximo ciclo reiniciado para ${nextDate}.`);
         }
       } catch (sendErr) {
@@ -2790,12 +2862,14 @@ async function runFollowUpsSchedulerForCompany(companyId) {
         saveMarketingConfig(errConfig, cid);
       }
 
-      if (i < dueIds.length - 1) {
-        await new Promise(r => setTimeout(r, 12000));
+      if (i < dueIds.length - 1 && delayMs > 0) {
+        await new Promise(r => setTimeout(r, delayMs));
       }
     }
+    return { sentCount };
   } catch (err) {
     console.error(`❌ [FollowUp Scheduler][${cid}] Erro no scheduler:`, err.message);
+    return { sentCount, error: err.message };
   } finally {
     runningFollowUpSchedulers.delete(cid);
   }
@@ -2809,15 +2883,9 @@ async function marketingSchedulerTick() {
   }
 }
 
-setInterval(marketingSchedulerTick, 60 * 1000);
-
 // =============================================
-// SERVER START
+// SERVER START & WATCHDOG KEEP-ALIVE (30s)
 // =============================================
-// ============================================================
-// AUTO-RESTORE DE SESSÕES NO BOOT & WATCHDOG KEEP-ALIVE (30s)
-// Garante que nenhuma loja caia e que todos os disparos continuem até segunda ordem!
-// ============================================================
 function discoverAllSavedAuthTenants() {
   const ids = new Set(getAllConfiguredTenantIds());
   try {
@@ -2846,17 +2914,34 @@ async function restoreAndKeepAliveAllSessions() {
   }
 }
 
-setInterval(restoreAndKeepAliveAllSessions, 30 * 1000);
+if (require.main === module) {
+  setInterval(marketingSchedulerTick, 60 * 1000);
+  setInterval(restoreAndKeepAliveAllSessions, 30 * 1000);
 
-app.listen(port, () => {
-  console.log(`🚀 Servidor backend Multitenant 24/7 rodando na porta ${port}`);
-  setTimeout(restoreAndKeepAliveAllSessions, 1500);
-});
+  app.listen(port, () => {
+    console.log(`🚀 Servidor backend Multitenant 24/7 rodando na porta ${port}`);
+    setTimeout(restoreAndKeepAliveAllSessions, 1500);
+  });
 
-process.on('uncaughtException', (err) => {
-  console.error('⚠️ UncaughtException capturado no backend:', err.message);
-});
+  process.on('uncaughtException', (err) => {
+    console.error('⚠️ UncaughtException capturado no backend:', err.message);
+  });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('⚠️ UnhandledRejection capturado no backend:', reason);
-});
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('⚠️ UnhandledRejection capturado no backend:', reason);
+  });
+}
+
+module.exports = {
+  app,
+  DATA_DIR,
+  OFFICIAL_COMPANY_ID,
+  loadMarketingConfig,
+  saveMarketingConfig,
+  getTenantSession,
+  mergeFollowUpsList,
+  mergeDismissedPhonesList,
+  buildServerFollowUpMessage,
+  runFollowUpsSchedulerForCompany,
+  marketingSchedulerTick,
+};

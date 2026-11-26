@@ -9,6 +9,7 @@
     "test:payroll": "tsx src/lib/payrollTester.ts",
     "test:investment": "tsx src/lib/investmentSimulatorTester.ts",
     "test:stock": "tsx src/lib/stockValidationTester.ts",
+    "test:followups": "tsx --tsconfig tsconfig.app.json src/lib/followUpsScenariosTester.ts",
     "lint": "oxlint",
     "preview": "vite preview"
   },

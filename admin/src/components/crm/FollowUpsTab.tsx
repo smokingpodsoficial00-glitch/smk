@@ -8,16 +8,17 @@ import {
 import { 
   fetchFollowUps, 
   deleteFollowUp, 
-  createFollowUp, 
   updateFollowUp, 
   isWithinSafeDispatchWindow,
   sync21DaysReplenishmentFollowUps,
   syncFollowUpsWithBackend,
-  notifyBackendFollowUpSent,
-  REPLENISHMENT_CYCLE_DAYS,
+  executeAutoDispatchBatch,
+  executeForceSendFollowUp,
+  isFollowUpDispatchBusy,
+  sortFollowUpsDeterministic,
+  formatFollowUpSentLabel,
   REPLENISHMENT_COPY_VARIATIONS,
   DEFAULT_COMPANY_ID,
-  toLocalDateString,
   normalizeFollowUpPhone,
   generateFollowUpMessage,
   type FollowUpItem
@@ -27,51 +28,6 @@ import { type FollowUpsTestSuiteReport } from '@/lib/followUpsTester';
 import { useAuth } from '@/contexts/AuthContext';
 import { NewFollowUpModal } from './NewFollowUpModal';
 import { supabase } from '@/lib/supabase';
-import { legacyFetch } from '@/lib/backend';
-
-// Trava global de módulo para impedir disparos duplicados mesmo em múltiplos renders/cliques rápidos
-const globalForceSendInFlight = new Set<string>();
-const globalRecentSentTimestamps = new Map<string, number>();
-let globalAutoDispatchRunning = false;
-
-const AUTO_DISPATCH_LOCK_PREFIX = 'smk_auto_fu_lock_';
-
-function getDailyAutoLockKey(companyId: string, phoneFormatted: string, dateStr: string): string {
-  return `${AUTO_DISPATCH_LOCK_PREFIX}${companyId}_${phoneFormatted}_${dateStr}`;
-}
-
-function hasDailyAutoLock(companyId: string, phoneFormatted: string, dateStr: string): boolean {
-  try {
-    return Boolean(localStorage.getItem(getDailyAutoLockKey(companyId, phoneFormatted, dateStr)));
-  } catch {
-    return false;
-  }
-}
-
-function setDailyAutoLock(companyId: string, phoneFormatted: string, dateStr: string): void {
-  try {
-    localStorage.setItem(getDailyAutoLockKey(companyId, phoneFormatted, dateStr), new Date().toISOString());
-  } catch {}
-}
-
-function clearDailyAutoLock(companyId: string, phoneFormatted: string, dateStr: string): void {
-  try {
-    localStorage.removeItem(getDailyAutoLockKey(companyId, phoneFormatted, dateStr));
-  } catch {}
-}
-
-function formatLastSentLabel(iso?: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  return d.toLocaleString('pt-BR', {
-    timeZone: 'America/Sao_Paulo',
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 export function FollowUpsTab() {
   const { company } = useAuth();
@@ -82,9 +38,12 @@ export function FollowUpsTab() {
   const [serverAutoDispatchActive, setServerAutoDispatchActive] = useState<boolean | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const loadSeqRef = useRef(0);
   const suppressRealtimeUntilRef = useRef(0);
   const delayedSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadDataRef = useRef<() => Promise<void>>(async () => {});
   const [editingItem, setEditingItem] = useState<FollowUpItem | null>(null);
   const [editedMessage, setEditedMessage] = useState<string>('');
   const [selectedVariationIdx, setSelectedVariationIdx] = useState<number>(0);
@@ -100,234 +59,57 @@ export function FollowUpsTab() {
   /**
    * Fallback seguro no painel quando o backend Node remoto ainda não foi reiniciado
    * para assumir o scheduler 24/7 (/api/marketing/followups/sync -> 404).
-   * Dispara automaticamente clientes com ciclo de 21 dias atingido (daysDiff <= 0),
-   * usando trava síncrona dupla + trava diária em localStorage antes da chamada HTTP.
+   * Executa sequencialmente com atualização imediata por cliente e bloqueio de concorrência.
    */
   const runGuardedFrontendAutoDispatch = async (items: FollowUpItem[], targetCompanyId: string) => {
-    if (globalAutoDispatchRunning) return;
-    const winCheck = isWithinSafeDispatchWindow();
-    if (!winCheck.inWindow) return;
-
-    const todayStr = toLocalDateString(new Date());
-    const nowMs = Date.now();
-    const twelveHoursMs = 12 * 60 * 60 * 1000;
-
-    const candidates = items.filter(item => {
-      if (item.status !== 'pendente' || item.reason_category !== 'recompra_futura') return false;
-      if ((item.daysDiff ?? 0) > 0) return false;
-      const phone = normalizeFollowUpPhone(item.client_phone);
-      if (!phone || phone.replace(/\D/g, '').length < 12) return false;
-      if (item.last_sent_at) {
-        const lastSentMs = new Date(item.last_sent_at).getTime();
-        if (!isNaN(lastSentMs) && (nowMs - lastSentMs) < twelveHoursMs) return false;
-      }
-      const lockKey = `${item.id}::${phone}`;
-      if (globalForceSendInFlight.has(lockKey) || globalForceSendInFlight.has(phone)) return false;
-      const recentMs = globalRecentSentTimestamps.get(phone) || 0;
-      if ((nowMs - recentMs) < 60000) return false;
-      if (hasDailyAutoLock(targetCompanyId, phone, todayStr)) return false;
-      return true;
+    const result = await executeAutoDispatchBatch(items, {
+      companyId: targetCompanyId,
+      delayMs: 3500,
+      onCandidateStart: (item) => {
+        setSendingId(item.id);
+      },
+      onCandidateEnd: (item) => {
+        setSendingId(prev => (prev === item.id ? null : prev));
+      },
+      onItemDispatched: (updatedItem, allSortedItems) => {
+        suppressRealtimeUntilRef.current = Date.now() + 4500;
+        setFollowUps(allSortedItems);
+        setSyncEngineFeedback(
+          `🤖 Disparo automático de 3 semanas enviado para ${updatedItem.client_name} (${updatedItem.client_phone})! Status atualizado para ENVIADO e contagem reiniciada para 21 dias.`
+        );
+      },
     });
 
-    if (candidates.length === 0) return;
-
-    globalAutoDispatchRunning = true;
-    try {
-      // Verifica se o WhatsApp Baileys está conectado antes de tentar qualquer disparo
-      let whatsappConnected = false;
-      try {
-        const qrRes = await legacyFetch('/api/qr');
-        if (qrRes.ok) {
-          const qrData = await qrRes.json().catch(() => ({}));
-          whatsappConnected = Boolean(qrData?.isReady || qrData?.status === 'CONNECTED');
-        }
-      } catch {
-        whatsappConnected = false;
-      }
-
-      if (!whatsappConnected) {
-        return;
-      }
-
-      let dispatchedCount = 0;
-
-      for (const item of candidates) {
-        if (!isWithinSafeDispatchWindow().inWindow) break;
-
-        const phone = normalizeFollowUpPhone(item.client_phone);
-        const lockKey = `${item.id}::${phone}`;
-        if (
-          globalForceSendInFlight.has(lockKey) ||
-          globalForceSendInFlight.has(phone) ||
-          hasDailyAutoLock(targetCompanyId, phone, todayStr)
-        ) {
-          continue;
-        }
-
-        // Trava síncrona dupla ANTES do disparo de rede para garantir zero duplicidade
-        globalForceSendInFlight.add(lockKey);
-        globalForceSendInFlight.add(phone);
-        setDailyAutoLock(targetCompanyId, phone, todayStr);
-        setSendingId(item.id);
-
-        try {
-          const msg = item.whatsappMessage || generateFollowUpMessage(item);
-          const res = await legacyFetch('/api/marketing/send-direct', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              phone,
-              number: phone,
-              name: item.client_name,
-              text: msg,
-              companyId: targetCompanyId,
-            }),
-          });
-          const resData = await res.json().catch(() => ({}));
-
-          if (!res.ok || !resData?.success) {
-            // Se falhou por indisponibilidade/desconexão clara (sem envio), libera trava diária para nova tentativa
-            if (res.status === 503 || res.status === 404 || !res.ok) {
-              clearDailyAutoLock(targetCompanyId, phone, todayStr);
-            }
-            console.warn(`[FollowUps Auto] Falha ao enviar para ${phone}:`, resData?.message || resData?.error || res.status);
-            continue;
-          }
-
-          globalRecentSentTimestamps.set(phone, Date.now());
-          suppressRealtimeUntilRef.current = Date.now() + 2500;
-
-          const now = new Date();
-          const sentIso = now.toISOString();
-          const nextCycleDate = new Date(now.getTime() + (REPLENISHMENT_CYCLE_DAYS * 24 * 60 * 60 * 1000));
-          const nextDate = toLocalDateString(nextCycleDate);
-          const nextSendCount = (item.send_count || 0) + 1;
-          const newDescription = `Disparo automático #${nextSendCount} enviado em ${formatLastSentLabel(sentIso)}. Novo ciclo de 3 semanas iniciado até ${nextDate}.`;
-
-          await updateFollowUp(item.id, {
-            status: 'pendente',
-            completed_at: sentIso,
-            last_sent_at: sentIso,
-            send_count: nextSendCount,
-            scheduled_date: nextDate,
-            custom_message: null,
-            reason_description: newDescription,
-          }, targetCompanyId);
-
-          await notifyBackendFollowUpSent({
-            id: item.id,
-            scheduled_date: nextDate,
-            completed_at: sentIso,
-            last_sent_at: sentIso,
-            send_count: nextSendCount,
-            custom_message: null,
-            reason_description: newDescription,
-          }, targetCompanyId);
-
-          dispatchedCount++;
-          const nextMsg = generateFollowUpMessage({
-            ...item,
-            send_count: nextSendCount,
-            custom_message: null,
-          });
-          const phoneClean = normalizeFollowUpPhone(item.client_phone);
-
-          setFollowUps(prev =>
-            prev.map(f =>
-              f.id === item.id
-                ? {
-                    ...f,
-                    status: 'pendente',
-                    completed_at: sentIso,
-                    last_sent_at: sentIso,
-                    send_count: nextSendCount,
-                    scheduled_date: nextDate,
-                    daysDiff: REPLENISHMENT_CYCLE_DAYS,
-                    custom_message: null,
-                    whatsappMessage: nextMsg,
-                    whatsappUrl: `https://wa.me/${phoneClean}?text=${encodeURIComponent(nextMsg)}`,
-                    reason_description: newDescription,
-                  }
-                : f
-            )
-          );
-
-          setSyncEngineFeedback(
-            `🤖 Disparo automático de 3 semanas enviado para ${item.client_name} (${phone})! Status atualizado para ENVIADO e contagem reiniciada para 21 dias.`
-          );
-
-          if (dispatchedCount < candidates.length) {
-            await new Promise(resolve => setTimeout(resolve, 3500));
-          }
-        } catch (sendErr: any) {
-          clearDailyAutoLock(targetCompanyId, phone, todayStr);
-          console.warn('[FollowUps Auto] Erro de comunicação ao disparar automaticamente:', sendErr?.message || sendErr);
-        } finally {
-          globalForceSendInFlight.delete(lockKey);
-          globalForceSendInFlight.delete(phone);
-          setSendingId(prev => (prev === item.id ? null : prev));
-        }
-      }
-    } finally {
-      globalAutoDispatchRunning = false;
+    if (result.sentCount > 0) {
+      suppressRealtimeUntilRef.current = Date.now() + 3000;
+      if (delayedSyncTimerRef.current) clearTimeout(delayedSyncTimerRef.current);
+      delayedSyncTimerRef.current = setTimeout(() => {
+        void loadDataRef.current();
+      }, 1500);
     }
   };
 
   const loadData = async () => {
+    // Nunca sobrescreve a tela durante um disparo automático/manual em andamento
+    if (isFollowUpDispatchBusy()) return;
+
     const seq = ++loadSeqRef.current;
     const targetCompanyId = company?.id || DEFAULT_COMPANY_ID;
     try {
       const liveClients = await fetchLiveClients(targetCompanyId);
-      // Sincroniza automaticamente a esteira para garantir que pedidos concluídos já estejam agendados
+      if (isFollowUpDispatchBusy()) return;
+
+      // Sincroniza automaticamente a esteira respeitando exclusões persistidas e janela de corte
       await sync21DaysReplenishmentFollowUps(liveClients, targetCompanyId);
+      if (isFollowUpDispatchBusy()) return;
+
       let data = await fetchFollowUps(targetCompanyId);
-
-      // Garante que o cliente de teste Eduardo Pitzke exista 1 única vez na esteira caso ainda não conste
-      const eduardoIndex = data.findIndex(f => {
-        const nameLower = (f.client_name || '').toLowerCase();
-        const phoneNorm = normalizeFollowUpPhone(f.client_phone);
-        return nameLower.includes('eduardo') || nameLower.includes('pitzke') || phoneNorm.includes('951741181');
-      });
-
-      if (eduardoIndex === -1) {
-        const eduardoClient = liveClients.find(c => {
-          const nameLower = (c.name || '').toLowerCase();
-          const phoneNorm = normalizeFollowUpPhone(c.cleanPhone || c.phone);
-          return nameLower.includes('eduardo') || nameLower.includes('pitzke') || phoneNorm.includes('951741181');
-        });
-        const eduardoPhone = eduardoClient?.phone || '5511951741181';
-        const eduardoProduct = (eduardoClient?.lastProduct && eduardoClient.lastProduct !== 'Nenhum produto ainda')
-          ? eduardoClient.lastProduct
-          : 'Pod Descartável';
-        const eduardoFlavor = eduardoClient?.lastFlavor && eduardoClient.lastFlavor !== 'Não especificado'
-          ? eduardoClient.lastFlavor
-          : 'Ice';
-        const scheduledDate = toLocalDateString(new Date());
-
-        const createdEduardo = await createFollowUp({
-          company_id: targetCompanyId,
-          client_id: eduardoClient?.id || null,
-          client_name: eduardoClient?.name || 'Eduardo Pitzke',
-          client_phone: eduardoPhone,
-          reason_category: 'recompra_futura',
-          reason_description: 'Ciclo de 3 semanas completo. Pronto para reposição.',
-          target_product: eduardoProduct,
-          target_flavor: eduardoFlavor,
-          target_puffs: eduardoClient?.lastPuffs || 20000,
-          scheduled_date: scheduledDate,
-          scheduled_time: '15:00'
-        });
-
-        if (createdEduardo) {
-          data = [createdEduardo, ...data];
-        }
-      }
 
       // Sincroniza com o motor 24/7 no backend Node (mesmo padrão das Campanhas)
       const backendSync = await syncFollowUpsWithBackend(data, targetCompanyId);
       data = backendSync.items;
 
-      if (seq === loadSeqRef.current) {
+      if (seq === loadSeqRef.current && !isFollowUpDispatchBusy()) {
         setServerAutoDispatchActive(backendSync.serverAutoDispatchActive);
         setFollowUps(data);
 
@@ -339,7 +121,7 @@ export function FollowUpsTab() {
           if (hasDueItems) {
             if (delayedSyncTimerRef.current) clearTimeout(delayedSyncTimerRef.current);
             delayedSyncTimerRef.current = setTimeout(() => {
-              void loadData();
+              void loadDataRef.current();
             }, 5000);
           }
         } else {
@@ -356,13 +138,17 @@ export function FollowUpsTab() {
     }
   };
 
+  loadDataRef.current = loadData;
+
   useEffect(() => {
-    loadData();
+    void loadDataRef.current();
 
     const targetCompanyId = company?.id || DEFAULT_COMPANY_ID;
-    let debounceTimer: any = null;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const pollTimer = setInterval(() => {
-      void loadData();
+      if (!isFollowUpDispatchBusy()) {
+        void loadDataRef.current();
+      }
     }, 60000);
 
     const channel = supabase
@@ -375,11 +161,13 @@ export function FollowUpsTab() {
           table: 'smoking_crm_follow_ups' 
         }, 
         () => {
-          if (Date.now() < suppressRealtimeUntilRef.current) return;
+          if (isFollowUpDispatchBusy() || Date.now() < suppressRealtimeUntilRef.current) return;
           if (debounceTimer) clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
-            loadData();
-          }, 400);
+            if (!isFollowUpDispatchBusy()) {
+              void loadDataRef.current();
+            }
+          }, 500);
         }
       )
       .subscribe();
@@ -412,122 +200,29 @@ export function FollowUpsTab() {
   };
 
   const handleForceAutomaticSend = async (item: FollowUpItem, customTextOverride?: string) => {
-    const rawPhone = item.client_phone;
-    if (!rawPhone) {
-      alert('Telefone do cliente não encontrado.');
-      return;
-    }
-
-    const phoneFormatted = normalizeFollowUpPhone(rawPhone);
-    if (!phoneFormatted) {
-      alert('Número de WhatsApp inválido.');
-      return;
-    }
-
-    // Trava síncrona dupla (em voo + cooldown de 8 segundos) para impedir disparos múltiplos
-    const lockKey = `${item.id}::${phoneFormatted}`;
-    if (globalForceSendInFlight.has(lockKey) || globalForceSendInFlight.has(phoneFormatted)) {
-      console.warn('[FollowUps] Disparo duplicado bloqueado (requisição já em andamento):', lockKey);
-      return;
-    }
-    const lastSentMs = globalRecentSentTimestamps.get(phoneFormatted) || 0;
-    if (Date.now() - lastSentMs < 8000) {
-      console.warn('[FollowUps] Cooldown anti-duplicidade ativo para:', phoneFormatted);
-      return;
-    }
-
     const targetCompanyId = company?.id || DEFAULT_COMPANY_ID;
-    const msg = (customTextOverride && customTextOverride.trim())
-      ? customTextOverride.trim()
-      : (item.whatsappMessage || generateFollowUpMessage(item));
-
-    globalForceSendInFlight.add(lockKey);
-    globalForceSendInFlight.add(phoneFormatted);
     setSendingId(item.id);
     setSyncEngineFeedback(null);
 
     try {
-      let sentViaBackend = false;
-      let backendErrorMsg = '';
+      const result = await executeForceSendFollowUp(item, {
+        companyId: targetCompanyId,
+        customTextOverride,
+      });
 
-      try {
-        const res = await legacyFetch('/api/marketing/send-direct', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: phoneFormatted,
-            number: phoneFormatted,
-            name: item.client_name,
-            text: msg,
-            companyId: targetCompanyId
-          })
-        });
-        const resData = await res.json().catch(() => ({}));
-        if (res.ok && resData?.success) {
-          sentViaBackend = true;
-        } else {
-          backendErrorMsg = resData?.message || resData?.error || `Erro HTTP ${res.status}`;
+      if (!result.success) {
+        if (!result.deduplicated) {
+          alert(`⚠️ Não foi possível disparar automaticamente pelo motor WhatsApp.\n\nMotivo: ${result.error || 'WhatsApp desconectado ou servidor offline.'}\n\nConecte o WhatsApp no topo da aba Marketing ou use o botão de ícone do WhatsApp para enviar manualmente.`);
         }
-      } catch (backendErr: any) {
-        backendErrorMsg = backendErr?.message || 'Falha de comunicação com o servidor WhatsApp.';
-        console.warn('Backend offline ou túnel indisponível para envio automático:', backendErr);
-      }
-
-      if (!sentViaBackend) {
-        alert(`⚠️ Não foi possível disparar automaticamente pelo motor WhatsApp.\n\nMotivo: ${backendErrorMsg || 'WhatsApp desconectado ou servidor offline.'}\n\nConecte o WhatsApp no topo da aba Marketing ou use o botão de ícone do WhatsApp para enviar manualmente.`);
         return;
       }
 
-      globalRecentSentTimestamps.set(phoneFormatted, Date.now());
-      suppressRealtimeUntilRef.current = Date.now() + 2000;
-
-      const now = new Date();
-      const sentIso = now.toISOString();
-      const nextCycleDate = new Date(now.getTime() + (REPLENISHMENT_CYCLE_DAYS * 24 * 60 * 60 * 1000));
-      const nextDate = toLocalDateString(nextCycleDate);
-      const nextSendCount = (item.send_count || 0) + 1;
-      const newDescription = `Disparo #${nextSendCount} enviado em ${formatLastSentLabel(sentIso)}. Novo ciclo de 3 semanas iniciado até ${nextDate}.`;
-
-      await updateFollowUp(item.id, {
-        status: 'pendente',
-        completed_at: sentIso,
-        last_sent_at: sentIso,
-        send_count: nextSendCount,
-        scheduled_date: nextDate,
-        custom_message: customTextOverride !== undefined ? msg : (item.custom_message ?? null),
-        reason_description: newDescription
-      }, targetCompanyId);
-
-      setDailyAutoLock(targetCompanyId, phoneFormatted, toLocalDateString(now));
-
-      await notifyBackendFollowUpSent({
-        id: item.id,
-        scheduled_date: nextDate,
-        completed_at: sentIso,
-        last_sent_at: sentIso,
-        send_count: nextSendCount,
-        custom_message: customTextOverride !== undefined ? msg : (item.custom_message ?? null),
-        reason_description: newDescription,
-      }, targetCompanyId);
+      const updatedItem = result.updatedItem!;
+      suppressRealtimeUntilRef.current = Date.now() + 4000;
 
       // Atualiza estado em tela imediatamente para manter o cliente visível com 0% e selo "Enviado"
       setFollowUps(prev =>
-        prev.map(f =>
-          f.id === item.id
-            ? {
-                ...f,
-                status: 'pendente',
-                completed_at: sentIso,
-                last_sent_at: sentIso,
-                send_count: nextSendCount,
-                scheduled_date: nextDate,
-                daysDiff: REPLENISHMENT_CYCLE_DAYS,
-                custom_message: customTextOverride !== undefined ? msg : f.custom_message,
-                whatsappMessage: msg,
-                reason_description: newDescription,
-              }
-            : f
-        )
+        sortFollowUpsDeterministic(prev.map(f => (f.id === item.id ? updatedItem : f)))
       );
 
       // Se estava filtrando apenas por "Disparar Hoje" ou "Atrasados", volta para "Total na Esteira" para o cliente não sumir da tela!
@@ -536,22 +231,43 @@ export function FollowUpsTab() {
       }
 
       setSyncEngineFeedback(
-        `✅ Mensagem única enviada para ${item.client_name} (${phoneFormatted})! Status marcado como ENVIADO e ciclo de 3 semanas zerado para recomeçar.`
+        `✅ Mensagem única enviada para ${item.client_name} (${updatedItem.client_phone})! Status marcado como ENVIADO e ciclo de 3 semanas zerado para recomeçar.`
       );
       await loadData();
     } catch (err: any) {
       alert(`Erro ao processar disparo: ${err.message || err}`);
     } finally {
-      globalForceSendInFlight.delete(lockKey);
-      globalForceSendInFlight.delete(phoneFormatted);
-      setSendingId(null);
+      setSendingId(prev => (prev === item.id ? null : prev));
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Deseja realmente excluir este agendamento de follow-up?')) {
-      await deleteFollowUp(id, company?.id);
+  const handleDelete = async (item: FollowUpItem) => {
+    const targetCompanyId = company?.id || DEFAULT_COMPANY_ID;
+    const normPhone = normalizeFollowUpPhone(item.client_phone);
+    setConfirmDeleteId(null);
+    setDeletingId(item.id);
+    suppressRealtimeUntilRef.current = Date.now() + 4000;
+
+    // Remoção otimista imediata da interface (inclusive duplicatas do mesmo número na recompra)
+    setFollowUps(prev =>
+      prev.filter(f => {
+        if (f.id === item.id) return false;
+        if (item.reason_category === 'recompra_futura' && normPhone && f.reason_category === 'recompra_futura') {
+          return normalizeFollowUpPhone(f.client_phone) !== normPhone;
+        }
+        return true;
+      })
+    );
+
+    try {
+      await deleteFollowUp(item.id, targetCompanyId, item);
+      setSyncEngineFeedback(`🗑️ Cliente "${item.client_name}" removido definitivamente da esteira.`);
       await loadData();
+    } catch (err: any) {
+      setSyncEngineFeedback(`⚠️ Erro ao excluir registro: ${err?.message || err}`);
+      await loadData();
+    } finally {
+      setDeletingId(prev => (prev === item.id ? null : prev));
     }
   };
 
@@ -882,7 +598,7 @@ export function FollowUpsTab() {
                             </span>
                             {(item.last_sent_at || item.completed_at) && (
                               <span className="text-[10px] text-white/40 font-mono">
-                                {formatLastSentLabel(item.last_sent_at || item.completed_at)}
+                                {formatFollowUpSentLabel(item.last_sent_at || item.completed_at)}
                               </span>
                             )}
                           </div>
@@ -944,14 +660,35 @@ export function FollowUpsTab() {
                             <MessageSquare className="size-4" />
                           </a>
 
-                          {/* Excluir da esteira */}
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            className="p-2 rounded-xl text-white/30 hover:text-red-400 hover:bg-white/5 transition-colors cursor-pointer"
-                            title="Remover da esteira"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
+                          {/* Excluir da esteira com confirmação inline sem bloquear popup */}
+                          {confirmDeleteId === item.id ? (
+                            <div className="inline-flex items-center gap-1 bg-red-500/10 border border-red-500/30 rounded-xl p-1">
+                              <button
+                                type="button"
+                                disabled={deletingId === item.id}
+                                onClick={() => void handleDelete(item)}
+                                className="px-2 py-1 rounded-lg bg-red-500 hover:bg-red-400 text-white text-[10px] font-black uppercase tracking-wider cursor-pointer disabled:opacity-50"
+                              >
+                                {deletingId === item.id ? 'Removendo...' : 'Excluir'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId(null)}
+                                className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 text-[10px] font-bold cursor-pointer"
+                              >
+                                Não
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteId(item.id)}
+                              className="p-2 rounded-xl text-white/30 hover:text-red-400 hover:bg-white/5 transition-colors cursor-pointer"
+                              title="Remover da esteira"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
