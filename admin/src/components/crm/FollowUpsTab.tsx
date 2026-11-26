@@ -1,31 +1,29 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
-  Calendar, Clock, CheckCircle2, AlertTriangle, MessageSquare, 
-  Plus, Search, Filter, Trash2, Edit3, ArrowRight, Phone,
-  Sparkles, Check, DollarSign, Package, RefreshCw, Layers, XCircle,
+  Calendar, Clock, CheckCircle2, MessageSquare, 
+  Search, Trash2, Edit3, Phone,
+  Sparkles, Check, Package, RefreshCw,
   ShieldCheck, X, Zap, Send, Loader2
 } from 'lucide-react';
 import { 
   fetchFollowUps, 
-  completeFollowUp, 
-  cancelFollowUp,
   deleteFollowUp, 
   createFollowUp, 
   updateFollowUp, 
-  FOLLOWUP_CATEGORIES, 
   isWithinSafeDispatchWindow,
   sync21DaysReplenishmentFollowUps,
+  syncFollowUpsWithBackend,
+  notifyBackendFollowUpSent,
   REPLENISHMENT_CYCLE_DAYS,
   REPLENISHMENT_COPY_VARIATIONS,
   DEFAULT_COMPANY_ID,
   toLocalDateString,
   normalizeFollowUpPhone,
   generateFollowUpMessage,
-  type FollowUpItem, 
-  type FollowUpReasonCategory 
+  type FollowUpItem
 } from '@/lib/followUps';
 import { fetchLiveClients } from '@/lib/crm';
-import { runFollowUpsValidationSuite, type FollowUpsTestSuiteReport } from '@/lib/followUpsTester';
+import { type FollowUpsTestSuiteReport } from '@/lib/followUpsTester';
 import { useAuth } from '@/contexts/AuthContext';
 import { NewFollowUpModal } from './NewFollowUpModal';
 import { supabase } from '@/lib/supabase';
@@ -34,6 +32,33 @@ import { legacyFetch } from '@/lib/backend';
 // Trava global de módulo para impedir disparos duplicados mesmo em múltiplos renders/cliques rápidos
 const globalForceSendInFlight = new Set<string>();
 const globalRecentSentTimestamps = new Map<string, number>();
+let globalAutoDispatchRunning = false;
+
+const AUTO_DISPATCH_LOCK_PREFIX = 'smk_auto_fu_lock_';
+
+function getDailyAutoLockKey(companyId: string, phoneFormatted: string, dateStr: string): string {
+  return `${AUTO_DISPATCH_LOCK_PREFIX}${companyId}_${phoneFormatted}_${dateStr}`;
+}
+
+function hasDailyAutoLock(companyId: string, phoneFormatted: string, dateStr: string): boolean {
+  try {
+    return Boolean(localStorage.getItem(getDailyAutoLockKey(companyId, phoneFormatted, dateStr)));
+  } catch {
+    return false;
+  }
+}
+
+function setDailyAutoLock(companyId: string, phoneFormatted: string, dateStr: string): void {
+  try {
+    localStorage.setItem(getDailyAutoLockKey(companyId, phoneFormatted, dateStr), new Date().toISOString());
+  } catch {}
+}
+
+function clearDailyAutoLock(companyId: string, phoneFormatted: string, dateStr: string): void {
+  try {
+    localStorage.removeItem(getDailyAutoLockKey(companyId, phoneFormatted, dateStr));
+  } catch {}
+}
 
 function formatLastSentLabel(iso?: string | null): string {
   if (!iso) return '';
@@ -54,15 +79,15 @@ export function FollowUpsTab() {
   const [loading, setLoading] = useState(true);
   const [isSyncingEngine, setIsSyncingEngine] = useState(false);
   const [syncEngineFeedback, setSyncEngineFeedback] = useState<string | null>(null);
+  const [serverAutoDispatchActive, setServerAutoDispatchActive] = useState<boolean | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const loadSeqRef = useRef(0);
   const suppressRealtimeUntilRef = useRef(0);
+  const delayedSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editingItem, setEditingItem] = useState<FollowUpItem | null>(null);
   const [editedMessage, setEditedMessage] = useState<string>('');
   const [selectedVariationIdx, setSelectedVariationIdx] = useState<number>(0);
-  const [selectedClientForModal, setSelectedClientForModal] = useState<any | null>(null);
-  const [isValidating, setIsValidating] = useState(false);
   const [testReport, setTestReport] = useState<FollowUpsTestSuiteReport | null>(null);
 
   const windowCheck = isWithinSafeDispatchWindow();
@@ -71,6 +96,182 @@ export function FollowUpsTab() {
   const [tabFilter, setTabFilter] = useState<'all' | 'today' | 'overdue' | 'upcoming' | 'completed'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  /**
+   * Fallback seguro no painel quando o backend Node remoto ainda não foi reiniciado
+   * para assumir o scheduler 24/7 (/api/marketing/followups/sync -> 404).
+   * Dispara automaticamente clientes com ciclo de 21 dias atingido (daysDiff <= 0),
+   * usando trava síncrona dupla + trava diária em localStorage antes da chamada HTTP.
+   */
+  const runGuardedFrontendAutoDispatch = async (items: FollowUpItem[], targetCompanyId: string) => {
+    if (globalAutoDispatchRunning) return;
+    const winCheck = isWithinSafeDispatchWindow();
+    if (!winCheck.inWindow) return;
+
+    const todayStr = toLocalDateString(new Date());
+    const nowMs = Date.now();
+    const twelveHoursMs = 12 * 60 * 60 * 1000;
+
+    const candidates = items.filter(item => {
+      if (item.status !== 'pendente' || item.reason_category !== 'recompra_futura') return false;
+      if ((item.daysDiff ?? 0) > 0) return false;
+      const phone = normalizeFollowUpPhone(item.client_phone);
+      if (!phone || phone.replace(/\D/g, '').length < 12) return false;
+      if (item.last_sent_at) {
+        const lastSentMs = new Date(item.last_sent_at).getTime();
+        if (!isNaN(lastSentMs) && (nowMs - lastSentMs) < twelveHoursMs) return false;
+      }
+      const lockKey = `${item.id}::${phone}`;
+      if (globalForceSendInFlight.has(lockKey) || globalForceSendInFlight.has(phone)) return false;
+      const recentMs = globalRecentSentTimestamps.get(phone) || 0;
+      if ((nowMs - recentMs) < 60000) return false;
+      if (hasDailyAutoLock(targetCompanyId, phone, todayStr)) return false;
+      return true;
+    });
+
+    if (candidates.length === 0) return;
+
+    globalAutoDispatchRunning = true;
+    try {
+      // Verifica se o WhatsApp Baileys está conectado antes de tentar qualquer disparo
+      let whatsappConnected = false;
+      try {
+        const qrRes = await legacyFetch('/api/qr');
+        if (qrRes.ok) {
+          const qrData = await qrRes.json().catch(() => ({}));
+          whatsappConnected = Boolean(qrData?.isReady || qrData?.status === 'CONNECTED');
+        }
+      } catch {
+        whatsappConnected = false;
+      }
+
+      if (!whatsappConnected) {
+        return;
+      }
+
+      let dispatchedCount = 0;
+
+      for (const item of candidates) {
+        if (!isWithinSafeDispatchWindow().inWindow) break;
+
+        const phone = normalizeFollowUpPhone(item.client_phone);
+        const lockKey = `${item.id}::${phone}`;
+        if (
+          globalForceSendInFlight.has(lockKey) ||
+          globalForceSendInFlight.has(phone) ||
+          hasDailyAutoLock(targetCompanyId, phone, todayStr)
+        ) {
+          continue;
+        }
+
+        // Trava síncrona dupla ANTES do disparo de rede para garantir zero duplicidade
+        globalForceSendInFlight.add(lockKey);
+        globalForceSendInFlight.add(phone);
+        setDailyAutoLock(targetCompanyId, phone, todayStr);
+        setSendingId(item.id);
+
+        try {
+          const msg = item.whatsappMessage || generateFollowUpMessage(item);
+          const res = await legacyFetch('/api/marketing/send-direct', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone,
+              number: phone,
+              name: item.client_name,
+              text: msg,
+              companyId: targetCompanyId,
+            }),
+          });
+          const resData = await res.json().catch(() => ({}));
+
+          if (!res.ok || !resData?.success) {
+            // Se falhou por indisponibilidade/desconexão clara (sem envio), libera trava diária para nova tentativa
+            if (res.status === 503 || res.status === 404 || !res.ok) {
+              clearDailyAutoLock(targetCompanyId, phone, todayStr);
+            }
+            console.warn(`[FollowUps Auto] Falha ao enviar para ${phone}:`, resData?.message || resData?.error || res.status);
+            continue;
+          }
+
+          globalRecentSentTimestamps.set(phone, Date.now());
+          suppressRealtimeUntilRef.current = Date.now() + 2500;
+
+          const now = new Date();
+          const sentIso = now.toISOString();
+          const nextCycleDate = new Date(now.getTime() + (REPLENISHMENT_CYCLE_DAYS * 24 * 60 * 60 * 1000));
+          const nextDate = toLocalDateString(nextCycleDate);
+          const nextSendCount = (item.send_count || 0) + 1;
+          const newDescription = `Disparo automático #${nextSendCount} enviado em ${formatLastSentLabel(sentIso)}. Novo ciclo de 3 semanas iniciado até ${nextDate}.`;
+
+          await updateFollowUp(item.id, {
+            status: 'pendente',
+            completed_at: sentIso,
+            last_sent_at: sentIso,
+            send_count: nextSendCount,
+            scheduled_date: nextDate,
+            custom_message: null,
+            reason_description: newDescription,
+          }, targetCompanyId);
+
+          await notifyBackendFollowUpSent({
+            id: item.id,
+            scheduled_date: nextDate,
+            completed_at: sentIso,
+            last_sent_at: sentIso,
+            send_count: nextSendCount,
+            custom_message: null,
+            reason_description: newDescription,
+          }, targetCompanyId);
+
+          dispatchedCount++;
+          const nextMsg = generateFollowUpMessage({
+            ...item,
+            send_count: nextSendCount,
+            custom_message: null,
+          });
+          const phoneClean = normalizeFollowUpPhone(item.client_phone);
+
+          setFollowUps(prev =>
+            prev.map(f =>
+              f.id === item.id
+                ? {
+                    ...f,
+                    status: 'pendente',
+                    completed_at: sentIso,
+                    last_sent_at: sentIso,
+                    send_count: nextSendCount,
+                    scheduled_date: nextDate,
+                    daysDiff: REPLENISHMENT_CYCLE_DAYS,
+                    custom_message: null,
+                    whatsappMessage: nextMsg,
+                    whatsappUrl: `https://wa.me/${phoneClean}?text=${encodeURIComponent(nextMsg)}`,
+                    reason_description: newDescription,
+                  }
+                : f
+            )
+          );
+
+          setSyncEngineFeedback(
+            `🤖 Disparo automático de 3 semanas enviado para ${item.client_name} (${phone})! Status atualizado para ENVIADO e contagem reiniciada para 21 dias.`
+          );
+
+          if (dispatchedCount < candidates.length) {
+            await new Promise(resolve => setTimeout(resolve, 3500));
+          }
+        } catch (sendErr: any) {
+          clearDailyAutoLock(targetCompanyId, phone, todayStr);
+          console.warn('[FollowUps Auto] Erro de comunicação ao disparar automaticamente:', sendErr?.message || sendErr);
+        } finally {
+          globalForceSendInFlight.delete(lockKey);
+          globalForceSendInFlight.delete(phone);
+          setSendingId(prev => (prev === item.id ? null : prev));
+        }
+      }
+    } finally {
+      globalAutoDispatchRunning = false;
+    }
+  };
 
   const loadData = async () => {
     const seq = ++loadSeqRef.current;
@@ -122,8 +323,29 @@ export function FollowUpsTab() {
         }
       }
 
+      // Sincroniza com o motor 24/7 no backend Node (mesmo padrão das Campanhas)
+      const backendSync = await syncFollowUpsWithBackend(data, targetCompanyId);
+      data = backendSync.items;
+
       if (seq === loadSeqRef.current) {
+        setServerAutoDispatchActive(backendSync.serverAutoDispatchActive);
         setFollowUps(data);
+
+        if (backendSync.serverAutoDispatchActive) {
+          // O scheduler 24/7 do servidor assume o disparo; agenda 1 refresh leve se houver itens vencidos
+          const hasDueItems = data.some(
+            f => f.status === 'pendente' && f.reason_category === 'recompra_futura' && (f.daysDiff ?? 0) <= 0
+          );
+          if (hasDueItems) {
+            if (delayedSyncTimerRef.current) clearTimeout(delayedSyncTimerRef.current);
+            delayedSyncTimerRef.current = setTimeout(() => {
+              void loadData();
+            }, 5000);
+          }
+        } else {
+          // Fallback protegido no painel enquanto o servidor remoto não for reiniciado
+          void runGuardedFrontendAutoDispatch(data, targetCompanyId);
+        }
       }
     } catch (e) {
       console.error("Erro ao carregar follow-ups:", e);
@@ -139,6 +361,10 @@ export function FollowUpsTab() {
 
     const targetCompanyId = company?.id || DEFAULT_COMPANY_ID;
     let debounceTimer: any = null;
+    const pollTimer = setInterval(() => {
+      void loadData();
+    }, 60000);
+
     const channel = supabase
       .channel(`crm_follow_ups_${targetCompanyId}`)
       .on(
@@ -159,7 +385,9 @@ export function FollowUpsTab() {
       .subscribe();
 
     return () => {
+      clearInterval(pollTimer);
       if (debounceTimer) clearTimeout(debounceTimer);
+      if (delayedSyncTimerRef.current) clearTimeout(delayedSyncTimerRef.current);
       supabase.removeChannel(channel);
     };
   }, [company?.id]);
@@ -270,6 +498,18 @@ export function FollowUpsTab() {
         reason_description: newDescription
       }, targetCompanyId);
 
+      setDailyAutoLock(targetCompanyId, phoneFormatted, toLocalDateString(now));
+
+      await notifyBackendFollowUpSent({
+        id: item.id,
+        scheduled_date: nextDate,
+        completed_at: sentIso,
+        last_sent_at: sentIso,
+        send_count: nextSendCount,
+        custom_message: customTextOverride !== undefined ? msg : (item.custom_message ?? null),
+        reason_description: newDescription,
+      }, targetCompanyId);
+
       // Atualiza estado em tela imediatamente para manter o cliente visível com 0% e selo "Enviado"
       setFollowUps(prev =>
         prev.map(f =>
@@ -308,18 +548,6 @@ export function FollowUpsTab() {
     }
   };
 
-  const handleComplete = async (id: string) => {
-    await completeFollowUp(id, company?.id);
-    await loadData();
-  };
-
-  const handleCancel = async (id: string) => {
-    if (confirm('Deseja realmente cancelar este agendamento de follow-up?')) {
-      await cancelFollowUp(id, company?.id);
-      await loadData();
-    }
-  };
-
   const handleDelete = async (id: string) => {
     if (confirm('Deseja realmente excluir este agendamento de follow-up?')) {
       await deleteFollowUp(id, company?.id);
@@ -327,16 +555,15 @@ export function FollowUpsTab() {
     }
   };
 
-  // Métricas
-  const overdueList = followUps.filter(f => f.status === 'pendente' && (f.daysDiff || 0) < 0);
-  const todayList = followUps.filter(f => f.status === 'pendente' && (f.daysDiff || 0) === 0);
+  // Métricas (inclui vencidos <= 0 em Disparar Hoje para que nenhum cliente com 3 semanas atingidas fique invisível)
+  const todayList = followUps.filter(f => f.status === 'pendente' && (f.daysDiff ?? 0) <= 0);
   const upcomingList = followUps.filter(f => f.status === 'pendente' && (f.daysDiff || 0) > 0);
   const completedList = followUps.filter(f => f.status === 'concluido' || Boolean(f.completed_at) || Boolean(f.last_sent_at));
 
   // Filtragem da Lista
   const filteredFollowUps = followUps.filter(item => {
     // 1. Filtro de Aba
-    if (tabFilter === 'today' && (item.status !== 'pendente' || item.daysDiff !== 0)) return false;
+    if (tabFilter === 'today' && (item.status !== 'pendente' || (item.daysDiff ?? 0) > 0)) return false;
     if (tabFilter === 'overdue' && (item.status !== 'pendente' || (item.daysDiff || 0) >= 0)) return false;
     if (tabFilter === 'upcoming' && (item.status !== 'pendente' || (item.daysDiff || 0) <= 0)) return false;
     if (tabFilter === 'completed' && item.status !== 'concluido' && !item.completed_at && !item.last_sent_at) return false;
@@ -379,6 +606,18 @@ export function FollowUpsTab() {
               }`}>
                 {windowCheck.inWindow ? '🟢 Janela Segura Aberta (10h-22h)' : '🌙 Fora da Janela (10h-22h)'}
               </span>
+              {serverAutoDispatchActive === true ? (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
+                  🤖 Motor 24/7 no Servidor Ativo
+                </span>
+              ) : serverAutoDispatchActive === false ? (
+                <span
+                  title="O painel dispara automaticamente quando aberto. Reinicie o iniciar_backend.bat para ativar o modo 24/7 com navegador fechado."
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-blue-500/15 text-blue-300 border-blue-500/30"
+                >
+                  ⚡ Auto-Disparo Ativo no Painel (reinicie iniciar_backend.bat para modo 24/7)
+                </span>
+              ) : null}
             </div>
             <p className="text-xs text-white/60 leading-relaxed max-w-2xl">
               Gatilho automático de 3 semanas (momento em que o pod começa a acabar). Com <strong>trava anti-spam</strong> se o cliente comprou recentemente e <strong>rotação de 5 copies curtas humanizadas</strong>.
@@ -462,7 +701,7 @@ export function FollowUpsTab() {
             {todayList.length > 0 && <span className="size-2 rounded-full bg-amber-400 animate-ping" />}
           </div>
           <div className="text-3xl font-extrabold text-white font-mono">{todayList.length}</div>
-          <p className="text-[11px] text-white/50 mt-1">Atingiram 3 semanas exatas hoje.</p>
+          <p className="text-[11px] text-white/50 mt-1">Atingiram 3 semanas e prontos para disparo.</p>
         </div>
 
         {/* Card Concluídos */}
@@ -549,8 +788,6 @@ export function FollowUpsTab() {
                 {filteredFollowUps.map(item => {
                   const isCompleted = item.status === 'concluido';
                   const isCancelled = item.status === 'cancelado';
-                  const isOverdue = (item.daysDiff || 0) < 0 && item.status === 'pendente';
-                  const isToday = (item.daysDiff || 0) === 0 && item.status === 'pendente';
 
                   // Cálculo do progresso no ciclo de 3 Semanas (21 dias)
                   const totalDays = 21;
@@ -665,7 +902,7 @@ export function FollowUpsTab() {
                             onClick={() => {
                               setEditingItem(item);
                               setEditedMessage(item.whatsappMessage || generateFollowUpMessage(item));
-                              const currentIdx = ((item.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 5);
+                              const currentIdx = (item.send_count || 0) % REPLENISHMENT_COPY_VARIATIONS.length;
                               setSelectedVariationIdx(currentIdx);
                             }}
                             className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 transition-colors cursor-pointer"
@@ -818,7 +1055,7 @@ export function FollowUpsTab() {
                       await updateFollowUp(editingItem.id, {
                         custom_message: cleaned || null
                       }, targetCompanyId);
-                      setFollowUps(prev => prev.map(f => {
+                      const updatedList = followUps.map(f => {
                         if (f.id !== editingItem.id) return f;
                         const updatedMsg = cleaned || generateFollowUpMessage({ ...f, custom_message: null });
                         const phoneClean = normalizeFollowUpPhone(f.client_phone);
@@ -828,8 +1065,10 @@ export function FollowUpsTab() {
                           whatsappMessage: updatedMsg,
                           whatsappUrl: `https://wa.me/${phoneClean}?text=${encodeURIComponent(updatedMsg)}`
                         };
-                      }));
+                      });
+                      setFollowUps(updatedList);
                       setEditingItem(null);
+                      await syncFollowUpsWithBackend(updatedList, targetCompanyId);
                     }}
                     className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all cursor-pointer"
                   >
@@ -865,7 +1104,7 @@ export function FollowUpsTab() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onFollowUpCreated={loadData}
-        initialClient={selectedClientForModal}
+        initialClient={null}
       />
 
       {/* Modal de Relatório de Validação do Bloco 9 */}

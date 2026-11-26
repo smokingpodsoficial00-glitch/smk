@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { legacyFetch, isLegacyBackendAllowed } from "@/lib/backend";
 
 export const DEFAULT_COMPANY_ID = 'd7e1c479-32b4-40b8-b2d7-42fe4db1f8b5';
 export const LOCAL_STORAGE_KEY = 'smoking_strategic_followups_v1';
@@ -179,9 +180,10 @@ export function generateFollowUpMessage(item: Partial<FollowUpItem>, variationIn
   }
 
   if (item.reason_category === 'recompra_futura') {
-    const idx = variationIndex !== undefined 
-      ? variationIndex 
-      : ((item.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 5);
+    const baseIdx = (item.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    const idx = variationIndex !== undefined
+      ? variationIndex
+      : ((baseIdx + (Number(item.send_count) || 0)) % REPLENISHMENT_COPY_VARIATIONS.length);
     const prod = item.target_product || 'pod';
     return getReplenishmentCopy(item.client_name || 'Cliente', idx, prod);
   }
@@ -658,10 +660,15 @@ export async function cancelFollowUp(id: string, companyId?: string): Promise<bo
   }, companyId);
 }
 
-// 6. Excluir Follow-up — SUPABASE PRIMÁRIO
+// 6. Excluir Follow-up — SUPABASE PRIMÁRIO + BACKEND
 export async function deleteFollowUp(id: string, companyId?: string): Promise<boolean> {
   const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
   deleteLocalFollowUp(id, targetCompanyId);
+
+  if (typeof window !== 'undefined' && isLegacyBackendAllowed(targetCompanyId)) {
+    legacyFetch(`/api/marketing/followups/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
+  }
+
   try {
     const { error } = await supabase
       .from('smoking_crm_follow_ups')
@@ -679,6 +686,85 @@ export async function deleteFollowUp(id: string, companyId?: string): Promise<bo
   }
 
   return true;
+}
+
+export interface SyncBackendFollowUpsResult {
+  serverAutoDispatchActive: boolean;
+  items: FollowUpItem[];
+}
+
+/**
+ * Sincroniza a esteira com o backend Node.js 24/7 (mesma arquitetura das Campanhas).
+ * - Se o servidor backend estiver atualizado (/api/marketing/followups/sync retornar 200),
+ *   o servidor assume o disparo automático em background (60s) e devolve o estado mais recente.
+ * - Se o servidor backend remoto ainda estiver em versão anterior (404), devolve serverAutoDispatchActive=false
+ *   para o frontend assumir o disparo automático com trava anti-duplicidade.
+ */
+export async function syncFollowUpsWithBackend(
+  localOrMergedItems: FollowUpItem[],
+  companyId?: string
+): Promise<SyncBackendFollowUpsResult> {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  if (typeof window === 'undefined' || !isLegacyBackendAllowed(targetCompanyId)) {
+    return { serverAutoDispatchActive: false, items: localOrMergedItems };
+  }
+
+  try {
+    const deletedIds = Array.from(getDeletedFollowUpIds(targetCompanyId));
+    const res = await legacyFetch('/api/marketing/followups/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companyId: targetCompanyId,
+        followUps: localOrMergedItems,
+        deletedIds,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.serverAutoDispatchActive && Array.isArray(data.followUps)) {
+        const deletedSet = getDeletedFollowUpIds(targetCompanyId);
+        const serverHydrated = data.followUps
+          .map(hydrateFollowUpRow)
+          .filter((item: FollowUpItem) => !deletedSet.has(item.id));
+        const deduped = deduplicateReplenishments(serverHydrated);
+        saveLocalFollowUps(deduped, targetCompanyId);
+        return {
+          serverAutoDispatchActive: true,
+          items: enrichFollowUps(deduped),
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[FollowUps] Aviso ao sincronizar esteira com backend Node:', err);
+  }
+
+  return { serverAutoDispatchActive: false, items: localOrMergedItems };
+}
+
+export async function notifyBackendFollowUpSent(
+  item: Partial<FollowUpItem> & { id: string },
+  companyId?: string
+): Promise<void> {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  if (typeof window === 'undefined' || !isLegacyBackendAllowed(targetCompanyId)) return;
+  try {
+    await legacyFetch('/api/marketing/followups/mark-sent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companyId: targetCompanyId,
+        id: item.id,
+        scheduled_date: item.scheduled_date,
+        completed_at: item.completed_at,
+        last_sent_at: item.last_sent_at,
+        send_count: item.send_count,
+        custom_message: item.custom_message,
+        reason_description: item.reason_description,
+      }),
+    });
+  } catch {}
 }
 
 // 7. Sincronização Inteligente do Ciclo de Recompra (21 dias com Trava Anti-Spam)
@@ -777,7 +863,7 @@ export async function sync21DaysReplenishmentFollowUps(
         });
         if (created) activeReplenishments.push(created);
         createdCount++;
-      } else if (existing.scheduled_date !== newScheduledDate && !existing.completed_at) {
+      } else if (existing.scheduled_date !== newScheduledDate) {
         await updateFollowUp(existing.id, {
           scheduled_date: newScheduledDate,
           target_product: client.lastProduct || existing.target_product,
@@ -864,11 +950,13 @@ export async function scheduleOrderReplenishmentFollowUp(order: any, companyId?:
       reason_description: `Contador reiniciado: compra concluída hoje (${targetProduct}). 3 semanas de contagem regressiva.`,
       updated_at: new Date().toISOString()
     }, targetCompanyId);
+    const syncedList = await fetchFollowUps(targetCompanyId);
+    void syncFollowUpsWithBackend(syncedList, targetCompanyId);
     return existing;
   }
 
   // Cria novo agendamento com o loading de 3 semanas
-  return await createFollowUp({
+  const created = await createFollowUp({
     company_id: targetCompanyId,
     client_id: order.client_id || order.customer_id || null,
     client_name: clientName,
@@ -882,4 +970,9 @@ export async function scheduleOrderReplenishmentFollowUp(order: any, companyId?:
     scheduled_time: '15:00',
     order_id: order.id || null
   });
+  if (created) {
+    const syncedList = await fetchFollowUps(targetCompanyId);
+    void syncFollowUpsWithBackend(syncedList, targetCompanyId);
+  }
+  return created;
 }

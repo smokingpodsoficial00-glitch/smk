@@ -208,6 +208,8 @@ function loadMarketingConfig(companyId = OFFICIAL_COMPANY_ID) {
         companyId: cid,
         campaigns: [],
         lists: [],
+        followUps: [],
+        deletedFollowUpIds: [],
         sentHistory: { globalSent: [] },
         idempotencyKeys: [],
         lastUpdated: null
@@ -218,10 +220,21 @@ function loadMarketingConfig(companyId = OFFICIAL_COMPANY_ID) {
     const raw = fs.readFileSync(configPath, 'utf-8');
     const parsed = JSON.parse(raw);
     if (!parsed.sentHistory) parsed.sentHistory = { globalSent: [] };
+    if (!Array.isArray(parsed.followUps)) parsed.followUps = [];
+    if (!Array.isArray(parsed.deletedFollowUpIds)) parsed.deletedFollowUpIds = [];
     return parsed;
   } catch (err) {
     console.error(`❌ [Marketing][${cid}] Erro ao carregar config:`, err.message);
-    return { companyId: cid, campaigns: [], lists: [], sentHistory: { globalSent: [] }, idempotencyKeys: [], lastUpdated: null };
+    return {
+      companyId: cid,
+      campaigns: [],
+      lists: [],
+      followUps: [],
+      deletedFollowUpIds: [],
+      sentHistory: { globalSent: [] },
+      idempotencyKeys: [],
+      lastUpdated: null
+    };
   }
 }
 
@@ -2450,10 +2463,349 @@ async function runSchedulerForCompany(companyId) {
   }
 }
 
+const OFFICIAL_FOLLOWUP_CATALOG_URL = 'https://smokingproject01.vercel.app/?src=followup21d';
+const REPLENISHMENT_CYCLE_DAYS_SERVER = 21;
+const FOLLOWUP_SAFE_START_HOUR = 10;
+const FOLLOWUP_SAFE_END_HOUR = 22;
+const REPLENISHMENT_SHORT_VARIATIONS = [
+  `Salve, {{nome}}, tudo bem? Eu vi que faz um tempo desde a sua última compra do seu {{produto}}. Gostaria de já ir separando o seu?\n\n${OFFICIAL_FOLLOWUP_CATALOG_URL}`,
+  `Opa, {{nome}}, beleza? Vi aqui sua última compra do seu {{produto}}. Quer que eu já deixe o seu próximo separado?\n\n${OFFICIAL_FOLLOWUP_CATALOG_URL}`,
+  `Fala, {{nome}}, tudo certo? Já faz um tempo que você pegou seu {{produto}}. Quer dar uma olhada no catálogo pra gente separar o próximo?\n\n${OFFICIAL_FOLLOWUP_CATALOG_URL}`,
+  `E aí, {{nome}}, tranquilo? Passando pra ver se já quer ir separando seu próximo pod depois do {{produto}}.\n\n${OFFICIAL_FOLLOWUP_CATALOG_URL}`,
+  `Salve, {{nome}}, tudo em paz? Faz um tempo da sua última compra do {{produto}}. Posso já ir separando um novo pra você?\n\n${OFFICIAL_FOLLOWUP_CATALOG_URL}`
+];
+
+function getSPDateStr(date = new Date()) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(date);
+  } catch {
+    const sp = new Date(date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const y = sp.getFullYear();
+    const m = String(sp.getMonth() + 1).padStart(2, '0');
+    const d = String(sp.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+}
+
+function getSPHour(date = new Date()) {
+  const sp = new Date(date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  return sp.getHours();
+}
+
+function addDaysToSPDateStr(days = REPLENISHMENT_CYCLE_DAYS_SERVER, baseDate = new Date()) {
+  return getSPDateStr(new Date(baseDate.getTime() + (days * 24 * 60 * 60 * 1000)));
+}
+
+function buildServerFollowUpMessage(item) {
+  if (item.custom_message && String(item.custom_message).trim().length > 0) {
+    return String(item.custom_message).trim();
+  }
+  const baseSum = String(item.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const idx = (baseSum + (Number(item.send_count) || 0)) % REPLENISHMENT_SHORT_VARIATIONS.length;
+  const firstName = String(item.client_name || 'Cliente').trim().split(' ')[0] || 'Cliente';
+  const product = String(item.target_product || 'pod').trim() || 'pod';
+  return REPLENISHMENT_SHORT_VARIATIONS[idx]
+    .replace(/{{nome}}/gi, firstName)
+    .replace(/{{produto}}/gi, product);
+}
+
+function mergeFollowUpsList(existingList = [], incomingList = [], deletedIds = []) {
+  const deletedSet = new Set(Array.isArray(deletedIds) ? deletedIds : []);
+  const byId = new Map();
+
+  for (const item of existingList) {
+    if (!item || !item.id || deletedSet.has(item.id)) continue;
+    byId.set(item.id, item);
+  }
+
+  for (const inc of incomingList) {
+    if (!inc || !inc.id || deletedSet.has(inc.id)) continue;
+    const prev = byId.get(inc.id);
+    if (!prev) {
+      byId.set(inc.id, inc);
+      continue;
+    }
+    const prevSentTs = prev.last_sent_at ? new Date(prev.last_sent_at).getTime() : (prev.completed_at ? new Date(prev.completed_at).getTime() : 0);
+    const incSentTs = inc.last_sent_at ? new Date(inc.last_sent_at).getTime() : (inc.completed_at ? new Date(inc.completed_at).getTime() : 0);
+    if (prevSentTs > incSentTs) {
+      // Servidor disparou mais recentemente: preserva estado de envio e próximo ciclo do servidor
+      byId.set(inc.id, { ...inc, ...prev });
+      continue;
+    }
+    const prevUpd = new Date(prev.updated_at || prev.created_at || 0).getTime();
+    const incUpd = new Date(inc.updated_at || inc.created_at || 0).getTime();
+    byId.set(inc.id, incUpd >= prevUpd ? { ...prev, ...inc } : { ...inc, ...prev });
+  }
+
+  // Deduplica registros ativos de recompra_futura pelo telefone normalizado
+  const seenPhones = new Map();
+  const deduped = [];
+  for (const item of byId.values()) {
+    if (item.reason_category !== 'recompra_futura' || item.status === 'cancelado') {
+      deduped.push(item);
+      continue;
+    }
+    const phoneKey = normalizeMarketingPhone(item.client_phone);
+    if (!phoneKey) {
+      deduped.push(item);
+      continue;
+    }
+    const existingIdx = seenPhones.get(phoneKey);
+    if (existingIdx === undefined) {
+      seenPhones.set(phoneKey, deduped.length);
+      deduped.push(item);
+    } else {
+      const prev = deduped[existingIdx];
+      const prevTime = Math.max(
+        prev.last_sent_at ? new Date(prev.last_sent_at).getTime() : 0,
+        prev.completed_at ? new Date(prev.completed_at).getTime() : 0,
+        prev.updated_at ? new Date(prev.updated_at).getTime() : 0
+      );
+      const currTime = Math.max(
+        item.last_sent_at ? new Date(item.last_sent_at).getTime() : 0,
+        item.completed_at ? new Date(item.completed_at).getTime() : 0,
+        item.updated_at ? new Date(item.updated_at).getTime() : 0
+      );
+      if (currTime > prevTime) {
+        deduped[existingIdx] = item;
+      }
+    }
+  }
+  return deduped;
+}
+
+app.get('/api/marketing/followups', (req, res) => {
+  try {
+    const companyId = getRequestCompanyId(req);
+    const config = loadMarketingConfig(companyId);
+    return res.json({
+      success: true,
+      serverAutoDispatchActive: true,
+      companyId,
+      followUps: config.followUps || []
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/marketing/followups/sync', (req, res) => {
+  try {
+    const companyId = getRequestCompanyId(req);
+    const { followUps: incomingList = [], deletedIds = [] } = req.body || {};
+    if (!Array.isArray(incomingList)) {
+      return res.status(400).json({ success: false, error: '"followUps" deve ser um array.' });
+    }
+    const config = loadMarketingConfig(companyId);
+    const combinedDeleted = Array.from(new Set([...(config.deletedFollowUpIds || []), ...(Array.isArray(deletedIds) ? deletedIds : [])])).slice(-300);
+    const merged = mergeFollowUpsList(config.followUps || [], incomingList, combinedDeleted);
+
+    config.deletedFollowUpIds = combinedDeleted;
+    config.followUps = merged;
+    saveMarketingConfig(config, companyId);
+
+    // Aciona verificação imediata do motor de 3 semanas em segundo plano
+    setTimeout(() => {
+      runFollowUpsSchedulerForCompany(companyId).catch(() => {});
+    }, 300);
+
+    return res.json({
+      success: true,
+      serverAutoDispatchActive: true,
+      companyId,
+      followUps: merged
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/marketing/followups/mark-sent', (req, res) => {
+  try {
+    const companyId = getRequestCompanyId(req);
+    const { id, scheduled_date, completed_at, last_sent_at, send_count, custom_message, reason_description } = req.body || {};
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'ID obrigatório.' });
+    }
+    const config = loadMarketingConfig(companyId);
+    const idx = (config.followUps || []).findIndex(f => f.id === id);
+    if (idx !== -1) {
+      config.followUps[idx] = {
+        ...config.followUps[idx],
+        status: 'pendente',
+        completed_at: completed_at || new Date().toISOString(),
+        last_sent_at: last_sent_at || completed_at || new Date().toISOString(),
+        scheduled_date: scheduled_date || addDaysToSPDateStr(REPLENISHMENT_CYCLE_DAYS_SERVER),
+        send_count: send_count ?? ((config.followUps[idx].send_count || 0) + 1),
+        ...(custom_message !== undefined ? { custom_message } : {}),
+        ...(reason_description !== undefined ? { reason_description } : {}),
+        updated_at: new Date().toISOString()
+      };
+      saveMarketingConfig(config, companyId);
+    }
+    return res.json({ success: true, companyId });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/marketing/followups/:id', (req, res) => {
+  try {
+    const companyId = getRequestCompanyId(req);
+    const { id } = req.params;
+    const config = loadMarketingConfig(companyId);
+    config.followUps = (config.followUps || []).filter(f => f.id !== id);
+    if (!Array.isArray(config.deletedFollowUpIds)) config.deletedFollowUpIds = [];
+    if (id && !config.deletedFollowUpIds.includes(id)) {
+      config.deletedFollowUpIds.push(id);
+      config.deletedFollowUpIds = config.deletedFollowUpIds.slice(-300);
+    }
+    saveMarketingConfig(config, companyId);
+    return res.json({ success: true, companyId });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+const runningFollowUpSchedulers = new Set();
+
+async function runFollowUpsSchedulerForCompany(companyId) {
+  const cid = sanitizeTenantId(companyId);
+  if (runningFollowUpSchedulers.has(cid)) return;
+  runningFollowUpSchedulers.add(cid);
+
+  try {
+    const config = loadMarketingConfig(cid);
+    const list = Array.isArray(config.followUps) ? config.followUps : [];
+    if (list.length === 0) return;
+
+    const now = new Date();
+    const todayStr = getSPDateStr(now);
+    const currentHour = getSPHour(now);
+    if (currentHour < FOLLOWUP_SAFE_START_HOUR || currentHour >= FOLLOWUP_SAFE_END_HOUR) {
+      return;
+    }
+
+    const dueIds = list
+      .filter(item => {
+        if (!item || item.status !== 'pendente' || item.reason_category !== 'recompra_futura') return false;
+        if (!item.scheduled_date || item.scheduled_date > todayStr) return false;
+        const phone = normalizeMarketingPhone(item.client_phone);
+        if (!phone || phone.length < 12) return false;
+        const lastSentMs = item.last_sent_at ? new Date(item.last_sent_at).getTime() : 0;
+        if (lastSentMs > 0 && (Date.now() - lastSentMs) < (12 * 60 * 60 * 1000)) return false;
+        const idempKey = `fu_${cid}_${item.id}_${todayStr}`;
+        if ((config.idempotencyKeys || []).some(k => k.key === idempKey)) return false;
+        return true;
+      })
+      .map(item => item.id);
+
+    if (dueIds.length === 0) return;
+
+    const session = getTenantSession(cid);
+    if (!session.isWhatsAppReady || !session.sock) {
+      if (hasSavedWhatsAppSession(cid)) {
+        await requestWhatsAppConnection(cid, false).catch(() => {});
+      }
+    }
+    if (!session.isWhatsAppReady || !session.sock) {
+      return;
+    }
+
+    for (let i = 0; i < dueIds.length; i++) {
+      const targetId = dueIds[i];
+      const freshConfig = loadMarketingConfig(cid);
+      cleanOldIdempotencyKeys(freshConfig);
+      const itemIdx = (freshConfig.followUps || []).findIndex(f => f.id === targetId);
+      if (itemIdx === -1) continue;
+
+      const freshItem = freshConfig.followUps[itemIdx];
+      if (!freshItem || freshItem.status !== 'pendente' || !freshItem.scheduled_date || freshItem.scheduled_date > todayStr) {
+        continue;
+      }
+
+      const lastSentMs = freshItem.last_sent_at ? new Date(freshItem.last_sent_at).getTime() : 0;
+      if (lastSentMs > 0 && (Date.now() - lastSentMs) < (12 * 60 * 60 * 1000)) {
+        continue;
+      }
+
+      const idempKey = `fu_${cid}_${freshItem.id}_${todayStr}`;
+      if (!Array.isArray(freshConfig.idempotencyKeys)) freshConfig.idempotencyKeys = [];
+      if (freshConfig.idempotencyKeys.some(k => k.key === idempKey)) continue;
+
+      const phoneDigits = normalizeMarketingPhone(freshItem.client_phone);
+      const formattedJid = formatToBaileysJid(phoneDigits);
+      const msgText = buildServerFollowUpMessage(freshItem);
+
+      // Reserva idempotência antes do disparo para evitar duplicatas em caso de reinício
+      freshConfig.idempotencyKeys.push({
+        key: idempKey,
+        timestamp: new Date().toISOString(),
+        campaignName: `FollowUp-21d:${freshItem.client_name || phoneDigits}`
+      });
+      saveMarketingConfig(freshConfig, cid);
+
+      try {
+        console.log(`🤖 [FollowUp Scheduler][${cid}] Disparando follow-up automático de 3 semanas para ${freshItem.client_name} (${phoneDigits})...`);
+        await sendBaileysMessage(formattedJid, msgText, {}, cid);
+
+        const postConfig = loadMarketingConfig(cid);
+        const postIdx = (postConfig.followUps || []).findIndex(f => f.id === targetId);
+        if (postIdx !== -1) {
+          const sentNow = new Date();
+          const sentIso = sentNow.toISOString();
+          const nextDate = addDaysToSPDateStr(REPLENISHMENT_CYCLE_DAYS_SERVER, sentNow);
+          const nextCount = (Number(postConfig.followUps[postIdx].send_count) || 0) + 1;
+          const timeLabel = sentNow.toLocaleString('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+
+          postConfig.followUps[postIdx] = {
+            ...postConfig.followUps[postIdx],
+            status: 'pendente',
+            completed_at: sentIso,
+            last_sent_at: sentIso,
+            send_count: nextCount,
+            scheduled_date: nextDate,
+            updated_at: sentIso,
+            reason_description: `Disparo automático #${nextCount} enviado em ${timeLabel}. Novo ciclo de 3 semanas iniciado até ${nextDate}.`
+          };
+          saveMarketingConfig(postConfig, cid);
+          console.log(`✅ [FollowUp Scheduler][${cid}] Follow-up enviado para ${freshItem.client_name}! Próximo ciclo reiniciado para ${nextDate}.`);
+        }
+      } catch (sendErr) {
+        console.warn(`⚠️ [FollowUp Scheduler][${cid}] Erro ao disparar para ${phoneDigits}:`, sendErr.message);
+        // Libera a chave do dia se falhou por queda momentânea, mantendo pendente para nova tentativa segura
+        const errConfig = loadMarketingConfig(cid);
+        errConfig.idempotencyKeys = (errConfig.idempotencyKeys || []).filter(k => k.key !== idempKey);
+        saveMarketingConfig(errConfig, cid);
+      }
+
+      if (i < dueIds.length - 1) {
+        await new Promise(r => setTimeout(r, 12000));
+      }
+    }
+  } catch (err) {
+    console.error(`❌ [FollowUp Scheduler][${cid}] Erro no scheduler:`, err.message);
+  } finally {
+    runningFollowUpSchedulers.delete(cid);
+  }
+}
+
 async function marketingSchedulerTick() {
   const tenantIds = getAllConfiguredTenantIds();
   for (const cid of tenantIds) {
     await runSchedulerForCompany(cid);
+    await runFollowUpsSchedulerForCompany(cid);
   }
 }
 
