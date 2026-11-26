@@ -632,6 +632,73 @@ async function runAllScenarios() {
   assert.equal(timedSendHits, 1);
 
   console.log('✅ Cenário 9 passou: Disparo agendado para +1 minuto aguardou o horário exato, disparou e reiniciou para +21d sem duplicar!');
+
+  // =========================================================================
+  // CENÁRIO 10: Cliente com last_sent_at recente (enviado há 1h) executando teste de 1 minuto
+  // =========================================================================
+  resetSimulatedDb();
+  resetFollowUpRuntimeLocksForTests();
+
+  const sentOneHourAgo = new Date(`${todayStr}T17:00:00-03:00`).toISOString();
+  const pizzaWithRecentSent = (await createFollowUp({
+    company_id: DEFAULT_COMPANY_ID,
+    client_phone: '11951741181',
+    client_name: 'Eduardo pizza',
+    reason_category: 'recompra_futura',
+    target_product: 'teste teste',
+    scheduled_date: plus21Str,
+  }))!;
+
+  // Simula que foi enviado há 1 hora
+  await updateFollowUp(pizzaWithRecentSent.id, {
+    status: 'pendente',
+    completed_at: sentOneHourAgo,
+    last_sent_at: sentOneHourAgo,
+    send_count: 1,
+  }, DEFAULT_COMPANY_ID);
+
+  // Agora agenda teste de 1 minuto (às 18:01)
+  const testTriggerIso = new Date(`${todayStr}T18:01:00-03:00`).toISOString();
+  await updateFollowUp(pizzaWithRecentSent.id, {
+    scheduled_trigger_at: testTriggerIso,
+  }, DEFAULT_COMPANY_ID);
+
+  const testLoaded = await fetchFollowUps(DEFAULT_COMPANY_ID);
+  assert.equal(testLoaded[0].scheduled_trigger_at, testTriggerIso);
+
+  let scenario10Hits = 0;
+  const s10Requester = async (path: string) => {
+    if (path.startsWith('/api/qr')) return new Response(JSON.stringify({ status: 'CONNECTED', isReady: true }), { status: 200 });
+    if (path.startsWith('/api/marketing/send-direct')) {
+      scenario10Hits++;
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  };
+
+  // Antes das 18:01 não dispara
+  const s10Before = await executeAutoDispatchBatch(testLoaded, {
+    companyId: DEFAULT_COMPANY_ID,
+    delayMs: 0,
+    nowFn: () => new Date(`${todayStr}T18:00:30-03:00`),
+    requester: s10Requester as any,
+  });
+  assert.equal(s10Before.sentCount, 0);
+  assert.equal(scenario10Hits, 0);
+
+  // Às 18:01:01 dispara com sucesso (mesmo tendo last_sent_at das 17:00)!
+  const s10At = await executeAutoDispatchBatch(testLoaded, {
+    companyId: DEFAULT_COMPANY_ID,
+    delayMs: 0,
+    nowFn: () => new Date(`${todayStr}T18:01:01-03:00`),
+    requester: s10Requester as any,
+  });
+  assert.equal(s10At.sentCount, 1, 'Deve disparar o teste mesmo com last_sent_at recente');
+  assert.equal(scenario10Hits, 1);
+  assert.equal(s10At.updatedItems[0].scheduled_trigger_at, null);
+  assert.equal(s10At.updatedItems[0].send_count, 2);
+
+  console.log('✅ Cenário 10 passou: Teste de 1 minuto executou com sucesso ignorando cooldown de envio anterior!');
   console.log('\n🎉 TODOS OS CENÁRIOS DE FRONTEND/PERSISTÊNCIA PASSARAM 100%!');
 }
 

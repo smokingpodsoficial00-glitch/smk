@@ -21,6 +21,8 @@ import {
   DEFAULT_COMPANY_ID,
   normalizeFollowUpPhone,
   generateFollowUpMessage,
+  resetClientLocksAndCooldown,
+  toLocalDateString,
   type FollowUpItem
 } from '@/lib/followUps';
 import { fetchLiveClients } from '@/lib/crm';
@@ -192,7 +194,7 @@ export function FollowUpsTab() {
 
   // Contador regressivo segundo a segundo para ciclos com horário exato agendado (ex: teste de 1 minuto)
   const hasTimedPendingTrigger = followUps.some(
-    f => f.status === 'pendente' && !f.last_sent_at && Boolean(f.scheduled_trigger_at)
+    f => f.status === 'pendente' && Boolean(f.scheduled_trigger_at)
   );
 
   useEffect(() => {
@@ -202,7 +204,7 @@ export function FollowUpsTab() {
       setCountdownNowMs(nowMs);
       const targetCompanyId = company?.id || DEFAULT_COMPANY_ID;
       const reachedTrigger = followUps.some(f => {
-        if (f.status !== 'pendente' || f.last_sent_at || !f.scheduled_trigger_at) return false;
+        if (f.status !== 'pendente' || !f.scheduled_trigger_at) return false;
         const tMs = new Date(f.scheduled_trigger_at).getTime();
         if (isNaN(tMs) || nowMs < tMs) return false;
         const triggerKey = `${f.id}::${f.scheduled_trigger_at}`;
@@ -221,6 +223,68 @@ export function FollowUpsTab() {
 
     return () => clearInterval(timer);
   }, [hasTimedPendingTrigger, followUps, serverAutoDispatchActive, company?.id]);
+
+  // Heartbeat automático a cada 30s para disparar follow-ups vencidos enquanto a aba estiver aberta
+  useEffect(() => {
+    const heartbeat = setInterval(() => {
+      if (isFollowUpDispatchBusy()) return;
+      void loadDataRef.current();
+    }, 30000);
+    return () => clearInterval(heartbeat);
+  }, []);
+
+  // Agendamento de Teste Rápido de 1 Minuto (60s) ao vivo
+  const handleScheduleOneMinuteTest = async (item: FollowUpItem) => {
+    const targetCompanyId = company?.id || DEFAULT_COMPANY_ID;
+    const phoneClean = normalizeFollowUpPhone(item.client_phone);
+    if (!phoneClean) return;
+
+    resetClientLocksAndCooldown(phoneClean, targetCompanyId);
+
+    const now = new Date();
+    const triggerDate = new Date(now.getTime() + 60 * 1000);
+    const triggerIso = triggerDate.toISOString();
+    const spDate = toLocalDateString(triggerDate);
+    const spTime = triggerDate.toLocaleTimeString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    const desc = 'Teste ao vivo: contagem regressiva de 1 minuto para disparo automático.';
+
+    // Atualiza imediatamente na UI
+    setFollowUps(prev => prev.map(f => {
+      if (f.id !== item.id) return f;
+      return {
+        ...f,
+        status: 'pendente',
+        completed_at: null,
+        last_sent_at: null,
+        scheduled_date: spDate,
+        scheduled_time: spTime,
+        scheduled_trigger_at: triggerIso,
+        daysDiff: 0,
+        reason_description: desc,
+      };
+    }));
+    setCountdownNowMs(Date.now());
+
+    try {
+      await updateFollowUp(item.id, {
+        status: 'pendente',
+        completed_at: null,
+        last_sent_at: null,
+        scheduled_date: spDate,
+        scheduled_time: spTime,
+        scheduled_trigger_at: triggerIso,
+        reason_description: desc,
+      }, targetCompanyId);
+    } catch (err) {
+      console.error('[FollowUps] Erro ao agendar teste de 1 minuto:', err);
+    }
+  };
 
   // Ações
   const handleSync21DaysEngine = async () => {
@@ -551,7 +615,7 @@ export function FollowUpsTab() {
                   const totalDays = 21;
                   const daysLeft = Math.max(0, item.daysDiff ?? 0);
                   const triggerMs = item.scheduled_trigger_at ? new Date(item.scheduled_trigger_at).getTime() : NaN;
-                  const msToTrigger = (!isCompleted && !item.last_sent_at && !isNaN(triggerMs))
+                  const msToTrigger = (!isCompleted && Boolean(item.scheduled_trigger_at) && !isNaN(triggerMs))
                     ? Math.max(0, triggerMs - countdownNowMs)
                     : 0;
                   const isCountdownPending = msToTrigger > 0;
@@ -684,6 +748,18 @@ export function FollowUpsTab() {
                           >
                             <Edit3 className="size-4" />
                           </button>
+
+                          {/* Botão Testar Disparo em 1 Minuto (60s) */}
+                          {!isCancelled && (
+                            <button
+                              type="button"
+                              onClick={() => void handleScheduleOneMinuteTest(item)}
+                              className="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-amber-200 border border-amber-500/30 transition-all cursor-pointer"
+                              title="Testar Disparo em 1 Minuto (Inicia contagem regressiva de 60s ao vivo)"
+                            >
+                              <Clock className="size-4" />
+                            </button>
+                          )}
 
                           {/* Botão Forçar Disparo Automático (Disparo da IA em 1 clique direto pelo motor) */}
                           {!isCompleted && !isCancelled && (
@@ -841,6 +917,22 @@ export function FollowUpsTab() {
 
                 <div className="flex items-center gap-2">
                   {/* Salvar na Esteira */}
+                  {/* Testar em 1 Minuto */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!editingItem) return;
+                      const target = editingItem;
+                      setEditingItem(null);
+                      await handleScheduleOneMinuteTest(target);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold border border-amber-500/30 flex items-center gap-1.5 transition-all cursor-pointer"
+                    title="Simular conclusão das 3 semanas em 60 segundos com contagem regressiva na tela"
+                  >
+                    <Clock className="size-3.5" />
+                    <span>Testar 1 Minuto</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={async () => {

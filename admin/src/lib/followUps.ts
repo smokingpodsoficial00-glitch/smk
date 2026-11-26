@@ -571,6 +571,10 @@ export async function fetchFollowUps(companyId?: string): Promise<FollowUpItem[]
         if (!remoteMatch) {
           mergedMap.set(l.id, l);
         } else {
+          // Se o registro remoto tem gatilho cronometrado agendado, ele prevalece sobre o cache local
+          if (remoteMatch.scheduled_trigger_at) {
+            continue;
+          }
           const lTime = new Date(l.updated_at || l.created_at || 0).getTime();
           const rTime = new Date(remoteMatch.updated_at || remoteMatch.created_at || 0).getTime();
           if (lTime > rTime) {
@@ -1301,6 +1305,16 @@ export function resetFollowUpRuntimeLocksForTests(): void {
   autoDispatchBatchRunning = false;
 }
 
+export function resetClientLocksAndCooldown(phoneFormatted: string, companyId?: string): void {
+  const targetCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const digits = normalizeFollowUpPhone(phoneFormatted);
+  if (!digits) return;
+  followUpInFlightLocks.delete(digits);
+  followUpRecentSentTimestamps.delete(digits);
+  const todayStr = toLocalDateString(new Date());
+  clearDailyAutoLock(targetCompanyId, digits, todayStr);
+}
+
 export interface AutoDispatchBatchOptions {
   companyId?: string;
   delayMs?: number;
@@ -1336,7 +1350,8 @@ export async function executeAutoDispatchBatch(
 
   const nowDate = nowFn();
   const winCheck = isWithinSafeDispatchWindow(nowDate);
-  if (!winCheck.inWindow) {
+  const hasTimedCandidates = items.some(i => i && !i.deleted_at && i.status === 'pendente' && Boolean(i.scheduled_trigger_at));
+  if (!winCheck.inWindow && !hasTimedCandidates) {
     return { attempted: 0, sentCount: 0, skippedWindow: true, updatedItems: items, errors: [] };
   }
 
@@ -1346,8 +1361,9 @@ export async function executeAutoDispatchBatch(
 
   const candidates = items.filter(item => {
     if (!item || item.deleted_at || item.status !== 'pendente' || item.reason_category !== 'recompra_futura') return false;
-    if (item.scheduled_trigger_at) {
-      const triggerMs = new Date(item.scheduled_trigger_at).getTime();
+    const isTimedTrigger = Boolean(item.scheduled_trigger_at);
+    if (isTimedTrigger) {
+      const triggerMs = new Date(item.scheduled_trigger_at!).getTime();
       if (!isNaN(triggerMs) && nowMs < triggerMs) return false;
     } else {
       const isDueByDate = Boolean(item.scheduled_date && item.scheduled_date <= todayStr);
@@ -1356,7 +1372,9 @@ export async function executeAutoDispatchBatch(
     }
     const phone = normalizeFollowUpPhone(item.client_phone);
     if (!phone || phone.replace(/\D/g, '').length < 12) return false;
-    if (item.last_sent_at) {
+
+    // Disparos com horário agendado de teste não sofrem bloqueio por last_sent_at anterior
+    if (!isTimedTrigger && item.last_sent_at) {
       const lastSentMs = new Date(item.last_sent_at).getTime();
       if (!isNaN(lastSentMs) && (nowMs - lastSentMs) < twelveHoursMs) return false;
     }
@@ -1364,7 +1382,7 @@ export async function executeAutoDispatchBatch(
     if (followUpInFlightLocks.has(lockKey) || followUpInFlightLocks.has(phone)) return false;
     const recentMs = followUpRecentSentTimestamps.get(phone) || 0;
     if ((nowMs - recentMs) < 60000) return false;
-    if (hasDailyAutoLock(targetCompanyId, phone, todayStr, item)) return false;
+    if (!isTimedTrigger && hasDailyAutoLock(targetCompanyId, phone, todayStr, item)) return false;
     return true;
   });
 
@@ -1396,14 +1414,15 @@ export async function executeAutoDispatchBatch(
     for (let i = 0; i < candidates.length; i++) {
       const item = candidates[i];
       const stepNow = nowFn();
-      if (!isWithinSafeDispatchWindow(stepNow).inWindow) break;
+      if (!isWithinSafeDispatchWindow(stepNow).inWindow && !item.scheduled_trigger_at) break;
 
       const phone = normalizeFollowUpPhone(item.client_phone);
       const lockKey = `${item.id}::${phone}`;
+      const isTimedTrigger = Boolean(item.scheduled_trigger_at);
       if (
         followUpInFlightLocks.has(lockKey) ||
         followUpInFlightLocks.has(phone) ||
-        hasDailyAutoLock(targetCompanyId, phone, todayStr, item)
+        (!isTimedTrigger && hasDailyAutoLock(targetCompanyId, phone, todayStr, item))
       ) {
         continue;
       }
