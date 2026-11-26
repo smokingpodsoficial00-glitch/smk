@@ -2560,13 +2560,13 @@ function mergeFollowUpsList(existingList = [], incomingList = [], deletedIds = [
     }
     const prevSentTs = prev.last_sent_at ? new Date(prev.last_sent_at).getTime() : (prev.completed_at ? new Date(prev.completed_at).getTime() : 0);
     const incSentTs = inc.last_sent_at ? new Date(inc.last_sent_at).getTime() : (inc.completed_at ? new Date(inc.completed_at).getTime() : 0);
-    if (prevSentTs > incSentTs) {
+    const prevUpd = new Date(prev.updated_at || prev.created_at || 0).getTime();
+    const incUpd = new Date(inc.updated_at || inc.created_at || 0).getTime();
+    if (prevSentTs > incSentTs && !(inc.scheduled_trigger_at && !inc.last_sent_at && incUpd > prevSentTs)) {
       // Servidor disparou mais recentemente: preserva estado de envio e próximo ciclo do servidor
       byId.set(inc.id, { ...inc, ...prev });
       continue;
     }
-    const prevUpd = new Date(prev.updated_at || prev.created_at || 0).getTime();
-    const incUpd = new Date(inc.updated_at || inc.created_at || 0).getTime();
     byId.set(inc.id, incUpd >= prevUpd ? { ...prev, ...inc } : { ...inc, ...prev });
   }
 
@@ -2662,7 +2662,7 @@ app.post('/api/marketing/followups/sync', (req, res) => {
 app.post('/api/marketing/followups/mark-sent', (req, res) => {
   try {
     const companyId = getRequestCompanyId(req);
-    const { id, scheduled_date, completed_at, last_sent_at, send_count, custom_message, reason_description } = req.body || {};
+    const { id, scheduled_date, completed_at, last_sent_at, send_count, custom_message, scheduled_trigger_at, reason_description } = req.body || {};
     if (!id) {
       return res.status(400).json({ success: false, error: 'ID obrigatório.' });
     }
@@ -2677,6 +2677,7 @@ app.post('/api/marketing/followups/mark-sent', (req, res) => {
         scheduled_date: scheduled_date || addDaysToSPDateStr(REPLENISHMENT_CYCLE_DAYS_SERVER),
         send_count: send_count ?? ((config.followUps[idx].send_count || 0) + 1),
         ...(custom_message !== undefined ? { custom_message } : {}),
+        ...(scheduled_trigger_at !== undefined ? { scheduled_trigger_at } : { scheduled_trigger_at: null }),
         ...(reason_description !== undefined ? { reason_description } : {}),
         updated_at: new Date().toISOString()
       };
@@ -2750,12 +2751,19 @@ async function runFollowUpsSchedulerForCompany(companyId, opts = {}) {
       .filter(item => {
         if (!item || item.deleted_at || item.status !== 'pendente' || item.reason_category !== 'recompra_futura') return false;
         if (isDismissedByPhone(item, config.dismissedFollowUpPhones || [])) return false;
-        if (!item.scheduled_date || item.scheduled_date > todayStr) return false;
+        if (item.scheduled_trigger_at) {
+          const tMs = new Date(item.scheduled_trigger_at).getTime();
+          if (!isNaN(tMs) && now.getTime() < tMs) return false;
+        } else {
+          if (!item.scheduled_date || item.scheduled_date > todayStr) return false;
+        }
         const phone = normalizeMarketingPhone(item.client_phone);
         if (!phone || phone.length < 12) return false;
         const lastSentMs = item.last_sent_at ? new Date(item.last_sent_at).getTime() : 0;
         if (lastSentMs > 0 && (now.getTime() - lastSentMs) < (12 * 60 * 60 * 1000)) return false;
-        const idempKey = `fu_${cid}_${item.id}_${todayStr}`;
+        const idempKey = item.scheduled_trigger_at
+          ? `fu_${cid}_${item.id}_${item.scheduled_trigger_at}`
+          : `fu_${cid}_${item.id}_${todayStr}`;
         if ((config.idempotencyKeys || []).some(k => k.key === idempKey)) return false;
         return true;
       })
@@ -2781,7 +2789,13 @@ async function runFollowUpsSchedulerForCompany(companyId, opts = {}) {
       if (itemIdx === -1) continue;
 
       const freshItem = freshConfig.followUps[itemIdx];
-      if (!freshItem || freshItem.deleted_at || freshItem.status !== 'pendente' || !freshItem.scheduled_date || freshItem.scheduled_date > todayStr) {
+      if (!freshItem || freshItem.deleted_at || freshItem.status !== 'pendente') {
+        continue;
+      }
+      if (freshItem.scheduled_trigger_at) {
+        const tMs = new Date(freshItem.scheduled_trigger_at).getTime();
+        if (!isNaN(tMs) && now.getTime() < tMs) continue;
+      } else if (!freshItem.scheduled_date || freshItem.scheduled_date > todayStr) {
         continue;
       }
       if (isDismissedByPhone(freshItem, freshConfig.dismissedFollowUpPhones || [])) {
@@ -2793,7 +2807,9 @@ async function runFollowUpsSchedulerForCompany(companyId, opts = {}) {
         continue;
       }
 
-      const idempKey = `fu_${cid}_${freshItem.id}_${todayStr}`;
+      const idempKey = freshItem.scheduled_trigger_at
+        ? `fu_${cid}_${freshItem.id}_${freshItem.scheduled_trigger_at}`
+        : `fu_${cid}_${freshItem.id}_${todayStr}`;
       if (!Array.isArray(freshConfig.idempotencyKeys)) freshConfig.idempotencyKeys = [];
       if (freshConfig.idempotencyKeys.some(k => k.key === idempKey)) continue;
 
@@ -2847,6 +2863,7 @@ async function runFollowUpsSchedulerForCompany(companyId, opts = {}) {
             send_count: nextCount,
             scheduled_date: nextDate,
             custom_message: null,
+            scheduled_trigger_at: null,
             updated_at: sentIso,
             reason_description: `Disparo automático #${nextCount} enviado em ${timeLabel}. Novo ciclo de 3 semanas iniciado até ${nextDate}.`
           };

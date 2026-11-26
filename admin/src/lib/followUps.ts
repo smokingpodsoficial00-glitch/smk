@@ -33,6 +33,7 @@ export interface FollowUpItem {
   last_sent_at?: string | null;
   send_count?: number;
   custom_message?: string | null;
+  scheduled_trigger_at?: string | null;
   deleted_at?: string | null;
   created_at: string;
   updated_at?: string | null;
@@ -275,6 +276,7 @@ function hydrateFollowUpRow(raw: any): FollowUpItem {
     last_sent_at: raw.last_sent_at ?? meta.last_sent_at ?? raw.completed_at ?? meta.completed_at ?? null,
     send_count: Number(raw.send_count ?? meta.send_count ?? (raw.completed_at || meta.completed_at ? 1 : 0)) || 0,
     custom_message: raw.custom_message ?? meta.custom_message ?? null,
+    scheduled_trigger_at: raw.scheduled_trigger_at ?? meta.scheduled_trigger_at ?? null,
     deleted_at: raw.deleted_at ?? meta.deleted_at ?? null,
     created_at: raw.created_at || meta.created_at || new Date().toISOString(),
     updated_at: raw.updated_at || meta.updated_at || raw.created_at || new Date().toISOString(),
@@ -285,7 +287,7 @@ function serializeFollowUpToDbRow(item: Partial<FollowUpItem>, companyId: string
   const scheduledDate = item.scheduled_date || toLocalDateString(new Date());
   const scheduledTime = item.scheduled_time || '15:00';
   const safeTime = /^\d{2}:\d{2}$/.test(scheduledTime) ? scheduledTime : '15:00';
-  const scheduledAtIso = `${scheduledDate}T${safeTime}:00-03:00`;
+  const scheduledAtIso = item.scheduled_trigger_at || `${scheduledDate}T${safeTime}:00-03:00`;
 
   const meta = {
     client_phone: normalizeFollowUpPhone(item.client_phone) || item.client_phone || '',
@@ -302,6 +304,7 @@ function serializeFollowUpToDbRow(item: Partial<FollowUpItem>, companyId: string
     last_sent_at: item.last_sent_at ?? item.completed_at ?? null,
     send_count: Number(item.send_count || 0),
     custom_message: item.custom_message ?? null,
+    scheduled_trigger_at: item.scheduled_trigger_at ?? null,
     deleted_at: item.deleted_at ?? null,
     updated_at: item.updated_at || new Date().toISOString(),
   };
@@ -947,6 +950,7 @@ export async function syncFollowUpsWithBackend(
               send_count: srvItem.send_count,
               scheduled_date: srvItem.scheduled_date,
               custom_message: srvItem.custom_message ?? null,
+              scheduled_trigger_at: srvItem.scheduled_trigger_at ?? null,
               reason_description: srvItem.reason_description,
               updated_at: srvItem.updated_at || new Date().toISOString(),
             }, targetCompanyId);
@@ -986,6 +990,7 @@ export async function notifyBackendFollowUpSent(
         last_sent_at: item.last_sent_at,
         send_count: item.send_count,
         custom_message: item.custom_message,
+        scheduled_trigger_at: item.scheduled_trigger_at ?? null,
         reason_description: item.reason_description,
       }),
     });
@@ -1067,8 +1072,12 @@ export async function sync21DaysReplenishmentFollowUps(
       continue;
     }
 
-    // Proteção de ciclo já disparado/reiniciado: se já foi enviado após a última compra, não sobrescrever a data!
+    // Proteção de ciclo já disparado/reiniciado ou com disparo cronometrado agendado: não sobrescrever!
     if (existing) {
+      if (existing.scheduled_trigger_at) {
+        updatedCount++;
+        continue;
+      }
       const lastSentTs = existing.last_sent_at
         ? new Date(existing.last_sent_at).getTime()
         : (existing.completed_at ? new Date(existing.completed_at).getTime() : 0);
@@ -1236,10 +1245,24 @@ export function getDailyAutoLockKey(companyId: string, phoneFormatted: string, d
   return `${AUTO_DISPATCH_LOCK_PREFIX}${companyId}_${phoneFormatted}_${dateStr}`;
 }
 
-export function hasDailyAutoLock(companyId: string, phoneFormatted: string, dateStr: string): boolean {
+export function hasDailyAutoLock(
+  companyId: string,
+  phoneFormatted: string,
+  dateStr: string,
+  item?: Pick<FollowUpItem, 'scheduled_trigger_at' | 'last_sent_at'>
+): boolean {
   try {
     if (typeof localStorage === 'undefined') return false;
-    return Boolean(localStorage.getItem(getDailyAutoLockKey(companyId, phoneFormatted, dateStr)));
+    const raw = localStorage.getItem(getDailyAutoLockKey(companyId, phoneFormatted, dateStr));
+    if (!raw) return false;
+    if (item?.scheduled_trigger_at && !item.last_sent_at) {
+      const triggerMs = new Date(item.scheduled_trigger_at).getTime();
+      const lockedMs = new Date(raw).getTime();
+      if (!isNaN(triggerMs) && !isNaN(lockedMs) && triggerMs > lockedMs) {
+        return false;
+      }
+    }
+    return true;
   } catch {
     return false;
   }
@@ -1323,9 +1346,14 @@ export async function executeAutoDispatchBatch(
 
   const candidates = items.filter(item => {
     if (!item || item.deleted_at || item.status !== 'pendente' || item.reason_category !== 'recompra_futura') return false;
-    const isDueByDate = Boolean(item.scheduled_date && item.scheduled_date <= todayStr);
-    const isDueByDiff = (item.daysDiff ?? 0) <= 0;
-    if (!isDueByDate && !isDueByDiff) return false;
+    if (item.scheduled_trigger_at) {
+      const triggerMs = new Date(item.scheduled_trigger_at).getTime();
+      if (!isNaN(triggerMs) && nowMs < triggerMs) return false;
+    } else {
+      const isDueByDate = Boolean(item.scheduled_date && item.scheduled_date <= todayStr);
+      const isDueByDiff = (item.daysDiff ?? 0) <= 0;
+      if (!isDueByDate && !isDueByDiff) return false;
+    }
     const phone = normalizeFollowUpPhone(item.client_phone);
     if (!phone || phone.replace(/\D/g, '').length < 12) return false;
     if (item.last_sent_at) {
@@ -1336,7 +1364,7 @@ export async function executeAutoDispatchBatch(
     if (followUpInFlightLocks.has(lockKey) || followUpInFlightLocks.has(phone)) return false;
     const recentMs = followUpRecentSentTimestamps.get(phone) || 0;
     if ((nowMs - recentMs) < 60000) return false;
-    if (hasDailyAutoLock(targetCompanyId, phone, todayStr)) return false;
+    if (hasDailyAutoLock(targetCompanyId, phone, todayStr, item)) return false;
     return true;
   });
 
@@ -1375,7 +1403,7 @@ export async function executeAutoDispatchBatch(
       if (
         followUpInFlightLocks.has(lockKey) ||
         followUpInFlightLocks.has(phone) ||
-        hasDailyAutoLock(targetCompanyId, phone, todayStr)
+        hasDailyAutoLock(targetCompanyId, phone, todayStr, item)
       ) {
         continue;
       }
@@ -1427,6 +1455,7 @@ export async function executeAutoDispatchBatch(
           send_count: nextSendCount,
           scheduled_date: nextDate,
           custom_message: null,
+          scheduled_trigger_at: null,
           reason_description: newDescription,
           updated_at: sentIso,
         }, targetCompanyId);
@@ -1439,6 +1468,7 @@ export async function executeAutoDispatchBatch(
             last_sent_at: sentIso,
             send_count: nextSendCount,
             custom_message: null,
+            scheduled_trigger_at: null,
             reason_description: newDescription,
           }, targetCompanyId);
         } else {
@@ -1453,6 +1483,7 @@ export async function executeAutoDispatchBatch(
               last_sent_at: sentIso,
               send_count: nextSendCount,
               custom_message: null,
+              scheduled_trigger_at: null,
               reason_description: newDescription,
             }),
           }).catch(() => {});
@@ -1474,6 +1505,7 @@ export async function executeAutoDispatchBatch(
           scheduled_date: nextDate,
           daysDiff: REPLENISHMENT_CYCLE_DAYS,
           custom_message: null,
+          scheduled_trigger_at: null,
           whatsappMessage: nextMsg,
           whatsappUrl: `https://wa.me/${phone}?text=${encodeURIComponent(nextMsg)}`,
           reason_description: newDescription,
@@ -1602,6 +1634,7 @@ export async function executeForceSendFollowUp(
       send_count: nextSendCount,
       scheduled_date: nextDate,
       custom_message: customMsgToSave,
+      scheduled_trigger_at: null,
       reason_description: newDescription,
       updated_at: sentIso,
     }, targetCompanyId);
@@ -1616,6 +1649,7 @@ export async function executeForceSendFollowUp(
         last_sent_at: sentIso,
         send_count: nextSendCount,
         custom_message: customMsgToSave,
+        scheduled_trigger_at: null,
         reason_description: newDescription,
       }, targetCompanyId);
     } else {
@@ -1630,6 +1664,7 @@ export async function executeForceSendFollowUp(
           last_sent_at: sentIso,
           send_count: nextSendCount,
           custom_message: customMsgToSave,
+          scheduled_trigger_at: null,
           reason_description: newDescription,
         }),
       }).catch(() => {});
@@ -1650,6 +1685,7 @@ export async function executeForceSendFollowUp(
       scheduled_date: nextDate,
       daysDiff: REPLENISHMENT_CYCLE_DAYS,
       custom_message: customMsgToSave,
+      scheduled_trigger_at: null,
       whatsappMessage: nextMsg,
       whatsappUrl: `https://wa.me/${phoneFormatted}?text=${encodeURIComponent(nextMsg)}`,
       reason_description: newDescription,

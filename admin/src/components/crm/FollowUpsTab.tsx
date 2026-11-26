@@ -40,10 +40,13 @@ export function FollowUpsTab() {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [countdownNowMs, setCountdownNowMs] = useState<number>(() => Date.now());
   const loadSeqRef = useRef(0);
   const suppressRealtimeUntilRef = useRef(0);
   const delayedSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownFiredRef = useRef<Set<string>>(new Set());
   const loadDataRef = useRef<() => Promise<void>>(async () => {});
+  const autoDispatchRef = useRef<(items: FollowUpItem[], cid: string) => Promise<void>>(async () => {});
   const [editingItem, setEditingItem] = useState<FollowUpItem | null>(null);
   const [editedMessage, setEditedMessage] = useState<string>('');
   const [selectedVariationIdx, setSelectedVariationIdx] = useState<number>(0);
@@ -89,6 +92,8 @@ export function FollowUpsTab() {
     }
   };
 
+  autoDispatchRef.current = runGuardedFrontendAutoDispatch;
+
   const loadData = async () => {
     // Nunca sobrescreve a tela durante um disparo automático/manual em andamento
     if (isFollowUpDispatchBusy()) return;
@@ -115,9 +120,14 @@ export function FollowUpsTab() {
 
         if (backendSync.serverAutoDispatchActive) {
           // O scheduler 24/7 do servidor assume o disparo; agenda 1 refresh leve se houver itens vencidos
-          const hasDueItems = data.some(
-            f => f.status === 'pendente' && f.reason_category === 'recompra_futura' && (f.daysDiff ?? 0) <= 0
-          );
+          const hasDueItems = data.some(f => {
+            if (f.status !== 'pendente' || f.reason_category !== 'recompra_futura') return false;
+            if (f.scheduled_trigger_at) {
+              const tMs = new Date(f.scheduled_trigger_at).getTime();
+              if (!isNaN(tMs) && Date.now() < tMs) return false;
+            }
+            return (f.daysDiff ?? 0) <= 0;
+          });
           if (hasDueItems) {
             if (delayedSyncTimerRef.current) clearTimeout(delayedSyncTimerRef.current);
             delayedSyncTimerRef.current = setTimeout(() => {
@@ -179,6 +189,38 @@ export function FollowUpsTab() {
       supabase.removeChannel(channel);
     };
   }, [company?.id]);
+
+  // Contador regressivo segundo a segundo para ciclos com horário exato agendado (ex: teste de 1 minuto)
+  const hasTimedPendingTrigger = followUps.some(
+    f => f.status === 'pendente' && !f.last_sent_at && Boolean(f.scheduled_trigger_at)
+  );
+
+  useEffect(() => {
+    if (!hasTimedPendingTrigger) return;
+    const timer = setInterval(() => {
+      const nowMs = Date.now();
+      setCountdownNowMs(nowMs);
+      const targetCompanyId = company?.id || DEFAULT_COMPANY_ID;
+      const reachedTrigger = followUps.some(f => {
+        if (f.status !== 'pendente' || f.last_sent_at || !f.scheduled_trigger_at) return false;
+        const tMs = new Date(f.scheduled_trigger_at).getTime();
+        if (isNaN(tMs) || nowMs < tMs) return false;
+        const triggerKey = `${f.id}::${f.scheduled_trigger_at}`;
+        if (countdownFiredRef.current.has(triggerKey)) return false;
+        countdownFiredRef.current.add(triggerKey);
+        return true;
+      });
+      if (reachedTrigger && !isFollowUpDispatchBusy()) {
+        if (serverAutoDispatchActive) {
+          void loadDataRef.current();
+        } else {
+          void autoDispatchRef.current(followUps, targetCompanyId);
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [hasTimedPendingTrigger, followUps, serverAutoDispatchActive, company?.id]);
 
   // Ações
   const handleSync21DaysEngine = async () => {
@@ -508,8 +550,20 @@ export function FollowUpsTab() {
                   // Cálculo do progresso no ciclo de 3 Semanas (21 dias)
                   const totalDays = 21;
                   const daysLeft = Math.max(0, item.daysDiff ?? 0);
+                  const triggerMs = item.scheduled_trigger_at ? new Date(item.scheduled_trigger_at).getTime() : NaN;
+                  const msToTrigger = (!isCompleted && !item.last_sent_at && !isNaN(triggerMs))
+                    ? Math.max(0, triggerMs - countdownNowMs)
+                    : 0;
+                  const isCountdownPending = msToTrigger > 0;
+                  const totalSecs = Math.ceil(msToTrigger / 1000);
+                  const cdMins = String(Math.floor(totalSecs / 60)).padStart(2, '0');
+                  const cdSecs = String(totalSecs % 60).padStart(2, '0');
                   const elapsedDays = Math.max(0, Math.min(totalDays, totalDays - daysLeft));
-                  const progressPct = (isCompleted || daysLeft === 0) ? 100 : Math.round((elapsedDays / totalDays) * 100);
+                  const progressPct = isCountdownPending
+                    ? 99
+                    : (isCompleted || daysLeft === 0)
+                    ? 100
+                    : Math.round((elapsedDays / totalDays) * 100);
 
                   const phoneClean = String(item.client_phone || '').replace(/\D/g, '');
                   const phoneFormatted = phoneClean.startsWith('55') ? phoneClean : `55${phoneClean}`;
@@ -549,6 +603,10 @@ export function FollowUpsTab() {
                                 <span className="text-emerald-400 font-bold flex items-center gap-1">
                                   <CheckCircle2 className="size-3.5" /> Concluído
                                 </span>
+                              ) : isCountdownPending ? (
+                                <span className="text-amber-300 font-bold flex items-center gap-1 animate-pulse font-mono">
+                                  <Clock className="size-3.5" /> Dispara em {cdMins}:{cdSecs}
+                                </span>
                               ) : daysLeft === 0 ? (
                                 <span className="text-amber-400 font-bold flex items-center gap-1 animate-pulse">
                                   <Clock className="size-3.5" /> 3 Semanas Atingidas
@@ -567,7 +625,7 @@ export function FollowUpsTab() {
                               className={`h-full transition-all duration-500 rounded-full ${
                                 isCompleted 
                                   ? 'bg-emerald-400' 
-                                  : daysLeft === 0 
+                                  : isCountdownPending || daysLeft === 0 
                                   ? 'bg-amber-400' 
                                   : 'bg-gradient-to-r from-blue-500 via-emerald-500 to-emerald-400'
                               }`}

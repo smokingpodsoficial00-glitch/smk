@@ -171,6 +171,7 @@ import {
   executeAutoDispatchBatch,
   executeForceSendFollowUp,
   isFollowUpDispatchBusy,
+  setDailyAutoLock,
   resetFollowUpRuntimeLocksForTests,
   sortFollowUpsDeterministic,
   type FollowUpItem,
@@ -560,6 +561,77 @@ async function runAllScenarios() {
     globalThis.fetch = baseFetch;
   }
 
+  // =========================================================================
+  // CENÁRIO 9: Contagem regressiva cronometrada (1 minuto) + trava anterior no mesmo dia
+  // =========================================================================
+  resetSimulatedDb();
+  resetFollowUpRuntimeLocksForTests();
+
+  const beforeLockIso = new Date(`${todayStr}T15:00:00-03:00`).toISOString();
+  setDailyAutoLock(DEFAULT_COMPANY_ID, '5511951741181', todayStr, beforeLockIso);
+
+  const triggerAtIso = new Date(`${todayStr}T16:01:00-03:00`).toISOString();
+  const timedItem = (await createFollowUp({
+    company_id: DEFAULT_COMPANY_ID,
+    client_phone: '11951741181',
+    client_name: 'Eduardo pizza',
+    reason_category: 'recompra_futura',
+    target_product: 'Ignite V150 Grape Ice',
+    scheduled_date: todayStr,
+  }))!;
+
+  await updateFollowUp(timedItem.id, {
+    scheduled_trigger_at: triggerAtIso,
+    completed_at: null,
+    last_sent_at: null,
+  }, DEFAULT_COMPANY_ID);
+
+  const timedLoaded = await fetchFollowUps(DEFAULT_COMPANY_ID);
+  assert.equal(timedLoaded[0].scheduled_trigger_at, triggerAtIso);
+
+  let timedSendHits = 0;
+  const timedRequester = async (path: string) => {
+    if (path.startsWith('/api/qr')) return new Response(JSON.stringify({ status: 'CONNECTED', isReady: true }), { status: 200 });
+    if (path.startsWith('/api/marketing/send-direct')) {
+      timedSendHits++;
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  };
+
+  // Antes do horário (16:00:30) NÃO dispara
+  const beforeTriggerRes = await executeAutoDispatchBatch(timedLoaded, {
+    companyId: DEFAULT_COMPANY_ID,
+    delayMs: 0,
+    nowFn: () => new Date(`${todayStr}T16:00:30-03:00`),
+    requester: timedRequester as any,
+  });
+  assert.equal(beforeTriggerRes.sentCount, 0);
+  assert.equal(timedSendHits, 0);
+
+  // Ao completar o 1 minuto (16:01:02) DISPARA mesmo existindo trava mais antiga das 15:00
+  const atTriggerRes = await executeAutoDispatchBatch(timedLoaded, {
+    companyId: DEFAULT_COMPANY_ID,
+    delayMs: 0,
+    nowFn: () => new Date(`${todayStr}T16:01:02-03:00`),
+    requester: timedRequester as any,
+  });
+  assert.equal(atTriggerRes.sentCount, 1);
+  assert.equal(timedSendHits, 1);
+  assert.equal(atTriggerRes.updatedItems[0].scheduled_trigger_at, null);
+  assert.equal(atTriggerRes.updatedItems[0].daysDiff, 21);
+
+  // 1 minuto depois (16:02:00) NÃO reenvia novamente
+  const afterTriggerRes = await executeAutoDispatchBatch(atTriggerRes.updatedItems, {
+    companyId: DEFAULT_COMPANY_ID,
+    delayMs: 0,
+    nowFn: () => new Date(`${todayStr}T16:02:00-03:00`),
+    requester: timedRequester as any,
+  });
+  assert.equal(afterTriggerRes.sentCount, 0);
+  assert.equal(timedSendHits, 1);
+
+  console.log('✅ Cenário 9 passou: Disparo agendado para +1 minuto aguardou o horário exato, disparou e reiniciou para +21d sem duplicar!');
   console.log('\n🎉 TODOS OS CENÁRIOS DE FRONTEND/PERSISTÊNCIA PASSARAM 100%!');
 }
 
